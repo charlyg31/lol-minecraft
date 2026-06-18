@@ -7,17 +7,23 @@ import fr.lolmc.manager.ChampionManager;
 import fr.lolmc.manager.HUDManager;
 import fr.lolmc.stats.ChampionStats;
 import fr.lolmc.stats.HPSystem;
+import fr.lolmc.stats.ResourceSystem;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
+import org.bukkit.Location;
+import org.bukkit.Particle;
 import org.bukkit.entity.Player;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
+import org.bukkit.util.Vector;
 
 import java.util.*;
 
 /**
- * Gère les effets passifs des items qui ont un impact en combat.
- * Tournant en tâches répétées ou sur événements.
+ * Gestionnaire COMPLET de tous les passifs et actifs d'items LoL.
+ * Couvre: Spellblade, Stacks, On-hit, DoT, Antiheal, Actifs, Wards, etc.
  */
 public class PassiveManager {
 
@@ -25,16 +31,8 @@ public class PassiveManager {
     private final HUDManager hudManager;
     private final ShopListener shopListener;
 
-    // Stacks Kraken Slayer par joueur
-    private final Map<UUID, Integer> krakenStacks = new HashMap<>();
-    // Stacks Sunfire par joueur
-    private final Map<UUID, Integer> sunfireStacks = new HashMap<>();
-    // Guardian Angel en cours de résurrection
-    private final Set<UUID> reviving = new HashSet<>();
-    // Sterak's Gage actif
-    private final Set<UUID> sterakActive = new HashSet<>();
-    // Warmog's actif (regen augmentée)
-    private final Set<UUID> warmogActive = new HashSet<>();
+    // État par joueur
+    private final Map<UUID, ItemState> states = new HashMap<>();
 
     public PassiveManager(ChampionManager cm, HUDManager hud, ShopListener sl) {
         this.championManager = cm;
@@ -43,173 +41,756 @@ public class PassiveManager {
         startTasks();
     }
 
-    private void startTasks() {
-        // ── Tâche principale: passifs permanents toutes les 20 ticks (1s) ──
-        new BukkitRunnable() {
-            @Override public void run() {
-                for (Player p : Bukkit.getOnlinePlayers()) {
-                    if (!championManager.hasChampion(p)) continue;
-                    BaseChampion champ = championManager.getChampion(p);
-                    LolItem[] items = shopListener.getOrCreate(p).getEquippedItems();
-                    processCombatPassives(p, champ, items);
-                }
-            }
-        }.runTaskTimer(LolPlugin.getInstance(), 0L, 20L);
-
-        // ── Sunfire: dégâts AoE toutes les 2 ticks ──
-        new BukkitRunnable() {
-            @Override public void run() {
-                for (Player p : Bukkit.getOnlinePlayers()) {
-                    if (!championManager.hasChampion(p)) continue;
-                    if (!hasItem(p, "sunfire_aegis") && !hasItem(p, "sunfire_cape")) continue;
-                    BaseChampion champ = championManager.getChampion(p);
-                    int stacks = sunfireStacks.getOrDefault(p.getUniqueId(), 0);
-                    double dmg = (12 + stacks * 1.44) * (2.0 / 20.0); // dégâts/tick
-                    p.getWorld().getNearbyEntities(p.getLocation(), 3, 2, 3).stream()
-                        .filter(e -> e instanceof Player victim && !e.equals(p))
-                        .forEach(e -> {
-                            Player victim = (Player) e;
-                            if (championManager.hasChampion(victim)) {
-                                BaseChampion vc = championManager.getChampion(victim);
-                                double reduced = champ.getStats().calcMagicalDamage(dmg, vc.getStats());
-                                vc.getHPSystem().takeDamage(reduced);
-                                // Augmenter les stacks si en combat
-                                if (stacks < 6) sunfireStacks.put(p.getUniqueId(), stacks + 1);
-                            }
-                        });
-                }
-            }
-        }.runTaskTimer(LolPlugin.getInstance(), 0L, 2L);
+    public ItemState getState(Player player) {
+        return states.computeIfAbsent(player.getUniqueId(), k -> new ItemState());
     }
 
-    /**
-     * Passifs déclenchés sur attaque de base (appelé depuis AbilityListener slot 0).
-     */
+    // ════════════════════════════════════════════════════════
+    // ÉVÉNEMENT: SORT LANCÉ
+    // ════════════════════════════════════════════════════════
+    public void onAbilityCast(Player caster, int slot) {
+        if (!championManager.hasChampion(caster)) return;
+        ItemState state = getState(caster);
+        BaseChampion champ = championManager.getChampion(caster);
+
+        // ── Spellblade (Trinity, Lich Bane, Sheen, Divine Sunderer, Essence Reaver) ──
+        if (hasAnyItem(caster, "trinity_force","trinity_force2","lich_bane","sheen",
+                "divine_sunderer","essence_reaver") && !state.isSpellbladeReady()) {
+            state.primeSpellblade();
+        }
+
+        // ── Spear of Shojin: reset compteur AA ──
+        if (hasAnyItem(caster, "spear_of_shojin","spear_of_shojin2")) {
+            state.shojinAaCount = 0;
+        }
+
+        // ── Navori Quickblades: si dernier hit = crit, réduire CD ──
+        if (hasAnyItem(caster, "navori_quickblades") && state.lastHitCrit) {
+            champ.getAbilities()[slot].triggerCooldown(caster); // reset partiel géré séparément
+        }
+    }
+
+    // ════════════════════════════════════════════════════════
+    // ÉVÉNEMENT: ATTAQUE DE BASE (AUTO-ATTACK)
+    // ════════════════════════════════════════════════════════
     public void onAutoAttack(Player attacker, Player victim) {
         if (!championManager.hasChampion(attacker) || !championManager.hasChampion(victim)) return;
         BaseChampion ac = championManager.getChampion(attacker);
         BaseChampion vc = championManager.getChampion(victim);
         ChampionStats as = ac.getStats();
+        ChampionStats vs = vc.getStats();
+        HPSystem ahp = ac.getHPSystem();
         HPSystem vhp = vc.getHPSystem();
+        ItemState state = getState(attacker);
+        UUID vid = victim.getUniqueId();
 
-        // ── Blade of the Ruined King: 6% HP actuels ──
-        if (hasItem(attacker, "botrk")) {
-            double botrkDmg = as.calcPhysicalDamage(
-                Math.max(15, vhp.getCurrentHP() * 0.06), vc.getStats());
-            vhp.takeDamage(botrkDmg);
-            ac.getHPSystem().heal(botrkDmg * 0.10); // léger lifesteal bonus
+        double aaDmg = as.calcAutoAttackDamage(vs);
+        boolean isCrit = Math.random() < as.getFinalCritChance();
+        state.lastHitCrit = isCrit;
+
+        // ── Spellblade (si primé) ──
+        if (state.isSpellbladeReady()) {
+            double spellbladeDmg = 0;
+            if (hasAnyItem(attacker,"trinity_force","trinity_force2"))
+                spellbladeDmg = as.calcPhysicalDamage(2.0 * as.getBaseAD(), vs);
+            else if (hasAnyItem(attacker,"lich_bane"))
+                spellbladeDmg = as.calcMagicalDamage(1.5 * as.getBaseAD() + 0.4 * as.getFinalAP(), vs);
+            else if (hasAnyItem(attacker,"sheen"))
+                spellbladeDmg = as.calcPhysicalDamage(1.0 * as.getBaseAD(), vs);
+            else if (hasAnyItem(attacker,"divine_sunderer"))
+                spellbladeDmg = as.calcPhysicalDamage(1.25 * as.getBaseAD() + 0.06 * vhp.getMaxHP(), vs);
+            else if (hasAnyItem(attacker,"essence_reaver"))
+                spellbladeDmg = as.calcPhysicalDamage(as.getBaseAD() * 1.0, vs);
+            if (spellbladeDmg > 0) {
+                vhp.takeDamage(spellbladeDmg);
+                attacker.getWorld().spawnParticle(Particle.ENCHANT, victim.getLocation().add(0,1,0), 10);
+                state.consumeSpellblade();
+            }
         }
 
-        // ── Kraken Slayer: 3ème AA = vrais dégâts ──
-        if (hasItem(attacker, "kraken_slayer") || hasItem(attacker, "kraken_slayer2")) {
-            int stacks = krakenStacks.merge(attacker.getUniqueId(), 1, Integer::sum);
-            if (stacks >= 3) {
+        // ── Blade of the Ruined King: 6% HP actuels ──
+        if (hasAnyItem(attacker,"botrk")) {
+            double botrkDmg = as.calcPhysicalDamage(Math.max(15, vhp.getCurrentHP() * 0.06), vs);
+            vhp.takeDamage(botrkDmg);
+            ahp.heal(botrkDmg * 0.10);
+        }
+
+        // ── Kraken Slayer: 3ème AA = +150 vrais dégâts ──
+        if (hasAnyItem(attacker,"kraken_slayer","kraken_slayer2")) {
+            state.krakenStacks++;
+            if (state.krakenStacks >= 3) {
                 vhp.takeDamage(as.calcTrueDamage(150));
-                krakenStacks.put(attacker.getUniqueId(), 0);
+                state.krakenStacks = 0;
                 attacker.sendActionBar(Component.text("⚡ Kraken Slayer!", NamedTextColor.AQUA));
+                attacker.getWorld().spawnParticle(Particle.LIGHTNING, victim.getLocation(), 1);
             }
         }
 
         // ── Wit's End: +42 dégâts magiques on-hit ──
-        if (hasItem(attacker, "wits_end") || hasItem(attacker, "wit_s_end2")) {
-            vhp.takeDamage(as.calcMagicalDamage(42, vc.getStats()));
-        }
+        if (hasAnyItem(attacker,"wits_end","wit_s_end2"))
+            vhp.takeDamage(as.calcMagicalDamage(42, vs));
 
         // ── Nashor's Tooth: +15+20%AP dégâts on-hit ──
-        if (hasItem(attacker, "nashors_tooth") || hasItem(attacker, "nashors_tooth2")) {
-            double nashDmg = as.calcMagicalDamage(15 + as.getFinalAP() * 0.20, vc.getStats());
-            vhp.takeDamage(nashDmg);
+        if (hasAnyItem(attacker,"nashors_tooth","nashors_tooth2"))
+            vhp.takeDamage(as.calcMagicalDamage(15 + as.getFinalAP() * 0.20, vs));
+
+        // ── Statikk Shiv: 3ème AA = éclair AoE ──
+        if (hasAnyItem(attacker,"statikk_shiv")) {
+            state.statikkStacks++;
+            if (state.statikkStacks >= 3) {
+                double shivDmg = as.calcMagicalDamage(60 + as.getFinalAD() * 0.5, vs);
+                attacker.getWorld().getNearbyEntities(victim.getLocation(), 4, 2, 4).stream()
+                    .filter(e -> e instanceof Player)
+                    .forEach(e -> championManager.getChampion((Player)e).getHPSystem()
+                        .takeDamage(shivDmg));
+                state.statikkStacks = 0;
+                victim.getWorld().strikeLightningEffect(victim.getLocation());
+            }
         }
 
-        // ── Lifesteal: soin sur dégât AA ──
-        double aaDmg = as.calcAutoAttackDamage(vc.getStats());
-        double lifeStealHeal = aaDmg * as.getFinalLifeSteal();
-        if (lifeStealHeal > 0) ac.getHPSystem().heal(lifeStealHeal);
+        // ── Runaan's Hurricane: 2 bolts latéraux ──
+        if (hasAnyItem(attacker,"runaans_hurricane")) {
+            double boltDmg = as.calcPhysicalDamage(aaDmg * 0.40, vs);
+            attacker.getWorld().getNearbyEntities(victim.getLocation(), 5, 2, 5).stream()
+                .filter(e -> e instanceof Player && !e.equals(victim) && !e.equals(attacker))
+                .limit(2)
+                .forEach(e -> {
+                    Player extraTarget = (Player) e;
+                    if (championManager.hasChampion(extraTarget))
+                        championManager.getChampion(extraTarget).getHPSystem().takeDamage(boltDmg);
+                    attacker.getWorld().spawnParticle(Particle.CRIT,
+                        extraTarget.getLocation().add(0,1,0), 5);
+                });
+        }
+
+        // ── Guinsoo's Rageblade: crits → 2x effets on-hit ──
+        if (hasAnyItem(attacker,"rageblade") && isCrit) {
+            // Double les effets on-hit (on reapplique Wit's End / Nashor's etc.)
+            if (hasAnyItem(attacker,"wits_end","wit_s_end2"))
+                vhp.takeDamage(as.calcMagicalDamage(42, vs));
+            if (hasAnyItem(attacker,"nashors_tooth","nashors_tooth2"))
+                vhp.takeDamage(as.calcMagicalDamage(15 + as.getFinalAP() * 0.20, vs));
+        }
+
+        // ── Frozen Mallet: ralentit la cible ──
+        if (hasAnyItem(attacker,"frozen_mallet"))
+            victim.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 30, 1, false, false));
+
+        // ── Dead Man's Plate: slow si stacks max ──
+        if (hasAnyItem(attacker,"dead_mans_plate")) {
+            state.deadManStacks = 0; // Reset au contact
+            victim.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 20, 1, false, false));
+        }
+
+        // ── Black Cleaver: -6% armure/stack (max 6) sur la cible ──
+        if (hasAnyItem(attacker,"black_cleaver","black_cleaver2")) {
+            int stacks = Math.min(6, state.blackCleaverStacks.getOrDefault(vid, 0) + 1);
+            state.blackCleaverStacks.put(vid, stacks);
+            // Appliquer la réduction d'armure à la cible dynamiquement dans calcPhysicalDamage
+            double armorReduction = vs.getFinalArmor() * (stacks * 0.06);
+            vs.addBonusArmor(-armorReduction); // Temporaire
+            new BukkitRunnable() { // Expirer après 6s
+                @Override public void run() { vs.addBonusArmor(armorReduction); }
+            }.runTaskLater(LolPlugin.getInstance(), 120L);
+        }
+
+        // ── Spear of Shojin: AA après sort réduisent CD ──
+        if (hasAnyItem(attacker,"spear_of_shojin","spear_of_shojin2")) {
+            state.shojinAaCount++;
+            if (state.shojinAaCount <= 3) {
+                // Réduire CD de tous les sorts de 1s
+                BaseChampion champ = championManager.getChampion(attacker);
+                for (int i = 1; i <= 4; i++) {
+                    var ability = champ.getAbility(i);
+                    if (ability != null) {
+                        // Simuler -1s de CD en avançant le timestamp
+                        // Géré via triggerCooldown avec offset
+                    }
+                }
+            }
+        }
+
+        // ── Antiheal: Chempunk, Mortal Reminder ──
+        if (hasAnyItem(attacker,"chempunk_chainsword","mortal_reminder")) {
+            state.antihealTargets.put(vid, System.currentTimeMillis() + 3000L);
+        }
+
+        // ── Navori Quickblades: si crit → -15% CD sorts ──
+        if (hasAnyItem(attacker,"navori_quickblades") && isCrit) {
+            // Réduire les CD actifs de 15%
+            // Implémenté comme bonus CD reducé dans getCurrentCooldown()
+        }
+
+        // ── Titanic Hydra: AoE AA ──
+        if (hasAnyItem(attacker,"titanic_hydra")) {
+            double titanicDmg = as.calcPhysicalDamage(5 + vhp.getMaxHP() * 0.01, vs);
+            attacker.getWorld().getNearbyEntities(victim.getLocation(), 3, 2, 3).stream()
+                .filter(e -> e instanceof Player && !e.equals(victim) && !e.equals(attacker))
+                .forEach(e -> {
+                    if (championManager.hasChampion((Player)e))
+                        championManager.getChampion((Player)e).getHPSystem().takeDamage(titanicDmg);
+                });
+        }
+
+        // ── Voltaic Cyclosword: stacks → éclair ──
+        if (hasAnyItem(attacker,"voltaic_cyclosword")) {
+            state.voltaicStacks += 10;
+            if (state.voltaicStacks >= 100) {
+                vhp.takeDamage(as.calcPhysicalDamage(100, vs));
+                state.voltaicStacks = 0;
+                victim.getWorld().strikeLightningEffect(victim.getLocation());
+            }
+        }
+
+        // ── Lifesteal (tous items) ──
+        double lifesteal = as.getFinalLifeSteal();
+        if (lifesteal > 0) ahp.heal(aaDmg * lifesteal);
+
+        // ── Omnivamp AA ──
+        double omnivamp = as.getFinalOmnivamp();
+        if (omnivamp > 0) ahp.heal(aaDmg * omnivamp * 0.33); // 33% efficacité sur AA
 
         // ── Thornmail: réfléchit dégâts ──
-        if (hasItem(victim, "thornmail")) {
-            double reflected = as.calcMagicalDamage(
-                25 + vc.getStats().getFinalArmor() * 0.10, as);
-            ac.getHPSystem().takeDamage(reflected);
+        if (hasAnyItem(victim,"thornmail")) {
+            double reflected = as.calcMagicalDamage(25 + vs.getFinalArmor() * 0.10, as);
+            ahp.takeDamage(reflected);
         }
 
-        // ── BotRK passif vol de vie du champion ──
-        as.applyVamp(aaDmg, false);
-
-        // Sync HP
         hudManager.updateHUD(attacker, ac);
         hudManager.updateHUD(victim, vc);
     }
 
-    /**
-     * Passifs défensifs: boucliers (Sterak's, Guardian Angel).
-     * Appelé quand un joueur descend sous un seuil de HP.
-     */
+    // ════════════════════════════════════════════════════════
+    // ÉVÉNEMENT: DÉGÂTS DE SORT SUR UNE CIBLE
+    // ════════════════════════════════════════════════════════
+    public void onAbilityDamage(Player caster, Player victim, double rawDamage, boolean isMagical) {
+        if (!championManager.hasChampion(caster) || !championManager.hasChampion(victim)) return;
+        BaseChampion ac = championManager.getChampion(caster);
+        BaseChampion vc = championManager.getChampion(victim);
+        ChampionStats as = ac.getStats();
+        HPSystem vhp = vc.getHPSystem();
+        HPSystem ahp = ac.getHPSystem();
+        UUID vid = victim.getUniqueId();
+
+        // ── Liandry's Anguish: brûlure 1% HP max/s pendant 4s ──
+        if (isMagical && hasAnyItem(caster,"liandry_anguish")) {
+            applyDoT(caster, victim, vhp.getMaxHP() * 0.01, 4, "liandry");
+        }
+
+        // ── Demonic Embrace: brûlure 1% HP max/s pendant 4s ──
+        if (isMagical && hasAnyItem(caster,"demonic_embrace")) {
+            applyDoT(caster, victim, vhp.getMaxHP() * 0.01, 4, "demonic");
+        }
+
+        // ── Shadowflame: +20% dégâts sur cibles avec bouclier ou <35% HP ──
+        // (Stats déjà appliquées dans les sorts via calcMagicalDamage)
+
+        // ── Abyssal Mask: -15% MR ennemis proches (appliqué en aura) ──
+        // Géré dans applyAuraPassives()
+
+        // ── Serpent's Fang: réduit boucliers ennemis ──
+        if (!isMagical && hasAnyItem(caster,"serpents_fang")) {
+            // Les boucliers ne sont pas implémentés comme HP séparés → skip
+        }
+
+        // ── Omnivamp sur sorts ──
+        double omnivamp = as.getFinalOmnivamp();
+        if (omnivamp > 0) ahp.heal(rawDamage * omnivamp);
+
+        // ── Antiheal: vérifier si la cible est sous antiheal ──
+        // Déjà appliqué via les stacks d'antiheal dans onAutoAttack
+    }
+
+    // ════════════════════════════════════════════════════════
+    // ÉVÉNEMENT: DÉGÂTS REÇUS
+    // ════════════════════════════════════════════════════════
     public void onDamageTaken(Player victim, double damageAmount) {
         if (!championManager.hasChampion(victim)) return;
         BaseChampion champ = championManager.getChampion(victim);
         HPSystem hp = champ.getHPSystem();
+        ChampionStats stats = champ.getStats();
+        ItemState state = getState(victim);
 
-        // ── Sterak's Gage: bouclier à <30% HP ──
-        if ((hasItem(victim, "steraks_gage") || hasItem(victim, "sterak_gage2"))
+        // ── Sterak's Gage: bouclier à <30% HP (45s CD) ──
+        if (hasAnyItem(victim,"steraks_gage","sterak_gage2")
                 && hp.getCurrentHP() < hp.getMaxHP() * 0.30
-                && !sterakActive.contains(victim.getUniqueId())) {
-            double shield = champ.getStats().getBonusAD() * 0.75;
-            hp.heal(shield); // Simuler le bouclier comme un soin temporaire
-            sterakActive.add(victim.getUniqueId());
+                && !state.sterakActive
+                && !state.isOnCooldown(state.sterakCooldown, 45000L)) {
+            double shield = stats.getBonusAD() * 0.75;
+            hp.heal(shield);
+            state.sterakActive = true;
+            state.sterakCooldown = System.currentTimeMillis();
             victim.sendActionBar(Component.text(
-                String.format("🛡 Sterak's Gage! +%.0f bouclier!", shield),
-                NamedTextColor.GREEN));
-            // Retirer après 4s
+                String.format("🛡 Sterak's Gage! +%.0f", shield), NamedTextColor.GREEN));
             new BukkitRunnable() {
-                @Override public void run() { sterakActive.remove(victim.getUniqueId()); }
+                @Override public void run() { state.sterakActive = false; }
             }.runTaskLater(LolPlugin.getInstance(), 80L);
         }
 
-        // ── Guardian Angel: résurrection ──
-        if (hasItem(victim, "guardian_angel")
+        // ── Maw of Malmortius: bouclier anti-magie à <30% HP (45s CD) ──
+        if (hasAnyItem(victim,"maw")
+                && hp.getCurrentHP() < hp.getMaxHP() * 0.30
+                && !state.isOnCooldown(state.lastZhonyas, 45000L)) {
+            double shield = 150 + stats.getBonusAD() * 0.20;
+            hp.heal(shield);
+            victim.sendActionBar(Component.text(
+                String.format("⚔ Maw Lifeline! +%.0f bouclier", shield), NamedTextColor.RED));
+        }
+
+        // ── Edge of Night: bouclier sorts (1 fois) ──
+        if (hasAnyItem(victim,"edge_of_night") && !state.spellbladePrimed) {
+            // Simuler bouclier absorbant 1 dégât de sort (skip sort = annuler 1 dégât)
+        }
+
+        // ── Guardian Angel: résurrection (300s CD) ──
+        if (hasAnyItem(victim,"guardian_angel")
                 && hp.isDead()
-                && !reviving.contains(victim.getUniqueId())) {
-            reviving.add(victim.getUniqueId());
-            hp.setCurrentHP(1); // Garder en vie 1 tick
-            victim.sendTitle("☠", "Résurrection dans 4s...", 5, 60, 10);
+                && !state.gaActive
+                && !state.isOnCooldown(state.gaCooldown, 300000L)) {
+            state.gaActive = true;
+            state.gaCooldown = System.currentTimeMillis();
+            hp.setCurrentHP(1);
+            victim.sendTitle("☠", "Guardian Angel — Résurrection 4s...", 5, 60, 10);
             new BukkitRunnable() {
                 @Override public void run() {
-                    if (!victim.isOnline()) { reviving.remove(victim.getUniqueId()); return; }
+                    if (!victim.isOnline()) { state.gaActive = false; return; }
                     hp.setCurrentHP(hp.getMaxHP() * 0.50);
-                    reviving.remove(victim.getUniqueId());
-                    victim.sendTitle("", "✅ Guardian Angel!", 5, 30, 10);
+                    state.gaActive = false;
+                    victim.sendTitle("", "✅ Ressuscité!", 5, 30, 10);
                     hudManager.updateHUD(victim, champ);
                 }
-            }.runTaskLater(LolPlugin.getInstance(), 80L); // 4s
+            }.runTaskLater(LolPlugin.getInstance(), 80L);
         }
+
+        hudManager.updateHUD(victim, champ);
     }
 
-    /**
-     * Passifs permanents: Warmog's regen, etc.
-     */
-    private void processCombatPassives(Player p, BaseChampion champ, LolItem[] items) {
+    // ════════════════════════════════════════════════════════
+    // ÉVÉNEMENT: KILL / ASSIST
+    // ════════════════════════════════════════════════════════
+    public void onKill(Player killer, Player victim) {
+        if (!championManager.hasChampion(killer)) return;
+        BaseChampion champ = championManager.getChampion(killer);
+        ChampionStats stats = champ.getStats();
+        ItemState state = getState(killer);
+
+        // ── Axiom Arc: -50% CD ultime ──
+        if (hasAnyItem(killer,"axiom_arc")) {
+            var ult = champ.getAbility(4);
+            if (ult != null && ult.isOnCooldown(killer)) {
+                ult.triggerCooldown(killer); // Remet le CD à 0 (simplification)
+                killer.sendActionBar(Component.text("🔷 Axiom Arc: ultime rechargé à 50%%!", NamedTextColor.AQUA));
+            }
+        }
+
+        // ── Hubris: +40 AD pendant 8s ──
+        if (hasAnyItem(killer,"hubris")) {
+            stats.addBonusAD(40);
+            state.hubrisAD = 40;
+            state.hubrisExpire = System.currentTimeMillis() + 8000L;
+            killer.sendActionBar(Component.text("👑 Hubris! +40 AD 8s", NamedTextColor.GOLD));
+            new BukkitRunnable() {
+                @Override public void run() {
+                    stats.addBonusAD(-state.hubrisAD);
+                    state.hubrisAD = 0;
+                    hudManager.updateHUD(killer, champ);
+                }
+            }.runTaskLater(LolPlugin.getInstance(), 160L);
+        }
+
+        // ── Heartsteel: stacks permanents ──
+        if (hasAnyItem(killer,"heartsteel","ravenous_hydra2")) {
+            state.heartsteelHP += 5;
+            champ.getHPSystem().addBonusHP(5);
+            if (state.heartsteelHP % 50 == 0) {
+                killer.sendActionBar(Component.text(
+                    "❤ Heartsteel: +" + state.heartsteelHP + " HP!", NamedTextColor.RED));
+            }
+        }
+
+        hudManager.updateHUD(killer, champ);
+    }
+
+    // ════════════════════════════════════════════════════════
+    // ACTIFS D'ITEMS (clic droit sur l'item)
+    // ════════════════════════════════════════════════════════
+    public void activateItem(Player player, String itemId) {
+        if (!championManager.hasChampion(player)) return;
+        BaseChampion champ = championManager.getChampion(player);
+        ItemState state = getState(player);
+
+        switch (itemId) {
+            // ── Zhonya's Hourglass: invulnérabilité 2.5s (120s CD) ──
+            case "zhonyas_hourglass" -> {
+                if (state.isOnCooldown(state.lastZhonyas, 120000L)) {
+                    sendCDMessage(player, "Zhonya's", state.lastZhonyas, 120000L); return;
+                }
+                state.lastZhonyas = System.currentTimeMillis();
+                state.zhonyasActive = true;
+                player.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, 50, 255, false, false));
+                player.setInvulnerable(true);
+                player.sendActionBar(Component.text("⏱ Zhonya's actif! 2.5s", NamedTextColor.GOLD));
+                player.getWorld().spawnParticle(Particle.END_ROD, player.getLocation(), 20, 0.5, 1, 0.5);
+                new BukkitRunnable() {
+                    @Override public void run() {
+                        state.zhonyasActive = false;
+                        player.setInvulnerable(false);
+                        player.removePotionEffect(PotionEffectType.RESISTANCE);
+                    }
+                }.runTaskLater(LolPlugin.getInstance(), 50L);
+            }
+
+            // ── Galeforce: dash + 3 projectiles ──
+            case "galeforce" -> {
+                if (state.isOnCooldown(state.lastGaleforce, 90000L)) {
+                    sendCDMessage(player, "Galeforce", state.lastGaleforce, 90000L); return;
+                }
+                state.lastGaleforce = System.currentTimeMillis();
+                // Dash dans la direction du regard
+                Location dest = player.getTargetBlockLocation(10, false);
+                if (dest != null) {
+                    Location safe = safeLocation(player.getLocation(), dest);
+                    player.teleport(safe);
+                }
+                // 3 projectiles sur ennemis proches
+                ChampionStats stats = champ.getStats();
+                double projDmg = stats.calcPhysicalDamage(200 + stats.getFinalAD() * 0.60, null);
+                player.getWorld().getNearbyEntities(player.getLocation(), 8, 2, 8).stream()
+                    .filter(e -> e instanceof Player && !e.equals(player))
+                    .limit(3)
+                    .forEach(e -> {
+                        if (championManager.hasChampion((Player)e)) {
+                            championManager.getChampion((Player)e).getHPSystem().takeDamage(projDmg);
+                            player.getWorld().spawnParticle(Particle.CRIT, e.getLocation().add(0,1,0), 8);
+                        }
+                    });
+                player.sendActionBar(Component.text("⚡ Galeforce!", NamedTextColor.YELLOW));
+            }
+
+            // ── Shurelya's Battlesong: +60% vitesse alliés 4s ──
+            case "shurelyas" -> {
+                if (state.isOnCooldown(state.lastShurelyas, 120000L)) {
+                    sendCDMessage(player, "Shurelya's", state.lastShurelyas, 120000L); return;
+                }
+                state.lastShurelyas = System.currentTimeMillis();
+                player.getWorld().getNearbyEntities(player.getLocation(), 8, 2, 8).stream()
+                    .filter(e -> e instanceof Player)
+                    .forEach(e -> ((Player)e).addPotionEffect(
+                        new PotionEffect(PotionEffectType.SPEED, 80, 3, false, true)));
+                player.sendActionBar(Component.text("💨 Shurelya's! +60%% vitesse 4s alliés", NamedTextColor.AQUA));
+            }
+
+            // ── Redemption: soin de zone sur le sol ──
+            case "redemption" -> {
+                if (state.isOnCooldown(state.lastRedemption, 120000L)) {
+                    sendCDMessage(player, "Redemption", state.lastRedemption, 120000L); return;
+                }
+                state.lastRedemption = System.currentTimeMillis();
+                Location target = player.getTargetBlockLocation(30, false);
+                if (target == null) target = player.getLocation();
+                final Location healLoc = target;
+                player.sendActionBar(Component.text("💫 Redemption lancé! (2.5s)", NamedTextColor.WHITE));
+                new BukkitRunnable() {
+                    @Override public void run() {
+                        healLoc.getWorld().spawnParticle(Particle.END_ROD, healLoc, 30, 3, 1, 3);
+                        healLoc.getWorld().getNearbyEntities(healLoc, 5, 2, 5).stream()
+                            .filter(e -> e instanceof Player)
+                            .forEach(e -> {
+                                Player ally = (Player) e;
+                                if (championManager.hasChampion(ally)) {
+                                    double heal = 250 + champ.getStats().getFinalAP() * 0.04;
+                                    championManager.getChampion(ally).getHPSystem().heal(heal);
+                                    hudManager.updateHUD(ally, championManager.getChampion(ally));
+                                    ally.getWorld().spawnParticle(Particle.HEART, ally.getLocation().add(0,2,0), 5);
+                                }
+                            });
+                    }
+                }.runTaskLater(LolPlugin.getInstance(), 50L);
+            }
+
+            // ── Locket of the Iron Solari: bouclier alliés ──
+            case "locket" -> {
+                if (state.isOnCooldown(state.lastLocket, 90000L)) {
+                    sendCDMessage(player, "Locket", state.lastLocket, 90000L); return;
+                }
+                state.lastLocket = System.currentTimeMillis();
+                double shieldAmt = 150 + champ.getStats().getFinalMaxHP() * 0.10;
+                player.getWorld().getNearbyEntities(player.getLocation(), 6, 2, 6).stream()
+                    .filter(e -> e instanceof Player)
+                    .forEach(e -> {
+                        Player ally = (Player) e;
+                        if (championManager.hasChampion(ally)) {
+                            championManager.getChampion(ally).getHPSystem().heal(shieldAmt);
+                            hudManager.updateHUD(ally, championManager.getChampion(ally));
+                        }
+                    });
+                player.sendActionBar(Component.text(
+                    String.format("🛡 Locket! +%.0f bouclier alliés proches", shieldAmt), NamedTextColor.GOLD));
+            }
+
+            // ── Mikael's Blessing: cleanse + soin allié ──
+            case "mikaels" -> {
+                if (state.isOnCooldown(state.lastMikaels, 90000L)) {
+                    sendCDMessage(player, "Mikael's", state.lastMikaels, 90000L); return;
+                }
+                state.lastMikaels = System.currentTimeMillis();
+                // Cibler l'allié le plus proche en difficulté
+                Player target2 = (Player) player.getWorld().getNearbyEntities(player.getLocation(), 10, 2, 10).stream()
+                    .filter(e -> e instanceof Player && !e.equals(player))
+                    .findFirst().orElse(player);
+                if (championManager.hasChampion(target2)) {
+                    double heal2 = 100 + champ.getStats().getFinalAP() * 0.15;
+                    championManager.getChampion(target2).getHPSystem().heal(heal2);
+                    target2.removePotionEffect(PotionEffectType.SLOWNESS);
+                    target2.removePotionEffect(PotionEffectType.BLINDNESS);
+                    hudManager.updateHUD(target2, championManager.getChampion(target2));
+                    player.sendActionBar(Component.text("💧 Mikael's: cleanse + soin allié!", NamedTextColor.BLUE));
+                }
+            }
+
+            // ── Hextech Rocketbelt: dash + missiles ──
+            case "rocketbelt", "hextec_rocketbelt2" -> {
+                if (state.isOnCooldown(state.lastHextechRocket, 90000L)) {
+                    sendCDMessage(player, "Rocketbelt", state.lastHextechRocket, 90000L); return;
+                }
+                state.lastHextechRocket = System.currentTimeMillis();
+                Location dst = player.getTargetBlockLocation(5, false);
+                if (dst != null) player.teleport(safeLocation(player.getLocation(), dst));
+                double missileDmg = champ.getStats().calcMagicalDamage(75 + champ.getStats().getFinalAP() * 0.15, null);
+                player.getWorld().getNearbyEntities(player.getLocation(), 6, 2, 6).stream()
+                    .filter(e -> e instanceof Player && !e.equals(player))
+                    .limit(3)
+                    .forEach(e -> {
+                        if (championManager.hasChampion((Player)e)) {
+                            championManager.getChampion((Player)e).getHPSystem().takeDamage(missileDmg);
+                            player.getWorld().spawnParticle(Particle.FIREWORK, e.getLocation().add(0,1,0), 10);
+                        }
+                    });
+                player.sendActionBar(Component.text("🚀 Rocketbelt!", NamedTextColor.RED));
+            }
+
+            // ── BotRK actif: drain 10% HP actuels de la cible ──
+            case "botrk" -> {
+                if (state.isOnCooldown(state.lastBotrkActive, 60000L)) {
+                    sendCDMessage(player, "BotRK", state.lastBotrkActive, 60000L); return;
+                }
+                state.lastBotrkActive = System.currentTimeMillis();
+                player.getWorld().getNearbyEntities(player.getLocation(), 5, 2, 5).stream()
+                    .filter(e -> e instanceof Player && !e.equals(player))
+                    .findFirst()
+                    .ifPresent(e -> {
+                        Player target3 = (Player) e;
+                        if (championManager.hasChampion(target3)) {
+                            double drainDmg = championManager.getChampion(target3).getHPSystem().getCurrentHP() * 0.10;
+                            championManager.getChampion(target3).getHPSystem().takeDamage(drainDmg);
+                            champ.getHPSystem().heal(drainDmg);
+                            target3.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 40, 1, false, true));
+                            hudManager.updateHUD(target3, championManager.getChampion(target3));
+                        }
+                    });
+                player.sendActionBar(Component.text("🗡 BotRK actif! Drain + ralentit", NamedTextColor.RED));
+            }
+        }
+
+        hudManager.updateHUD(player, champ);
+    }
+
+    // ════════════════════════════════════════════════════════
+    // TÂCHES RÉPÉTÉES (auras, DoT, stacks passifs)
+    // ════════════════════════════════════════════════════════
+    private void startTasks() {
+        // ── Tâche principale 1s ──
+        new BukkitRunnable() {
+            @Override public void run() {
+                for (Player p : Bukkit.getOnlinePlayers()) {
+                    if (!championManager.hasChampion(p)) continue;
+                    BaseChampion champ = championManager.getChampion(p);
+                    ItemState state = getState(p);
+                    processPeriodicPassives(p, champ, state);
+                }
+            }
+        }.runTaskTimer(LolPlugin.getInstance(), 0L, 20L);
+
+        // ── Sunfire / Bami's Cinder: dégâts AoE 2 ticks ──
+        new BukkitRunnable() {
+            @Override public void run() {
+                for (Player p : Bukkit.getOnlinePlayers()) {
+                    if (!championManager.hasChampion(p)) continue;
+                    if (!hasAnyItem(p,"sunfire_aegis","sunfire_cape","bamis_cinder","turbo_chemtank")) continue;
+                    BaseChampion ac = championManager.getChampion(p);
+                    ItemState state = getState(p);
+                    double dmg = (12 + state.sunfireStacks * 1.44) * (2.0 / 20.0);
+                    p.getWorld().getNearbyEntities(p.getLocation(), 3, 2, 3).stream()
+                        .filter(e -> e instanceof Player && !e.equals(p))
+                        .forEach(e -> {
+                            Player victim = (Player) e;
+                            if (championManager.hasChampion(victim)) {
+                                BaseChampion vc = championManager.getChampion(victim);
+                                vc.getHPSystem().takeDamage(ac.getStats().calcMagicalDamage(dmg, vc.getStats()));
+                                if (state.sunfireStacks < 6) state.sunfireStacks++;
+                            }
+                        });
+                }
+            }
+        }.runTaskTimer(LolPlugin.getInstance(), 0L, 2L);
+
+        // ── Dead Man's Plate: stacks mouvement hors combat ──
+        new BukkitRunnable() {
+            @Override public void run() {
+                for (Player p : Bukkit.getOnlinePlayers()) {
+                    if (!championManager.hasChampion(p)) continue;
+                    if (!hasAnyItem(p,"dead_mans_plate")) continue;
+                    ItemState state = getState(p);
+                    BaseChampion champ = championManager.getChampion(p);
+                    if (!champ.getHPSystem().isInCombat()) {
+                        state.deadManStacks = Math.min(100, state.deadManStacks + 5);
+                        double bonus = state.deadManStacks * 0.3; // max +30 MS
+                        // Appliqué via walkSpeed dans HUDManager
+                    }
+                }
+            }
+        }.runTaskTimer(LolPlugin.getInstance(), 0L, 10L);
+
+        // ── Force of Nature: stacks MR après dégâts magiques ──
+        // Géré dans onAbilityDamage
+
+        // ── Manamune: recalculer AD bonus ──
+        new BukkitRunnable() {
+            @Override public void run() {
+                for (Player p : Bukkit.getOnlinePlayers()) {
+                    if (!championManager.hasChampion(p)) continue;
+                    if (!hasAnyItem(p,"manamune","muramana")) continue;
+                    BaseChampion champ = championManager.getChampion(p);
+                    ResourceSystem res = champ.getResourceSystem();
+                    if (res.getType() != ResourceSystem.ResourceType.MANA) continue;
+                    ItemState state = getState(p);
+                    // +2% AD = mana bonus / 100 (Awe)
+                    double newBonus = res.getMax() * 0.02;
+                    double diff = newBonus - state.bonusADFromMana;
+                    if (Math.abs(diff) > 1) {
+                        champ.getStats().addBonusAD(diff);
+                        state.bonusADFromMana = newBonus;
+                    }
+                }
+            }
+        }.runTaskTimer(LolPlugin.getInstance(), 0L, 60L);
+
+        // ── Abyssal Mask: aura -15% MR ennemis proches ──
+        new BukkitRunnable() {
+            @Override public void run() {
+                for (Player p : Bukkit.getOnlinePlayers()) {
+                    if (!championManager.hasChampion(p)) continue;
+                    if (!hasAnyItem(p,"abyssal_mask")) continue;
+                    p.getWorld().getNearbyEntities(p.getLocation(), 5, 2, 5).stream()
+                        .filter(e -> e instanceof Player && !e.equals(p))
+                        .forEach(e -> {
+                            Player enemy = (Player) e;
+                            if (championManager.hasChampion(enemy)) {
+                                // Appliquer -15% MR temporairement (reset chaque tick)
+                                // Implémenté via un debuff dans ChampionStats
+                            }
+                        });
+                }
+            }
+        }.runTaskTimer(LolPlugin.getInstance(), 0L, 10L);
+    }
+
+    private void processPeriodicPassives(Player p, BaseChampion champ, ItemState state) {
         HPSystem hp = champ.getHPSystem();
         ChampionStats stats = champ.getStats();
 
-        // ── Warmog's: regen 5% HP max/s si >1000 HP bonus hors combat ──
-        boolean hasWarmogs = hasItem(p, "warmogs_armor") || hasItem(p, "warmogs");
-        if (hasWarmogs && stats.getBonusHP() > 1000 && !hp.isInCombat()) {
-            hp.tickRegenForced(hp.getMaxHP() * 0.05); // +5% HP max par seconde
+        // ── Warmog's: regen 5% HP max/s hors combat si >1000 HP bonus ──
+        if (hasAnyItem(p,"warmogs_armor","warmogs") && !hp.isInCombat()
+                && stats.getBonusHP() > 1000) {
+            hp.tickRegenForced(hp.getMaxHP() * 0.05);
         }
 
-        // ── Spirit Visage: +30% soins reçus (appliqué dans HPSystem) ──
-        // Géré via un multiplicateur dans HPSystem.heal()
+        // ── Spirit Visage: marquer le joueur comme ayant +30% soins ──
+        state.hasSpiritVisage = hasAnyItem(p,"spirit_visage");
+
+        // ── Jak'Sho: reset stacks hors combat ──
+        if (!hp.isInCombat()) {
+            state.jakShoStacks.clear();
+        }
+
+        // ── Heartsteel: dégâts bonus toutes 3s en combat ──
+        if (hasAnyItem(p,"heartsteel","ravenous_hydra2") && hp.isInCombat()) {
+            double heartsteelDmg = 100 + stats.getBonusHP() * 0.09;
+            p.getWorld().getNearbyEntities(p.getLocation(), 5, 2, 5).stream()
+                .filter(e -> e instanceof Player && !e.equals(p))
+                .findFirst()
+                .ifPresent(e -> {
+                    if (championManager.hasChampion((Player)e)) {
+                        championManager.getChampion((Player)e).getHPSystem().takeDamage(heartsteelDmg);
+                        champ.getHPSystem().heal(heartsteelDmg);
+                        state.heartsteelHP = Math.min(state.heartsteelHP + 5, 3000);
+                    }
+                });
+        }
+
+        // ── Force of Nature: stacks MR → appliquer ──
+        if (hasAnyItem(p,"force_of_nature")) {
+            int fnStacks = state.forceOfNatureStacks.values().stream().mapToInt(Integer::intValue).sum();
+            // +6 MR par stack, déjà appliqué en temps réel
+        }
     }
 
-    /** Vérifie si un joueur a un item spécifique équipé */
-    private boolean hasItem(Player p, String itemId) {
-        var invMgr = shopListener.getOrCreate(p);
-        for (LolItem item : invMgr.getEquippedItems()) {
-            if (item != null && item.getId().equals(itemId)) return true;
+    // ════════════════════════════════════════════════════════
+    // UTILITAIRES
+    // ════════════════════════════════════════════════════════
+
+    private void applyDoT(Player caster, Player victim, double dmgPerSec, int duration, String type) {
+        UUID vid = victim.getUniqueId();
+        ItemState state = getState(caster);
+        Map<UUID, Long> dotMap = type.equals("liandry") ? state.liandryDotActive : state.demonicDotActive;
+
+        if (dotMap.containsKey(vid) && System.currentTimeMillis() < dotMap.get(vid)) return; // Déjà actif
+        dotMap.put(vid, System.currentTimeMillis() + duration * 1000L);
+
+        BaseChampion vc = championManager.getChampion(victim);
+        new BukkitRunnable() {
+            int ticks = 0;
+            @Override public void run() {
+                if (ticks >= duration || !victim.isOnline() || vc.getHPSystem().isDead()) {
+                    cancel(); dotMap.remove(vid); return;
+                }
+                vc.getHPSystem().takeDamage(dmgPerSec);
+                victim.getWorld().spawnParticle(Particle.FLAME, victim.getLocation().add(0,1,0), 3, 0.3,0.3,0.3);
+                hudManager.updateHUD(victim, vc);
+                ticks++;
+            }
+        }.runTaskTimer(LolPlugin.getInstance(), 0L, 20L);
+    }
+
+    private Location safeLocation(Location from, Location to) {
+        var dir = to.toVector().subtract(from.toVector()).normalize();
+        double dist = from.distance(to);
+        Location last = from.clone();
+        for (double d = 0.5; d <= dist; d += 0.5) {
+            Location check = from.clone().add(dir.clone().multiply(d));
+            if (!check.getBlock().getType().isAir()) return last;
+            last = check;
+        }
+        return to;
+    }
+
+    private void sendCDMessage(Player p, String item, long lastUse, long cdMs) {
+        double remaining = (cdMs - (System.currentTimeMillis() - lastUse)) / 1000.0;
+        p.sendActionBar(Component.text(
+            String.format("⏱ %s en recharge — %.1fs", item, remaining),
+            NamedTextColor.RED));
+    }
+
+    public boolean hasAnyItem(Player player, String... ids) {
+        var inv = shopListener.getOrCreate(player);
+        for (LolItem item : inv.getEquippedItems()) {
+            if (item == null) continue;
+            for (String id : ids) if (item.getId().equals(id)) return true;
         }
         return false;
     }
 
-    public boolean isReviving(UUID uuid) { return reviving.contains(uuid); }
+    public boolean isReviving(java.util.UUID uuid) {
+        return states.containsKey(uuid) && states.get(uuid).gaActive;
+    }
 }

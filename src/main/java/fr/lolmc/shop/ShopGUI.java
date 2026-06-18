@@ -2,6 +2,7 @@ package fr.lolmc.shop;
 
 import fr.lolmc.item.ItemRegistry;
 import fr.lolmc.item.LolItem;
+import fr.lolmc.item.consumable.ConsumableManager;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
@@ -99,6 +100,7 @@ public class ShopGUI {
             case ATTACK_SPEED -> Material.BOW;
             case SUPPORT      -> Material.GOLDEN_APPLE;
             case UTILITY      -> Material.COMPASS;
+            case CONSUMABLE   -> Material.POTION;
         };
         ItemStack item = new ItemStack(mat);
         ItemMeta meta = item.getItemMeta();
@@ -203,6 +205,7 @@ public class ShopGUI {
             case ATTACK_SPEED -> "⚡ Vitesse";
             case SUPPORT      -> "💚 Support";
             case UTILITY      -> "🧰 Utilitaire";
+            case CONSUMABLE   -> "🧪 Consommables";
         };
     }
 }
