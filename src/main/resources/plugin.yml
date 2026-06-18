@@ -1,0 +1,11 @@
+name: LolMC
+version: 1.0.0
+main: fr.lolmc.LolPlugin
+api-version: '1.21'
+description: League of Legends en Minecraft — 20 champions
+
+commands:
+  champion:
+    description: Gère les champions LoL
+    usage: /champion <pick|list|info> [args]
+    aliases: [champ]
