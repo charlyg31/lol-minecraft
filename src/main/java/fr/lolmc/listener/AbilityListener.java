@@ -11,7 +11,6 @@ import org.bukkit.event.block.Action;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.player.*;
-import org.bukkit.inventory.ItemStack;
 import org.bukkit.scheduler.BukkitRunnable;
 
 public class AbilityListener implements Listener {
@@ -20,115 +19,85 @@ public class AbilityListener implements Listener {
 
     public AbilityListener(ChampionManager manager) {
         this.manager = manager;
-        // Tâche répétée : afficher la portée quand on tient un sort
+        // Affichage portée toutes les 2 ticks
         new BukkitRunnable() {
-            @Override
-            public void run() {
-                for (Player player : LolPlugin.getInstance().getServer().getOnlinePlayers()) {
-                    if (!manager.hasChampion(player)) continue;
-                    BaseChampion champ = manager.getChampion(player);
-                    champ.displayRangeIfHoldingAbility(player);
+            @Override public void run() {
+                for (Player p : LolPlugin.getInstance().getServer().getOnlinePlayers()) {
+                    if (manager.hasChampion(p)) manager.getChampion(p).displayRangeIfHoldingAbility(p);
                 }
             }
-        }.runTaskTimer(LolPlugin.getInstance(), 0L, 2L); // toutes les 2 ticks
+        }.runTaskTimer(LolPlugin.getInstance(), 0L, 2L);
     }
 
-    // ── Clic gauche (attaque / sort sur cible) ──────────────────
+    // Clic droit sur un joueur → sort actif sur cible
     @EventHandler
-    public void onPlayerInteractEntity(PlayerInteractEntityEvent event) {
-        Player player = event.getPlayer();
-        if (!manager.hasChampion(player)) return;
-        if (!(event.getRightClicked() instanceof Player target)) return;
+    public void onInteractEntity(PlayerInteractEntityEvent e) {
+        Player caster = e.getPlayer();
+        if (!manager.hasChampion(caster)) return;
+        if (!(e.getRightClicked() instanceof Player target)) return;
 
-        BaseChampion champ = manager.getChampion(player);
-        int slot = player.getInventory().getHeldItemSlot();
+        int slot = caster.getInventory().getHeldItemSlot();
+        if (slot < 0 || slot > 4) return;
 
-        if (slot >= 0 && slot <= 4) {
-            event.setCancelled(true);
-            champ.tryUseAbility(player, slot, target);
+        e.setCancelled(true);
+        manager.getChampion(caster).tryUseAbility(caster, slot, target);
+    }
+
+    // Clic droit dans le vide → self-cast (W/E buffs, AoE autour du caster)
+    @EventHandler
+    public void onInteract(PlayerInteractEvent e) {
+        Player caster = e.getPlayer();
+        if (!manager.hasChampion(caster)) return;
+
+        Action a = e.getAction();
+        if (a != Action.RIGHT_CLICK_AIR && a != Action.RIGHT_CLICK_BLOCK) return;
+
+        int slot = caster.getInventory().getHeldItemSlot();
+        if (slot < 1 || slot > 4) return; // slot 0 = AA uniquement via dégâts
+
+        e.setCancelled(true);
+        // Self-cast : passe null comme cible (les sorts gèrent eux-mêmes)
+        manager.getChampion(caster).tryUseAbility(caster, slot, null);
+    }
+
+    // Clic gauche sur entité → AA (slot 0)
+    @EventHandler
+    public void onDamage(EntityDamageByEntityEvent e) {
+        if (!(e.getDamager() instanceof Player caster)) return;
+        if (!(e.getEntity() instanceof Player target)) return;
+        if (!manager.hasChampion(caster)) return;
+
+        if (caster.getInventory().getHeldItemSlot() == 0) {
+            e.setCancelled(true);
+            manager.getChampion(caster).tryUseAbility(caster, 0, target);
         }
     }
 
-    // ── Clic droit dans le vide (sorts self-cast / directionnels) ──
+    // Changement de slot → refresh tooltip
     @EventHandler
-    public void onPlayerInteract(PlayerInteractEvent event) {
-        Player player = event.getPlayer();
-        if (!manager.hasChampion(player)) return;
-
-        Action action = event.getAction();
-        if (action != Action.RIGHT_CLICK_AIR && action != Action.RIGHT_CLICK_BLOCK) return;
-
-        int slot = player.getInventory().getHeldItemSlot();
-        if (slot < 1 || slot > 4) return; // slot 0 = AA, pas de self-cast
-
-        BaseChampion champ = manager.getChampion(player);
-        BaseAbility ability = champ.getAbilityForSlot(slot);
-        if (ability == null) return;
-
-        event.setCancelled(true);
-
-        // Self-cast (W, E sans cible) → passe le joueur lui-même comme cible
-        champ.tryUseAbility(player, slot, player);
+    public void onSlotChange(PlayerItemHeldEvent e) {
+        Player p = e.getPlayer();
+        if (!manager.hasChampion(p)) return;
+        int s = e.getNewSlot();
+        if (s >= 0 && s <= 4) manager.getChampion(p).refreshSlot(p, s);
     }
 
-    // ── Attaque de base (clic gauche sur entité) ─────────────────
+    // Bloquer modification des slots 0-4
     @EventHandler
-    public void onEntityDamage(EntityDamageByEntityEvent event) {
-        if (!(event.getDamager() instanceof Player player)) return;
-        if (!(event.getEntity() instanceof Player target)) return;
-        if (!manager.hasChampion(player)) return;
-
-        BaseChampion champ = manager.getChampion(player);
-        int slot = player.getInventory().getHeldItemSlot();
-
-        // Slot 0 = attaque de base
-        if (slot == 0) {
-            event.setCancelled(true);
-            champ.tryUseAbility(player, 0, target);
-        }
-    }
-
-    // ── Changement de slot → rafraîchir affichage portée ─────────
-    @EventHandler
-    public void onSlotChange(PlayerItemHeldEvent event) {
-        Player player = event.getPlayer();
-        if (!manager.hasChampion(player)) return;
-
-        // Rafraîchir l'item dans le slot (tooltip à jour)
-        BaseChampion champ = manager.getChampion(player);
-        int newSlot = event.getNewSlot();
-        if (newSlot >= 0 && newSlot <= 4) {
-            champ.refreshSlot(player, newSlot);
-        }
-    }
-
-    // ── Empêcher de dropper/modifier les sorts dans l'inventaire ──
-    @EventHandler
-    public void onInventoryClick(InventoryClickEvent event) {
-        if (!(event.getWhoClicked() instanceof Player player)) return;
-        if (!manager.hasChampion(player)) return;
-
-        int slot = event.getSlot();
-        // Protéger les slots 0-4 (sorts)
-        if (slot >= 0 && slot <= 4) {
-            event.setCancelled(true);
-        }
+    public void onInventoryClick(InventoryClickEvent e) {
+        if (!(e.getWhoClicked() instanceof Player p)) return;
+        if (!manager.hasChampion(p)) return;
+        if (e.getSlot() >= 0 && e.getSlot() <= 4) e.setCancelled(true);
     }
 
     @EventHandler
-    public void onDrop(PlayerDropItemEvent event) {
-        Player player = event.getPlayer();
-        if (!manager.hasChampion(player)) return;
-
-        int slot = player.getInventory().getHeldItemSlot();
-        if (slot >= 0 && slot <= 4) {
-            event.setCancelled(true);
-        }
+    public void onDrop(PlayerDropItemEvent e) {
+        if (!manager.hasChampion(e.getPlayer())) return;
+        if (e.getPlayer().getInventory().getHeldItemSlot() <= 4) e.setCancelled(true);
     }
 
-    // ── Quitter → nettoyer ───────────────────────────────────────
     @EventHandler
-    public void onQuit(PlayerQuitEvent event) {
-        manager.removeChampion(event.getPlayer());
+    public void onQuit(PlayerQuitEvent e) {
+        manager.removeChampion(e.getPlayer());
     }
 }

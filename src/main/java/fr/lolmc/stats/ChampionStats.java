@@ -153,6 +153,7 @@ public class ChampionStats {
      * formule LoL : dmg * 100 / (100 + armor_effective)
      */
     public double calcPhysicalDamage(double rawDamage, ChampionStats target) {
+        if (target == null) return rawDamage; // pas de réduction si pas de cible connue
         double effectiveArmor = Math.max(0, target.getFinalArmor() - this.getFinalLethality());
         double reduction = 100.0 / (100.0 + effectiveArmor);
         return rawDamage * reduction;
@@ -162,6 +163,7 @@ public class ChampionStats {
      * Calcule les dégâts magiques après réduction de MR.
      */
     public double calcMagicalDamage(double rawDamage, ChampionStats target) {
+        if (target == null) return rawDamage;
         double effectiveMR = Math.max(0, target.getFinalMagicResist() * (1.0 - this.getFinalMagicPen()));
         double reduction = 100.0 / (100.0 + effectiveMR);
         return rawDamage * reduction;
@@ -181,7 +183,7 @@ public class ChampionStats {
         double ad = getFinalAD();
         boolean isCrit = Math.random() < getFinalCritChance();
         if (isCrit) ad *= getFinalCritDamage();
-        return calcPhysicalDamage(ad, target);
+        return calcPhysicalDamage(ad, target); // target peut être null
     }
 
     /**
