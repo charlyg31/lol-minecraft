@@ -31,6 +31,7 @@ public abstract class BaseAbility {
     protected final DamageType damageType;
 
     protected double resourceCost; // coût en mana/énergie par cast (0 = gratuit)
+    protected double dynamicCooldownOverride = -1; // -1 = utiliser baseCooldown, sinon override (pour l'AA)
     private final Map<UUID, Long> cooldowns = new HashMap<>();
 
     public enum AbilitySlot { AA, Q, W, E, R }
@@ -84,9 +85,16 @@ public abstract class BaseAbility {
     }
 
     public double getCurrentCooldown(ChampionStats stats) {
+        // Si override dynamique (ex: AA dont le CD dépend de l'AS en jeu)
+        if (dynamicCooldownOverride > 0) return dynamicCooldownOverride;
         double base = baseCooldown[Math.min(level - 1, baseCooldown.length - 1)];
         if (stats == null) return base;
         return base * stats.getCooldownMultiplier();
+    }
+
+    /** Permet de modifier le cooldown de l'AA dynamiquement selon la vitesse d'attaque. */
+    public void setDynamicCooldown(double seconds) {
+        this.dynamicCooldownOverride = Math.max(0.1, seconds);
     }
 
     // ─── Affichage portée (particules visibles uniquement pour le caster) ──

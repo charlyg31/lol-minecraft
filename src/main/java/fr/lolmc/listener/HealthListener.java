@@ -1,6 +1,7 @@
 package fr.lolmc.listener;
 
 import fr.lolmc.LolPlugin;
+import fr.lolmc.item.PassiveManager;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.manager.ChampionManager;
 import fr.lolmc.manager.HUDManager;
@@ -74,7 +75,11 @@ public class HealthListener implements Listener {
         if (isEnvironmental) {
             BaseChampion champ = manager.getChampion(p);
             HPSystem hp = champ.getHPSystem();
-            hp.takeDamage(dmg * 5); // Amplifier légèrement les dégâts env.
+            double finalDmg = dmg * 5;
+            hp.takeDamage(finalDmg);
+            // Vérifier passifs défensifs (Sterak's, Guardian Angel)
+            PassiveManager pm = LolPlugin.getInstance().getPassiveManager();
+            if (pm != null) pm.onDamageTaken(p, finalDmg);
             hud.updateHUD(p, champ);
         }
     }

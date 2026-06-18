@@ -2,6 +2,7 @@ package fr.lolmc;
 
 import fr.lolmc.listener.AbilityListener;
 import fr.lolmc.item.ItemRegistry;
+import fr.lolmc.item.PassiveManager;
 import fr.lolmc.listener.ShopCommand;
 import fr.lolmc.listener.ShopListener;
 import fr.lolmc.shop.GoldManager;
@@ -26,6 +27,7 @@ public class LolPlugin extends JavaPlugin {
     private ShopGUI shopGUI;
     private GoldManager goldManager;
     private ShopListener shopListener;
+    private PassiveManager passiveManager;
 
     @Override
     public void onEnable() {
@@ -37,6 +39,7 @@ public class LolPlugin extends JavaPlugin {
         shopGUI = new ShopGUI();
         goldManager = new GoldManager();
         shopListener = new ShopListener(shopGUI, championManager, goldManager, hudManager);
+        passiveManager = new PassiveManager(championManager, hudManager, shopListener);
         // Charger le registre d'items
         ItemRegistry.all(); // force le static init
         headManager     = new HeadManager(this);
@@ -78,4 +81,5 @@ public class LolPlugin extends JavaPlugin {
     public ShopGUI getShopGUI()                 { return shopGUI; }
     public GoldManager getGoldManager()         { return goldManager; }
     public ShopListener getShopListener()       { return shopListener; }
+    public PassiveManager getPassiveManager()   { return passiveManager; }
 }

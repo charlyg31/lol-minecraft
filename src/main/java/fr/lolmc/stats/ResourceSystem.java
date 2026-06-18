@@ -21,7 +21,7 @@ public class ResourceSystem {
     private final ResourceType type;
     private final double maxResource;
     private double currentResource;
-    private final double regenPer5s; // regen toutes les 5 secondes
+    private double regenPer5s; // regen toutes les 5 secondes
 
     // Énergie Lee Sin / Zed : regen 50/5s en LoL réel
     // Mana : variable selon champion (6–15/5s)
@@ -84,6 +84,15 @@ public class ResourceSystem {
     public boolean hasResource()        { return type != ResourceType.NONE; }
     public void setCurrent(double v)    { currentResource = Math.max(0, Math.min(maxResource, v)); }
     public void fill()                  { currentResource = maxResource; }
+    /** Augmente/réduit le max (achat/vente d'item avec +mana) */
+    public void addMaxResource(double v) {
+        double ratio = maxResource > 0 ? currentResource / maxResource : 1.0;
+        maxResource = Math.max(0, maxResource + v);
+        // Garder le ratio actuel (si 80% plein, rester à 80%)
+        currentResource = ratio * maxResource;
+    }
+    /** Augmente/réduit la regen par 5s */
+    public void addRegen(double v) { regenPer5s = Math.max(0, regenPer5s + v); }
 
     /**
      * Ratio 0.0..1.0 pour la barre EXP.
