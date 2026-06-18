@@ -9,6 +9,8 @@ import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Bukkit;
 import org.bukkit.attribute.Attribute;
+import org.bukkit.attribute.AttributeModifier;
+import org.bukkit.attribute.Attribute;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
 
@@ -89,6 +91,42 @@ public class HUDManager {
         // ── 4. Nourriture désactivée (toujours à 20) ──
         player.setFoodLevel(20);
         player.setSaturation(20f);
+
+        // ── 5. Vitesse de mouvement LoL → Minecraft ──
+        applyMovementSpeed(player, champ.getStats());
+
+        // ── 6. Vitesse d'attaque → cooldown AA slot 0 ──
+        applyAttackSpeed(champ);
+    }
+
+    /**
+     * Convertit la vitesse de mouvement LoL en vitesse Minecraft.
+     * LoL: vitesse base ~325-360, max ~500+
+     * Minecraft walkSpeed: 0.2 = normal (100%%), range 0.0..1.0
+     * Mapping: LoL 330 = MC 0.2, LoL 500 = MC 0.35
+     */
+    private void applyMovementSpeed(Player player, fr.lolmc.stats.ChampionStats stats) {
+        double lolMS = stats.getFinalMovementSpeed();
+        // Formule: mc_speed = (lolMS / 330.0) * 0.2
+        float mcSpeed = (float) Math.min(1.0, Math.max(0.05, (lolMS / 330.0) * 0.2));
+        if (Math.abs(player.getWalkSpeed() - mcSpeed) > 0.001f) {
+            player.setWalkSpeed(mcSpeed);
+        }
+    }
+
+    /**
+     * Applique la vitesse d'attaque au cooldown du sort AA (slot 0).
+     * LoL: AS 0.5-2.5 attaques/sec → cooldown AA = 1.0/AS secondes
+     */
+    private void applyAttackSpeed(fr.lolmc.champion.base.BaseChampion champ) {
+        double as = champ.getStats().getFinalAttackSpeed();
+        as = Math.max(0.2, Math.min(2.5, as));
+        double newCooldown = 1.0 / as;
+        var aa = champ.getAbility(0);
+        if (aa != null) {
+            // Modifier le cooldown de base de l'AA dynamiquement
+            aa.setDynamicCooldown(newCooldown);
+        }
     }
 
     private void syncMinecraftHP(Player player, HPSystem hp) {

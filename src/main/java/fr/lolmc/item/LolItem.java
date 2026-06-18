@@ -89,11 +89,38 @@ public class LolItem {
         stats.addBonusOmnivamp(bonusOmnivamp);
         stats.addBonusAbilityHaste(bonusAbilityHaste);
 
+        // HP
         if (bonusHP > 0) hp.addBonusHP(bonusHP);
-        if (bonusMana > 0 && res.getType() == ResourceSystem.ResourceType.MANA) {
-            res.setCurrent(res.getCurrent() + bonusMana);
-        }
+
+        // Regen HP
         if (bonusHPRegen > 0) hp.setHpRegen(hp.getHpRegenPer5s() + bonusHPRegen);
+
+        // Mana: augmenter le MAX et le current
+        if (bonusMana > 0 && res.getType() == ResourceSystem.ResourceType.MANA) {
+            res.addMaxResource(bonusMana);
+        }
+        // Regen mana
+        if (bonusManaRegen > 0 && res.getType() == ResourceSystem.ResourceType.MANA) {
+            res.addRegen(bonusManaRegen);
+        }
+
+        // Passifs spéciaux
+        applyPassive(stats);
+    }
+
+    /**
+     * Applique les effets passifs qui modifient les stats de base.
+     * Ex: Rabadon's +35% AP, Manamune +2% AD/mana, etc.
+     */
+    private void applyPassive(ChampionStats stats) {
+        if (passiveName == null) return;
+        switch (passiveName) {
+            case "Amplification" -> stats.multiplyAP(1.35);  // Rabadon's +35% AP
+            case "Awe" -> {
+                // Archangel's/Manamune: +1% AP ou AD pour chaque 100 mana bonus
+                // Appliqué dynamiquement dans HUDManager
+            }
+        }
     }
 
     /**
@@ -116,6 +143,20 @@ public class LolItem {
 
         if (bonusHP > 0) hp.addBonusHP(-bonusHP);
         if (bonusHPRegen > 0) hp.setHpRegen(Math.max(0, hp.getHpRegenPer5s() - bonusHPRegen));
+        if (bonusMana > 0 && res.getType() == ResourceSystem.ResourceType.MANA)
+            res.addMaxResource(-bonusMana);
+        if (bonusManaRegen > 0 && res.getType() == ResourceSystem.ResourceType.MANA)
+            res.addRegen(-bonusManaRegen);
+
+        // Retirer les passifs multiplicatifs
+        removePassive(stats);
+    }
+
+    private void removePassive(ChampionStats stats) {
+        if (passiveName == null) return;
+        switch (passiveName) {
+            case "Amplification" -> stats.multiplyAP(1.0 / 1.35); // Annuler Rabadon's
+        }
     }
 
     // ── ItemStack Minecraft ───────────────────────────────────────

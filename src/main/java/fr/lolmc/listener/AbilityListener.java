@@ -1,6 +1,7 @@
 package fr.lolmc.listener;
 
 import fr.lolmc.LolPlugin;
+import fr.lolmc.item.PassiveManager;
 import fr.lolmc.ability.base.BaseAbility;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.manager.ChampionManager;
@@ -70,6 +71,9 @@ public class AbilityListener implements Listener {
         if (caster.getInventory().getHeldItemSlot() == 0) {
             e.setCancelled(true);
             manager.getChampion(caster).tryUseAbility(caster, 0, target);
+            // Déclencher les passifs on-hit (BotRK, Kraken, Wit's End, etc.)
+            PassiveManager pm = LolPlugin.getInstance().getPassiveManager();
+            if (pm != null) pm.onAutoAttack(caster, target);
         }
     }
 
