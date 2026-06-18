@@ -2,6 +2,7 @@ package fr.lolmc.champion.impl.support;
 
 import fr.lolmc.LolPlugin;
 import fr.lolmc.ability.base.BaseAbility;
+import fr.lolmc.stats.ResourceSystem;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.stats.ChampionStats;
 import net.kyori.adventure.text.Component;
@@ -23,11 +24,13 @@ public class Blitzcrank extends BaseChampion {
     @Override protected void registerAbilities() {
         setAbility(0,new AA()); setAbility(1,new Q());
         setAbility(2,new W()); setAbility(3,new E()); setAbility(4,new R());
+        initSystems(623, 8.0, ResourceSystem.ResourceType.MANA, 400, 10.0);
     }
 
     static class AA extends BaseAbility {
         AA(){super("aa_blitzcrank","Attaque de base",Material.IRON_INGOT,AbilitySlot.AA,
-            new double[]{0.5},5,0,DamageType.PHYSICAL);}
+            new double[]{0.5},5,0,DamageType.PHYSICAL);
+            resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double dmg=s.calcAutoAttackDamage(null);
@@ -40,7 +43,8 @@ public class Blitzcrank extends BaseChampion {
 
     static class Q extends BaseAbility {
         Q(){super("q_blitzcrank","Poing-Harpon",Material.FISHING_ROD,AbilitySlot.Q,
-            new double[]{20,19,18,17,16},20,0,DamageType.MAGICAL);}
+            new double[]{20,19,18,17,16},20,0,DamageType.MAGICAL);
+            resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double dmg=s.calcMagicalDamage(75+s.getFinalAP()*0.6,null);
@@ -57,7 +61,8 @@ public class Blitzcrank extends BaseChampion {
 
     static class W extends BaseAbility {
         W(){super("w_blitzcrank","Surcharge",Material.REDSTONE,AbilitySlot.W,
-            new double[]{22,20,18,16,14},0,0,DamageType.TRUE);}
+            new double[]{22,20,18,16,14},0,0,DamageType.TRUE);
+            resourceCost = 75;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             c.addPotionEffect(new PotionEffect(PotionEffectType.SPEED,80,4,false,true));
             c.sendActionBar(Component.text("⚡ SURCHARGE 4s!",NamedTextColor.YELLOW));
@@ -67,7 +72,8 @@ public class Blitzcrank extends BaseChampion {
 
     static class E extends BaseAbility {
         E(){super("e_blitzcrank","Poing Électrique",Material.LIGHTNING_ROD,AbilitySlot.E,
-            new double[]{10,9,8,7,6},5,0,DamageType.PHYSICAL);}
+            new double[]{10,9,8,7,6},5,0,DamageType.PHYSICAL);
+            resourceCost = 25;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double dmg=s.calcPhysicalDamage(80+s.getFinalAD(),null);
@@ -83,7 +89,8 @@ public class Blitzcrank extends BaseChampion {
 
     static class R extends BaseAbility {
         R(){super("r_blitzcrank","Champ Statique",Material.COPPER_INGOT,AbilitySlot.R,
-            new double[]{40,30,20},5,4,DamageType.MAGICAL);}
+            new double[]{40,30,20},5,4,DamageType.MAGICAL);
+            resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             double dmg=275+s.getFinalAP()*0.7;
             c.getWorld().getNearbyEntities(c.getLocation(),4,2,4).stream()

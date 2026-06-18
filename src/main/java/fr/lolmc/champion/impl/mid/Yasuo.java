@@ -2,6 +2,7 @@ package fr.lolmc.champion.impl.mid;
 
 import fr.lolmc.LolPlugin;
 import fr.lolmc.ability.base.BaseAbility;
+import fr.lolmc.stats.ResourceSystem;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.stats.ChampionStats;
 import net.kyori.adventure.text.Component;
@@ -23,13 +24,15 @@ public class Yasuo extends BaseChampion {
     @Override protected void registerAbilities() {
         setAbility(0,new AA()); setAbility(1,new Q());
         setAbility(2,new W()); setAbility(3,new E()); setAbility(4,new R());
+        initSystems(523, 0.0, ResourceSystem.ResourceType.FLOW, 100, 0.0);
     }
 
     public static final Map<UUID,Integer> qCasts=new HashMap<>();
 
     static class AA extends BaseAbility {
         AA(){super("aa_yasuo","Attaque de base",Material.IRON_SWORD,AbilitySlot.AA,
-            new double[]{0.5},5,0,DamageType.PHYSICAL);}
+            new double[]{0.5},5,0,DamageType.PHYSICAL);
+            resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double dmg=s.calcAutoAttackDamage(null);
@@ -42,7 +45,8 @@ public class Yasuo extends BaseChampion {
 
     static class Q extends BaseAbility {
         Q(){super("q_yasuo","Acier Tranchant",Material.BLAZE_POWDER,AbilitySlot.Q,
-            new double[]{4,3.5,3,2.5,2},20,6,DamageType.PHYSICAL);}
+            new double[]{4,3.5,3,2.5,2},20,6,DamageType.PHYSICAL);
+            resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             int casts=qCasts.merge(c.getUniqueId(),1,Integer::sum);
             double dmg=s.calcPhysicalDamage(20+s.getFinalAD(),null);
@@ -67,7 +71,8 @@ public class Yasuo extends BaseChampion {
 
     static class W extends BaseAbility {
         W(){super("w_yasuo","Mur du Vent",Material.WHITE_WOOL,AbilitySlot.W,
-            new double[]{26,24,22,20,18},0,6,DamageType.TRUE);}
+            new double[]{26,24,22,20,18},0,6,DamageType.TRUE);
+            resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             c.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE,80,0,false,true));
             c.sendActionBar(Component.text("💨 Mur du Vent 4s!",NamedTextColor.WHITE));
@@ -77,7 +82,8 @@ public class Yasuo extends BaseChampion {
 
     static class E extends BaseAbility {
         E(){super("e_yasuo","Balayage de Lame",Material.FEATHER,AbilitySlot.E,
-            new double[]{0.5,0.5,0.5,0.5,0.5},5,0,DamageType.PHYSICAL);}
+            new double[]{0.5,0.5,0.5,0.5,0.5},5,0,DamageType.PHYSICAL);
+            resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             Location dest=safeTeleport(c.getLocation(),t.getLocation());
@@ -93,7 +99,8 @@ public class Yasuo extends BaseChampion {
 
     static class R extends BaseAbility {
         R(){super("r_yasuo","Dernier Souffle",Material.ELYTRA,AbilitySlot.R,
-            new double[]{200,180,160},5,4,DamageType.PHYSICAL);}
+            new double[]{200,180,160},5,4,DamageType.PHYSICAL);
+            resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double dmg=s.calcPhysicalDamage(200+s.getFinalAD()*1.5,null);

@@ -2,6 +2,7 @@ package fr.lolmc.champion.impl.support;
 
 import fr.lolmc.LolPlugin;
 import fr.lolmc.ability.base.BaseAbility;
+import fr.lolmc.stats.ResourceSystem;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.stats.ChampionStats;
 import net.kyori.adventure.text.Component;
@@ -23,11 +24,13 @@ public class Leona extends BaseChampion {
     @Override protected void registerAbilities() {
         setAbility(0,new AA()); setAbility(1,new Q());
         setAbility(2,new W()); setAbility(3,new E()); setAbility(4,new R());
+        initSystems(576, 7.0, ResourceSystem.ResourceType.MANA, 420, 9.0);
     }
 
     static class AA extends BaseAbility {
         AA(){super("aa_leona","Attaque de base",Material.IRON_SWORD,AbilitySlot.AA,
-            new double[]{0.5},5,0,DamageType.PHYSICAL);}
+            new double[]{0.5},5,0,DamageType.PHYSICAL);
+            resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double dmg=s.calcAutoAttackDamage(null);
@@ -40,7 +43,8 @@ public class Leona extends BaseChampion {
 
     static class Q extends BaseAbility {
         Q(){super("q_leona","Lumière du Zénith",Material.GOLD_INGOT,AbilitySlot.Q,
-            new double[]{11,10,9,8,7},5,0,DamageType.MAGICAL);}
+            new double[]{11,10,9,8,7},5,0,DamageType.MAGICAL);
+            resourceCost = 45;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double dmg=s.calcMagicalDamage(40+s.getFinalAP()*0.4,null);
@@ -56,7 +60,8 @@ public class Leona extends BaseChampion {
 
     static class W extends BaseAbility {
         W(){super("w_leona","Éclat Solaire",Material.GOLDEN_CHESTPLATE,AbilitySlot.W,
-            new double[]{14,13,12,11,10},0,0,DamageType.TRUE);}
+            new double[]{14,13,12,11,10},0,0,DamageType.TRUE);
+            resourceCost = 45;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             c.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE,60,2,false,true));
             c.sendActionBar(Component.text("🛡 Éclat Solaire 3s!",NamedTextColor.GOLD));
@@ -66,7 +71,8 @@ public class Leona extends BaseChampion {
 
     static class E extends BaseAbility {
         E(){super("e_leona","Zenith Blade",Material.BLAZE_ROD,AbilitySlot.E,
-            new double[]{13,12,11,10,9},20,0,DamageType.MAGICAL);}
+            new double[]{13,12,11,10,9},20,0,DamageType.MAGICAL);
+            resourceCost = 55;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             Location dest=safeTeleport(c.getLocation(),t.getLocation());
@@ -83,7 +89,8 @@ public class Leona extends BaseChampion {
 
     static class R extends BaseAbility {
         R(){super("r_leona","Éclipse Solaire",Material.SUNFLOWER,AbilitySlot.R,
-            new double[]{130,105,80},25,4,DamageType.MAGICAL);}
+            new double[]{130,105,80},25,4,DamageType.MAGICAL);
+            resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double dmg=100+s.getFinalAP()*0.7;

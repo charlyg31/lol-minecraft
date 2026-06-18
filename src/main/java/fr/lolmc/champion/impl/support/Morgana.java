@@ -2,6 +2,7 @@ package fr.lolmc.champion.impl.support;
 
 import fr.lolmc.LolPlugin;
 import fr.lolmc.ability.base.BaseAbility;
+import fr.lolmc.stats.ResourceSystem;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.stats.ChampionStats;
 import net.kyori.adventure.text.Component;
@@ -23,11 +24,13 @@ public class Morgana extends BaseChampion {
     @Override protected void registerAbilities() {
         setAbility(0,new AA()); setAbility(1,new Q());
         setAbility(2,new W()); setAbility(3,new E()); setAbility(4,new R());
+        initSystems(560, 7.0, ResourceSystem.ResourceType.MANA, 480, 12.0);
     }
 
     static class AA extends BaseAbility {
         AA(){super("aa_morgana","Attaque de base",Material.PURPLE_DYE,AbilitySlot.AA,
-            new double[]{0.5},5,0,DamageType.MAGICAL);}
+            new double[]{0.5},5,0,DamageType.MAGICAL);
+            resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double dmg=s.calcMagicalDamage(s.getFinalAP()*0.3,null);
@@ -40,7 +43,8 @@ public class Morgana extends BaseChampion {
 
     static class Q extends BaseAbility {
         Q(){super("q_morgana","Filet des Ombres",Material.LEAD,AbilitySlot.Q,
-            new double[]{11,10.5,10,9.5,9},20,0,DamageType.MAGICAL);}
+            new double[]{11,10.5,10,9.5,9},20,0,DamageType.MAGICAL);
+            resourceCost = 50;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double dmg=s.calcMagicalDamage(80+s.getFinalAP()*0.9,null);
@@ -56,7 +60,8 @@ public class Morgana extends BaseChampion {
 
     static class W extends BaseAbility {
         W(){super("w_morgana","Emprisonnement Torturé",Material.NETHERRACK,AbilitySlot.W,
-            new double[]{10,9,8,7,6},20,4,DamageType.MAGICAL);}
+            new double[]{10,9,8,7,6},20,4,DamageType.MAGICAL);
+            resourceCost = 25;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             Location loc=t.getLocation();
@@ -80,7 +85,8 @@ public class Morgana extends BaseChampion {
 
     static class E extends BaseAbility {
         E(){super("e_morgana","Bouclier Noir",Material.BLACK_STAINED_GLASS,AbilitySlot.E,
-            new double[]{23,21,19,17,15},0,0,DamageType.TRUE);}
+            new double[]{23,21,19,17,15},0,0,DamageType.TRUE);
+            resourceCost = 80;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             Player dest=t!=null?t:c;
             dest.addPotionEffect(new PotionEffect(PotionEffectType.ABSORPTION,100,2,false,true));
@@ -92,7 +98,8 @@ public class Morgana extends BaseChampion {
 
     static class R extends BaseAbility {
         R(){super("r_morgana","Chaînes de la Corruption",Material.CHAIN,AbilitySlot.R,
-            new double[]{120,110,100},20,5,DamageType.MAGICAL);}
+            new double[]{120,110,100},20,5,DamageType.MAGICAL);
+            resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             double dmg=150+s.getFinalAP()*0.7;
             c.getWorld().getNearbyEntities(c.getLocation(),5,2,5).stream()

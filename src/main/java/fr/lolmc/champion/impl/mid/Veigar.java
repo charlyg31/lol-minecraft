@@ -2,6 +2,7 @@ package fr.lolmc.champion.impl.mid;
 
 import fr.lolmc.LolPlugin;
 import fr.lolmc.ability.base.BaseAbility;
+import fr.lolmc.stats.ResourceSystem;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.stats.ChampionStats;
 import net.kyori.adventure.text.Component;
@@ -23,13 +24,15 @@ public class Veigar extends BaseChampion {
     @Override protected void registerAbilities() {
         setAbility(0,new AA()); setAbility(1,new Q());
         setAbility(2,new W()); setAbility(3,new E()); setAbility(4,new R());
+        initSystems(491, 6.0, ResourceSystem.ResourceType.MANA, 490, 11.0);
     }
 
     public static final Map<UUID,Integer> apStacks=new HashMap<>();
 
     static class AA extends BaseAbility {
         AA(){super("aa_veigar","Attaque de base",Material.PURPLE_DYE,AbilitySlot.AA,
-            new double[]{0.5},5,0,DamageType.MAGICAL);}
+            new double[]{0.5},5,0,DamageType.MAGICAL);
+            resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double dmg=s.calcMagicalDamage(s.getFinalAP()*0.6,null);
@@ -42,7 +45,8 @@ public class Veigar extends BaseChampion {
 
     static class Q extends BaseAbility {
         Q(){super("q_veigar","Singularité Primordiale",Material.AMETHYST_SHARD,AbilitySlot.Q,
-            new double[]{5,4.5,4,3.5,3},20,0,DamageType.MAGICAL);}
+            new double[]{5,4.5,4,3.5,3},20,0,DamageType.MAGICAL);
+            resourceCost = 40;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double dmg=s.calcMagicalDamage(90+s.getFinalAP()*0.6,null);
@@ -59,7 +63,8 @@ public class Veigar extends BaseChampion {
 
     static class W extends BaseAbility {
         W(){super("w_veigar","Météorite Sombre",Material.OBSIDIAN,AbilitySlot.W,
-            new double[]{10,9,8,7,6},20,3,DamageType.MAGICAL);}
+            new double[]{10,9,8,7,6},20,3,DamageType.MAGICAL);
+            resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             Location loc=t.getLocation();
@@ -81,7 +86,8 @@ public class Veigar extends BaseChampion {
 
     static class E extends BaseAbility {
         E(){super("e_veigar","Cage Événementielle",Material.DARK_OAK_FENCE,AbilitySlot.E,
-            new double[]{18,16,14,12,10},20,4,DamageType.TRUE);}
+            new double[]{18,16,14,12,10},20,4,DamageType.TRUE);
+            resourceCost = 80;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             Location center=t.getLocation();
@@ -101,7 +107,8 @@ public class Veigar extends BaseChampion {
 
     static class R extends BaseAbility {
         R(){super("r_veigar","Doom",Material.NETHER_STAR,AbilitySlot.R,
-            new double[]{120,100,80},20,0,DamageType.MAGICAL);}
+            new double[]{120,100,80},20,0,DamageType.MAGICAL);
+            resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double missing=1.0+(1.0-t.getHealth()/t.getMaxHealth())*0.75;

@@ -2,6 +2,7 @@ package fr.lolmc.champion.impl.mid;
 
 import fr.lolmc.LolPlugin;
 import fr.lolmc.ability.base.BaseAbility;
+import fr.lolmc.stats.ResourceSystem;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.stats.ChampionStats;
 import net.kyori.adventure.text.Component;
@@ -23,6 +24,7 @@ public class Zed extends BaseChampion {
     @Override protected void registerAbilities() {
         setAbility(0,new AA()); setAbility(1,new Q());
         setAbility(2,new W()); setAbility(3,new E()); setAbility(4,new R());
+        initSystems(582, 7.0, ResourceSystem.ResourceType.ENERGY, 200, 50.0);
     }
 
     // Ombre active par joueur
@@ -30,7 +32,8 @@ public class Zed extends BaseChampion {
 
     static class AA extends BaseAbility {
         AA(){super("aa_zed","Attaque de base",Material.IRON_SWORD,AbilitySlot.AA,
-            new double[]{0.5},5,0,DamageType.PHYSICAL);}
+            new double[]{0.5},5,0,DamageType.PHYSICAL);
+            resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double dmg=s.calcAutoAttackDamage(null);
@@ -43,7 +46,8 @@ public class Zed extends BaseChampion {
 
     static class Q extends BaseAbility {
         Q(){super("q_zed","Lames Tourbillonnantes",Material.ARROW,AbilitySlot.Q,
-            new double[]{6,5.5,5,4.5,4},20,0,DamageType.PHYSICAL);}
+            new double[]{6,5.5,5,4.5,4},20,0,DamageType.PHYSICAL);
+            resourceCost = 40;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double dmg=s.calcPhysicalDamage(70+s.getFinalAD()*0.9,null);
@@ -57,7 +61,8 @@ public class Zed extends BaseChampion {
 
     static class W extends BaseAbility {
         W(){super("w_zed","Ombre Vivante",Material.GRAY_DYE,AbilitySlot.W,
-            new double[]{20,18,16,14,12},0,0,DamageType.TRUE);}
+            new double[]{20,18,16,14,12},0,0,DamageType.TRUE);
+            resourceCost = 40;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(shadows.containsKey(c.getUniqueId())) {
                 // Double cast: téléportation sur l'ombre
@@ -81,7 +86,8 @@ public class Zed extends BaseChampion {
 
     static class E extends BaseAbility {
         E(){super("e_zed","Ombre Tranchante",Material.DARK_OAK_SWORD,AbilitySlot.E,
-            new double[]{4,3,2,1,0.5},5,4,DamageType.PHYSICAL);}
+            new double[]{4,3,2,1,0.5},5,4,DamageType.PHYSICAL);
+            resourceCost = 50;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             double dmg=45+s.getFinalAD()*0.8;
             c.getWorld().getNearbyEntities(c.getLocation(),4,2,4).stream()
@@ -99,7 +105,8 @@ public class Zed extends BaseChampion {
 
     static class R extends BaseAbility {
         R(){super("r_zed","Mort en Sursis",Material.WITHER_ROSE,AbilitySlot.R,
-            new double[]{120,100,80},20,0,DamageType.TRUE);}
+            new double[]{120,100,80},20,0,DamageType.TRUE);
+            resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             t.sendActionBar(Component.text("💀 Mort en Sursis — 3s...",NamedTextColor.DARK_RED));

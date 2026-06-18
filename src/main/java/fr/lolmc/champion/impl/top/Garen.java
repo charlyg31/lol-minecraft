@@ -2,6 +2,7 @@ package fr.lolmc.champion.impl.top;
 
 import fr.lolmc.LolPlugin;
 import fr.lolmc.ability.base.BaseAbility;
+import fr.lolmc.stats.ResourceSystem;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.stats.ChampionStats;
 import net.kyori.adventure.text.Component;
@@ -23,11 +24,13 @@ public class Garen extends BaseChampion {
     @Override protected void registerAbilities() {
         setAbility(0,new AA()); setAbility(1,new Q());
         setAbility(2,new W()); setAbility(3,new E()); setAbility(4,new R());
+        initSystems(620, 8.0, ResourceSystem.ResourceType.NONE, 0, 0.0);
     }
 
     static class AA extends BaseAbility {
         AA(){super("aa_garen","Attaque de base",Material.IRON_SWORD,AbilitySlot.AA,
-            new double[]{0.5},5,0,DamageType.PHYSICAL);}
+            new double[]{0.5},5,0,DamageType.PHYSICAL);
+            resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double dmg=s.calcAutoAttackDamage(null);
@@ -41,7 +44,8 @@ public class Garen extends BaseChampion {
     // Q — Jugement Décisif
     static class Q extends BaseAbility {
         Q(){super("q_garen","Jugement Décisif",Material.GOLDEN_SWORD,AbilitySlot.Q,
-            new double[]{8,7.5,7,6.5,6},5,0,DamageType.PHYSICAL);}
+            new double[]{8,7.5,7,6.5,6},5,0,DamageType.PHYSICAL);
+            resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double dmg=s.calcPhysicalDamage(30+s.getFinalAD()*1.4,null);
@@ -59,7 +63,8 @@ public class Garen extends BaseChampion {
     // W — Courage
     static class W extends BaseAbility {
         W(){super("w_garen","Courage",Material.SHIELD,AbilitySlot.W,
-            new double[]{23,21,19,17,15},0,0,DamageType.TRUE);}
+            new double[]{23,21,19,17,15},0,0,DamageType.TRUE);
+            resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             c.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE,40,1,false,true));
             c.sendActionBar(Component.text("🛡 Courage actif!",NamedTextColor.GOLD));
@@ -72,7 +77,8 @@ public class Garen extends BaseChampion {
     // E — Tournoiement
     static class E extends BaseAbility {
         E(){super("e_garen","Tournoiement",Material.COMPASS,AbilitySlot.E,
-            new double[]{9,8,7,6,5},5,4,DamageType.PHYSICAL);}
+            new double[]{9,8,7,6,5},5,4,DamageType.PHYSICAL);
+            resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             c.sendActionBar(Component.text("⚔ Tournoiement!",NamedTextColor.GOLD));
             new BukkitRunnable(){
@@ -97,7 +103,8 @@ public class Garen extends BaseChampion {
     // R — Exécution
     static class R extends BaseAbility {
         R(){super("r_garen","Exécution",Material.NETHERITE_SWORD,AbilitySlot.R,
-            new double[]{120,100,80},25,0,DamageType.TRUE);}
+            new double[]{120,100,80},25,0,DamageType.TRUE);
+            resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double missing=1.0-t.getHealth()/t.getMaxHealth();

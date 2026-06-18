@@ -2,6 +2,7 @@ package fr.lolmc.champion.impl.top;
 
 import fr.lolmc.LolPlugin;
 import fr.lolmc.ability.base.BaseAbility;
+import fr.lolmc.stats.ResourceSystem;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.stats.ChampionStats;
 import net.kyori.adventure.text.Component;
@@ -23,11 +24,13 @@ public class Darius extends BaseChampion {
     @Override protected void registerAbilities() {
         setAbility(0,new AA()); setAbility(1,new Q());
         setAbility(2,new W()); setAbility(3,new E()); setAbility(4,new R());
+        initSystems(582, 8.0, ResourceSystem.ResourceType.NONE, 0, 0.0);
     }
 
     static class AA extends BaseAbility {
         AA(){super("aa_darius","Attaque de base",Material.IRON_AXE,AbilitySlot.AA,
-            new double[]{0.5},5,0,DamageType.PHYSICAL);}
+            new double[]{0.5},5,0,DamageType.PHYSICAL);
+            resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double dmg=s.calcAutoAttackDamage(null);
@@ -40,7 +43,8 @@ public class Darius extends BaseChampion {
 
     static class Q extends BaseAbility {
         Q(){super("q_darius","Lacération",Material.NETHERITE_AXE,AbilitySlot.Q,
-            new double[]{9,8,7,6,5},5,5,DamageType.PHYSICAL);}
+            new double[]{9,8,7,6,5},5,5,DamageType.PHYSICAL);
+            resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             c.getWorld().getNearbyEntities(c.getLocation(),5,2,5).stream()
                 .filter(e->e instanceof Player&&!e.equals(c))
@@ -60,7 +64,8 @@ public class Darius extends BaseChampion {
 
     static class W extends BaseAbility {
         W(){super("w_darius","Destruction",Material.GOLDEN_AXE,AbilitySlot.W,
-            new double[]{9,8,7,6,5},5,0,DamageType.PHYSICAL);}
+            new double[]{9,8,7,6,5},5,0,DamageType.PHYSICAL);
+            resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double dmg=s.calcPhysicalDamage(s.getFinalAD()*2.0,null);
@@ -74,7 +79,8 @@ public class Darius extends BaseChampion {
 
     static class E extends BaseAbility {
         E(){super("e_darius","Appréhension",Material.FISHING_ROD,AbilitySlot.E,
-            new double[]{24,21,18,15,12},5,5,DamageType.PHYSICAL);}
+            new double[]{24,21,18,15,12},5,5,DamageType.PHYSICAL);
+            resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             c.getWorld().getNearbyEntities(c.getLocation(),5,2,5).stream()
                 .filter(e->e instanceof Player&&!e.equals(c))
@@ -90,7 +96,8 @@ public class Darius extends BaseChampion {
 
     static class R extends BaseAbility {
         R(){super("r_darius","Guillotine Noxienne",Material.NETHERITE_AXE,AbilitySlot.R,
-            new double[]{120,100,80},5,0,DamageType.TRUE);}
+            new double[]{120,100,80},5,0,DamageType.TRUE);
+            resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double dmg=s.calcTrueDamage(100+level*40+s.getFinalAD()*0.75);

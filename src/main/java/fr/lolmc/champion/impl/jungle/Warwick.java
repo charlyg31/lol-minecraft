@@ -2,6 +2,7 @@ package fr.lolmc.champion.impl.jungle;
 
 import fr.lolmc.LolPlugin;
 import fr.lolmc.ability.base.BaseAbility;
+import fr.lolmc.stats.ResourceSystem;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.stats.ChampionStats;
 import net.kyori.adventure.text.Component;
@@ -23,11 +24,13 @@ public class Warwick extends BaseChampion {
     @Override protected void registerAbilities() {
         setAbility(0,new AA()); setAbility(1,new Q());
         setAbility(2,new W()); setAbility(3,new E()); setAbility(4,new R());
+        initSystems(577, 9.0, ResourceSystem.ResourceType.NONE, 0, 0.0);
     }
 
     static class AA extends BaseAbility {
         AA(){super("aa_warwick","Attaque de base",Material.IRON_SWORD,AbilitySlot.AA,
-            new double[]{0.5},5,0,DamageType.PHYSICAL);}
+            new double[]{0.5},5,0,DamageType.PHYSICAL);
+            resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double dmg=s.calcAutoAttackDamage(null);
@@ -40,7 +43,8 @@ public class Warwick extends BaseChampion {
 
     static class Q extends BaseAbility {
         Q(){super("q_warwick","Morsure Infectée",Material.BONE,AbilitySlot.Q,
-            new double[]{6,5,4,3,2},20,0,DamageType.MAGICAL);}
+            new double[]{6,5,4,3,2},20,0,DamageType.MAGICAL);
+            resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double dmg=s.calcMagicalDamage(10+s.getFinalAD()+s.getFinalAP()*0.5,null);
@@ -57,7 +61,8 @@ public class Warwick extends BaseChampion {
 
     static class W extends BaseAbility {
         W(){super("w_warwick","Meute de Prédateurs",Material.RED_WOOL,AbilitySlot.W,
-            new double[]{0,0,0,0,0},0,0,DamageType.TRUE);}
+            new double[]{0,0,0,0,0},0,0,DamageType.TRUE);
+            resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             c.addPotionEffect(new PotionEffect(PotionEffectType.SPEED,60,2,false,true));
             c.sendActionBar(Component.text("🐺 Meute actif!",NamedTextColor.RED));
@@ -67,7 +72,8 @@ public class Warwick extends BaseChampion {
 
     static class E extends BaseAbility {
         E(){super("e_warwick","Peur au Ventre",Material.SPIDER_EYE,AbilitySlot.E,
-            new double[]{22,20,18,16,14},5,3,DamageType.PHYSICAL);}
+            new double[]{22,20,18,16,14},5,3,DamageType.PHYSICAL);
+            resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             c.getWorld().getNearbyEntities(c.getLocation(),3,2,3).stream()
                 .filter(e->e instanceof Player&&!e.equals(c))
@@ -81,7 +87,8 @@ public class Warwick extends BaseChampion {
 
     static class R extends BaseAbility {
         R(){super("r_warwick","Chasse Infinie",Material.RED_WOOL,AbilitySlot.R,
-            new double[]{110,85,60},25,0,DamageType.PHYSICAL);}
+            new double[]{110,85,60},25,0,DamageType.PHYSICAL);
+            resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             Location dest=safeTeleport(c.getLocation(),t.getLocation());

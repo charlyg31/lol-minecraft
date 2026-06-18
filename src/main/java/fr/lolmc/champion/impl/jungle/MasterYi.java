@@ -2,6 +2,7 @@ package fr.lolmc.champion.impl.jungle;
 
 import fr.lolmc.LolPlugin;
 import fr.lolmc.ability.base.BaseAbility;
+import fr.lolmc.stats.ResourceSystem;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.stats.ChampionStats;
 import net.kyori.adventure.text.Component;
@@ -23,11 +24,13 @@ public class MasterYi extends BaseChampion {
     @Override protected void registerAbilities() {
         setAbility(0,new AA()); setAbility(1,new Q());
         setAbility(2,new W()); setAbility(3,new E()); setAbility(4,new R());
+        initSystems(559, 7.0, ResourceSystem.ResourceType.NONE, 0, 0.0);
     }
 
     static class AA extends BaseAbility {
         AA(){super("aa_masteryi","Attaque de base",Material.IRON_SWORD,AbilitySlot.AA,
-            new double[]{0.5},5,0,DamageType.PHYSICAL);}
+            new double[]{0.5},5,0,DamageType.PHYSICAL);
+            resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double dmg=s.calcAutoAttackDamage(null);
@@ -40,7 +43,8 @@ public class MasterYi extends BaseChampion {
 
     static class Q extends BaseAbility {
         Q(){super("q_masteryi","Frappe Alpha",Material.ENDER_PEARL,AbilitySlot.Q,
-            new double[]{18,16,14,12,10},15,0,DamageType.TRUE);}
+            new double[]{18,16,14,12,10},15,0,DamageType.TRUE);
+            resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             Location dest=safeTeleport(c.getLocation(),t.getLocation());
@@ -56,7 +60,8 @@ public class MasterYi extends BaseChampion {
 
     static class W extends BaseAbility {
         W(){super("w_masteryi","Méditation",Material.GOLDEN_APPLE,AbilitySlot.W,
-            new double[]{35,30,25,20,15},0,0,DamageType.TRUE);}
+            new double[]{35,30,25,20,15},0,0,DamageType.TRUE);
+            resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             c.addPotionEffect(new PotionEffect(PotionEffectType.REGENERATION,80,4,false,true));
             c.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE,80,2,false,true));
@@ -67,7 +72,8 @@ public class MasterYi extends BaseChampion {
 
     static class E extends BaseAbility {
         E(){super("e_masteryi","Style Wuju",Material.BLAZE_ROD,AbilitySlot.E,
-            new double[]{18,17,16,15,14},0,0,DamageType.TRUE);}
+            new double[]{18,17,16,15,14},0,0,DamageType.TRUE);
+            resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             c.addPotionEffect(new PotionEffect(PotionEffectType.STRENGTH,100,1,false,true));
             c.sendActionBar(Component.text("⚔ Wuju actif 5s!",NamedTextColor.YELLOW));
@@ -79,7 +85,8 @@ public class MasterYi extends BaseChampion {
 
     static class R extends BaseAbility {
         R(){super("r_masteryi","Highlander",Material.FEATHER,AbilitySlot.R,
-            new double[]{85,70,55},0,0,DamageType.TRUE);}
+            new double[]{85,70,55},0,0,DamageType.TRUE);
+            resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             c.addPotionEffect(new PotionEffect(PotionEffectType.SPEED,140,3,false,true));
             c.addPotionEffect(new PotionEffect(PotionEffectType.HASTE,140,2,false,true));

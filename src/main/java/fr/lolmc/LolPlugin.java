@@ -1,9 +1,11 @@
 package fr.lolmc;
 
 import fr.lolmc.listener.AbilityListener;
+import fr.lolmc.listener.HealthListener;
 import fr.lolmc.listener.ChampionCommand;
 import fr.lolmc.listener.GUIListener;
 import fr.lolmc.manager.ChampionGUI;
+import fr.lolmc.manager.HUDManager;
 import fr.lolmc.manager.ChampionManager;
 import fr.lolmc.manager.HeadManager;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -15,6 +17,7 @@ public class LolPlugin extends JavaPlugin {
     private HeadManager headManager;
     private ChampionGUI championGUI;
     private GUIListener guiListener;
+    private HUDManager hudManager;
 
     @Override
     public void onEnable() {
@@ -22,11 +25,13 @@ public class LolPlugin extends JavaPlugin {
         saveDefaultConfig();
 
         championManager = new ChampionManager();
+        hudManager = new HUDManager(championManager);
         headManager     = new HeadManager(this);
         championGUI     = new ChampionGUI(championManager, headManager);
-        guiListener     = new GUIListener(championGUI, championManager, headManager);
+        guiListener     = new GUIListener(championGUI, championManager, headManager, hudManager);
 
         getServer().getPluginManager().registerEvents(new AbilityListener(championManager), this);
+        getServer().getPluginManager().registerEvents(new HealthListener(championManager, hudManager), this);
         getServer().getPluginManager().registerEvents(guiListener, this);
 
         var cmd = getCommand("champion");
@@ -49,4 +54,5 @@ public class LolPlugin extends JavaPlugin {
     public HeadManager getHeadManager()         { return headManager; }
     public ChampionGUI getChampionGUI()         { return championGUI; }
     public GUIListener getGUIListener()         { return guiListener; }
+    public HUDManager getHUDManager()           { return hudManager; }
 }

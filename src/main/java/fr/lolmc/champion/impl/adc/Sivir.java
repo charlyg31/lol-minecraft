@@ -2,6 +2,7 @@ package fr.lolmc.champion.impl.adc;
 
 import fr.lolmc.LolPlugin;
 import fr.lolmc.ability.base.BaseAbility;
+import fr.lolmc.stats.ResourceSystem;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.stats.ChampionStats;
 import net.kyori.adventure.text.Component;
@@ -23,11 +24,13 @@ public class Sivir extends BaseChampion {
     @Override protected void registerAbilities() {
         setAbility(0,new AA()); setAbility(1,new Q());
         setAbility(2,new W()); setAbility(3,new E()); setAbility(4,new R());
+        initSystems(532, 3.0, ResourceSystem.ResourceType.MANA, 450, 11.0);
     }
 
     static class AA extends BaseAbility {
         AA(){super("aa_sivir","Attaque de base",Material.STONE_SWORD,AbilitySlot.AA,
-            new double[]{0.5},5,0,DamageType.PHYSICAL);}
+            new double[]{0.5},5,0,DamageType.PHYSICAL);
+            resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double dmg=s.calcAutoAttackDamage(null);
@@ -40,7 +43,8 @@ public class Sivir extends BaseChampion {
 
     static class Q extends BaseAbility {
         Q(){super("q_sivir","Lame Boomerang",Material.IRON_AXE,AbilitySlot.Q,
-            new double[]{9,8,7,6,5},25,0,DamageType.PHYSICAL);}
+            new double[]{9,8,7,6,5},25,0,DamageType.PHYSICAL);
+            resourceCost = 70;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double dmg=s.calcPhysicalDamage(50+s.getFinalAD()*0.5,null);
@@ -61,7 +65,8 @@ public class Sivir extends BaseChampion {
 
     static class W extends BaseAbility {
         W(){super("w_sivir","Ricochets",Material.MUSIC_DISC_CAT,AbilitySlot.W,
-            new double[]{10,9,8,7,6},0,0,DamageType.PHYSICAL);}
+            new double[]{10,9,8,7,6},0,0,DamageType.PHYSICAL);
+            resourceCost = 22;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             c.addPotionEffect(new PotionEffect(PotionEffectType.STRENGTH,100,0,false,true));
             c.addPotionEffect(new PotionEffect(PotionEffectType.HASTE,100,1,false,true));
@@ -72,7 +77,8 @@ public class Sivir extends BaseChampion {
 
     static class E extends BaseAbility {
         E(){super("e_sivir","Bouclier Maléfique",Material.SHIELD,AbilitySlot.E,
-            new double[]{22,20,18,16,14},0,0,DamageType.TRUE);}
+            new double[]{22,20,18,16,14},0,0,DamageType.TRUE);
+            resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             c.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE,40,3,false,true));
             c.sendActionBar(Component.text("🛡 Bouclier Maléfique!",NamedTextColor.GREEN));
@@ -82,7 +88,8 @@ public class Sivir extends BaseChampion {
 
     static class R extends BaseAbility {
         R(){super("r_sivir","Appel des Flèches",Material.GOLDEN_AXE,AbilitySlot.R,
-            new double[]{120,100,80},0,0,DamageType.TRUE);}
+            new double[]{120,100,80},0,0,DamageType.TRUE);
+            resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             c.addPotionEffect(new PotionEffect(PotionEffectType.SPEED,80,2,false,true));
             c.addPotionEffect(new PotionEffect(PotionEffectType.HASTE,80,2,false,true));
