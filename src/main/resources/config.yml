@@ -1,0 +1,31 @@
+# LoL MC — Configuration des textures de têtes
+# Pour chaque champion, colle la valeur "Value" depuis :
+# https://minecraft-heads.com/custom-heads/tag/League-of-Legends
+# Cherche le nom du champion, clique dessus, copie le champ "Value" (base64)
+
+heads:
+  # TOP
+  garen:       "PASTE_VALUE_HERE"
+  malphite:    "PASTE_VALUE_HERE"
+  darius:      "PASTE_VALUE_HERE"
+  nasus:       "PASTE_VALUE_HERE"
+  # JUNGLE
+  warwick:     "PASTE_VALUE_HERE"
+  amumu:       "PASTE_VALUE_HERE"
+  masteryi:    "PASTE_VALUE_HERE"
+  leesin:      "PASTE_VALUE_HERE"
+  # MID
+  annie:       "PASTE_VALUE_HERE"
+  veigar:      "PASTE_VALUE_HERE"
+  zed:         "PASTE_VALUE_HERE"
+  yasuo:       "PASTE_VALUE_HERE"
+  # SUPPORT
+  morgana:     "PASTE_VALUE_HERE"
+  leona:       "PASTE_VALUE_HERE"
+  blitzcrank:  "PASTE_VALUE_HERE"
+  janna:       "PASTE_VALUE_HERE"
+  # ADC
+  ashe:        "PASTE_VALUE_HERE"
+  sivir:       "PASTE_VALUE_HERE"
+  jinx:        "PASTE_VALUE_HERE"
+  missfortune: "PASTE_VALUE_HERE"

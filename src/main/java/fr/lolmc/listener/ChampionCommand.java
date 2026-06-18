@@ -1,6 +1,7 @@
 package fr.lolmc.listener;
 
 import fr.lolmc.champion.base.BaseChampion;
+import fr.lolmc.manager.ChampionGUI;
 import fr.lolmc.manager.ChampionManager;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -17,9 +18,11 @@ import java.util.List;
 public class ChampionCommand implements CommandExecutor, TabCompleter {
 
     private final ChampionManager manager;
+    private final ChampionGUI gui;
 
-    public ChampionCommand(ChampionManager manager) {
+    public ChampionCommand(ChampionManager manager, ChampionGUI gui) {
         this.manager = manager;
+        this.gui = gui;
     }
 
     @Override
@@ -35,6 +38,7 @@ public class ChampionCommand implements CommandExecutor, TabCompleter {
         }
 
         switch (args[0].toLowerCase()) {
+            case "gui" -> gui.open(player);
             case "pick" -> {
                 if (args.length < 2) {
                     player.sendMessage("§cUsage: /champion pick <nom>");
@@ -58,6 +62,8 @@ public class ChampionCommand implements CommandExecutor, TabCompleter {
     private void sendHelp(Player player) {
         player.sendMessage(Component.text("══ LoL MC - Champions ══", NamedTextColor.GOLD)
                 .decoration(TextDecoration.BOLD, true));
+        player.sendMessage(Component.text("/champion gui", NamedTextColor.YELLOW)
+                .append(Component.text(" - Ouvrir le menu de sélection", NamedTextColor.GRAY)));
         player.sendMessage(Component.text("/champion pick <nom>", NamedTextColor.YELLOW)
                 .append(Component.text(" - Choisir un champion", NamedTextColor.GRAY)));
         player.sendMessage(Component.text("/champion list [role]", NamedTextColor.YELLOW)
@@ -130,7 +136,7 @@ public class ChampionCommand implements CommandExecutor, TabCompleter {
     public List<String> onTabComplete(CommandSender sender, Command cmd, String alias, String[] args) {
         List<String> completions = new ArrayList<>();
         if (args.length == 1) {
-            completions.addAll(List.of("pick", "list", "info"));
+            completions.addAll(List.of("gui", "pick", "list", "info"));
         } else if (args.length == 2) {
             if (args[0].equalsIgnoreCase("pick")) {
                 for (BaseChampion c : manager.getAllChampions()) {
