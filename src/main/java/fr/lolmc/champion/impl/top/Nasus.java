@@ -2,6 +2,7 @@ package fr.lolmc.champion.impl.top;
 
 import fr.lolmc.LolPlugin;
 import fr.lolmc.ability.base.BaseAbility;
+import fr.lolmc.stats.ResourceSystem;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.stats.ChampionStats;
 import net.kyori.adventure.text.Component;
@@ -23,6 +24,7 @@ public class Nasus extends BaseChampion {
     @Override protected void registerAbilities() {
         setAbility(0,new AA()); setAbility(1,new Q());
         setAbility(2,new W()); setAbility(3,new E()); setAbility(4,new R());
+        initSystems(616, 9.0, ResourceSystem.ResourceType.MANA, 380, 9.0);
     }
 
     // Stacks Q globaux par UUID
@@ -30,7 +32,8 @@ public class Nasus extends BaseChampion {
 
     static class AA extends BaseAbility {
         AA(){super("aa_nasus","Attaque de base",Material.BONE,AbilitySlot.AA,
-            new double[]{0.5},5,0,DamageType.PHYSICAL);}
+            new double[]{0.5},5,0,DamageType.PHYSICAL);
+            resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double dmg=s.calcAutoAttackDamage(null);
@@ -43,7 +46,8 @@ public class Nasus extends BaseChampion {
 
     static class Q extends BaseAbility {
         Q(){super("q_nasus","Frappe du Faucheur",Material.BONE,AbilitySlot.Q,
-            new double[]{8,7,6,5,4},5,0,DamageType.PHYSICAL);}
+            new double[]{8,7,6,5,4},5,0,DamageType.PHYSICAL);
+            resourceCost = 20;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             int stacks=qStacks.getOrDefault(c.getUniqueId(),0);
@@ -59,7 +63,8 @@ public class Nasus extends BaseChampion {
 
     static class W extends BaseAbility {
         W(){super("w_nasus","Flétrissure",Material.WITHER_ROSE,AbilitySlot.W,
-            new double[]{15,14,13,12,11},20,0,DamageType.MAGICAL);}
+            new double[]{15,14,13,12,11},20,0,DamageType.MAGICAL);
+            resourceCost = 80;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             t.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,100,2,false,true));
@@ -70,7 +75,8 @@ public class Nasus extends BaseChampion {
 
     static class E extends BaseAbility {
         E(){super("e_nasus","Esprit du Vide",Material.PURPLE_WOOL,AbilitySlot.E,
-            new double[]{12,11,10,9,8},20,3,DamageType.MAGICAL);}
+            new double[]{12,11,10,9,8},20,3,DamageType.MAGICAL);
+            resourceCost = 70;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             Location loc=t.getLocation();
@@ -94,7 +100,8 @@ public class Nasus extends BaseChampion {
 
     static class R extends BaseAbility {
         R(){super("r_nasus","Furie des Sables",Material.GOLDEN_HELMET,AbilitySlot.R,
-            new double[]{120,100,80},0,3,DamageType.MAGICAL);}
+            new double[]{120,100,80},0,3,DamageType.MAGICAL);
+            resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             c.addPotionEffect(new PotionEffect(PotionEffectType.HEALTH_BOOST,300,2,false,true));
             c.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE,300,1,false,true));

@@ -1,5 +1,8 @@
 package fr.lolmc.champion.base;
 
+import fr.lolmc.stats.HPSystem;
+import fr.lolmc.stats.ResourceSystem;
+
 import fr.lolmc.ability.base.BaseAbility;
 import fr.lolmc.stats.ChampionStats;
 import net.kyori.adventure.text.Component;
@@ -13,6 +16,8 @@ public abstract class BaseChampion {
     protected final ChampionRole role;
     protected final ChampionStats stats;
     protected final BaseAbility[] abilities = new BaseAbility[5];
+    protected HPSystem hpSystem;
+    protected ResourceSystem resourceSystem;
 
     public enum ChampionRole { TOP, JUNGLE, MID, SUPPORT, ADC }
 
@@ -20,6 +25,14 @@ public abstract class BaseChampion {
         this.id = id; this.displayName = displayName;
         this.role = role; this.stats = stats;
         registerAbilities();
+        // HPSystem et ResourceSystem initialisés par les sous-classes via initSystems()
+    }
+
+    protected void initSystems(double maxHP, double hpRegen,
+                                ResourceSystem.ResourceType resType,
+                                double maxResource, double resRegen) {
+        this.hpSystem = new HPSystem(maxHP, hpRegen);
+        this.resourceSystem = new ResourceSystem(resType, maxResource, resRegen);
     }
 
     protected abstract void registerAbilities();
@@ -57,6 +70,25 @@ public abstract class BaseChampion {
             return;
         }
 
+        // Vérifier et consommer la ressource (mana/énergie)
+        if (resourceSystem != null && ability.getResourceCost() > 0) {
+            if (!resourceSystem.consume(ability.getResourceCost())) {
+                String resName = switch (resourceSystem.getType()) {
+                    case MANA   -> "mana";
+                    case ENERGY -> "énergie";
+                    case FLOW   -> "flow";
+                    case FURY   -> "furie";
+                    default     -> "ressource";
+                };
+                caster.sendActionBar(Component.text(
+                    String.format("❌ Pas assez de %s (%s: %.0f/%.0f)",
+                        resName, ability.getName(),
+                        resourceSystem.getCurrent(), resourceSystem.getMax()),
+                    NamedTextColor.RED));
+                return;
+            }
+        }
+
         ability.cast(caster, stats, target);
         ability.triggerCooldown(caster);
         // Refresh tooltip après le cast
@@ -79,6 +111,9 @@ public abstract class BaseChampion {
     public ChampionStats     getStats()       { return stats; }
     public BaseAbility[]     getAbilities()   { return abilities; }
     public BaseAbility       getAbility(int i){ return (i>=0&&i<5)?abilities[i]:null; }
+
+    public HPSystem getHPSystem()           { return hpSystem; }
+    public ResourceSystem getResourceSystem() { return resourceSystem; }
 
     protected void setAbility(int slot, BaseAbility a) {
         if (slot >= 0 && slot < 5) abilities[slot] = a;

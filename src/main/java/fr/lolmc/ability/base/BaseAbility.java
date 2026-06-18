@@ -30,6 +30,7 @@ public abstract class BaseAbility {
     protected final double aoeRadius;
     protected final DamageType damageType;
 
+    protected double resourceCost; // coût en mana/énergie par cast (0 = gratuit)
     private final Map<UUID, Long> cooldowns = new HashMap<>();
 
     public enum AbilitySlot { AA, Q, W, E, R }
@@ -164,6 +165,9 @@ public abstract class BaseAbility {
         lore.add(stat("Cooldown", String.format("%.1fs", getCurrentCooldown(stats))));
         if (range > 0)     lore.add(stat("Portée",         String.format("%.0f blocs", range)));
         if (aoeRadius > 0) lore.add(stat("Zone d'effet",   String.format("%.0f blocs", aoeRadius)));
+        if (resourceCost > 0) {
+            lore.add(stat("Coût", String.format("%.0f", resourceCost)));
+        }
         lore.add(stat("Dégâts", switch (damageType) {
             case PHYSICAL -> "§cPhysiques";
             case MAGICAL  -> "§9Magiques";
@@ -195,6 +199,10 @@ public abstract class BaseAbility {
         if (!cur.isEmpty()) lines.add(cur.toString().trim());
         return lines;
     }
+
+    // ─── Ressource ───────────────────────────────────────────────
+    public double getResourceCost() { return resourceCost; }
+    public void setResourceCost(double cost) { this.resourceCost = cost; }
 
     // ─── Getters ─────────────────────────────────────────────────
 

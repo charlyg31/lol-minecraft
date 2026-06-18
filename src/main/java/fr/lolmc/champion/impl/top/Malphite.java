@@ -2,6 +2,7 @@ package fr.lolmc.champion.impl.top;
 
 import fr.lolmc.LolPlugin;
 import fr.lolmc.ability.base.BaseAbility;
+import fr.lolmc.stats.ResourceSystem;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.stats.ChampionStats;
 import net.kyori.adventure.text.Component;
@@ -23,11 +24,13 @@ public class Malphite extends BaseChampion {
     @Override protected void registerAbilities() {
         setAbility(0,new AA()); setAbility(1,new Q());
         setAbility(2,new W()); setAbility(3,new E()); setAbility(4,new R());
+        initSystems(574, 8.5, ResourceSystem.ResourceType.MANA, 480, 11.0);
     }
 
     static class AA extends BaseAbility {
         AA(){super("aa_malphite","Attaque de base",Material.STONE_SWORD,AbilitySlot.AA,
-            new double[]{0.5},5,0,DamageType.PHYSICAL);}
+            new double[]{0.5},5,0,DamageType.PHYSICAL);
+            resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double dmg=s.calcAutoAttackDamage(null);
@@ -40,7 +43,8 @@ public class Malphite extends BaseChampion {
 
     static class Q extends BaseAbility {
         Q(){super("q_malphite","Éclat de Pierre",Material.COBBLESTONE,AbilitySlot.Q,
-            new double[]{8,7.5,7,6.5,6},20,0,DamageType.MAGICAL);}
+            new double[]{8,7.5,7,6.5,6},20,0,DamageType.MAGICAL);
+            resourceCost = 70;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double dmg=s.calcMagicalDamage(70+s.getFinalAP()*0.6+s.getFinalMaxHP()*0.1,null);
@@ -57,7 +61,8 @@ public class Malphite extends BaseChampion {
 
     static class W extends BaseAbility {
         W(){super("w_malphite","Frappe Sismique",Material.IRON_CHESTPLATE,AbilitySlot.W,
-            new double[]{12,11,10,9,8},5,3,DamageType.PHYSICAL);}
+            new double[]{12,11,10,9,8},5,3,DamageType.PHYSICAL);
+            resourceCost = 25;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             c.getWorld().getNearbyEntities(c.getLocation(),3,2,3).stream()
                 .filter(e->e instanceof Player&&!e.equals(c))
@@ -71,7 +76,8 @@ public class Malphite extends BaseChampion {
 
     static class E extends BaseAbility {
         E(){super("e_malphite","Sol Fracturé",Material.CRACKED_STONE_BRICKS,AbilitySlot.E,
-            new double[]{10,9,8,7,6},5,4,DamageType.MAGICAL);}
+            new double[]{10,9,8,7,6},5,4,DamageType.MAGICAL);
+            resourceCost = 50;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             double dmg=60+s.getFinalAP()*0.3+s.getFinalArmor()*0.2;
             c.getWorld().getNearbyEntities(c.getLocation(),4,2,4).stream()
@@ -89,7 +95,8 @@ public class Malphite extends BaseChampion {
 
     static class R extends BaseAbility {
         R(){super("r_malphite","Assaut Implacable",Material.ANVIL,AbilitySlot.R,
-            new double[]{130,105,80},20,4,DamageType.MAGICAL);}
+            new double[]{130,105,80},20,4,DamageType.MAGICAL);
+            resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             Location dest=safeTeleport(c.getLocation(),t.getLocation());

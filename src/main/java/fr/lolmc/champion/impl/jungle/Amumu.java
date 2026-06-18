@@ -2,6 +2,7 @@ package fr.lolmc.champion.impl.jungle;
 
 import fr.lolmc.LolPlugin;
 import fr.lolmc.ability.base.BaseAbility;
+import fr.lolmc.stats.ResourceSystem;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.stats.ChampionStats;
 import net.kyori.adventure.text.Component;
@@ -23,11 +24,13 @@ public class Amumu extends BaseChampion {
     @Override protected void registerAbilities() {
         setAbility(0,new AA()); setAbility(1,new Q());
         setAbility(2,new W()); setAbility(3,new E()); setAbility(4,new R());
+        initSystems(613, 8.0, ResourceSystem.ResourceType.MANA, 480, 10.0);
     }
 
     static class AA extends BaseAbility {
         AA(){super("aa_amumu","Attaque de base",Material.IRON_SWORD,AbilitySlot.AA,
-            new double[]{0.5},5,0,DamageType.PHYSICAL);}
+            new double[]{0.5},5,0,DamageType.PHYSICAL);
+            resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double dmg=s.calcAutoAttackDamage(null);
@@ -40,7 +43,8 @@ public class Amumu extends BaseChampion {
 
     static class Q extends BaseAbility {
         Q(){super("q_amumu","Bandage",Material.STRING,AbilitySlot.Q,
-            new double[]{10,9,8,7,6},20,0,DamageType.MAGICAL);}
+            new double[]{10,9,8,7,6},20,0,DamageType.MAGICAL);
+            resourceCost = 70;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             Location dest=safeTeleport(c.getLocation(),t.getLocation());
@@ -57,7 +61,8 @@ public class Amumu extends BaseChampion {
 
     static class W extends BaseAbility {
         W(){super("w_amumu","Désespoir",Material.CRYING_OBSIDIAN,AbilitySlot.W,
-            new double[]{0,0,0,0,0},0,3,DamageType.MAGICAL);}
+            new double[]{0,0,0,0,0},0,3,DamageType.MAGICAL);
+            resourceCost = 8;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             c.sendActionBar(Component.text("😢 Désespoir actif 5s!",NamedTextColor.DARK_BLUE));
             new BukkitRunnable(){
@@ -79,7 +84,8 @@ public class Amumu extends BaseChampion {
 
     static class E extends BaseAbility {
         E(){super("e_amumu","Tantrum",Material.SLIME_BALL,AbilitySlot.E,
-            new double[]{9,8,7,6,5},5,3,DamageType.MAGICAL);}
+            new double[]{9,8,7,6,5},5,3,DamageType.MAGICAL);
+            resourceCost = 35;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             double dmg=65+s.getFinalAP()*0.3;
             c.getWorld().getNearbyEntities(c.getLocation(),3,2,3).stream()
@@ -94,7 +100,8 @@ public class Amumu extends BaseChampion {
 
     static class R extends BaseAbility {
         R(){super("r_amumu","Malédiction Éternelle",Material.CHAIN,AbilitySlot.R,
-            new double[]{150,130,110},5,5,DamageType.MAGICAL);}
+            new double[]{150,130,110},5,5,DamageType.MAGICAL);
+            resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             double dmg=150+s.getFinalAP()*0.8;
             c.getWorld().getNearbyEntities(c.getLocation(),5,2,5).stream()

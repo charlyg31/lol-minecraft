@@ -1,6 +1,7 @@
 package fr.lolmc.listener;
 
 import fr.lolmc.LolPlugin;
+import fr.lolmc.manager.HUDManager;
 import fr.lolmc.manager.ChampionGUI;
 import fr.lolmc.manager.ChampionManager;
 import fr.lolmc.manager.HeadManager;
@@ -22,14 +23,16 @@ public class GUIListener implements Listener {
     private final ChampionGUI gui;
     private final ChampionManager manager;
     private final HeadManager headManager;
+    private final HUDManager hudManager;
 
     // NBT tag clé pour identifier une tête de champion (stocké dans le lore)
     public static final String HEAD_TAG = "§0LOL_CHAMPION_HEAD";
 
-    public GUIListener(ChampionGUI gui, ChampionManager manager, HeadManager headManager) {
+    public GUIListener(ChampionGUI gui, ChampionManager manager, HeadManager headManager, HUDManager hudManager) {
         this.gui = gui;
         this.manager = manager;
         this.headManager = headManager;
+        this.hudManager = hudManager;
     }
 
     // ── Clic dans le GUI ──────────────────────────────────────────
@@ -50,6 +53,8 @@ public class GUIListener implements Listener {
         // Assigner le champion
         manager.assignChampion(player, champId);
         player.closeInventory();
+        // Init HP/Ressource/HUD
+        if (manager.hasChampion(player)) hudManager.initPlayer(player, manager.getChampion(player));
 
         // Équiper la tête du champion
         equipChampionHead(player, champId);

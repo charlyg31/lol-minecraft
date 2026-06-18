@@ -2,6 +2,7 @@ package fr.lolmc.champion.impl.adc;
 
 import fr.lolmc.LolPlugin;
 import fr.lolmc.ability.base.BaseAbility;
+import fr.lolmc.stats.ResourceSystem;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.stats.ChampionStats;
 import net.kyori.adventure.text.Component;
@@ -23,11 +24,13 @@ public class Ashe extends BaseChampion {
     @Override protected void registerAbilities() {
         setAbility(0,new AA()); setAbility(1,new Q());
         setAbility(2,new W()); setAbility(3,new E()); setAbility(4,new R());
+        initSystems(528, 3.0, ResourceSystem.ResourceType.MANA, 480, 11.0);
     }
 
     static class AA extends BaseAbility {
         AA(){super("aa_ashe","Attaque de base",Material.ARROW,AbilitySlot.AA,
-            new double[]{0.5},5,0,DamageType.PHYSICAL);}
+            new double[]{0.5},5,0,DamageType.PHYSICAL);
+            resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double dmg=s.calcAutoAttackDamage(null);
@@ -40,7 +43,8 @@ public class Ashe extends BaseChampion {
 
     static class Q extends BaseAbility {
         Q(){super("q_ashe","Tir Concentré",Material.SPECTRAL_ARROW,AbilitySlot.Q,
-            new double[]{14,12,10,8,6},25,0,DamageType.PHYSICAL);}
+            new double[]{14,12,10,8,6},25,0,DamageType.PHYSICAL);
+            resourceCost = 25;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             c.addPotionEffect(new PotionEffect(PotionEffectType.STRENGTH,120,0,false,true));
             c.addPotionEffect(new PotionEffect(PotionEffectType.SPEED,120,0,false,true));
@@ -51,7 +55,8 @@ public class Ashe extends BaseChampion {
 
     static class W extends BaseAbility {
         W(){super("w_ashe","Tir de Volée",Material.TIPPED_ARROW,AbilitySlot.W,
-            new double[]{14,12,10,8,6},25,4,DamageType.PHYSICAL);}
+            new double[]{14,12,10,8,6},25,4,DamageType.PHYSICAL);
+            resourceCost = 50;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double dmg=s.calcPhysicalDamage(s.getFinalAD()*1.1,null);
@@ -70,7 +75,8 @@ public class Ashe extends BaseChampion {
 
     static class E extends BaseAbility {
         E(){super("e_ashe","Faucon Explorateur",Material.FEATHER,AbilitySlot.E,
-            new double[]{5,4,3,2,1},60,0,DamageType.TRUE);}
+            new double[]{5,4,3,2,1},60,0,DamageType.TRUE);
+            resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             c.sendActionBar(Component.text("🦅 Faucon envoyé! Zone révélée.",NamedTextColor.YELLOW));
         }
@@ -79,7 +85,8 @@ public class Ashe extends BaseChampion {
 
     static class R extends BaseAbility {
         R(){super("r_ashe","Flèche de Cristal",Material.DIAMOND,AbilitySlot.R,
-            new double[]{100,80,60},25,2,DamageType.PHYSICAL);}
+            new double[]{100,80,60},25,2,DamageType.PHYSICAL);
+            resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double dmg=s.calcPhysicalDamage(250+s.getFinalAP(),null);

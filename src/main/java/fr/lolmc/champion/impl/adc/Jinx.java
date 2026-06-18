@@ -2,6 +2,7 @@ package fr.lolmc.champion.impl.adc;
 
 import fr.lolmc.LolPlugin;
 import fr.lolmc.ability.base.BaseAbility;
+import fr.lolmc.stats.ResourceSystem;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.stats.ChampionStats;
 import net.kyori.adventure.text.Component;
@@ -23,11 +24,13 @@ public class Jinx extends BaseChampion {
     @Override protected void registerAbilities() {
         setAbility(0,new AA()); setAbility(1,new Q());
         setAbility(2,new W()); setAbility(3,new E()); setAbility(4,new R());
+        initSystems(516, 3.0, ResourceSystem.ResourceType.NONE, 0, 0.0);
     }
 
     static class AA extends BaseAbility {
         AA(){super("aa_jinx","Attaque de base",Material.CROSSBOW,AbilitySlot.AA,
-            new double[]{0.5},5,0,DamageType.PHYSICAL);}
+            new double[]{0.5},5,0,DamageType.PHYSICAL);
+            resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double dmg=s.calcAutoAttackDamage(null);
@@ -40,7 +43,8 @@ public class Jinx extends BaseChampion {
 
     static class Q extends BaseAbility {
         Q(){super("q_jinx","Choix des Armes",Material.TNT,AbilitySlot.Q,
-            new double[]{0,0,0,0,0},25,3,DamageType.PHYSICAL);}
+            new double[]{0,0,0,0,0},25,3,DamageType.PHYSICAL);
+            resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             c.addPotionEffect(new PotionEffect(PotionEffectType.HASTE,40,1,false,true));
             c.sendActionBar(Component.text("💥 Bazooka actif!",NamedTextColor.RED));
@@ -50,7 +54,8 @@ public class Jinx extends BaseChampion {
 
     static class W extends BaseAbility {
         W(){super("w_jinx","Zap",Material.LIGHTNING_ROD,AbilitySlot.W,
-            new double[]{10,9,8,7,6},25,0,DamageType.PHYSICAL);}
+            new double[]{10,9,8,7,6},25,0,DamageType.PHYSICAL);
+            resourceCost = 20;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double dmg=s.calcPhysicalDamage(20+s.getFinalAD()*1.6,null);
@@ -65,7 +70,8 @@ public class Jinx extends BaseChampion {
 
     static class E extends BaseAbility {
         E(){super("e_jinx","Champ de Mines",Material.TRIPWIRE_HOOK,AbilitySlot.E,
-            new double[]{20,18,16,14,12},25,2,DamageType.MAGICAL);}
+            new double[]{20,18,16,14,12},25,2,DamageType.MAGICAL);
+            resourceCost = 50;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double dmg=s.calcMagicalDamage(80+s.getFinalAP()*0.7,null);
@@ -80,7 +86,8 @@ public class Jinx extends BaseChampion {
 
     static class R extends BaseAbility {
         R(){super("r_jinx","Super Méga Rocket",Material.FIREWORK_ROCKET,AbilitySlot.R,
-            new double[]{90,75,60},25,5,DamageType.PHYSICAL);}
+            new double[]{90,75,60},25,5,DamageType.PHYSICAL);
+            resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double missing=1.0+(1.0-t.getHealth()/t.getMaxHealth())*1.5;

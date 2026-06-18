@@ -2,6 +2,7 @@ package fr.lolmc.champion.impl.support;
 
 import fr.lolmc.LolPlugin;
 import fr.lolmc.ability.base.BaseAbility;
+import fr.lolmc.stats.ResourceSystem;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.stats.ChampionStats;
 import net.kyori.adventure.text.Component;
@@ -23,11 +24,13 @@ public class Janna extends BaseChampion {
     @Override protected void registerAbilities() {
         setAbility(0,new AA()); setAbility(1,new Q());
         setAbility(2,new W()); setAbility(3,new E()); setAbility(4,new R());
+        initSystems(476, 7.0, ResourceSystem.ResourceType.MANA, 480, 11.0);
     }
 
     static class AA extends BaseAbility {
         AA(){super("aa_janna","Attaque de base",Material.FEATHER,AbilitySlot.AA,
-            new double[]{0.5},5,0,DamageType.MAGICAL);}
+            new double[]{0.5},5,0,DamageType.MAGICAL);
+            resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double dmg=s.calcMagicalDamage(s.getFinalAP()*0.3,null);
@@ -40,7 +43,8 @@ public class Janna extends BaseChampion {
 
     static class Q extends BaseAbility {
         Q(){super("q_janna","Tailwind",Material.WHITE_DYE,AbilitySlot.Q,
-            new double[]{12,11,10,9,8},20,2,DamageType.MAGICAL);}
+            new double[]{12,11,10,9,8},20,2,DamageType.MAGICAL);
+            resourceCost = 60;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double dmg=s.calcMagicalDamage(60+s.getFinalAP()*0.35,null);
@@ -55,7 +59,8 @@ public class Janna extends BaseChampion {
 
     static class W extends BaseAbility {
         W(){super("w_janna","Zéphyr",Material.CYAN_DYE,AbilitySlot.W,
-            new double[]{8,7,6,5,4},20,0,DamageType.MAGICAL);}
+            new double[]{8,7,6,5,4},20,0,DamageType.MAGICAL);
+            resourceCost = 40;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double dmg=s.calcMagicalDamage(55+s.getFinalAP()*0.5,null);
@@ -70,7 +75,8 @@ public class Janna extends BaseChampion {
 
     static class E extends BaseAbility {
         E(){super("e_janna","Oeil de la Tempête",Material.LIGHT_BLUE_DYE,AbilitySlot.E,
-            new double[]{10,9,8,7,6},0,0,DamageType.TRUE);}
+            new double[]{10,9,8,7,6},0,0,DamageType.TRUE);
+            resourceCost = 70;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             Player dest=t!=null?t:c;
             dest.addPotionEffect(new PotionEffect(PotionEffectType.ABSORPTION,100,2,false,true));
@@ -82,7 +88,8 @@ public class Janna extends BaseChampion {
 
     static class R extends BaseAbility {
         R(){super("r_janna","Réveil",Material.HEART_OF_THE_SEA,AbilitySlot.R,
-            new double[]{150,120,90},20,4,DamageType.TRUE);}
+            new double[]{150,120,90},20,4,DamageType.TRUE);
+            resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // Repousse ennemis
             c.getWorld().getNearbyEntities(c.getLocation(),4,2,4).stream()

@@ -2,6 +2,7 @@ package fr.lolmc.champion.impl.adc;
 
 import fr.lolmc.LolPlugin;
 import fr.lolmc.ability.base.BaseAbility;
+import fr.lolmc.stats.ResourceSystem;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.stats.ChampionStats;
 import net.kyori.adventure.text.Component;
@@ -23,11 +24,13 @@ public class MissFortune extends BaseChampion {
     @Override protected void registerAbilities() {
         setAbility(0,new AA()); setAbility(1,new Q());
         setAbility(2,new W()); setAbility(3,new E()); setAbility(4,new R());
+        initSystems(523, 3.0, ResourceSystem.ResourceType.NONE, 0, 0.0);
     }
 
     static class AA extends BaseAbility {
         AA(){super("aa_missfortune","Attaque de base",Material.BOW,AbilitySlot.AA,
-            new double[]{0.5},5,0,DamageType.PHYSICAL);}
+            new double[]{0.5},5,0,DamageType.PHYSICAL);
+            resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double dmg=s.calcAutoAttackDamage(null);
@@ -40,7 +43,8 @@ public class MissFortune extends BaseChampion {
 
     static class Q extends BaseAbility {
         Q(){super("q_missfortune","Double Tir",Material.FLINT_AND_STEEL,AbilitySlot.Q,
-            new double[]{7,6,5,4,3},25,0,DamageType.PHYSICAL);}
+            new double[]{7,6,5,4,3},25,0,DamageType.PHYSICAL);
+            resourceCost = 43;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double d1=s.calcPhysicalDamage(20+s.getFinalAD()*0.85,null);
@@ -56,7 +60,8 @@ public class MissFortune extends BaseChampion {
 
     static class W extends BaseAbility {
         W(){super("w_missfortune","Strut",Material.LEATHER_BOOTS,AbilitySlot.W,
-            new double[]{19,17,15,13,11},0,0,DamageType.TRUE);}
+            new double[]{19,17,15,13,11},0,0,DamageType.TRUE);
+            resourceCost = 30;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             c.addPotionEffect(new PotionEffect(PotionEffectType.SPEED,60,1,false,true));
             c.addPotionEffect(new PotionEffect(PotionEffectType.HASTE,60,2,false,true));
@@ -67,7 +72,8 @@ public class MissFortune extends BaseChampion {
 
     static class E extends BaseAbility {
         E(){super("e_missfortune","Pluie de Balles",Material.GUNPOWDER,AbilitySlot.E,
-            new double[]{18,15,12,9,6},25,3,DamageType.PHYSICAL);}
+            new double[]{18,15,12,9,6},25,3,DamageType.PHYSICAL);
+            resourceCost = 80;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double dmg=s.calcPhysicalDamage(60+s.getFinalAD()*0.8,null);
@@ -86,7 +92,8 @@ public class MissFortune extends BaseChampion {
 
     static class R extends BaseAbility {
         R(){super("r_missfortune","Pluie de Balles R",Material.NETHERITE_HOE,AbilitySlot.R,
-            new double[]{120,100,80},25,8,DamageType.PHYSICAL);}
+            new double[]{120,100,80},25,8,DamageType.PHYSICAL);
+            resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             c.sendActionBar(Component.text("🔫 PLUIE DE BALLES! 3s",NamedTextColor.RED));
             new BukkitRunnable(){
