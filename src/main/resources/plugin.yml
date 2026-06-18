@@ -9,3 +9,8 @@ commands:
     description: Gère les champions LoL
     usage: /champion <pick|list|info> [args]
     aliases: [champ]
+
+  shop:
+    description: Ouvre la boutique LoL
+    usage: /shop [gold|addgold <montant>]
+    aliases: [boutique, b]

@@ -1,6 +1,11 @@
 package fr.lolmc;
 
 import fr.lolmc.listener.AbilityListener;
+import fr.lolmc.item.ItemRegistry;
+import fr.lolmc.listener.ShopCommand;
+import fr.lolmc.listener.ShopListener;
+import fr.lolmc.shop.GoldManager;
+import fr.lolmc.shop.ShopGUI;
 import fr.lolmc.listener.HealthListener;
 import fr.lolmc.listener.ChampionCommand;
 import fr.lolmc.listener.GUIListener;
@@ -18,6 +23,9 @@ public class LolPlugin extends JavaPlugin {
     private ChampionGUI championGUI;
     private GUIListener guiListener;
     private HUDManager hudManager;
+    private ShopGUI shopGUI;
+    private GoldManager goldManager;
+    private ShopListener shopListener;
 
     @Override
     public void onEnable() {
@@ -26,12 +34,18 @@ public class LolPlugin extends JavaPlugin {
 
         championManager = new ChampionManager();
         hudManager = new HUDManager(championManager);
+        shopGUI = new ShopGUI();
+        goldManager = new GoldManager();
+        shopListener = new ShopListener(shopGUI, championManager, goldManager, hudManager);
+        // Charger le registre d'items
+        ItemRegistry.all(); // force le static init
         headManager     = new HeadManager(this);
         championGUI     = new ChampionGUI(championManager, headManager);
         guiListener     = new GUIListener(championGUI, championManager, headManager, hudManager);
 
         getServer().getPluginManager().registerEvents(new AbilityListener(championManager), this);
         getServer().getPluginManager().registerEvents(new HealthListener(championManager, hudManager), this);
+        getServer().getPluginManager().registerEvents(shopListener, this);
         getServer().getPluginManager().registerEvents(guiListener, this);
 
         var cmd = getCommand("champion");
@@ -41,7 +55,13 @@ public class LolPlugin extends JavaPlugin {
             cmd.setTabCompleter(champCmd);
         }
 
-        getLogger().info("LoL MC activé — 20 champions chargés.");
+        var shopCmd = getCommand("shop");
+        if (shopCmd != null) {
+            var sc = new ShopCommand(shopGUI, championManager, goldManager);
+            shopCmd.setExecutor(sc);
+            shopCmd.setTabCompleter(sc);
+        }
+        getLogger().info("LoL MC activé — 20 champions + boutique chargés.");
     }
 
     @Override
@@ -55,4 +75,7 @@ public class LolPlugin extends JavaPlugin {
     public ChampionGUI getChampionGUI()         { return championGUI; }
     public GUIListener getGUIListener()         { return guiListener; }
     public HUDManager getHUDManager()           { return hudManager; }
+    public ShopGUI getShopGUI()                 { return shopGUI; }
+    public GoldManager getGoldManager()         { return goldManager; }
+    public ShopListener getShopListener()       { return shopListener; }
 }

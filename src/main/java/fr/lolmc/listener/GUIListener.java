@@ -54,7 +54,10 @@ public class GUIListener implements Listener {
         manager.assignChampion(player, champId);
         player.closeInventory();
         // Init HP/Ressource/HUD
-        if (manager.hasChampion(player)) hudManager.initPlayer(player, manager.getChampion(player));
+        if (manager.hasChampion(player)) {
+            hudManager.initPlayer(player, manager.getChampion(player));
+            LolPlugin.getInstance().getShopListener().initPlayer(player);
+        }
 
         // Équiper la tête du champion
         equipChampionHead(player, champId);
