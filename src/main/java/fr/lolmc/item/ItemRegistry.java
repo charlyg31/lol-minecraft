@@ -306,6 +306,23 @@ public class ItemRegistry {
         reg(new LolItem("hexdrinker",      "Hexdrinker",        1300, Material.STONE_AXE,       DAMAGE).ad(25).mr(35).passive("Lifeline","Bouclier sorts."));
         reg(new LolItem("spear_of_shojin2","Spear of Shojin",  3100, Material.STICK,           DAMAGE).ad(55).hp(300).ah(20).passive("Dragonforce","3 AA réduisent CD."));
 
+
+        // ════════════════════════════════════════════════════════════
+        // CONSOMMABLES & WARDS (prix officiels LoL)
+        // ════════════════════════════════════════════════════════════
+
+        reg(new LolItem("health_potion2",      "Potion de vie",            50,  Material.POTION,            CONSUMABLE).passive("Actif","Soigne 150 HP sur 15s. Max 5 en inventaire."));
+        reg(new LolItem("refillable_potion2",  "Fiole rechargeable",       150, Material.GLASS_BOTTLE,      CONSUMABLE).passive("Actif","2 charges — Soigne 125 HP en 12s."));
+        reg(new LolItem("biscuit_will",        "Biscuit de la Volonté",    0,   Material.COOKIE,            CONSUMABLE).passive("Actif","Soigne 150 HP + 100 mana. +50 mana max si mana plein."));
+        reg(new LolItem("elixir_wrath2",       "Élixir de Fureur",         500, Material.DRAGON_BREATH,     CONSUMABLE).passive("Actif","3min: +30 AD + vol de vie physique."));
+        reg(new LolItem("elixir_iron2",        "Élixir de Fer",            500, Material.FERMENTED_SPIDER_EYE,CONSUMABLE).passive("Actif","3min: +300 HP + Ténacité."));
+        reg(new LolItem("elixir_sorcery2",     "Élixir de Sorcellerie",    500, Material.MAGENTA_DYE,       CONSUMABLE).passive("Actif","3min: +50 AP + mana/s."));
+        reg(new LolItem("control_ward2",       "Sentinelle de contrôle",   75,  Material.PINK_CANDLE,       CONSUMABLE).passive("Actif","Révèle et désactive wards ennemies. Max 2."));
+        reg(new LolItem("stealth_ward2",       "Totem furtif",             0,   Material.SOUL_TORCH,        CONSUMABLE).passive("Actif","Place ward invisible 60-150s. 3 charges."));
+        reg(new LolItem("oracle_lens2",        "Lentille Oracle",          0,   Material.SPYGLASS,          CONSUMABLE).passive("Actif","Révèle wards proches 10s. Dispo niv 3."));
+        reg(new LolItem("farsight2",           "Vision Lointaine",         0,   Material.COMPASS,           CONSUMABLE).passive("Actif","Ward révélatrice longue portée (1 HP)."));
+        reg(new LolItem("cappa_juice2",        "Cappa Juice",              700, Material.HONEY_BOTTLE,      CONSUMABLE).passive("Actif","Soigne 40%% HP max sur 120s."));
+
         System.out.println("[ItemRegistry] " + ITEMS.size() + " items chargés.");
     }
 

@@ -33,7 +33,8 @@ public class LolItem {
         TANK,         // HP / Armor / MR
         ATTACK_SPEED, // AS / On-hit
         SUPPORT,      // Heal power / Aura
-        UTILITY       // MS / Mana / Spécial
+        UTILITY,      // MS / Mana / Spécial
+        CONSUMABLE    // Potions, wards, élixirs
     }
 
     // ── Stats bonus ──

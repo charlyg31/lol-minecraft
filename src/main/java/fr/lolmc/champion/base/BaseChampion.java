@@ -1,5 +1,6 @@
 package fr.lolmc.champion.base;
 
+import fr.lolmc.LolPlugin;
 import fr.lolmc.stats.HPSystem;
 import fr.lolmc.stats.ResourceSystem;
 
@@ -91,6 +92,9 @@ public abstract class BaseChampion {
 
         ability.cast(caster, stats, target);
         ability.triggerCooldown(caster);
+        // Déclencher passifs post-sort (Spellblade, Shojin, etc.)
+        var pm = LolPlugin.getInstance().getPassiveManager();
+        if (pm != null) pm.onAbilityCast(caster, slot);
         // Refresh tooltip après le cast
         refreshSlot(caster, slot);
     }

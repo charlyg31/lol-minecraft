@@ -1,6 +1,9 @@
 package fr.lolmc.listener;
 
 import fr.lolmc.LolPlugin;
+import fr.lolmc.item.PassiveManager;
+import fr.lolmc.item.consumable.ConsumableManager;
+import fr.lolmc.item.LolItem.ItemCategory;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.item.ItemRegistry;
 import fr.lolmc.item.LolItem;
@@ -77,9 +80,22 @@ public class ShopListener implements Listener {
         if (isSortSlot || isItemSlot) {
             event.setCancelled(true);
             if (isItemSlot) {
-                // Clic droit sur item équipé = vendre
                 if (event.isRightClick()) {
-                    trySellItem(player, slot);
+                    // Shift+clic droit = vendre
+                    if (event.isShiftClick()) {
+                        trySellItem(player, slot);
+                    } else {
+                        // Clic droit = activer l'actif de l'item
+                        int lolSlot = PlayerInventoryManager.getLolSlotIndex(slot);
+                        if (lolSlot >= 0) {
+                            var inv = getOrCreate(player);
+                            var item = inv.getItem(lolSlot);
+                            if (item != null) {
+                                PassiveManager pm = LolPlugin.getInstance().getPassiveManager();
+                                if (pm != null) pm.activateItem(player, item.getId());
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -124,8 +140,15 @@ public class ShopListener implements Listener {
         // Acheter
         BaseChampion champ = championManager.getChampion(player);
         if (goldManager.spendGold(player.getUniqueId(), item.getGoldCost())) {
-            inv.equipItem(player, champ, item);
-            hudManager.updateHUD(player, champ);
+            // Consommables: utilisation immédiate
+            ConsumableManager cm = LolPlugin.getInstance().getConsumableManager();
+            if (item.getCategory() == ItemCategory.CONSUMABLE && cm != null) {
+                useConsumable(player, item.getId(), cm);
+                hudManager.updateHUD(player, champ);
+            } else {
+                inv.equipItem(player, champ, item);
+                hudManager.updateHUD(player, champ);
+            }
             // Rafraîchir l'affichage de l'or dans la boutique
             player.sendActionBar(Component.text(
                 String.format("💰 Or: %d | %s acheté!", 
