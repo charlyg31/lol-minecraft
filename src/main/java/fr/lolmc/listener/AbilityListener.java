@@ -221,5 +221,6 @@ public class AbilityListener implements Listener {
         LolPlugin.getInstance().getTeamManager().removePlayer(p.getUniqueId());
         LolPlugin.getInstance().getPartyManager().cleanup(p.getUniqueId());
         LolPlugin.getInstance().getMatchmakingManager().cleanup(p.getUniqueId());
+        LolPlugin.getInstance().getBushManager().cleanup(p.getUniqueId());
     }
 }

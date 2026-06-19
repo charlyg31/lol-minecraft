@@ -18,6 +18,7 @@ import fr.lolmc.game.MinionManager;
 import fr.lolmc.game.RoadManager;
 import fr.lolmc.game.RewardManager;
 import fr.lolmc.game.JungleManager;
+import fr.lolmc.game.BushManager;
 import fr.lolmc.listener.AbilityListener;
 import fr.lolmc.listener.EntityDeathListener;
 import fr.lolmc.item.consumable.ConsumableManager;
@@ -60,6 +61,7 @@ public class LolPlugin extends JavaPlugin {
     private RoadManager roadManager;
     private RewardManager rewardManager;
     private JungleManager jungleManager;
+    private BushManager bushManager;
     private AbilityListener abilityListener;
 
     @Override
@@ -82,6 +84,7 @@ public class LolPlugin extends JavaPlugin {
         roadManager.applyToMinionManager();
         rewardManager = new RewardManager(championManager, goldManager);
         jungleManager = new JungleManager();
+        bushManager = new BushManager(teamManager);
         hudManager = new HUDManager(championManager);
         shopGUI = new ShopGUI();
         goldManager = new GoldManager();
@@ -170,5 +173,6 @@ public class LolPlugin extends JavaPlugin {
     public RoadManager getRoadManager()         { return roadManager; }
     public RewardManager getRewardManager()     { return rewardManager; }
     public JungleManager getJungleManager()     { return jungleManager; }
+    public BushManager getBushManager()         { return bushManager; }
     public AbilityListener getAbilityListener() { return abilityListener; }
 }

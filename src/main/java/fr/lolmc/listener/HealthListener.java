@@ -79,7 +79,8 @@ public class HealthListener implements Listener {
             hp.takeDamage(finalDmg);
             // Vérifier passifs défensifs (Sterak's, Guardian Angel)
             PassiveManager pm = LolPlugin.getInstance().getPassiveManager();
-            if (pm != null) pm.onDamageTaken(p, finalDmg);
+            if (pm != null) LolPlugin.getInstance().getBushManager().revealOnDamage(player);
+            pm.onDamageTaken(p, finalDmg);
             hud.updateHUD(p, champ);
         }
     }
