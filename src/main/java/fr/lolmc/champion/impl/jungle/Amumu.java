@@ -5,6 +5,7 @@ import fr.lolmc.ability.base.BaseAbility;
 import fr.lolmc.stats.ResourceSystem;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.stats.ChampionStats;
+import fr.lolmc.util.DamageUtil;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.*;
@@ -34,7 +35,7 @@ public class Amumu extends BaseChampion {
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double dmg=s.calcAutoAttackDamage(null);
-            t.damage(dmg); s.applyVamp(dmg,false);
+            DamageUtil.damage(c, t, dmg, false);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             return String.format("Inflige %.0f dégâts.", s.getFinalAD());
@@ -50,7 +51,7 @@ public class Amumu extends BaseChampion {
             Location dest=safeTeleport(c.getLocation(),t.getLocation());
             c.teleport(dest);
             double dmg=s.calcMagicalDamage(80+s.getFinalAP()*0.7,null);
-            t.damage(dmg);
+            DamageUtil.abilityDamage(c, t, dmg);
             t.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,20,10,false,true));
             t.sendActionBar(Component.text("🧻 Bandage! Stun 1s!",NamedTextColor.YELLOW));
         }
@@ -72,7 +73,7 @@ public class Amumu extends BaseChampion {
                     double dmg=s.getFinalMaxHP()*0.01+s.getFinalAP()*0.01;
                     c.getWorld().getNearbyEntities(c.getLocation(),3,2,3).stream()
                         .filter(e->e instanceof Player&&!e.equals(c))
-                        .forEach(e->((Player)e).damage(s.calcMagicalDamage(dmg,null)));
+                        .forEach(e->DamageUtil.abilityDamage(c, (Player)e, s.calcMagicalDamage(dmg,null)));
                     tick+=20;
                 }
             }.runTaskTimer(LolPlugin.getInstance(),0L,20L);
@@ -90,7 +91,7 @@ public class Amumu extends BaseChampion {
             double dmg=65+s.getFinalAP()*0.3;
             c.getWorld().getNearbyEntities(c.getLocation(),3,2,3).stream()
                 .filter(e->e instanceof Player&&!e.equals(c))
-                .forEach(e->((Player)e).damage(s.calcMagicalDamage(dmg,null)));
+                .forEach(e->DamageUtil.abilityDamage(c, (Player)e, s.calcMagicalDamage(dmg,null)));
             c.getWorld().spawnParticle(Particle.ANGRY_VILLAGER,c.getLocation(),8,1,1,1);
         }
         @Override public String getDynamicDescription(ChampionStats s){
@@ -107,7 +108,7 @@ public class Amumu extends BaseChampion {
             c.getWorld().getNearbyEntities(c.getLocation(),5,2,5).stream()
                 .filter(e->e instanceof Player&&!e.equals(c))
                 .forEach(e->{
-                    ((Player)e).damage(s.calcMagicalDamage(dmg,null));
+                    DamageUtil.abilityDamage(c, (Player)e, s.calcMagicalDamage(dmg,null));
                     ((Player)e).addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,40,10,false,true));
                     ((Player)e).sendActionBar(Component.text("⛓ Malédiction Amumu! Root 2s",NamedTextColor.DARK_PURPLE));
                 });

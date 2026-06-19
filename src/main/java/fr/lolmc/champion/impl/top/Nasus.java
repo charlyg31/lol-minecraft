@@ -5,6 +5,7 @@ import fr.lolmc.ability.base.BaseAbility;
 import fr.lolmc.stats.ResourceSystem;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.stats.ChampionStats;
+import fr.lolmc.util.DamageUtil;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.*;
@@ -37,7 +38,7 @@ public class Nasus extends BaseChampion {
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double dmg=s.calcAutoAttackDamage(null);
-            t.damage(dmg); s.applyVamp(dmg,false);
+            DamageUtil.damage(c, t, dmg, false);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             return String.format("Inflige %.0f dégâts.", s.getFinalAD());
@@ -52,7 +53,7 @@ public class Nasus extends BaseChampion {
             if(t==null)return;
             int stacks=qStacks.getOrDefault(c.getUniqueId(),0);
             double dmg=s.calcPhysicalDamage(s.getFinalAD()+stacks,null);
-            t.damage(dmg);
+            DamageUtil.abilityDamage(c, t, dmg);
             if(t.getHealth()-dmg<=0) {qStacks.merge(c.getUniqueId(),6,Integer::sum);}
         }
         @Override public String getDynamicDescription(ChampionStats s){
@@ -87,7 +88,7 @@ public class Nasus extends BaseChampion {
                     double dmg=(55+s.getFinalMaxHP()*0.05)/5.0;
                     loc.getWorld().getNearbyEntities(loc,3,2,3).stream()
                         .filter(e->e instanceof Player&&!e.equals(c))
-                        .forEach(e->((Player)e).damage(s.calcMagicalDamage(dmg,null)));
+                        .forEach(e->DamageUtil.abilityDamage(c, (Player)e, s.calcMagicalDamage(dmg,null)));
                     loc.getWorld().spawnParticle(Particle.WITCH,loc,5,1,1,1);
                     tick+=20;
                 }
@@ -113,7 +114,7 @@ public class Nasus extends BaseChampion {
                     double dmg=3+s.getFinalMaxHP()*0.01;
                     c.getWorld().getNearbyEntities(c.getLocation(),3,2,3).stream()
                         .filter(e->e instanceof Player&&!e.equals(c))
-                        .forEach(e->((Player)e).damage(s.calcMagicalDamage(dmg,null)));
+                        .forEach(e->DamageUtil.abilityDamage(c, (Player)e, s.calcMagicalDamage(dmg,null)));
                     tick+=20;
                 }
             }.runTaskTimer(LolPlugin.getInstance(),0L,20L);

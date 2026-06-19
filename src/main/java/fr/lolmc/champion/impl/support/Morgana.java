@@ -5,6 +5,7 @@ import fr.lolmc.ability.base.BaseAbility;
 import fr.lolmc.stats.ResourceSystem;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.stats.ChampionStats;
+import fr.lolmc.util.DamageUtil;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.*;
@@ -34,7 +35,7 @@ public class Morgana extends BaseChampion {
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double dmg=s.calcMagicalDamage(s.getFinalAP()*0.3,null);
-            t.damage(dmg); s.applyVamp(dmg,false);
+            DamageUtil.damage(c, t, dmg, false);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             return String.format("Inflige %.0f dégâts.", s.getFinalAP());
@@ -48,7 +49,7 @@ public class Morgana extends BaseChampion {
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double dmg=s.calcMagicalDamage(80+s.getFinalAP()*0.9,null);
-            t.damage(dmg);
+            DamageUtil.abilityDamage(c, t, dmg);
             t.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,40,10,false,true));
             t.sendActionBar(Component.text("🕸 Root 2s — Morgana Q!",NamedTextColor.DARK_PURPLE));
             c.getWorld().spawnParticle(Particle.WITCH,t.getLocation(),10,0.5,0.5,0.5);
@@ -72,7 +73,7 @@ public class Morgana extends BaseChampion {
                     double dmg=(24+s.getFinalAP()*0.11);
                     loc.getWorld().getNearbyEntities(loc,4,2,4).stream()
                         .filter(e->e instanceof Player)
-                        .forEach(e->((Player)e).damage(s.calcMagicalDamage(dmg,null)));
+                        .forEach(e->DamageUtil.abilityDamage(c, (Player)e, s.calcMagicalDamage(dmg,null)));
                     loc.getWorld().spawnParticle(Particle.WITCH,loc,5,2,0,2);
                     tick+=20;
                 }
@@ -105,7 +106,7 @@ public class Morgana extends BaseChampion {
             c.getWorld().getNearbyEntities(c.getLocation(),5,2,5).stream()
                 .filter(e->e instanceof Player&&!e.equals(c))
                 .forEach(e->{
-                    ((Player)e).damage(s.calcMagicalDamage(dmg,null));
+                    DamageUtil.abilityDamage(c, (Player)e, s.calcMagicalDamage(dmg,null));
                     ((Player)e).addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,30,10,false,true));
                     ((Player)e).sendActionBar(Component.text("⛓ STUN Morgana R!",NamedTextColor.DARK_PURPLE));
                 });

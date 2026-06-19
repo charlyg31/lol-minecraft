@@ -131,7 +131,7 @@ public class HUDManager {
 
     private void syncMinecraftHP(Player player, HPSystem hp) {
         // Mettre maxHealth à 40 (fixe)
-        var attr = player.getAttribute(Attribute.MAX_HEALTH);
+        var attr = player.getAttribute(Attribute.GENERIC_MAX_HEALTH);
         if (attr != null && attr.getValue() != 40.0) {
             attr.setBaseValue(40.0);
         }
@@ -231,7 +231,7 @@ public class HUDManager {
      */
     public void initPlayer(Player player, BaseChampion champ) {
         // HP max Minecraft = 40
-        var attr = player.getAttribute(Attribute.MAX_HEALTH);
+        var attr = player.getAttribute(Attribute.GENERIC_MAX_HEALTH);
         if (attr != null) attr.setBaseValue(40.0);
         player.setHealth(40.0);
 
@@ -246,7 +246,6 @@ public class HUDManager {
         player.setSaturation(20f);
 
         // Désactiver regen Minecraft naturelle (gérée par nous)
-        player.setHealthScaled(false);
 
         // Première update
         updateHUD(player, champ);

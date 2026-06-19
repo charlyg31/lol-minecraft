@@ -122,7 +122,7 @@ public class PassiveManager {
                 vhp.takeDamage(as.calcTrueDamage(150));
                 state.krakenStacks = 0;
                 attacker.sendActionBar(Component.text("⚡ Kraken Slayer!", NamedTextColor.AQUA));
-                attacker.getWorld().spawnParticle(Particle.LIGHTNING, victim.getLocation(), 1);
+                victim.getWorld().strikeLightningEffect(victim.getLocation());
             }
         }
 
@@ -447,7 +447,7 @@ public class PassiveManager {
                 }
                 state.lastGaleforce = System.currentTimeMillis();
                 // Dash dans la direction du regard
-                Location dest = player.getTargetBlockLocation(10, false);
+                Location dest = (player.getTargetBlockExact(10) != null ? player.getTargetBlockExact(10).getLocation() : player.getLocation().add(player.getLocation().getDirection().multiply(10)));
                 if (dest != null) {
                     Location safe = safeLocation(player.getLocation(), dest);
                     player.teleport(safe);
@@ -486,7 +486,7 @@ public class PassiveManager {
                     sendCDMessage(player, "Redemption", state.lastRedemption, 120000L); return;
                 }
                 state.lastRedemption = System.currentTimeMillis();
-                Location target = player.getTargetBlockLocation(30, false);
+                Location target = (player.getTargetBlockExact(30) != null ? player.getTargetBlockExact(30).getLocation() : player.getLocation().add(player.getLocation().getDirection().multiply(30)));
                 if (target == null) target = player.getLocation();
                 final Location healLoc = target;
                 player.sendActionBar(Component.text("💫 Redemption lancé! (2.5s)", NamedTextColor.WHITE));
@@ -554,7 +554,7 @@ public class PassiveManager {
                     sendCDMessage(player, "Rocketbelt", state.lastHextechRocket, 90000L); return;
                 }
                 state.lastHextechRocket = System.currentTimeMillis();
-                Location dst = player.getTargetBlockLocation(5, false);
+                Location dst = (player.getTargetBlockExact(5) != null ? player.getTargetBlockExact(5).getLocation() : player.getLocation().add(player.getLocation().getDirection().multiply(5)));
                 if (dst != null) player.teleport(safeLocation(player.getLocation(), dst));
                 double missileDmg = champ.getStats().calcMagicalDamage(75 + champ.getStats().getFinalAP() * 0.15, null);
                 player.getWorld().getNearbyEntities(player.getLocation(), 6, 2, 6).stream()

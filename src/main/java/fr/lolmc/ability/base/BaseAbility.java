@@ -107,7 +107,8 @@ public abstract class BaseAbility {
 
         // Zone d'effet là où le joueur regarde
         if (aoeRadius > 0) {
-            Location target = player.getTargetBlockLocation((int) Math.min(range, 64), false);
+            org.bukkit.block.Block tb = player.getTargetBlockExact((int) Math.min(range, 64));
+            Location target = tb != null ? tb.getLocation() : null;
             if (target == null)
                 target = eye.clone().add(player.getLocation().getDirection().multiply(range));
             drawCircle(player, target, aoeRadius, Color.fromRGB(255, 100, 0));

@@ -5,6 +5,7 @@ import fr.lolmc.ability.base.BaseAbility;
 import fr.lolmc.stats.ResourceSystem;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.stats.ChampionStats;
+import fr.lolmc.util.DamageUtil;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.*;
@@ -34,7 +35,7 @@ public class Darius extends BaseChampion {
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double dmg=s.calcAutoAttackDamage(null);
-            t.damage(dmg); s.applyVamp(dmg,false);
+            DamageUtil.damage(c, t, dmg, false);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             return String.format("Inflige %.0f dégâts.", s.getFinalAD());
@@ -52,7 +53,7 @@ public class Darius extends BaseChampion {
                     double dist=e.getLocation().distance(c.getLocation());
                     double mult=dist>3?1.5:1.0; // bord = +50%
                     double dmg=s.calcPhysicalDamage((40+s.getFinalAD()*0.6)*mult,null);
-                    ((Player)e).damage(dmg);
+                    DamageUtil.abilityDamage(c, (Player)e, dmg);
                 });
             c.getWorld().spawnParticle(Particle.SWEEP_ATTACK,c.getLocation(),5,2,1,2);
         }
@@ -69,7 +70,7 @@ public class Darius extends BaseChampion {
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double dmg=s.calcPhysicalDamage(s.getFinalAD()*2.0,null);
-            t.damage(dmg);
+            DamageUtil.abilityDamage(c, t, dmg);
             c.getWorld().spawnParticle(Particle.CRIT,t.getLocation(),10);
         }
         @Override public String getDynamicDescription(ChampionStats s){
@@ -102,7 +103,7 @@ public class Darius extends BaseChampion {
             if(t==null)return;
             double dmg=s.calcTrueDamage(100+level*40+s.getFinalAD()*0.75);
             t.getWorld().strikeLightningEffect(t.getLocation());
-            t.damage(dmg);
+            DamageUtil.abilityDamage(c, t, dmg);
             t.sendMessage(Component.text("☠ Guillotine Noxienne!",NamedTextColor.DARK_RED));
         }
         @Override public String getDynamicDescription(ChampionStats s){

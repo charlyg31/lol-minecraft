@@ -5,6 +5,7 @@ import fr.lolmc.ability.base.BaseAbility;
 import fr.lolmc.stats.ResourceSystem;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.stats.ChampionStats;
+import fr.lolmc.util.DamageUtil;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.*;
@@ -37,7 +38,7 @@ public class Zed extends BaseChampion {
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double dmg=s.calcAutoAttackDamage(null);
-            t.damage(dmg); s.applyVamp(dmg,false);
+            DamageUtil.damage(c, t, dmg, false);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             return String.format("Inflige %.0f dégâts.", s.getFinalAD());
@@ -51,7 +52,7 @@ public class Zed extends BaseChampion {
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double dmg=s.calcPhysicalDamage(70+s.getFinalAD()*0.9,null);
-            t.damage(dmg);
+            DamageUtil.abilityDamage(c, t, dmg);
             c.getWorld().spawnParticle(Particle.CRIT,t.getLocation(),8,0.3,0.3,0.3);
         }
         @Override public String getDynamicDescription(ChampionStats s){
@@ -93,7 +94,7 @@ public class Zed extends BaseChampion {
             c.getWorld().getNearbyEntities(c.getLocation(),4,2,4).stream()
                 .filter(e->e instanceof Player&&!e.equals(c))
                 .forEach(e->{
-                    ((Player)e).damage(s.calcPhysicalDamage(dmg,null));
+                    DamageUtil.abilityDamage(c, (Player)e, s.calcPhysicalDamage(dmg,null));
                     ((Player)e).addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,30,1,false,true));
                 });
             c.getWorld().spawnParticle(Particle.CRIT,c.getLocation(),10,2,1,2);
@@ -115,7 +116,7 @@ public class Zed extends BaseChampion {
                     if(!t.isOnline())return;
                     double dmg=s.calcTrueDamage(t.getMaxHealth()*0.2+s.getFinalAD()*0.75);
                     t.getWorld().strikeLightningEffect(t.getLocation());
-                    t.damage(dmg);
+                    DamageUtil.abilityDamage(c, t, dmg);
                     t.sendMessage(Component.text("☠ Mort en Sursis!",NamedTextColor.DARK_RED));
                 }
             }.runTaskLater(LolPlugin.getInstance(),60L);
