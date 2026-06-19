@@ -24,6 +24,7 @@ public class MinionManager {
 
     public static NamespacedKey KEY_MINION;
     public static NamespacedKey KEY_TEAM;
+    public static NamespacedKey KEY_LANE;
 
     private final MapManager mapManager;
     // Waypoints par lane : "top" → liste de points que les sbires suivent
@@ -41,6 +42,7 @@ public class MinionManager {
         this.mapManager = mapManager;
         KEY_MINION = new NamespacedKey(LolPlugin.getInstance(), "minion");
         KEY_TEAM = new NamespacedKey(LolPlugin.getInstance(), "minion_team");
+        KEY_LANE = new NamespacedKey(LolPlugin.getInstance(), "minion_lane");
     }
 
     // ── Démarrage / arrêt des vagues ──────────────────────────────
@@ -101,6 +103,7 @@ public class MinionManager {
             // Tag PDC
             z.getPersistentDataContainer().set(KEY_MINION, PersistentDataType.BYTE, (byte) 1);
             z.getPersistentDataContainer().set(KEY_TEAM, PersistentDataType.STRING, team.name());
+            z.getPersistentDataContainer().set(KEY_LANE, PersistentDataType.STRING, lane);
             // Couleur visuelle via nom
             z.customName(Component.text(team == Team.BLUE ? "🔵 Sbire" : "🔴 Sbire",
                     team == Team.BLUE ? NamedTextColor.BLUE : NamedTextColor.RED));
@@ -114,29 +117,63 @@ public class MinionManager {
 
     // ── Déplacement ───────────────────────────────────────────────
 
+    // Distance max de déviation avant de forcer le retour sur le chemin
+    private static final double MAX_DEVIATION = 10.0;
+
     private void moveMinions() {
+        var roadManager = LolPlugin.getInstance().getRoadManager();
         for (var world : LolPlugin.getInstance().getServer().getWorlds()) {
             for (Entity e : world.getEntities()) {
                 if (!(e instanceof Zombie z)) continue;
                 if (!isMinion(z)) continue;
                 Team team = getMinionTeam(z);
                 if (team == null) continue;
-
                 String lane = getMinionLane(z);
-                // Avancer vers la base ennemie via les waypoints
-                Location target = getNextWaypoint(team, lane, z.getLocation());
-                if (target != null && z.getTarget() == null) {
-                    // Pathfinding Minecraft natif vers le waypoint
-                    z.getPathfinder().moveTo(target, 1.0);
-                }
 
-                // Chercher un ennemi proche à attaquer (sbire/champion ennemi)
+                // Distance au chemin le plus proche
+                Location roadPoint = roadManager.getClosestRoadPoint(lane, z.getLocation());
+                boolean tooFar = roadPoint != null
+                        && roadPoint.getWorld().equals(z.getLocation().getWorld())
+                        && roadPoint.distance(z.getLocation()) > MAX_DEVIATION;
+
+                // Chercher un ennemi proche
                 LivingEntity enemy = findNearbyEnemy(z, team);
-                if (enemy != null) {
+
+                if (tooFar) {
+                    // Trop loin du chemin → revenir, ignorer l'ennemi
+                    z.setTarget(null);
+                    z.getPathfinder().moveTo(roadPoint, 1.2);
+                } else if (enemy != null) {
+                    // Dévier pour attaquer (dans la limite des 10 blocs)
                     z.setTarget(enemy);
+                } else {
+                    // Avancer le long du chemin vers la base ennemie
+                    z.setTarget(null);
+                    Location next = getNextRoadWaypoint(team, lane, z.getLocation());
+                    if (next != null) z.getPathfinder().moveTo(next, 1.0);
                 }
             }
         }
+    }
+
+    /**
+     * Prochain waypoint sur la route selon l'équipe.
+     * BLEU parcourt la route dans l'ordre de tracé, ROUGE en sens inverse.
+     */
+    private Location getNextRoadWaypoint(Team team, String lane, Location current) {
+        var road = LolPlugin.getInstance().getRoadManager().getRoad(lane);
+        if (road == null || road.isEmpty()) return null;
+
+        List<Location> path = new ArrayList<>(road);
+        if (team == Team.RED) Collections.reverse(path); // rouge va dans l'autre sens
+
+        // Trouver le 1er waypoint encore "devant" (non atteint)
+        for (Location wp : path) {
+            if (wp.getWorld().equals(current.getWorld()) && wp.distance(current) > 3.0) {
+                return wp;
+            }
+        }
+        return path.get(path.size() - 1); // dernier point = base ennemie
     }
 
     private LivingEntity findNearbyEnemy(Zombie minion, Team team) {
@@ -181,9 +218,12 @@ public class MinionManager {
     }
 
     private Location getMinionSpawn(Team team, String lane) {
-        var waypoints = (team == Team.BLUE ? blueLaneWaypoints : redLaneWaypoints).get(lane);
-        if (waypoints == null || waypoints.isEmpty()) return null;
-        return waypoints.get(0).clone();
+        var road = LolPlugin.getInstance().getRoadManager().getRoad(lane);
+        if (road == null || road.isEmpty()) return null;
+        // Bleu spawn au début de la route, rouge à la fin
+        return team == Team.BLUE
+                ? road.get(0).clone()
+                : road.get(road.size() - 1).clone();
     }
 
     // ── Helpers PDC ───────────────────────────────────────────────
@@ -198,8 +238,8 @@ public class MinionManager {
     }
 
     private String getMinionLane(Zombie z) {
-        // Stocké dans le nom custom ou via une autre clé — simplifié ici
-        return "mid"; // par défaut, amélioration possible avec une 3e clé PDC
+        String lane = z.getPersistentDataContainer().get(KEY_LANE, PersistentDataType.STRING);
+        return lane != null ? lane : "mid";
     }
 
     public void clearAllMinions() {
