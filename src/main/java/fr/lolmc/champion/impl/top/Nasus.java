@@ -52,7 +52,7 @@ public class Nasus extends BaseChampion {
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             int stacks=qStacks.getOrDefault(c.getUniqueId(),0);
-            double dmg=s.calcPhysicalDamage(s.getFinalAD()+stacks,null);
+            double dmg=s.getFinalAD()+stacks;
             DamageUtil.abilityDamage(c, t, dmg);
             if(t.getHealth()-dmg<=0) {qStacks.merge(c.getUniqueId(),6,Integer::sum);}
         }
@@ -88,7 +88,7 @@ public class Nasus extends BaseChampion {
                     double dmg=(55+s.getFinalMaxHP()*0.05)/5.0;
                     loc.getWorld().getNearbyEntities(loc,3,2,3).stream()
                         .filter(e->e instanceof Player&&!e.equals(c))
-                        .forEach(e->DamageUtil.abilityDamage(c, (Player)e, s.calcMagicalDamage(dmg,null)));
+                        .forEach(e->DamageUtil.abilityDamageMagic(c, (Player)e, dmg));
                     loc.getWorld().spawnParticle(Particle.WITCH,loc,5,1,1,1);
                     tick+=20;
                 }
@@ -114,7 +114,7 @@ public class Nasus extends BaseChampion {
                     double dmg=3+s.getFinalMaxHP()*0.01;
                     c.getWorld().getNearbyEntities(c.getLocation(),3,2,3).stream()
                         .filter(e->e instanceof Player&&!e.equals(c))
-                        .forEach(e->DamageUtil.abilityDamage(c, (Player)e, s.calcMagicalDamage(dmg,null)));
+                        .forEach(e->DamageUtil.abilityDamageMagic(c, (Player)e, dmg));
                     tick+=20;
                 }
             }.runTaskTimer(LolPlugin.getInstance(),0L,20L);

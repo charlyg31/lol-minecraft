@@ -34,8 +34,8 @@ public class Janna extends BaseChampion {
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
-            double dmg=s.calcMagicalDamage(s.getFinalAP()*0.3,null);
-            DamageUtil.damage(c, t, dmg, false);
+            double dmg=s.getFinalAP()*0.3;
+            DamageUtil.damage(c, t, dmg, false, DamageUtil.Type.MAGICAL);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             return String.format("Inflige %.0f dégâts.", s.getFinalAP());
@@ -48,8 +48,8 @@ public class Janna extends BaseChampion {
             resourceCost = 60;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
-            double dmg=s.calcMagicalDamage(60+s.getFinalAP()*0.35,null);
-            DamageUtil.abilityDamage(c, t, dmg);
+            double dmg=60+s.getFinalAP()*0.35;
+            DamageUtil.abilityDamageMagic(c, t, dmg);
             t.setVelocity(new Vector(0,0.8,0));
             t.sendActionBar(Component.text("🌪 Tornade!",NamedTextColor.WHITE));
         }
@@ -64,8 +64,8 @@ public class Janna extends BaseChampion {
             resourceCost = 40;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
-            double dmg=s.calcMagicalDamage(55+s.getFinalAP()*0.5,null);
-            DamageUtil.abilityDamage(c, t, dmg);
+            double dmg=55+s.getFinalAP()*0.5;
+            DamageUtil.abilityDamageMagic(c, t, dmg);
             t.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,60,2,false,true));
             t.sendActionBar(Component.text("💨 Zéphyr -30%%!",NamedTextColor.AQUA));
         }

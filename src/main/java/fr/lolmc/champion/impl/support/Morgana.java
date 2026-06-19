@@ -34,8 +34,8 @@ public class Morgana extends BaseChampion {
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
-            double dmg=s.calcMagicalDamage(s.getFinalAP()*0.3,null);
-            DamageUtil.damage(c, t, dmg, false);
+            double dmg=s.getFinalAP()*0.3;
+            DamageUtil.damage(c, t, dmg, false, DamageUtil.Type.MAGICAL);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             return String.format("Inflige %.0f dégâts.", s.getFinalAP());
@@ -48,8 +48,8 @@ public class Morgana extends BaseChampion {
             resourceCost = 50;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
-            double dmg=s.calcMagicalDamage(80+s.getFinalAP()*0.9,null);
-            DamageUtil.abilityDamage(c, t, dmg);
+            double dmg=80+s.getFinalAP()*0.9;
+            DamageUtil.abilityDamageMagic(c, t, dmg);
             t.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,40,10,false,true));
             t.sendActionBar(Component.text("🕸 Root 2s — Morgana Q!",NamedTextColor.DARK_PURPLE));
             c.getWorld().spawnParticle(Particle.WITCH,t.getLocation(),10,0.5,0.5,0.5);
@@ -73,7 +73,7 @@ public class Morgana extends BaseChampion {
                     double dmg=(24+s.getFinalAP()*0.11);
                     loc.getWorld().getNearbyEntities(loc,4,2,4).stream()
                         .filter(e->e instanceof Player)
-                        .forEach(e->DamageUtil.abilityDamage(c, (Player)e, s.calcMagicalDamage(dmg,null)));
+                        .forEach(e->DamageUtil.abilityDamageMagic(c, (Player)e, dmg));
                     loc.getWorld().spawnParticle(Particle.WITCH,loc,5,2,0,2);
                     tick+=20;
                 }
@@ -106,7 +106,7 @@ public class Morgana extends BaseChampion {
             c.getWorld().getNearbyEntities(c.getLocation(),5,2,5).stream()
                 .filter(e->e instanceof Player&&!e.equals(c))
                 .forEach(e->{
-                    DamageUtil.abilityDamage(c, (Player)e, s.calcMagicalDamage(dmg,null));
+                    DamageUtil.abilityDamageMagic(c, (Player)e, dmg);
                     ((Player)e).addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,30,10,false,true));
                     ((Player)e).sendActionBar(Component.text("⛓ STUN Morgana R!",NamedTextColor.DARK_PURPLE));
                 });

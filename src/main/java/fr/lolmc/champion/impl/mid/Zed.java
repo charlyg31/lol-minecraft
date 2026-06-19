@@ -51,7 +51,7 @@ public class Zed extends BaseChampion {
             resourceCost = 40;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
-            double dmg=s.calcPhysicalDamage(70+s.getFinalAD()*0.9,null);
+            double dmg=70+s.getFinalAD()*0.9;
             DamageUtil.abilityDamage(c, t, dmg);
             c.getWorld().spawnParticle(Particle.CRIT,t.getLocation(),8,0.3,0.3,0.3);
         }
@@ -94,7 +94,7 @@ public class Zed extends BaseChampion {
             c.getWorld().getNearbyEntities(c.getLocation(),4,2,4).stream()
                 .filter(e->e instanceof Player&&!e.equals(c))
                 .forEach(e->{
-                    DamageUtil.abilityDamage(c, (Player)e, s.calcPhysicalDamage(dmg,null));
+                    DamageUtil.abilityDamage(c, (Player)e, dmg);
                     ((Player)e).addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,30,1,false,true));
                 });
             c.getWorld().spawnParticle(Particle.CRIT,c.getLocation(),10,2,1,2);
@@ -114,9 +114,9 @@ public class Zed extends BaseChampion {
             new BukkitRunnable(){
                 @Override public void run(){
                     if(!t.isOnline())return;
-                    double dmg=s.calcTrueDamage(t.getMaxHealth()*0.2+s.getFinalAD()*0.75);
+                    double dmg=t.getMaxHealth()*0.2+s.getFinalAD()*0.75;
                     t.getWorld().strikeLightningEffect(t.getLocation());
-                    DamageUtil.abilityDamage(c, t, dmg);
+                    DamageUtil.trueDamage(c, t, dmg);
                     t.sendMessage(Component.text("☠ Mort en Sursis!",NamedTextColor.DARK_RED));
                 }
             }.runTaskLater(LolPlugin.getInstance(),60L);

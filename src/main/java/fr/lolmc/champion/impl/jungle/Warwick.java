@@ -48,8 +48,8 @@ public class Warwick extends BaseChampion {
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
-            double dmg=s.calcMagicalDamage(10+s.getFinalAD()+s.getFinalAP()*0.5,null);
-            DamageUtil.abilityDamage(c, t, dmg);
+            double dmg=10+s.getFinalAD()+s.getFinalAP()*0.5;
+            DamageUtil.abilityDamageMagic(c, t, dmg);
             double heal=dmg*0.7;
             c.setHealth(Math.min(c.getMaxHealth(),c.getHealth()+heal));
             c.getWorld().spawnParticle(Particle.HEART,c.getLocation(),5,0.5,0.5,0.5);
@@ -94,7 +94,7 @@ public class Warwick extends BaseChampion {
             if(t==null)return;
             Location dest=safeTeleport(c.getLocation(),t.getLocation());
             c.teleport(dest);
-            double dmg=s.calcPhysicalDamage(175+s.getFinalAD()*1.5,null);
+            double dmg=175+s.getFinalAD()*1.5;
             DamageUtil.abilityDamage(c, t, dmg);
             t.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,30,10,false,true));
             t.setVelocity(new Vector(0,0.8,0));

@@ -52,7 +52,7 @@ public class Darius extends BaseChampion {
                 .forEach(e->{
                     double dist=e.getLocation().distance(c.getLocation());
                     double mult=dist>3?1.5:1.0; // bord = +50%
-                    double dmg=s.calcPhysicalDamage((40+s.getFinalAD()*0.6)*mult,null);
+                    double dmg=(40+s.getFinalAD()*0.6)*mult;
                     DamageUtil.abilityDamage(c, (Player)e, dmg);
                 });
             c.getWorld().spawnParticle(Particle.SWEEP_ATTACK,c.getLocation(),5,2,1,2);
@@ -69,7 +69,7 @@ public class Darius extends BaseChampion {
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
-            double dmg=s.calcPhysicalDamage(s.getFinalAD()*2.0,null);
+            double dmg=s.getFinalAD()*2.0;
             DamageUtil.abilityDamage(c, t, dmg);
             c.getWorld().spawnParticle(Particle.CRIT,t.getLocation(),10);
         }
@@ -101,9 +101,9 @@ public class Darius extends BaseChampion {
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
-            double dmg=s.calcTrueDamage(100+level*40+s.getFinalAD()*0.75);
+            double dmg=100+level*40+s.getFinalAD()*0.75;
             t.getWorld().strikeLightningEffect(t.getLocation());
-            DamageUtil.abilityDamage(c, t, dmg);
+            DamageUtil.trueDamage(c, t, dmg);
             t.sendMessage(Component.text("☠ Guillotine Noxienne!",NamedTextColor.DARK_RED));
         }
         @Override public String getDynamicDescription(ChampionStats s){

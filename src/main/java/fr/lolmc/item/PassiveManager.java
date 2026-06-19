@@ -317,7 +317,7 @@ public class PassiveManager {
                 && !state.sterakActive
                 && !state.isOnCooldown(state.sterakCooldown, 45000L)) {
             double shield = stats.getBonusAD() * 0.75;
-            hp.heal(shield);
+            stats.addShield(shield);
             state.sterakActive = true;
             state.sterakCooldown = System.currentTimeMillis();
             victim.sendActionBar(Component.text(
@@ -332,9 +332,9 @@ public class PassiveManager {
                 && hp.getCurrentHP() < hp.getMaxHP() * 0.30
                 && !state.isOnCooldown(state.lastZhonyas, 45000L)) {
             double shield = 150 + stats.getBonusAD() * 0.20;
-            hp.heal(shield);
+            stats.addMagicShield(shield);
             victim.sendActionBar(Component.text(
-                String.format("⚔ Maw Lifeline! +%.0f bouclier", shield), NamedTextColor.RED));
+                String.format("⚔ Maw Lifeline! +%.0f bouclier magique", shield), NamedTextColor.RED));
         }
 
         // ── Edge of Night: bouclier sorts (1 fois) ──
@@ -520,7 +520,7 @@ public class PassiveManager {
                     .forEach(e -> {
                         Player ally = (Player) e;
                         if (championManager.hasChampion(ally)) {
-                            championManager.getChampion(ally).getHPSystem().heal(shieldAmt);
+                            championManager.getChampion(ally).getStats().addShield(shieldAmt);
                             hudManager.updateHUD(ally, championManager.getChampion(ally));
                         }
                     });

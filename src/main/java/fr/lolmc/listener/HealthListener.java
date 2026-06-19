@@ -104,6 +104,7 @@ public class HealthListener implements Listener {
         // Reset HP à max après respawn
         champ.getHPSystem().setCurrentHP(champ.getHPSystem().getMaxHP());
         champ.getResourceSystem().fill();
+        champ.getStats().clearShields();
 
         // Re-init le HUD
         LolPlugin.getInstance().getServer().getScheduler()

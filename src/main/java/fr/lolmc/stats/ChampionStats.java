@@ -1,213 +1,202 @@
 package fr.lolmc.stats;
 
 /**
- * Stats d'un champion — toutes les valeurs passent par ici.
- * Les objets ajoutent leurs bonus via addBonus().
- * Les sorts utilisent getFinal*() pour leurs calculs.
+ * Stats d'un champion avec le modèle de dégâts LoL officiel.
+ *
+ * Ordre de calcul de la pénétration (comme dans LoL) :
+ *   1. Réduction d'armure plate (Black Cleaver) — déjà appliquée via addBonusArmor négatif
+ *   2. Réduction d'armure en % (effets de réduction)
+ *   3. Pénétration d'armure en % (Lord Dominik's, Last Whisper)
+ *   4. Pénétration plate / Létalité (Youmuu's, etc.)
+ * Puis formule de réduction :
+ *   - armure >= 0 : dmg * 100 / (100 + armure_effective)
+ *   - armure < 0  : dmg * (2 - 100 / (100 - armure_effective))
  */
 public class ChampionStats {
 
-    // ── Stats de base (définies par le champion, niveau 1) ──
-    private double baseMaxHP;
-    private double baseAttackDamage;   // AD
-    private double baseAbilityPower;   // AP
-    private double baseArmor;
-    private double baseMagicResist;
-    private double baseAttackSpeed;    // attaques par seconde
-    private double baseCritChance;     // 0.0 à 1.0
-    private double baseCritDamage;     // multiplicateur (défaut 1.75)
-    private double baseMovementSpeed;
-    private double baseRange;          // portée attaque de base en blocs
-    private double baseHPRegen;        // HP régénérés par seconde
-    private double baseLethality;      // pénétration armure fixe
-    private double baseMagicPen;       // pénétration magie fixe (0.0..1.0)
-    private double baseLifeSteal;      // 0.0 à 1.0
-    private double baseOmnivamp;       // 0.0 à 1.0
-    private double baseAbilityHaste;   // réduit les cooldowns
+    // ── Stats de base (niveau 1) ──
+    private double baseMaxHP, baseAttackDamage, baseAbilityPower;
+    private double baseArmor, baseMagicResist, baseAttackSpeed;
+    private double baseCritChance, baseCritDamage, baseMovementSpeed, baseRange, baseHPRegen;
 
-    // ── Bonus ajoutés par les objets/runes ──
-    private double bonusMaxHP;
-    private double bonusAttackDamage;
-    private double bonusAbilityPower;
-    private double bonusArmor;
-    private double bonusMagicResist;
-    private double bonusAttackSpeed;
-    private double bonusCritChance;
-    private double bonusCritDamage;
-    private double bonusMovementSpeed;
-    private double bonusRange;
-    private double bonusHPRegen;
+    // ── Pénétration ──
+    private double baseLethality;        // pénétration armure plate
     private double bonusLethality;
-    private double bonusMagicPen;
-    private double bonusLifeSteal;
-    private double bonusOmnivamp;
-    private double bonusAbilityHaste;
+    private double bonusArmorPenPercent; // pénétration armure en % (0.0..1.0)
+    private double baseFlatMagicPen;     // pénétration magique plate (Sorcerer's Shoes = 18)
+    private double bonusFlatMagicPen;
+    private double bonusMagicPenPercent; // pénétration magique en % (0.0..1.0)
 
-    // ── Multiplicateurs (ex: +15% AD) ──
-    private double multAttackDamage = 1.0;
-    private double multAbilityPower = 1.0;
-    private double multMovementSpeed = 1.0;
-    private double multAttackSpeed   = 1.0;
-    private double multMaxHP         = 1.0;
+    // ── Réductions défensives (reçues) ──
+    private double flatDamageReduction;     // Doran's Shield -8
+    private double percentDamageReduction;  // réduction % générale
+    private double aaPercentReduction;      // Plated Steelcaps -12% des AA
+    private double tenacity;                // 0.0..1.0 réduction durée CC
 
-    // ── HP actuel ──
+    // ── Bonus objets ──
+    private double bonusMaxHP, bonusAttackDamage, bonusAbilityPower;
+    private double bonusArmor, bonusMagicResist, bonusAttackSpeed;
+    private double bonusCritChance, bonusCritDamage, bonusMovementSpeed, bonusRange, bonusHPRegen;
+    private double bonusLifeSteal, bonusOmnivamp, bonusAbilityHaste;
+
+    // ── Multiplicateurs ──
+    private double multAttackDamage = 1.0, multAbilityPower = 1.0;
+    private double multMovementSpeed = 1.0, multAttackSpeed = 1.0, multMaxHP = 1.0;
+
+    // ── HP & bouclier ──
     private double currentHP;
+    private double shieldAmount = 0;        // bouclier général (absorbe tout)
+    private double magicShieldAmount = 0;   // bouclier anti-magie (Maw, Banshee's)
 
-    public ChampionStats(double maxHP, double ad, double ap,
-                         double armor, double mr, double attackSpeed,
-                         double crit, double moveSpeed, double range,
-                         double hpRegen) {
-        this.baseMaxHP        = maxHP;
-        this.baseAttackDamage = ad;
-        this.baseAbilityPower = ap;
-        this.baseArmor        = armor;
-        this.baseMagicResist  = mr;
-        this.baseAttackSpeed  = attackSpeed;
-        this.baseCritChance   = crit;
-        this.baseCritDamage   = 1.75;
-        this.baseMovementSpeed = moveSpeed;
-        this.baseRange        = range;
-        this.baseHPRegen      = hpRegen;
-        this.baseLethality    = 0;
-        this.baseMagicPen     = 0;
-        this.baseLifeSteal    = 0;
-        this.baseOmnivamp     = 0;
-        this.baseAbilityHaste = 0;
-        this.currentHP        = getFinalMaxHP();
+    public ChampionStats(double maxHP, double ad, double ap, double armor, double mr,
+                         double attackSpeed, double crit, double moveSpeed, double range, double hpRegen) {
+        this.baseMaxHP = maxHP; this.baseAttackDamage = ad; this.baseAbilityPower = ap;
+        this.baseArmor = armor; this.baseMagicResist = mr; this.baseAttackSpeed = attackSpeed;
+        this.baseCritChance = crit; this.baseCritDamage = 1.75;
+        this.baseMovementSpeed = moveSpeed; this.baseRange = range; this.baseHPRegen = hpRegen;
+        this.currentHP = getFinalMaxHP();
     }
 
     // ══════════════════════════════════════════════
-    // GETTERS FINAUX (base + bonus + multiplicateurs)
+    // GETTERS FINAUX
     // ══════════════════════════════════════════════
 
-    public double getFinalMaxHP() {
-        return (baseMaxHP + bonusMaxHP) * multMaxHP;
-    }
+    public double getFinalMaxHP()        { return (baseMaxHP + bonusMaxHP) * multMaxHP; }
+    public double getFinalAD()           { return (baseAttackDamage + bonusAttackDamage) * multAttackDamage; }
+    public double getFinalAP()           { return (baseAbilityPower + bonusAbilityPower) * multAbilityPower; }
+    public double getFinalArmor()        { return baseArmor + bonusArmor; }
+    public double getFinalMagicResist()  { return baseMagicResist + bonusMagicResist; }
+    public double getFinalAttackSpeed()  { return Math.min((baseAttackSpeed + bonusAttackSpeed) * multAttackSpeed, 2.5); }
+    public double getFinalCritChance()   { return Math.min(baseCritChance + bonusCritChance, 1.0); }
+    public double getFinalCritDamage()   { return baseCritDamage + bonusCritDamage; }
+    public double getFinalMovementSpeed(){ return (baseMovementSpeed + bonusMovementSpeed) * multMovementSpeed; }
+    public double getFinalRange()        { return baseRange + bonusRange; }
+    public double getFinalHPRegen()      { return baseHPRegen + bonusHPRegen; }
+    public double getFinalLethality()    { return baseLethality + bonusLethality; }
+    public double getFinalLifeSteal()    { return Math.min(bonusLifeSteal, 1.0); }
+    public double getFinalOmnivamp()     { return Math.min(bonusOmnivamp, 1.0); }
+    public double getFinalAbilityHaste() { return bonusAbilityHaste; }
+    public double getFinalTenacity()     { return Math.min(tenacity, 0.95); }
 
-    public double getFinalAD() {
-        return (baseAttackDamage + bonusAttackDamage) * multAttackDamage;
-    }
-
-    public double getFinalAP() {
-        return (baseAbilityPower + bonusAbilityPower) * multAbilityPower;
-    }
-
-    public double getFinalArmor() {
-        return baseArmor + bonusArmor;
-    }
-
-    public double getFinalMagicResist() {
-        return baseMagicResist + bonusMagicResist;
-    }
-
-    public double getFinalAttackSpeed() {
-        return Math.min((baseAttackSpeed + bonusAttackSpeed) * multAttackSpeed, 2.5);
-    }
-
-    public double getFinalCritChance() {
-        return Math.min(baseCritChance + bonusCritChance, 1.0);
-    }
-
-    public double getFinalCritDamage() {
-        return baseCritDamage + bonusCritDamage;
-    }
-
-    public double getFinalMovementSpeed() {
-        return (baseMovementSpeed + bonusMovementSpeed) * multMovementSpeed;
-    }
-
-    public double getFinalRange() {
-        return baseRange + bonusRange;
-    }
-
-    public double getFinalHPRegen() {
-        return baseHPRegen + bonusHPRegen;
-    }
-
-    public double getFinalLethality() {
-        return baseLethality + bonusLethality;
-    }
-
-    public double getFinalMagicPen() {
-        return Math.min(baseMagicPen + bonusMagicPen, 0.45);
-    }
-
-    public double getFinalLifeSteal() {
-        return Math.min(baseLifeSteal + bonusLifeSteal, 1.0);
-    }
-
-    public double getFinalOmnivamp() {
-        return Math.min(baseOmnivamp + bonusOmnivamp, 1.0);
-    }
-
-    public double getFinalAbilityHaste() {
-        return baseAbilityHaste + bonusAbilityHaste;
-    }
+    // Pénétration
+    public double getArmorPenPercent()   { return Math.min(bonusArmorPenPercent, 1.0); }
+    public double getFlatMagicPen()      { return baseFlatMagicPen + bonusFlatMagicPen; }
+    public double getMagicPenPercent()   { return Math.min(bonusMagicPenPercent, 1.0); }
+    // Compat : ancienne API getFinalMagicPen() = pénétration magique en %
+    public double getFinalMagicPen()     { return getMagicPenPercent(); }
 
     // ══════════════════════════════════════════════
-    // CALCULS DE DÉGÂTS (utilisés par sorts + AA)
+    // CALCUL DES DÉGÂTS — modèle LoL officiel
     // ══════════════════════════════════════════════
 
     /**
-     * Calcule les dégâts physiques après réduction d'armure.
-     * formule LoL : dmg * 100 / (100 + armor_effective)
+     * Armure effective après pénétration, dans l'ordre LoL :
+     * (armure) → ×(1 - pén%) → - pén_plate, borné à un minimum de 0 côté pénétration
+     * (la pénétration ne peut pas rendre l'armure négative ; seules les réductions le peuvent)
      */
+    private double effectiveArmor(double targetArmor) {
+        double armor = targetArmor;
+        if (armor > 0) {
+            armor *= (1.0 - getArmorPenPercent());     // pén %
+            armor -= getFinalLethality();              // pén plate
+            if (armor < 0) armor = 0;                  // la pén seule ne passe pas sous 0
+        }
+        return armor; // peut être <0 si l'armure de base était négative (réductions)
+    }
+
+    private double effectiveMR(double targetMR) {
+        double mr = targetMR;
+        if (mr > 0) {
+            mr *= (1.0 - getMagicPenPercent());
+            mr -= getFlatMagicPen();
+            if (mr < 0) mr = 0;
+        }
+        return mr;
+    }
+
+    /** Multiplicateur de réduction selon la résistance (gère le négatif). */
+    private double resistMultiplier(double resist) {
+        if (resist >= 0) return 100.0 / (100.0 + resist);
+        return 2.0 - 100.0 / (100.0 - resist); // formule LoL pour résistance négative
+    }
+
     public double calcPhysicalDamage(double rawDamage, ChampionStats target) {
-        if (target == null) return rawDamage; // pas de réduction si pas de cible connue
-        double effectiveArmor = Math.max(0, target.getFinalArmor() - this.getFinalLethality());
-        double reduction = 100.0 / (100.0 + effectiveArmor);
-        return rawDamage * reduction;
+        if (target == null) return rawDamage;
+        double armor = effectiveArmor(target.getFinalArmor());
+        return rawDamage * resistMultiplier(armor);
     }
 
-    /**
-     * Calcule les dégâts magiques après réduction de MR.
-     */
     public double calcMagicalDamage(double rawDamage, ChampionStats target) {
         if (target == null) return rawDamage;
-        double effectiveMR = Math.max(0, target.getFinalMagicResist() * (1.0 - this.getFinalMagicPen()));
-        double reduction = 100.0 / (100.0 + effectiveMR);
-        return rawDamage * reduction;
+        double mr = effectiveMR(target.getFinalMagicResist());
+        return rawDamage * resistMultiplier(mr);
     }
 
-    /**
-     * Calcule les dégâts vrais (ignorent armure/MR).
-     */
     public double calcTrueDamage(double rawDamage) {
         return rawDamage;
     }
 
-    /**
-     * Calcule les dégâts d'attaque de base avec crit éventuel.
-     */
     public double calcAutoAttackDamage(ChampionStats target) {
         double ad = getFinalAD();
-        boolean isCrit = Math.random() < getFinalCritChance();
-        if (isCrit) ad *= getFinalCritDamage();
-        return calcPhysicalDamage(ad, target); // target peut être null
+        if (Math.random() < getFinalCritChance()) ad *= getFinalCritDamage();
+        return calcPhysicalDamage(ad, target);
     }
 
     /**
-     * Applique le lifesteal/omnivamp après un dégât.
+     * Applique les réductions défensives reçues (plate puis %), côté CIBLE.
+     * Appelé par HPSystem/DamageUtil après le calcul de résistance.
+     * @param isAutoAttack true pour appliquer aussi aaPercentReduction (Plated Steelcaps)
      */
-    public void applyVamp(double damageDealt, boolean isAbility) {
-        double heal = 0;
-        if (!isAbility) {
-            heal = damageDealt * getFinalLifeSteal();
-        }
-        heal += damageDealt * getFinalOmnivamp();
-        currentHP = Math.min(currentHP + heal, getFinalMaxHP());
+    public double applyDamageReductions(double incomingDamage, boolean isAutoAttack) {
+        double dmg = incomingDamage;
+        if (isAutoAttack) dmg *= (1.0 - Math.min(aaPercentReduction, 1.0));
+        dmg *= (1.0 - Math.min(percentDamageReduction, 1.0));
+        dmg -= flatDamageReduction;
+        return Math.max(0, dmg);
     }
 
-    /**
-     * Convertit l'ability haste en cooldown multiplier.
-     * formule LoL : CDmult = 100 / (100 + abilityHaste)
-     */
     public double getCooldownMultiplier() {
         return 100.0 / (100.0 + getFinalAbilityHaste());
     }
 
+    public void applyVamp(double damageDealt, boolean isAbility) {
+        double heal = 0;
+        if (!isAbility) heal = damageDealt * getFinalLifeSteal();
+        heal += damageDealt * getFinalOmnivamp();
+        currentHP = Math.min(currentHP + heal, getFinalMaxHP());
+    }
+
     // ══════════════════════════════════════════════
-    // AJOUT BONUS (appelé par les objets)
+    // BOUCLIERS (vrai système, se consument)
+    // ══════════════════════════════════════════════
+
+    public void addShield(double amount)       { shieldAmount += amount; }
+    public void addMagicShield(double amount)   { magicShieldAmount += amount; }
+    public double getShield()                   { return shieldAmount + magicShieldAmount; }
+
+    /**
+     * Absorbe des dégâts avec les boucliers. Retourne les dégâts restants à infliger aux HP.
+     * @param isMagic true si dégâts magiques (le bouclier anti-magie s'applique en priorité)
+     */
+    public double absorbWithShield(double damage, boolean isMagic) {
+        double remaining = damage;
+        if (isMagic && magicShieldAmount > 0) {
+            double absorbed = Math.min(magicShieldAmount, remaining);
+            magicShieldAmount -= absorbed;
+            remaining -= absorbed;
+        }
+        if (remaining > 0 && shieldAmount > 0) {
+            double absorbed = Math.min(shieldAmount, remaining);
+            shieldAmount -= absorbed;
+            remaining -= absorbed;
+        }
+        return remaining;
+    }
+
+    public void clearShields() { shieldAmount = 0; magicShieldAmount = 0; }
+
+    // ══════════════════════════════════════════════
+    // AJOUT BONUS (objets)
     // ══════════════════════════════════════════════
 
     public void addBonusHP(double v)           { bonusMaxHP += v; }
@@ -222,39 +211,49 @@ public class ChampionStats {
     public void addBonusRange(double v)        { bonusRange += v; }
     public void addBonusHPRegen(double v)      { bonusHPRegen += v; }
     public void addBonusLethality(double v)    { bonusLethality += v; }
-    public void addBonusMagicPen(double v)     { bonusMagicPen += v; }
     public void addBonusLifeSteal(double v)    { bonusLifeSteal += v; }
     public void addBonusOmnivamp(double v)     { bonusOmnivamp += v; }
     public void addBonusAbilityHaste(double v) { bonusAbilityHaste += v; }
 
-    public void multiplyAD(double mult)    { multAttackDamage *= mult; }
-    public void multiplyAP(double mult)    { multAbilityPower *= mult; }
-    public void multiplyMS(double mult)    { multMovementSpeed *= mult; }
-    public void multiplyAS(double mult)    { multAttackSpeed *= mult; }
-    public void multiplyHP(double mult)    { multMaxHP *= mult; }
+    // Pénétration — nouvelles méthodes
+    public void addBonusArmorPenPercent(double v) { bonusArmorPenPercent += v; }
+    public void addBonusFlatMagicPen(double v)    { bonusFlatMagicPen += v; }
+    public void addBonusMagicPenPercent(double v) { bonusMagicPenPercent += v; }
+    // Compat : ancienne API addBonusMagicPen(v) = pénétration magique en %
+    public void addBonusMagicPen(double v)        { bonusMagicPenPercent += v; }
+
+    // Réductions défensives
+    public void addFlatDamageReduction(double v)   { flatDamageReduction += v; }
+    public void addPercentDamageReduction(double v){ percentDamageReduction += v; }
+    public void addAAPercentReduction(double v)    { aaPercentReduction += v; }
+    public void addTenacity(double v)              { tenacity += v; }
+
+    public void multiplyAD(double m) { multAttackDamage *= m; }
+    public void multiplyAP(double m) { multAbilityPower *= m; }
+    public void multiplyMS(double m) { multMovementSpeed *= m; }
+    public void multiplyAS(double m) { multAttackSpeed *= m; }
+    public void multiplyHP(double m) { multMaxHP *= m; }
 
     // ══════════════════════════════════════════════
     // HP
     // ══════════════════════════════════════════════
 
-    public double getCurrentHP()  { return currentHP; }
-    public void setCurrentHP(double hp) { currentHP = Math.max(0, Math.min(hp, getFinalMaxHP())); }
-    public void takeDamage(double dmg)  { currentHP = Math.max(0, currentHP - dmg); }
-    public boolean isDead()             { return currentHP <= 0; }
-
-    // ══════════════════════════════════════════════
-    // RESET BONUS (appelé quand un objet est retiré)
-    // ══════════════════════════════════════════════
+    public double getCurrentHP()        { return currentHP; }
+    public void setCurrentHP(double hp)  { currentHP = Math.max(0, Math.min(hp, getFinalMaxHP())); }
+    public void takeDamage(double dmg)   { currentHP = Math.max(0, currentHP - dmg); }
+    public boolean isDead()              { return currentHP <= 0; }
 
     public void resetBonuses() {
         bonusMaxHP=bonusAttackDamage=bonusAbilityPower=bonusArmor=0;
         bonusMagicResist=bonusAttackSpeed=bonusCritChance=bonusCritDamage=0;
         bonusMovementSpeed=bonusRange=bonusHPRegen=bonusLethality=0;
-        bonusMagicPen=bonusLifeSteal=bonusOmnivamp=bonusAbilityHaste=0;
+        bonusLifeSteal=bonusOmnivamp=bonusAbilityHaste=0;
+        bonusArmorPenPercent=bonusFlatMagicPen=bonusMagicPenPercent=0;
+        flatDamageReduction=percentDamageReduction=aaPercentReduction=tenacity=0;
         multAttackDamage=multAbilityPower=multMovementSpeed=multAttackSpeed=multMaxHP=1.0;
     }
 
-    // Getters de base (pour affichage)
+    // Getters de base (affichage + passifs)
     public double getBaseAD()  { return baseAttackDamage; }
     public double getBaseAP()  { return baseAbilityPower; }
     public double getBonusAD() { return bonusAttackDamage; }

@@ -48,12 +48,12 @@ public class Sivir extends BaseChampion {
             resourceCost = 70;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
-            double dmg=s.calcPhysicalDamage(50+s.getFinalAD()*0.5,null);
+            double dmg=50+s.getFinalAD()*0.5;
             DamageUtil.abilityDamage(c, t, dmg);
             // Retour: dégâts réduits
             new BukkitRunnable(){@Override public void run(){
                 if(!t.isOnline())return;
-                DamageUtil.abilityDamage(c, t, s.calcPhysicalDamage(dmg*0.7,null));
+                DamageUtil.abilityDamage(c, t, dmg*0.7);
                 c.getWorld().spawnParticle(Particle.CRIT,t.getLocation(),5);
             }}.runTaskLater(LolPlugin.getInstance(),15L);
             c.getWorld().spawnParticle(Particle.CRIT,t.getLocation(),10);

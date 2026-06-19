@@ -47,8 +47,13 @@ public class LolItem {
     private double bonusCritChance;
     private double bonusCritDamage;
     private double bonusMoveSpeed;
-    private double bonusLethality;
-    private double bonusMagicPen;
+    private double bonusLethality;        // pénétration armure plate
+    private double bonusArmorPenPercent;  // pénétration armure %
+    private double bonusMagicPen;         // pénétration magique % (compat)
+    private double bonusFlatMagicPen;     // pénétration magique plate
+    private double bonusFlatDmgReduction; // Doran's Shield
+    private double bonusAAReduction;      // Plated Steelcaps
+    private double bonusTenacity;         // Mercury's Treads
     private double bonusLifeSteal;
     private double bonusOmnivamp;
     private double bonusAbilityHaste;
@@ -86,7 +91,12 @@ public class LolItem {
         stats.addBonusCritDamage(bonusCritDamage);
         stats.addBonusMoveSpeed(bonusMoveSpeed);
         stats.addBonusLethality(bonusLethality);
+        stats.addBonusArmorPenPercent(bonusArmorPenPercent);
         stats.addBonusMagicPen(bonusMagicPen);
+        stats.addBonusFlatMagicPen(bonusFlatMagicPen);
+        stats.addFlatDamageReduction(bonusFlatDmgReduction);
+        stats.addAAPercentReduction(bonusAAReduction);
+        stats.addTenacity(bonusTenacity);
         stats.addBonusLifeSteal(bonusLifeSteal);
         stats.addBonusOmnivamp(bonusOmnivamp);
         stats.addBonusAbilityHaste(bonusAbilityHaste);
@@ -138,7 +148,12 @@ public class LolItem {
         stats.addBonusCritDamage(-bonusCritDamage);
         stats.addBonusMoveSpeed(-bonusMoveSpeed);
         stats.addBonusLethality(-bonusLethality);
+        stats.addBonusArmorPenPercent(-bonusArmorPenPercent);
         stats.addBonusMagicPen(-bonusMagicPen);
+        stats.addBonusFlatMagicPen(-bonusFlatMagicPen);
+        stats.addFlatDamageReduction(-bonusFlatDmgReduction);
+        stats.addAAPercentReduction(-bonusAAReduction);
+        stats.addTenacity(-bonusTenacity);
         stats.addBonusLifeSteal(-bonusLifeSteal);
         stats.addBonusOmnivamp(-bonusOmnivamp);
         stats.addBonusAbilityHaste(-bonusAbilityHaste);
@@ -194,7 +209,11 @@ public class LolItem {
         if (bonusCritChance > 0)   lore.add(stat("🎯 Chance critique",     "+" + pct(bonusCritChance), NamedTextColor.RED));
         if (bonusCritDamage > 0)   lore.add(stat("💥 Dégâts critiques",    "+" + pct(bonusCritDamage), NamedTextColor.RED));
         if (bonusLethality > 0)    lore.add(stat("🗡 Létalité",            "+" + (int)bonusLethality, NamedTextColor.RED));
-        if (bonusMagicPen > 0)     lore.add(stat("🌀 Pénétration magique", "+" + pct(bonusMagicPen), NamedTextColor.BLUE));
+        if (bonusMagicPen > 0)     lore.add(stat("🌀 Pénétration magique %", "+" + pct(bonusMagicPen), NamedTextColor.BLUE));
+        if (bonusArmorPenPercent > 0) lore.add(stat("🗡 Pénétration armure %", "+" + pct(bonusArmorPenPercent), NamedTextColor.RED));
+        if (bonusFlatMagicPen > 0) lore.add(stat("🌀 Pénétration magique", "+" + (int)bonusFlatMagicPen, NamedTextColor.BLUE));
+        if (bonusTenacity > 0)     lore.add(stat("🏃 Ténacité", "+" + pct(bonusTenacity), NamedTextColor.GREEN));
+        if (bonusFlatDmgReduction > 0) lore.add(stat("🛡 Réduction dégâts", "-" + (int)bonusFlatDmgReduction, NamedTextColor.GREEN));
         if (bonusLifeSteal > 0)    lore.add(stat("🩸 Vol de vie",          "+" + pct(bonusLifeSteal), NamedTextColor.RED));
         if (bonusOmnivamp > 0)     lore.add(stat("💚 Omnivamp",            "+" + pct(bonusOmnivamp), NamedTextColor.GREEN));
         if (bonusAbilityHaste > 0) lore.add(stat("⏱ Hâte de compétence",  "+" + (int)bonusAbilityHaste, NamedTextColor.AQUA));
@@ -262,6 +281,11 @@ public class LolItem {
     public LolItem ms(double v)           { bonusMoveSpeed = v;    return this; }
     public LolItem lethality(double v)    { bonusLethality = v;    return this; }
     public LolItem magicPen(double v)     { bonusMagicPen = v;     return this; }
+    public LolItem armorPenPct(double v)  { bonusArmorPenPercent = v; return this; }
+    public LolItem flatMagicPen(double v) { bonusFlatMagicPen = v;  return this; }
+    public LolItem dmgReduction(double v) { bonusFlatDmgReduction = v; return this; }
+    public LolItem aaReduction(double v)  { bonusAAReduction = v;   return this; }
+    public LolItem tenacity(double v)     { bonusTenacity = v;      return this; }
     public LolItem lifeSteal(double v)    { bonusLifeSteal = v;    return this; }
     public LolItem omnivamp(double v)     { bonusOmnivamp = v;     return this; }
     public LolItem ah(double v)           { bonusAbilityHaste = v; return this; }

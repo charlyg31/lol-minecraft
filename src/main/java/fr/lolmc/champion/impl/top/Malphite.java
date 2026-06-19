@@ -35,7 +35,7 @@ public class Malphite extends BaseChampion {
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double dmg=s.calcAutoAttackDamage(null);
-            DamageUtil.damage(c, t, dmg, false);
+            DamageUtil.damage(c, t, dmg, false, DamageUtil.Type.MAGICAL);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             return String.format("Inflige %.0f dégâts.", s.getFinalAD());
@@ -48,8 +48,8 @@ public class Malphite extends BaseChampion {
             resourceCost = 70;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
-            double dmg=s.calcMagicalDamage(70+s.getFinalAP()*0.6+s.getFinalMaxHP()*0.1,null);
-            DamageUtil.abilityDamage(c, t, dmg);
+            double dmg=70+s.getFinalAP()*0.6+s.getFinalMaxHP()*0.1;
+            DamageUtil.abilityDamageMagic(c, t, dmg);
             t.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,40,1,false,true));
             t.getWorld().spawnParticle(Particle.BLOCK,t.getLocation(),15,0.3,0.3,0.3,
                 Material.STONE.createBlockData());
@@ -84,7 +84,7 @@ public class Malphite extends BaseChampion {
             c.getWorld().getNearbyEntities(c.getLocation(),4,2,4).stream()
                 .filter(e->e instanceof Player&&!e.equals(c))
                 .forEach(e->{
-                    DamageUtil.abilityDamage(c, (Player)e, s.calcMagicalDamage(dmg,null));
+                    DamageUtil.abilityDamageMagic(c, (Player)e, dmg);
                     ((Player)e).addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,20,1,false,true));
                 });
             c.getWorld().spawnParticle(Particle.BLOCK,c.getLocation(),25,2,0,2,Material.STONE.createBlockData());
@@ -106,7 +106,7 @@ public class Malphite extends BaseChampion {
             c.getWorld().getNearbyEntities(c.getLocation(),4,2,4).stream()
                 .filter(e->e instanceof Player&&!e.equals(c))
                 .forEach(e->{
-                    DamageUtil.abilityDamage(c, (Player)e, s.calcMagicalDamage(dmg,null));
+                    DamageUtil.abilityDamageMagic(c, (Player)e, dmg);
                     ((Player)e).setVelocity(new Vector(0,1.2,0));
                     ((Player)e).sendActionBar(Component.text("🪨 KNOCKUP Malphite!",NamedTextColor.DARK_GRAY));
                 });

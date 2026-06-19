@@ -50,7 +50,7 @@ public class Yasuo extends BaseChampion {
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             int casts=qCasts.merge(c.getUniqueId(),1,Integer::sum);
-            double dmg=s.calcPhysicalDamage(20+s.getFinalAD(),null);
+            double dmg=20+s.getFinalAD();
             // Tornade linéaire devant
             Location front=c.getLocation().add(c.getLocation().getDirection().multiply(3));
             c.getWorld().getNearbyEntities(front,3,1,3).stream()
@@ -89,7 +89,7 @@ public class Yasuo extends BaseChampion {
             if(t==null)return;
             Location dest=safeTeleport(c.getLocation(),t.getLocation());
             c.teleport(dest);
-            double dmg=s.calcPhysicalDamage(70+s.getFinalAD()*0.6,null);
+            double dmg=70+s.getFinalAD()*0.6;
             DamageUtil.abilityDamage(c, t, dmg);
             c.getWorld().spawnParticle(Particle.SWEEP_ATTACK,dest,5);
         }
@@ -104,7 +104,7 @@ public class Yasuo extends BaseChampion {
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
-            double dmg=s.calcPhysicalDamage(200+s.getFinalAD()*1.5,null);
+            double dmg=200+s.getFinalAD()*1.5;
             c.getWorld().getNearbyEntities(c.getLocation(),4,3,4).stream()
                 .filter(e->e instanceof Player&&!e.equals(c))
                 .forEach(e->{

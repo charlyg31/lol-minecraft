@@ -50,8 +50,8 @@ public class MasterYi extends BaseChampion {
             if(t==null)return;
             Location dest=safeTeleport(c.getLocation(),t.getLocation());
             c.teleport(dest);
-            double dmg=s.calcTrueDamage(25+s.getFinalAD()*1.1);
-            DamageUtil.abilityDamage(c, t, dmg);
+            double dmg=25+s.getFinalAD()*1.1;
+            DamageUtil.trueDamage(c, t, dmg);
             c.getWorld().spawnParticle(Particle.CRIT,t.getLocation(),10,0.5,0.5,0.5);
         }
         @Override public String getDynamicDescription(ChampionStats s){

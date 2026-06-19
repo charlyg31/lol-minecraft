@@ -48,8 +48,8 @@ public class MissFortune extends BaseChampion {
             resourceCost = 43;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
-            double d1=s.calcPhysicalDamage(20+s.getFinalAD()*0.85,null);
-            double d2=s.calcPhysicalDamage((20+s.getFinalAD()*0.85)*1.35,null);
+            double d1=20+s.getFinalAD()*0.85;
+            double d2=(20+s.getFinalAD()*0.85)*1.35;
             DamageUtil.abilityDamage(c, t, d1+d2);
             c.getWorld().spawnParticle(Particle.CRIT,t.getLocation(),10,0.3,0.3,0.3);
         }
@@ -77,7 +77,7 @@ public class MissFortune extends BaseChampion {
             resourceCost = 80;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
-            double dmg=s.calcPhysicalDamage(60+s.getFinalAD()*0.8,null);
+            double dmg=60+s.getFinalAD()*0.8;
             t.getWorld().getNearbyEntities(t.getLocation(),3,2,3).stream()
                 .filter(e->e instanceof Player)
                 .forEach(e->{
@@ -104,7 +104,7 @@ public class MissFortune extends BaseChampion {
                     double dmg=(110+s.getFinalAP()*0.2)/3.0;
                     c.getWorld().getNearbyEntities(c.getLocation(),8,2,8).stream()
                         .filter(e->e instanceof Player&&!e.equals(c))
-                        .forEach(e->DamageUtil.abilityDamage(c, (Player)e, s.calcPhysicalDamage(dmg,null)));
+                        .forEach(e->DamageUtil.abilityDamage(c, (Player)e, dmg));
                     c.getWorld().spawnParticle(Particle.CRIT,c.getLocation().add(
                         c.getLocation().getDirection().multiply(4)),5,3,0,3);
                     tick+=20;
