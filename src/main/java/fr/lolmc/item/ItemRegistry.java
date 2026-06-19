@@ -133,7 +133,7 @@ public class ItemRegistry {
         reg(new LolItem("hullbreaker",    "Hullbreaker",       3000, Material.OAK_LOG,        DAMAGE).ad(50).hp(400).passive("Boarding Party","Seul: +20 armure/MR. Boost minions proches."));
         reg(new LolItem("anathema_chains","Anathema's Chains", 2500, Material.CHAIN,          TANK).hp(650).ah(20).passive("Vendetta","Désigne 1 ennemi: -20%% dégâts de lui."));
         reg(new LolItem("frozen_mallet",  "Frozen Mallet",     3100, Material.PACKED_ICE,     TANK).ad(30).hp(700).passive("Icy","AA ralentissent 40%% (20%% ranged) 1.5s."));
-        reg(new LolItem("ravenous_hydra2","Heartsteel",        3000, Material.NETHER_HEART,   TANK).hp(800).hpRegen(50).passive("Colossal Consumption","Toutes 3s: +5 HP stack."));
+        reg(new LolItem("ravenous_hydra2","Heartsteel",        3000, Material.RED_CONCRETE,   TANK).hp(800).hpRegen(50).passive("Colossal Consumption","Toutes 3s: +5 HP stack."));
         reg(new LolItem("warmogs",        "Warmog's Armor",    3100, Material.RED_WOOL,       TANK).hp(800).hpRegen(200).passive("Warmog's Heart",">1000 HP bonus: +5%% HP max/s hors combat."));
         reg(new LolItem("bandlepipes",    "Bandlepipes",       2300, Material.NOTE_BLOCK,     SUPPORT).hp(250).armor(25).mr(25).ah(15).passive("Rally","CC: alliés proches +15%% AS 5s."));
         reg(new LolItem("mantle_12th",    "Mantle of the Twelfth Hour",3000,Material.TOTEM_OF_UNDYING,TANK).hp(400).armor(30).mr(30).hpRegen(150).passive("Lifeline","HP bas: soin sur 4s + tenacité."));
@@ -276,7 +276,7 @@ public class ItemRegistry {
         reg(new LolItem("sunfire_aegis",   "Sunfire Aegis",     3100, Material.MAGMA_BLOCK,     TANK).hp(400).armor(50).mr(25).passive("Immolate","12-30 dégâts/s AoE."));
         reg(new LolItem("thornmail",       "Thornmail",         2700, Material.IRON_BARS,       TANK).hp(350).armor(60).passive("Thornmail","Réfléchit dégâts aux attaquants."));
         reg(new LolItem("gargoyle_stoneplate","Gargoyle Stoneplate",3300,Material.STONE,        TANK).hp(400).armor(60).mr(60).passive("Stone Skin","Actif: +100%% HP bonus temp."));
-        reg(new LolItem("heartsteel",      "Heartsteel",        3000, Material.NETHER_HEART,    TANK).hp(800).hpRegen(50).passive("Colossal Consumption","Stack HP."));
+        reg(new LolItem("heartsteel",      "Heartsteel",        3000, Material.RED_CONCRETE,    TANK).hp(800).hpRegen(50).passive("Colossal Consumption","Stack HP."));
         reg(new LolItem("jaksho",          "Jak'Sho, The Protean",3400,Material.ENDER_EYE,     TANK).hp(400).armor(40).mr(40).passive("Voidborn Resilience","+5 armure/MR par stack."));
         reg(new LolItem("force_of_nature","Force of Nature",    2900, Material.GRASS_BLOCK,     TANK).hp(350).mr(60).ms(5).passive("Absorb","Dégâts magiques: +6 MR/stack."));
         reg(new LolItem("randuins_omen",   "Randuin's Omen",    2700, Material.IRON_CHESTPLATE, TANK).hp(400).armor(80).passive("Cold Steel","-15%% AS attaquants."));
@@ -322,6 +322,74 @@ public class ItemRegistry {
         reg(new LolItem("oracle_lens2",        "Lentille Oracle",          0,   Material.SPYGLASS,          CONSUMABLE).passive("Actif","Révèle wards proches 10s. Dispo niv 3."));
         reg(new LolItem("farsight2",           "Vision Lointaine",         0,   Material.COMPASS,           CONSUMABLE).passive("Actif","Ward révélatrice longue portée (1 HP)."));
         reg(new LolItem("cappa_juice2",        "Cappa Juice",              700, Material.HONEY_BOTTLE,      CONSUMABLE).passive("Actif","Soigne 40%% HP max sur 120s."));
+
+
+        // ════════════════════════════════════════════════════════════
+        // ITEMS OFFICIELS MANQUANTS (57 items — patch 16.12)
+        // ════════════════════════════════════════════════════════════
+
+        // ── LEGENDARIES manquants ──
+        reg(new LolItem("deaths_dance",       "Death's Dance",            3300, Material.NETHERITE_SWORD,    DAMAGE).ad(65).armor(40).ah(15).passive("Cauterize","Soins retardés: 30%% dégâts → soin sur 3s.").passive("Dance","Kill/assist soigne 15%% HP max."));
+        reg(new LolItem("stridebreaker",      "Stridebreaker",            3300, Material.DIAMOND_AXE,     DAMAGE).ad(55).hp(300).as(0.20).ah(20).passive("Halting Slash","Actif: AoE qui ralentit 60%% 1s."));
+        reg(new LolItem("goredrinker",        "Goredrinker",              3200, Material.NETHERITE_SWORD, DAMAGE).ad(55).hp(350).ah(20).omnivamp(0.08).passive("Thirsting Slash","Actif: fente AoE, soigne 15+10%%HP man."));
+        reg(new LolItem("mercurial_scimitar", "Mercurial Scimitar",       3200, Material.GOLDEN_SWORD,    DAMAGE).ad(50).mr(30).lifeSteal(0.10).passive("Quicksilver","Actif: cleanse tous CC (90s CD)."));
+        reg(new LolItem("stormrazor",         "Stormrazor",               3200, Material.SPECTRAL_ARROW,  DAMAGE).ad(60).crit(0.20).ms(5).passive("Paralyze","1ère AA: ralentit 99%% 0.5s (18s CD)."));
+        reg(new LolItem("dusk_and_dawn",      "Dusk and Dawn",            3100, Material.PURPLE_DYE,      MAGE).ap(70).ah(20).passive("Spellblade","Après sort: AA double effet on-hit."));
+        reg(new LolItem("yun_tal_wildarrows", "Yun Tal Wildarrows",       3100, Material.BOW,             ATTACK_SPEED).ad(60).crit(0.20).as(0.15).passive("Serration","Crits: DoT 60%% AD physiques sur 3s."));
+        reg(new LolItem("cryptbloom",         "Cryptbloom",               3000, Material.FERN,    MAGE).ap(80).mr(40).magicPen(0.12).passive("Noxious Bloom","Kill/assist: zone qui soigne alliés."));
+        reg(new LolItem("experimental_hexplate","Experimental Hexplate",  3000, Material.COPPER_INGOT,    DAMAGE).ad(50).hp(300).ah(25).passive("Supersonic","Après ultime: +30%% AS + 15%% MS 7s."));
+        reg(new LolItem("hextech_gunblade",   "Hextech Gunblade",         3000, Material.BLAZE_ROD,       MAGE).ad(45).ap(65).lifeSteal(0.10).omnivamp(0.10).passive("Spellblade AP","Sorts soignent aussi via AD."));
+        reg(new LolItem("liandry_torment",    "Liandry's Torment",        3000, Material.CAMPFIRE,        MAGE).ap(90).mana(300).ah(25).passive("Torment","Dégâts sorts: brûlure 1%%HP max/s 4s."));
+        reg(new LolItem("rite_of_ruin",       "Rite of Ruin",             3000, Material.OBSIDIAN,        TANK).hp(400).armor(40).mr(40).passive("Rite","Dégâts sorts: -3%% résistances/stack (max 10)."));
+        reg(new LolItem("silvermere_dawn",    "Silvermere Dawn",          3000, Material.LIGHT_BLUE_DYE,  UTILITY).ad(50).mr(40).passive("Quicksilver","Actif: cleanse CC + +60%% tenacité 3s."));
+        reg(new LolItem("terminus",           "Terminus",                 3000, Material.CHAIN,           ATTACK_SPEED).ad(30).as(0.40).passive("Juxtaposition","AA alternate Light/Dark: armure/MR ou pén."));
+        reg(new LolItem("duskblade",          "Duskblade of Draktharr",   2950, Material.OBSIDIAN,        DAMAGE).ad(65).lethality(20).ah(20).passive("Nightstalker","Après invis: prochain AA +0-200 dégâts."));
+        reg(new LolItem("eclipse",            "Eclipse",                  2900, Material.ORANGE_DYE,      DAMAGE).ad(55).armor(15).lifeSteal(0.08).passive("Ever Rising Moon","2 AA/1.5s: bouclier + 15%% MS."));
+        reg(new LolItem("kaenic_rookern",     "Kaenic Rookern",           2900, Material.WHITE_WOOL,      TANK).hp(400).mr(80).passive("Nirvana","Hors combat: bouclier 200+150%%MR."));
+        reg(new LolItem("crown_shattered_queen","Crown of the Shattered Queen",2865,Material.EMERALD,    MAGE).ap(80).hp(250).mana(600).ah(20).passive("Queendom","Au combat: bouclier 250+15%%HP max 5s."));
+        reg(new LolItem("everfrost",          "Everfrost",                2865, Material.ICE,             MAGE).ap(75).mana(600).ah(20).hp(250).passive("Glaciate","Actif: rayon gelant 550 dégâts + root."));
+        reg(new LolItem("morellonomicon",     "Morellonomicon",           2850, Material.NETHERRACK,      MAGE).ap(90).hp(250).passive("Affliction","Dégâts magiques: -50%% soins 5s si ennemi <50%% HP."));
+        reg(new LolItem("prowlers_claw",      "Prowler's Claw",           2850, Material.DARK_OAK_SWORD,  DAMAGE).ad(60).lethality(18).ah(20).passive("Sandswipe","Actif: dash + 15%% dégâts bonus 3s."));
+        reg(new LolItem("hollow_radiance",    "Hollow Radiance",          2800, Material.PURPLE_STAINED_GLASS,TANK).hp(350).armor(25).mr(50).ah(15).passive("Immolate","12-40 dégâts/s AoE. Ralentit 30%%."));
+        reg(new LolItem("umbral_glaive",      "Umbral Glaive",            2800, Material.DARK_OAK_SWORD,  DAMAGE).ad(50).lethality(15).ah(20).passive("Blackout","AA: détecte et détruit wards proches."));
+        reg(new LolItem("night_harvester",    "Night Harvester",          2765, Material.WITHER_ROSE,     MAGE).ap(80).ms(5).ah(15).passive("Soulrend","1ère fois/12s sur champ: 75+12%%AP dégâts AoE."));
+        reg(new LolItem("ludens_echo",        "Luden's Echo",             2750, Material.AMETHYST_SHARD,  MAGE).ap(90).mana(600).ah(20).passive("Surge","Toutes 12s: sort → éclair 100+15%%AP."));
+        reg(new LolItem("shield_rakkor",      "Shield of the Rakkor",     2675, Material.SHIELD,     TANK).hp(400).armor(60).passive("Reverence","AA sur toi: réfléchit 15+5%%armure dégâts."));
+        reg(new LolItem("navori_flickerblade","Navori Flickerblade",      2650, Material.FEATHER,         ATTACK_SPEED).ad(55).crit(0.20).as(0.25).passive("Transcendence","Crits: réduit CD sorts de 15%%."));
+        reg(new LolItem("radiant_virtue",     "Radiant Virtue",           2600, Material.GLOWSTONE,       SUPPORT).hp(400).hpRegen(200).ah(20).passive("Noblesse","Ultime: soigne alliés 6%%HP max + MS 8s."));
+        reg(new LolItem("rod_of_ages",        "Rod of Ages",              2600, Material.BAMBOO,           MAGE).ap(40).hp(300).mana(400).passive("Eternity","Stacks mensuels +20HP+20mana. Max 10."));
+        reg(new LolItem("rylais_crystal_scepter","Rylai's Crystal Scepter",2600,Material.PINK_WOOL,MAGE).ap(75).hp(350).passive("Crystal Scepter","Sorts: ralentissent 25%% 1s."));
+        reg(new LolItem("protoplasm_harness","Protoplasm Harness",        2500, Material.SLIME_BLOCK,      TANK).hp(450).armor(30).mr(30).passive("Protoplasm","AA: stacks. 6 stacks → AoE."));
+        reg(new LolItem("trailblazer",        "Trailblazer",              2400, Material.SUGAR_CANE,       UTILITY).hp(300).ms(8).ah(15).passive("Trailblaze","Ennemis traversant: ralentissent. Alliés: +MS."));
+        reg(new LolItem("winters_approach",   "Winter's Approach",        2400, Material.BLUE_ICE,         UTILITY).hp(400).mana(500).passive("Awe","+1%%HP par 100 mana bonus. Stacks AA/sorts."));
+        reg(new LolItem("chemtech_putrifier","Chemtech Putrifier",        1900, Material.POISONOUS_POTATO, SUPPORT).ap(40).mana(200).ah(20).passive("Puffcap Toxin","Sorts: -60%% soins ennemis 3s."));
+
+        // ── EPICS manquants ──
+        reg(new LolItem("seekers_armguard",   "Seeker's Armguard",        1600, Material.IRON_CHESTPLATE, MAGE).ap(20).armor(30));
+        reg(new LolItem("verdant_barrier",    "Verdant Barrier",          1600, Material.GREEN_DYE,       MAGE).ap(20).mr(30));
+        reg(new LolItem("mejais_soulstealer", "Mejai's Soulstealer",      1500, Material.BOOK,            MAGE).ap(20).ms(5).passive("Dread","Stacks AP: +5 par kill, +2 assist. Max 25 stacks = +100 AP."));
+        reg(new LolItem("the_brutalizer",     "The Brutalizer",           1337, Material.IRON_AXE,        DAMAGE).ad(25).lethality(10).ah(10));
+        reg(new LolItem("quicksilver_sash",   "Quicksilver Sash",         1300, Material.CYAN_STAINED_GLASS,UTILITY).mr(30).passive("Quicksilver","Actif: cleanse CC instantané (90s CD)."));
+        reg(new LolItem("lost_chapter",       "Lost Chapter",             1200, Material.WRITTEN_BOOK,    MAGE).ap(25).mana(300).ah(10));
+        reg(new LolItem("tiamat",             "Tiamat",                   1200, Material.IRON_AXE,        DAMAGE).ad(25).hpRegen(75).passive("Crescent","AA: AoE 60%% dégâts latéraux."));
+        reg(new LolItem("tunneler",           "Tunneler",                 1150, Material.STONE_PICKAXE,   TANK).hp(250).armor(20).passive("Charge","+MS vers tour ennemie."));
+        reg(new LolItem("rageknife",          "Rageknife",                1100, Material.STICK,           ATTACK_SPEED).as(0.35).passive("Phantom Hit","Toutes les 2 AA: applique on-hit ×2."));
+        reg(new LolItem("hextech_alternator", "Hextech Alternator",       1100, Material.COPPER_INGOT,    MAGE).ap(40).passive("Disrupt","Après 10s hors dégâts: +60 dégâts magiques sort/AA."));
+        reg(new LolItem("ironspike_whip",     "Ironspike Whip",           1100, Material.GOLDEN_PICKAXE,  DAMAGE).ad(25).hpRegen(50).passive("Crescent","AA: AoE côtés."));
+        reg(new LolItem("steel_sigil",        "Steel Sigil",              1100, Material.CHAIN,           DAMAGE).ad(20).crit(0.15));
+        reg(new LolItem("lifewell_pendant",   "Lifewell Pendant",         1050, Material.GHAST_TEAR,      TANK).hp(200).hpRegen(75));
+        reg(new LolItem("chalice_blessing",   "Chalice of Blessing",      900,  Material.GLASS_BOTTLE,    SUPPORT).mana(300).manaRegen(50).passive("Font of Life","Soin allié marqué: +50+3%%mana HP."));
+        reg(new LolItem("fated_ashes",        "Fated Ashes",              900,  Material.BLAZE_POWDER,    MAGE).ap(25).passive("Immolate","12 dégâts/s AoE faibles."));
+        reg(new LolItem("glacial_buckler",    "Glacial Buckler",          900,  Material.PACKED_ICE,      TANK).armor(30).mana(250).ah(10));
+        reg(new LolItem("executioners_calling","Executioner's Calling",   800,  Material.IRON_SWORD,      DAMAGE).ad(20).crit(0.10).passive("Executioner","Dégâts physiques: -40%% soins cible 3s."));
+        reg(new LolItem("rectrix",            "Rectrix",                  775,  Material.GOLD_INGOT,ATTACK_SPEED).as(0.20).ms(5));
+        reg(new LolItem("forbidden_idol",     "Forbidden Idol",           600,  Material.TOTEM_OF_UNDYING,SUPPORT).manaRegen(50).passive("Forbidden","+8%% puissance soin/bouclier."));
+        reg(new LolItem("scouts_slingshot",   "Scout's Slingshot",        600,  Material.BOW,             UTILITY).passive("Actif","Envoie une ward révélatrice à longue portée."));
+
+        // ── BASICS manquants ──
+        reg(new LolItem("null_magic_mantle",  "Null-Magic Mantle",        400,  Material.LIGHT_GRAY_DYE,  TANK).mr(25));
+        reg(new LolItem("tear_of_goddess",    "Tear of the Goddess",      400,  Material.WATER_BUCKET,    UTILITY).mana(240).manaRegen(25).passive("Awe","Stacks mana sur AA/sorts."));
+        reg(new LolItem("dark_seal",          "Dark Seal",                350,  Material.BLACKSTONE,      MAGE).ap(15).hp(60).passive("Dread","Stacks AP par kill. Perd 4 stacks à la mort."));
 
         System.out.println("[ItemRegistry] " + ITEMS.size() + " items chargés.");
     }
