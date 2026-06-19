@@ -15,6 +15,7 @@ import fr.lolmc.game.SchematicManager;
 import fr.lolmc.game.MapManager;
 import fr.lolmc.game.TurretManager;
 import fr.lolmc.game.MinionManager;
+import fr.lolmc.game.RoadManager;
 import fr.lolmc.item.consumable.ConsumableManager;
 import fr.lolmc.listener.ShopCommand;
 import fr.lolmc.listener.ShopListener;
@@ -52,6 +53,7 @@ public class LolPlugin extends JavaPlugin {
     private MapManager mapManager;
     private TurretManager turretManager;
     private MinionManager minionManager;
+    private RoadManager roadManager;
 
     @Override
     public void onEnable() {
@@ -69,6 +71,8 @@ public class LolPlugin extends JavaPlugin {
         mapManager = new MapManager(schematicManager);
         minionManager = new MinionManager(mapManager);
         turretManager = new TurretManager(mapManager, championManager, teamManager);
+        roadManager = new RoadManager();
+        roadManager.applyToMinionManager();
         hudManager = new HUDManager(championManager);
         shopGUI = new ShopGUI();
         goldManager = new GoldManager();
@@ -114,7 +118,7 @@ public class LolPlugin extends JavaPlugin {
             getCommand("queue").setExecutor(partyCmd);
             getCommand("queue").setTabCompleter(partyCmd);
         }
-        var lolCmd = new LolCommand(mapManager);
+        var lolCmd = new LolCommand(mapManager, roadManager);
         if (getCommand("lol") != null) {
             getCommand("lol").setExecutor(lolCmd);
             getCommand("lol").setTabCompleter(lolCmd);
@@ -151,4 +155,5 @@ public class LolPlugin extends JavaPlugin {
     public MapManager getMapManager()           { return mapManager; }
     public TurretManager getTurretManager()     { return turretManager; }
     public MinionManager getMinionManager()     { return minionManager; }
+    public RoadManager getRoadManager()         { return roadManager; }
 }

@@ -34,6 +34,7 @@ import java.util.*;
 public class LolCommand implements CommandExecutor, TabCompleter, Listener {
 
     private final MapManager mapManager;
+    private final fr.lolmc.game.RoadManager roadManager;
 
     // Mode setup en attente d'un clic, par joueur
     private final Map<UUID, PendingSetup> pending = new HashMap<>();
@@ -43,8 +44,9 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
 
     private record PendingSetup(String kind, Type type, Team team, String lane, int index, int position) {}
 
-    public LolCommand(MapManager mapManager) {
+    public LolCommand(MapManager mapManager, fr.lolmc.game.RoadManager roadManager) {
         this.mapManager = mapManager;
+        this.roadManager = roadManager;
     }
 
     @Override
@@ -61,6 +63,7 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
             case "set" -> handleSet(player, args);
             case "position" -> handlePosition(player, args);
             case "lane" -> handleLane(player, args);
+            case "road" -> handleRoad(player, args);
             case "start" -> {
                 player.sendMessage(Component.text("⚔ Lancement de la partie...", NamedTextColor.GOLD));
                 mapManager.resetAllStructures();
@@ -154,6 +157,58 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
                 + "Tape /lol lane done pour finir.", lane), NamedTextColor.AQUA));
     }
 
+
+    // ── /lol road ─────────────────────────────────────────────────
+
+    private void handleRoad(Player player, String[] args) {
+        // /lol road end  → terminer
+        if (args.length >= 2 && args[1].equalsIgnoreCase("end")) {
+            if (!roadManager.isPainting(player.getUniqueId())) {
+                player.sendMessage(Component.text("❌ Aucune route en cours de tracé.", NamedTextColor.RED));
+                return;
+            }
+            int count = roadManager.finishPainting(player.getUniqueId());
+            // Retirer l'outil de peinture
+            player.getInventory().remove(Material.GOLDEN_HOE);
+            player.sendMessage(Component.text(String.format(
+                    "✔ Route enregistrée (%d points de passage). Les blocs sont restaurés.", count),
+                    NamedTextColor.GREEN));
+            return;
+        }
+
+        // /lol road <lane> <blue|red>
+        if (args.length < 3) {
+            player.sendMessage("§cUsage: /lol road <top|mid|bot> <blue|red> | /lol road end");
+            return;
+        }
+        String lane = args[1].toLowerCase();
+        String teamHint = args[2].toLowerCase();
+        if (!teamHint.equals("blue") && !teamHint.equals("red")
+                && !teamHint.equals("bleu") && !teamHint.equals("rouge")) {
+            player.sendMessage("§cÉquipe: blue ou red");
+            return;
+        }
+
+        roadManager.startPainting(player.getUniqueId(), lane, teamHint);
+        // Donner l'outil de peinture
+        var tool = new org.bukkit.inventory.ItemStack(Material.GOLDEN_HOE);
+        var meta = tool.getItemMeta();
+        if (meta != null) {
+            meta.displayName(Component.text("🖌 Pinceau de route — " + lane,
+                    NamedTextColor.GREEN).decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
+            meta.lore(java.util.List.of(
+                Component.text("Clique sur les blocs pour tracer le chemin.", NamedTextColor.GRAY)
+                    .decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false),
+                Component.text("/lol road end pour terminer.", NamedTextColor.GRAY)
+                    .decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false)));
+            tool.setItemMeta(meta);
+        }
+        player.getInventory().addItem(tool);
+        player.sendMessage(Component.text(String.format(
+                "🖌 Trace la route de la lane %s (sens %s). Clique les blocs, puis /lol road end.",
+                lane, teamHint), NamedTextColor.AQUA));
+    }
+
     // ── Clic au sol ───────────────────────────────────────────────
 
     @EventHandler
@@ -161,6 +216,18 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
         Player player = e.getPlayer();
         if (e.getAction() != Action.LEFT_CLICK_BLOCK && e.getAction() != Action.RIGHT_CLICK_BLOCK) return;
         if (e.getClickedBlock() == null) return;
+
+        // Mode peinture de route (pinceau)
+        if (roadManager.isPainting(player.getUniqueId())) {
+            // Seulement si le joueur tient le pinceau
+            if (player.getInventory().getItemInMainHand().getType() == Material.GOLDEN_HOE) {
+                e.setCancelled(true);
+                if (roadManager.paintBlock(player.getUniqueId(), e.getClickedBlock())) {
+                    player.sendActionBar(Component.text("🖌 Bloc peint", NamedTextColor.GREEN));
+                }
+                return;
+            }
+        }
 
         // Mode lane : ajouter un waypoint
         if (laneSetup.containsKey(player.getUniqueId())) {
@@ -233,11 +300,12 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
 
     @Override
     public List<String> onTabComplete(CommandSender sender, Command cmd, String alias, String[] args) {
-        if (args.length == 1) return List.of("set", "position", "lane", "start", "stop");
+        if (args.length == 1) return List.of("set", "position", "lane", "road", "start", "stop");
         if (args.length == 2) {
             return switch (args[0].toLowerCase()) {
                 case "set" -> List.of("turret", "nexus", "basenexus");
                 case "position", "lane" -> List.of("blue", "red");
+                case "road" -> List.of("top", "mid", "bot", "end");
                 default -> List.of();
             };
         }
