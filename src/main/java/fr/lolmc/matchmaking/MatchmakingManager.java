@@ -107,59 +107,104 @@ public class MatchmakingManager {
     private void tryStartMatch() {
         if (countInQueue() < TOTAL_PLAYERS) return;
 
-        // Former 2 équipes de 5
+        // Trouver une combinaison de groupes formant 2 équipes de 5 EXACTEMENT,
+        // sans jamais séparer un groupe (bin packing).
+        List<List<UUID>> groups = new ArrayList<>(queue);
+        Result result = findTwoTeams(groups);
+        if (result == null) {
+            // 10+ joueurs en file mais aucune combinaison ne forme 5+5
+            // sans séparer de groupe (ex: 3+3+3+1). On informe et on attend.
+            for (UUID id : inQueue) {
+                Player p = Bukkit.getPlayer(id);
+                if (p != null) p.sendActionBar(net.kyori.adventure.text.Component.text(
+                    "⏳ En attente d'une composition d'équipes compatible...",
+                    net.kyori.adventure.text.format.NamedTextColor.YELLOW));
+            }
+            return;
+        }
+
+        // Retirer de la file tous les groupes utilisés
+        Set<List<UUID>> used = new HashSet<>();
+        used.addAll(result.blueGroups);
+        used.addAll(result.redGroups);
+        queue.removeAll(used);
+        for (List<UUID> g : used) inQueue.removeAll(g);
+
+        // Aplatir en listes de joueurs
         List<UUID> blue = new ArrayList<>();
         List<UUID> red = new ArrayList<>();
-
-        // Trier les groupes du plus grand au plus petit (placer les gros groupes d'abord)
-        List<List<UUID>> sorted = new ArrayList<>(queue);
-        sorted.sort((a, b) -> b.size() - a.size());
-
-        // Placer chaque groupe dans l'équipe avec le plus de place
-        // (en gardant les groupes intacts tant que possible)
-        List<UUID> leftovers = new ArrayList<>();
-        for (List<UUID> group : sorted) {
-            if (blue.size() + group.size() <= PLAYERS_PER_TEAM
-                    && (blue.size() <= red.size() || red.size() + group.size() > PLAYERS_PER_TEAM)) {
-                blue.addAll(group);
-            } else if (red.size() + group.size() <= PLAYERS_PER_TEAM) {
-                red.addAll(group);
-            } else {
-                // Le groupe ne rentre pas entier → on le sépare (autorisé)
-                leftovers.addAll(group);
-            }
-        }
-
-        // Compléter les équipes avec les leftovers (joueurs séparés)
-        for (UUID id : leftovers) {
-            if (blue.size() < PLAYERS_PER_TEAM) blue.add(id);
-            else if (red.size() < PLAYERS_PER_TEAM) red.add(id);
-        }
-
-        // Vérifier qu'on a bien 5v5
-        if (blue.size() != PLAYERS_PER_TEAM || red.size() != PLAYERS_PER_TEAM) {
-            // Sécurité : si l'algo n'a pas équilibré, on remet tout à plat
-            List<UUID> all = new ArrayList<>();
-            for (List<UUID> g : sorted) all.addAll(g);
-            blue.clear(); red.clear();
-            for (int i = 0; i < all.size() && i < TOTAL_PLAYERS; i++) {
-                if (i % 2 == 0) blue.add(all.get(i));
-                else red.add(all.get(i));
-            }
-        }
-
-        // Retirer ces joueurs de la file
-        Set<UUID> matched = new HashSet<>();
-        matched.addAll(blue);
-        matched.addAll(red);
-        queue.removeIf(group -> group.stream().anyMatch(matched::contains));
-        inQueue.removeAll(matched);
+        for (List<UUID> g : result.blueGroups) blue.addAll(g);
+        for (List<UUID> g : result.redGroups)  red.addAll(g);
 
         // Assigner les équipes
-        for (UUID id : blue) teamManager.setTeam(Bukkit.getPlayer(id), Team.BLUE);
-        for (UUID id : red)  teamManager.setTeam(Bukkit.getPlayer(id), Team.RED);
+        for (UUID id : blue) { Player p = Bukkit.getPlayer(id); if (p != null) teamManager.setTeam(p, Team.BLUE); }
+        for (UUID id : red)  { Player p = Bukkit.getPlayer(id); if (p != null) teamManager.setTeam(p, Team.RED); }
 
         startMatch(blue, red);
+
+        // Relancer au cas où il resterait assez de monde pour une 2e partie
+        if (countInQueue() >= TOTAL_PLAYERS) tryStartMatch();
+    }
+
+    /** Résultat du matchmaking : les groupes de chaque équipe. */
+    private static class Result {
+        final List<List<UUID>> blueGroups;
+        final List<List<UUID>> redGroups;
+        Result(List<List<UUID>> b, List<List<UUID>> r) { blueGroups = b; redGroups = r; }
+    }
+
+    /**
+     * Cherche 2 sous-ensembles disjoints de groupes faisant chacun PLAYERS_PER_TEAM (5),
+     * sans séparer aucun groupe.
+     * 1) Trouve un 1er sous-ensemble = 5 (équipe bleue)
+     * 2) Parmi le reste, trouve un 2e sous-ensemble = 5 (équipe rouge)
+     */
+    private Result findTwoTeams(List<List<UUID>> groups) {
+        // Toutes les combinaisons de groupes dont la somme = 5
+        List<List<Integer>> combos = subsetsSummingTo(groups, PLAYERS_PER_TEAM);
+        for (List<Integer> blueIdx : combos) {
+            // Groupes restants après avoir retiré l'équipe bleue
+            Set<Integer> usedBlue = new HashSet<>(blueIdx);
+            List<List<UUID>> remaining = new ArrayList<>();
+            List<Integer> remapIndex = new ArrayList<>();
+            for (int i = 0; i < groups.size(); i++) {
+                if (!usedBlue.contains(i)) { remaining.add(groups.get(i)); remapIndex.add(i); }
+            }
+            // Chercher une équipe rouge = 5 dans le reste
+            List<List<Integer>> redCombos = subsetsSummingTo(remaining, PLAYERS_PER_TEAM);
+            if (!redCombos.isEmpty()) {
+                List<List<UUID>> blueG = new ArrayList<>();
+                for (int i : blueIdx) blueG.add(groups.get(i));
+                List<List<UUID>> redG = new ArrayList<>();
+                for (int i : redCombos.get(0)) redG.add(remaining.get(i));
+                return new Result(blueG, redG);
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Retourne toutes les combinaisons d'indices de groupes dont la somme des tailles = target.
+     * (backtracking)
+     */
+    private List<List<Integer>> subsetsSummingTo(List<List<UUID>> groups, int target) {
+        List<List<Integer>> results = new ArrayList<>();
+        backtrack(groups, target, 0, new ArrayList<>(), 0, results);
+        return results;
+    }
+
+    private void backtrack(List<List<UUID>> groups, int target, int start,
+                           List<Integer> current, int currentSum, List<List<Integer>> results) {
+        if (currentSum == target) {
+            results.add(new ArrayList<>(current));
+            return;
+        }
+        if (currentSum > target) return;
+        for (int i = start; i < groups.size(); i++) {
+            current.add(i);
+            backtrack(groups, target, i + 1, current, currentSum + groups.get(i).size(), results);
+            current.remove(current.size() - 1);
+        }
     }
 
     private void startMatch(List<UUID> blue, List<UUID> red) {
