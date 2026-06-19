@@ -48,8 +48,8 @@ public class Blitzcrank extends BaseChampion {
             resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
-            double dmg=s.calcMagicalDamage(75+s.getFinalAP()*0.6,null);
-            DamageUtil.abilityDamage(c, t, dmg);
+            double dmg=75+s.getFinalAP()*0.6;
+            DamageUtil.abilityDamageMagic(c, t, dmg);
             Vector pull=c.getLocation().toVector().subtract(t.getLocation().toVector()).normalize().multiply(1.8);
             pull.setY(0.3); t.setVelocity(pull);
             t.sendActionBar(Component.text("🪝 HARPON!",NamedTextColor.YELLOW));
@@ -77,7 +77,7 @@ public class Blitzcrank extends BaseChampion {
             resourceCost = 25;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
-            double dmg=s.calcPhysicalDamage(80+s.getFinalAD(),null);
+            double dmg=80+s.getFinalAD();
             DamageUtil.abilityDamage(c, t, dmg);
             t.setVelocity(new Vector(0,0.9,0));
             t.sendActionBar(Component.text("⚡ Knockup!",NamedTextColor.YELLOW));
@@ -97,7 +97,7 @@ public class Blitzcrank extends BaseChampion {
             c.getWorld().getNearbyEntities(c.getLocation(),4,2,4).stream()
                 .filter(e->e instanceof Player&&!e.equals(c))
                 .forEach(e->{
-                    DamageUtil.abilityDamage(c, (Player)e, s.calcMagicalDamage(dmg,null));
+                    DamageUtil.abilityDamageMagic(c, (Player)e, dmg);
                     ((Player)e).addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,10,10,false,true));
                 });
             c.getWorld().strikeLightningEffect(c.getLocation());

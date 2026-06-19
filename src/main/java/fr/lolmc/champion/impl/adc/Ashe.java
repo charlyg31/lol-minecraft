@@ -60,7 +60,7 @@ public class Ashe extends BaseChampion {
             resourceCost = 50;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
-            double dmg=s.calcPhysicalDamage(s.getFinalAD()*1.1,null);
+            double dmg=s.getFinalAD()*1.1;
             t.getWorld().getNearbyEntities(t.getLocation(),4,2,4).stream()
                 .filter(e->e instanceof Player)
                 .forEach(e->{
@@ -90,7 +90,7 @@ public class Ashe extends BaseChampion {
             resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
-            double dmg=s.calcPhysicalDamage(250+s.getFinalAP(),null);
+            double dmg=250+s.getFinalAP();
             DamageUtil.abilityDamage(c, t, dmg);
             t.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,70,10,false,true));
             t.getWorld().spawnParticle(Particle.END_ROD,t.getLocation(),30,1,1,1);

@@ -48,7 +48,7 @@ public class LeeSin extends BaseChampion {
             resourceCost = 50;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
-            double dmg=s.calcPhysicalDamage(55+s.getFinalAD()*0.9,null);
+            double dmg=55+s.getFinalAD()*0.9;
             DamageUtil.abilityDamage(c, t, dmg);
             t.sendActionBar(Component.text("🦵 Frappe Sonique!",NamedTextColor.YELLOW));
             c.getWorld().spawnParticle(Particle.SONIC_BOOM,t.getLocation(),1);
@@ -84,7 +84,7 @@ public class LeeSin extends BaseChampion {
             c.getWorld().getNearbyEntities(c.getLocation(),4,2,4).stream()
                 .filter(e->e instanceof Player&&!e.equals(c))
                 .forEach(e->{
-                    DamageUtil.abilityDamage(c, (Player)e, s.calcPhysicalDamage(dmg,null));
+                    DamageUtil.abilityDamage(c, (Player)e, dmg);
                     ((Player)e).addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,40,1,false,true));
                 });
             c.getWorld().spawnParticle(Particle.FLAME,c.getLocation(),20,2,1,2,0.05);
@@ -100,7 +100,7 @@ public class LeeSin extends BaseChampion {
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
-            double dmg=s.calcPhysicalDamage(175+s.getFinalAD()*2.0,null);
+            double dmg=175+s.getFinalAD()*2.0;
             DamageUtil.abilityDamage(c, t, dmg);
             Vector kb=t.getLocation().toVector().subtract(c.getLocation().toVector()).normalize().multiply(2.5);
             kb.setY(1.5); t.setVelocity(kb);

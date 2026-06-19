@@ -36,8 +36,8 @@ public class Veigar extends BaseChampion {
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
-            double dmg=s.calcMagicalDamage(s.getFinalAP()*0.6,null);
-            DamageUtil.damage(c, t, dmg, false);
+            double dmg=s.getFinalAP()*0.6;
+            DamageUtil.damage(c, t, dmg, false, DamageUtil.Type.MAGICAL);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             return String.format("Inflige %.0f dégâts.", s.getFinalAP());
@@ -50,8 +50,8 @@ public class Veigar extends BaseChampion {
             resourceCost = 40;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
-            double dmg=s.calcMagicalDamage(90+s.getFinalAP()*0.6,null);
-            DamageUtil.abilityDamage(c, t, dmg);
+            double dmg=90+s.getFinalAP()*0.6;
+            DamageUtil.abilityDamageMagic(c, t, dmg);
             apStacks.merge(c.getUniqueId(),5,Integer::sum);
             s.addBonusAP(5);
             t.getWorld().spawnParticle(Particle.WITCH,t.getLocation(),10,0.3,0.3,0.3);
@@ -75,7 +75,7 @@ public class Veigar extends BaseChampion {
                     double dmg=120+s.getFinalAP()*0.7;
                     loc.getWorld().getNearbyEntities(loc,3,2,3).stream()
                         .filter(e->e instanceof Player)
-                        .forEach(e->DamageUtil.abilityDamage(c, (Player)e, s.calcMagicalDamage(dmg,null)));
+                        .forEach(e->DamageUtil.abilityDamageMagic(c, (Player)e, dmg));
                     loc.getWorld().spawnParticle(Particle.EXPLOSION,loc,5,1,0,1);
                 }
             }.runTaskLater(LolPlugin.getInstance(),25L);
@@ -113,9 +113,9 @@ public class Veigar extends BaseChampion {
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double missing=1.0+(1.0-t.getHealth()/t.getMaxHealth())*0.75;
-            double dmg=s.calcMagicalDamage((250+s.getFinalAP()*0.75)*missing,null);
+            double dmg=(250+s.getFinalAP()*0.75)*missing;
             t.getWorld().strikeLightningEffect(t.getLocation());
-            DamageUtil.abilityDamage(c, t, dmg);
+            DamageUtil.abilityDamageMagic(c, t, dmg);
             t.sendMessage(Component.text("☠ DOOM!",NamedTextColor.DARK_PURPLE));
         }
         @Override public String getDynamicDescription(ChampionStats s){

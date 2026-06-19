@@ -34,8 +34,8 @@ public class Annie extends BaseChampion {
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
-            double dmg=s.calcMagicalDamage(s.getFinalAP()*0.2+s.getFinalAD(),null);
-            DamageUtil.damage(c, t, dmg, false);
+            double dmg=s.getFinalAP()*0.2+s.getFinalAD();
+            DamageUtil.damage(c, t, dmg, false, DamageUtil.Type.MAGICAL);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             return String.format("Inflige %.0f dégâts.", s.getFinalAP());
@@ -48,8 +48,8 @@ public class Annie extends BaseChampion {
             resourceCost = 60;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
-            double dmg=s.calcMagicalDamage(80+s.getFinalAP()*0.75,null);
-            DamageUtil.abilityDamage(c, t, dmg);
+            double dmg=80+s.getFinalAP()*0.75;
+            DamageUtil.abilityDamageMagic(c, t, dmg);
             t.getWorld().spawnParticle(Particle.FLAME,t.getLocation(),15,0.5,0.5,0.5,0.1);
         }
         @Override public String getDynamicDescription(ChampionStats s){
@@ -65,7 +65,7 @@ public class Annie extends BaseChampion {
             double dmg=70+s.getFinalAP()*0.65;
             c.getWorld().getNearbyEntities(c.getLocation(),4,2,4).stream()
                 .filter(e->e instanceof Player&&!e.equals(c))
-                .forEach(e->DamageUtil.abilityDamage(c, (Player)e, s.calcMagicalDamage(dmg,null)));
+                .forEach(e->DamageUtil.abilityDamageMagic(c, (Player)e, dmg));
             c.getWorld().spawnParticle(Particle.FLAME,c.getLocation(),25,2,1,2,0.08);
         }
         @Override public String getDynamicDescription(ChampionStats s){
@@ -92,10 +92,10 @@ public class Annie extends BaseChampion {
             resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
-            double dmg=s.calcMagicalDamage(200+s.getFinalAP()*0.7,null);
+            double dmg=200+s.getFinalAP()*0.7;
             t.getWorld().getNearbyEntities(t.getLocation(),3,2,3).stream()
                 .filter(e->e instanceof Player)
-                .forEach(e->{DamageUtil.abilityDamage(c, (Player)e, dmg);((Player)e).setFireTicks(60);
+                .forEach(e->{DamageUtil.abilityDamageMagic(c, (Player)e, dmg);((Player)e).setFireTicks(60);
                     ((Player)e).sendActionBar(Component.text("🔥 TIBBERS!",NamedTextColor.RED));});
             t.getWorld().spawnParticle(Particle.LAVA,t.getLocation(),30,2,1,2);
         }
