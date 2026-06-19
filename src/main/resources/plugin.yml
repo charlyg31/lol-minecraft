@@ -14,3 +14,8 @@ commands:
     description: Ouvre la boutique LoL
     usage: /shop [gold|addgold <montant>]
     aliases: [boutique, b]
+
+  team:
+    description: Rejoindre une équipe (bleu/rouge)
+    usage: /team <bleu|rouge|auto>
+    aliases: [equipe]

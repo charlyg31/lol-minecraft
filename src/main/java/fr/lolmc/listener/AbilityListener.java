@@ -153,16 +153,19 @@ public class AbilityListener implements Listener {
     @EventHandler
     public void onQuit(PlayerQuitEvent e) {
         Player p = e.getPlayer();
-        manager.removeChampion(p);
-        LolPlugin.getInstance().getHotbarManager().cleanup(p.getUniqueId());
-        LolPlugin.getInstance().getFlashManager().cleanup(p.getUniqueId());
+        cleanupPlayer(p);
     }
 
     @EventHandler
     public void onKick(PlayerKickEvent e) {
-        Player p = e.getPlayer();
+        cleanupPlayer(e.getPlayer());
+    }
+
+    private void cleanupPlayer(Player p) {
         manager.removeChampion(p);
         LolPlugin.getInstance().getHotbarManager().cleanup(p.getUniqueId());
         LolPlugin.getInstance().getFlashManager().cleanup(p.getUniqueId());
+        LolPlugin.getInstance().getWardManager().cleanup(p.getUniqueId());
+        LolPlugin.getInstance().getTeamManager().removePlayer(p.getUniqueId());
     }
 }

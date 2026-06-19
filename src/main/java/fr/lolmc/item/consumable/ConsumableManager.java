@@ -245,6 +245,9 @@ public class ConsumableManager {
             }
         }.runTaskLater(LolPlugin.getInstance(), duration);
 
+        // Enregistrer la ward dans le WardManager (détection des ennemis)
+        LolPlugin.getInstance().getWardManager().placeWard(player, wardLoc, wardDuration);
+
         String wardType = visible ? "🔵 Totem de vision" : "👁 Ward furtive";
         player.sendActionBar(Component.text(
             String.format("%s placée! (dure %ds)", wardType, wardDuration),
@@ -260,13 +263,18 @@ public class ConsumableManager {
         final Location wardLoc = loc.clone().add(0, 1, 0);
         wardLoc.getBlock().setType(Material.PINK_CANDLE);
 
-        // Révèle les wards ennemies (détruit les torches soul dans un rayon)
-        nearbyBlocks(wardLoc, 5).stream()
-            .filter(b -> b.getType() == Material.SOUL_TORCH)
+        // Détruire les wards ennemies enregistrées dans un rayon de 6 blocs
+        int destroyed = LolPlugin.getInstance().getWardManager()
+                .destroyEnemyWards(player, wardLoc, 6.0);
+        // Détruire aussi les blocs torche soul résiduels
+        nearbyBlocks(wardLoc, 6).stream()
+            .filter(b -> b.getType() == Material.SOUL_TORCH || b.getType() == Material.TORCH)
             .forEach(b -> {
                 b.setType(Material.AIR);
                 wardLoc.getWorld().spawnParticle(Particle.SMOKE, b.getLocation().add(0.5,0.5,0.5), 5);
             });
+        // Enregistrer la control ward elle-même (équipe du poseur)
+        LolPlugin.getInstance().getWardManager().placeWard(player, wardLoc, 240);
 
         // Dure jusqu'à destruction (peut être détruit par l'adversaire)
         new BukkitRunnable() {

@@ -5,6 +5,8 @@ import fr.lolmc.item.ItemRegistry;
 import fr.lolmc.item.PassiveManager;
 import fr.lolmc.item.HotbarManager;
 import fr.lolmc.item.FlashManager;
+import fr.lolmc.team.TeamManager;
+import fr.lolmc.ward.WardManager;
 import fr.lolmc.item.consumable.ConsumableManager;
 import fr.lolmc.listener.ShopCommand;
 import fr.lolmc.listener.ShopListener;
@@ -34,6 +36,8 @@ public class LolPlugin extends JavaPlugin {
     private ConsumableManager consumableManager;
     private HotbarManager hotbarManager;
     private FlashManager flashManager;
+    private TeamManager teamManager;
+    private WardManager wardManager;
 
     @Override
     public void onEnable() {
@@ -43,6 +47,8 @@ public class LolPlugin extends JavaPlugin {
         championManager = new ChampionManager();
         flashManager = new FlashManager();
         hotbarManager = new HotbarManager();
+        teamManager = new TeamManager();
+        wardManager = new WardManager(teamManager);
         hudManager = new HUDManager(championManager);
         shopGUI = new ShopGUI();
         goldManager = new GoldManager();
@@ -73,6 +79,12 @@ public class LolPlugin extends JavaPlugin {
             shopCmd.setExecutor(sc);
             shopCmd.setTabCompleter(sc);
         }
+        var teamCmd = getCommand("team");
+        if (teamCmd != null) {
+            var tc = new fr.lolmc.listener.TeamCommand(teamManager);
+            teamCmd.setExecutor(tc);
+            teamCmd.setTabCompleter(tc);
+        }
         getLogger().info("LoL MC activé — 20 champions + boutique chargés.");
     }
 
@@ -94,4 +106,6 @@ public class LolPlugin extends JavaPlugin {
     public ConsumableManager getConsumableManager() { return consumableManager; }
     public HotbarManager getHotbarManager()     { return hotbarManager; }
     public FlashManager getFlashManager()       { return flashManager; }
+    public TeamManager getTeamManager()         { return teamManager; }
+    public WardManager getWardManager()         { return wardManager; }
 }
