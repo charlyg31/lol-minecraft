@@ -29,3 +29,8 @@ commands:
     description: Rejoindre la file d'attente
     usage: /queue [leave]
     aliases: [file, q]
+
+  lol:
+    description: Configuration de la carte (admin)
+    usage: /lol <set|position|lane|start|stop>
+    permission: lolmc.admin

@@ -10,6 +10,11 @@ import fr.lolmc.ward.WardManager;
 import fr.lolmc.matchmaking.PartyManager;
 import fr.lolmc.matchmaking.MatchmakingManager;
 import fr.lolmc.listener.PartyCommand;
+import fr.lolmc.listener.LolCommand;
+import fr.lolmc.game.SchematicManager;
+import fr.lolmc.game.MapManager;
+import fr.lolmc.game.TurretManager;
+import fr.lolmc.game.MinionManager;
 import fr.lolmc.item.consumable.ConsumableManager;
 import fr.lolmc.listener.ShopCommand;
 import fr.lolmc.listener.ShopListener;
@@ -43,6 +48,10 @@ public class LolPlugin extends JavaPlugin {
     private WardManager wardManager;
     private PartyManager partyManager;
     private MatchmakingManager matchmakingManager;
+    private SchematicManager schematicManager;
+    private MapManager mapManager;
+    private TurretManager turretManager;
+    private MinionManager minionManager;
 
     @Override
     public void onEnable() {
@@ -56,6 +65,10 @@ public class LolPlugin extends JavaPlugin {
         wardManager = new WardManager(teamManager);
         partyManager = new PartyManager();
         matchmakingManager = new MatchmakingManager(partyManager, teamManager);
+        schematicManager = new SchematicManager();
+        mapManager = new MapManager(schematicManager);
+        minionManager = new MinionManager(mapManager);
+        turretManager = new TurretManager(mapManager, championManager, teamManager);
         hudManager = new HUDManager(championManager);
         shopGUI = new ShopGUI();
         goldManager = new GoldManager();
@@ -101,6 +114,14 @@ public class LolPlugin extends JavaPlugin {
             getCommand("queue").setExecutor(partyCmd);
             getCommand("queue").setTabCompleter(partyCmd);
         }
+        var lolCmd = new LolCommand(mapManager);
+        if (getCommand("lol") != null) {
+            getCommand("lol").setExecutor(lolCmd);
+            getCommand("lol").setTabCompleter(lolCmd);
+        }
+        getServer().getPluginManager().registerEvents(lolCmd, this);
+        getServer().getPluginManager().registerEvents(
+            new fr.lolmc.listener.StructureDamageListener(mapManager, championManager, teamManager), this);
         getLogger().info("LoL MC activé — 20 champions + boutique chargés.");
     }
 
@@ -126,4 +147,8 @@ public class LolPlugin extends JavaPlugin {
     public WardManager getWardManager()         { return wardManager; }
     public PartyManager getPartyManager()       { return partyManager; }
     public MatchmakingManager getMatchmakingManager() { return matchmakingManager; }
+    public SchematicManager getSchematicManager() { return schematicManager; }
+    public MapManager getMapManager()           { return mapManager; }
+    public TurretManager getTurretManager()     { return turretManager; }
+    public MinionManager getMinionManager()     { return minionManager; }
 }

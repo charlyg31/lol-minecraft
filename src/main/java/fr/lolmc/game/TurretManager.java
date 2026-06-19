@@ -1,0 +1,201 @@
+package fr.lolmc.game;
+
+import fr.lolmc.LolPlugin;
+import fr.lolmc.champion.base.BaseChampion;
+import fr.lolmc.game.GameStructure.Type;
+import fr.lolmc.manager.ChampionManager;
+import fr.lolmc.team.TeamManager;
+import fr.lolmc.team.TeamManager.Team;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
+import org.bukkit.Location;
+import org.bukkit.Particle;
+import org.bukkit.Sound;
+import org.bukkit.entity.LivingEntity;
+import org.bukkit.entity.Player;
+import org.bukkit.scheduler.BukkitRunnable;
+
+import java.util.*;
+
+/**
+ * Gère le comportement des tourelles :
+ *  - Zone d'attaque (rayon = portée tourelle, > AA d'ADC de 2 blocs)
+ *  - Priorité : tape les sbires, SAUF si un ennemi attaque un allié champion dans la zone
+ *  - Dégâts basés sur le jeu de base (montants progressifs)
+ */
+public class TurretManager {
+
+    private final MapManager mapManager;
+    private final ChampionManager championManager;
+    private final TeamManager teamManager;
+
+    // Portée d'une tourelle : AA d'ADC (~5-6 blocs) + 2 blocs = ~8 blocs
+    private static final double TURRET_RANGE = 8.0;
+    // Cadence de tir : 1 tir par seconde (20 ticks)
+    private static final long ATTACK_PERIOD = 20L;
+    // Dégâts de base d'une tourelle (LoL: ~152 au début, augmente avec le temps)
+    private static final double TURRET_BASE_DAMAGE = 150.0;
+
+    // Aggro tourelle : cible actuelle de chaque tourelle (UUID joueur visé)
+    private final Map<String, UUID> turretAggro = new HashMap<>();
+    // Compteur de stacks de dégâts (la tourelle tape de plus en plus fort sur la même cible)
+    private final Map<String, Integer> turretStacks = new HashMap<>();
+
+    public TurretManager(MapManager mapManager, ChampionManager championManager, TeamManager teamManager) {
+        this.mapManager = mapManager;
+        this.championManager = championManager;
+        this.teamManager = teamManager;
+        startTurretTask();
+    }
+
+    private void startTurretTask() {
+        new BukkitRunnable() {
+            @Override public void run() {
+                for (GameStructure turret : mapManager.getStructures()) {
+                    if (turret.getType() != Type.TURRET || turret.isDestroyed()) continue;
+                    processTurret(turret);
+                }
+            }
+        }.runTaskTimer(LolPlugin.getInstance(), 0L, ATTACK_PERIOD);
+    }
+
+    private void processTurret(GameStructure turret) {
+        Location center = turret.getCenter().clone().add(0.5, 1, 0.5);
+        Team turretTeam = turret.getTeam();
+        String turretId = turret.getId();
+
+        // 1. Chercher une cible prioritaire : ennemi qui attaque un allié champion dans la zone
+        Player priorityTarget = findPriorityTarget(center, turretTeam);
+
+        if (priorityTarget != null) {
+            // Aggro sur le joueur ennemi
+            fireAtPlayer(turret, center, priorityTarget);
+            return;
+        }
+
+        // 2. Sinon, taper les sbires ennemis dans la zone (priorité par défaut)
+        LivingEntity minion = findEnemyMinion(center, turretTeam);
+        if (minion != null) {
+            fireAtMinion(turret, center, minion);
+            turretAggro.remove(turretId);
+            return;
+        }
+
+        // 3. Sinon, taper un champion ennemi qui traîne dans la zone
+        Player champTarget = findEnemyChampion(center, turretTeam);
+        if (champTarget != null) {
+            fireAtPlayer(turret, center, champTarget);
+        } else {
+            turretAggro.remove(turretId);
+            turretStacks.remove(turretId);
+        }
+    }
+
+    // ── Recherche de cibles ───────────────────────────────────────
+
+    /**
+     * Cherche un ennemi qui attaque un allié champion dans la zone de la tourelle.
+     * (Détecté via le système de combat : un joueur ayant infligé des dégâts récemment.)
+     */
+    private Player findPriorityTarget(Location center, Team turretTeam) {
+        for (var entity : center.getWorld().getNearbyEntities(center, TURRET_RANGE, TURRET_RANGE, TURRET_RANGE)) {
+            if (!(entity instanceof Player p)) continue;
+            if (!championManager.hasChampion(p)) continue;
+            Team pTeam = teamManager.getTeam(p);
+            if (pTeam == null || pTeam == turretTeam) continue; // pas un ennemi
+
+            // Ce joueur ennemi a-t-il attaqué un allié récemment ? (combat tag)
+            BaseChampion champ = championManager.getChampion(p);
+            if (champ.getHPSystem().isInCombat() && hasAlliedChampionNearby(center, turretTeam)) {
+                return p;
+            }
+        }
+        return null;
+    }
+
+    private boolean hasAlliedChampionNearby(Location center, Team turretTeam) {
+        for (var entity : center.getWorld().getNearbyEntities(center, TURRET_RANGE, TURRET_RANGE, TURRET_RANGE)) {
+            if (entity instanceof Player p && championManager.hasChampion(p)) {
+                if (teamManager.getTeam(p) == turretTeam) return true;
+            }
+        }
+        return false;
+    }
+
+    private LivingEntity findEnemyMinion(Location center, Team turretTeam) {
+        LivingEntity closest = null;
+        double closestDist = Double.MAX_VALUE;
+        for (var entity : center.getWorld().getNearbyEntities(center, TURRET_RANGE, TURRET_RANGE, TURRET_RANGE)) {
+            // Les sbires sont des entités taggées par le MinionManager
+            if (entity instanceof LivingEntity le && fr.lolmc.game.MinionManager.isMinion(le)) {
+                Team minionTeam = fr.lolmc.game.MinionManager.getMinionTeam(le);
+                if (minionTeam != null && minionTeam != turretTeam) {
+                    double d = le.getLocation().distance(center);
+                    if (d < closestDist) { closestDist = d; closest = le; }
+                }
+            }
+        }
+        return closest;
+    }
+
+    private Player findEnemyChampion(Location center, Team turretTeam) {
+        Player closest = null;
+        double closestDist = Double.MAX_VALUE;
+        for (var entity : center.getWorld().getNearbyEntities(center, TURRET_RANGE, TURRET_RANGE, TURRET_RANGE)) {
+            if (entity instanceof Player p && championManager.hasChampion(p)) {
+                Team pTeam = teamManager.getTeam(p);
+                if (pTeam != null && pTeam != turretTeam) {
+                    double d = p.getLocation().distance(center);
+                    if (d < closestDist) { closestDist = d; closest = p; }
+                }
+            }
+        }
+        return closest;
+    }
+
+    // ── Tir ───────────────────────────────────────────────────────
+
+    private void fireAtPlayer(GameStructure turret, Location center, Player target) {
+        String turretId = turret.getId();
+        // Stacks : +40% dégâts par tir consécutif sur un champion (comme LoL)
+        UUID lastTarget = turretAggro.get(turretId);
+        int stacks = lastTarget != null && lastTarget.equals(target.getUniqueId())
+                ? turretStacks.getOrDefault(turretId, 0) + 1 : 0;
+        turretAggro.put(turretId, target.getUniqueId());
+        turretStacks.put(turretId, Math.min(stacks, 3));
+
+        double damage = TURRET_BASE_DAMAGE * (1.0 + stacks * 0.40);
+
+        // Projectile visuel
+        shootBeam(center, target.getLocation().add(0, 1, 0));
+
+        // Dégâts via le système LoL (dégâts vrais de tourelle, mais ici on passe par HPSystem)
+        if (championManager.hasChampion(target)) {
+            BaseChampion champ = championManager.getChampion(target);
+            champ.getHPSystem().takeDamage(damage);
+            var hud = LolPlugin.getInstance().getHUDManager();
+            if (hud != null) hud.updateHUD(target, champ);
+            target.sendActionBar(Component.text(
+                    String.format("🗼 Tourelle! -%.0f", damage), NamedTextColor.RED));
+        }
+    }
+
+    private void fireAtMinion(GameStructure turret, Location center, LivingEntity minion) {
+        shootBeam(center, minion.getLocation().add(0, 0.5, 0));
+        // Les sbires meurent en ~1-2 coups de tourelle
+        minion.damage(TURRET_BASE_DAMAGE);
+    }
+
+    private void shootBeam(Location from, Location to) {
+        var dir = to.toVector().subtract(from.toVector()).normalize();
+        double dist = from.distance(to);
+        for (double d = 0; d < dist; d += 0.5) {
+            Location point = from.clone().add(dir.clone().multiply(d));
+            from.getWorld().spawnParticle(Particle.CRIT, point, 2, 0.05, 0.05, 0.05, 0);
+        }
+        from.getWorld().playSound(from, Sound.ENTITY_ARROW_SHOOT, 0.6f, 0.8f);
+        to.getWorld().spawnParticle(Particle.EXPLOSION, to, 1);
+    }
+
+    public double getTurretRange() { return TURRET_RANGE; }
+}
