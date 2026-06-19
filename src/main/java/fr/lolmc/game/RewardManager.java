@@ -74,7 +74,14 @@ public class RewardManager {
         int levelsGained = champ.getLevelSystem().addXP(xp);
         if (levelsGained > 0) {
             int newLevel = champ.getLevelSystem().getLevel();
-            player.sendTitle("", "§a⬆ Niveau " + newLevel, 5, 30, 10);
+            player.showTitle(net.kyori.adventure.title.Title.title(
+                    net.kyori.adventure.text.Component.empty(),
+                    net.kyori.adventure.text.Component.text("⬆ Niveau " + newLevel,
+                        net.kyori.adventure.text.format.NamedTextColor.GREEN),
+                    net.kyori.adventure.title.Title.Times.times(
+                        java.time.Duration.ofMillis(250),
+                        java.time.Duration.ofMillis(1500),
+                        java.time.Duration.ofMillis(500))));
             player.playSound(player.getLocation(),
                     org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 1f, 1f);
             // Faire clignoter les sorts désormais améliorables

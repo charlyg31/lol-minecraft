@@ -350,13 +350,25 @@ public class PassiveManager {
             state.gaActive = true;
             state.gaCooldown = System.currentTimeMillis();
             hp.setCurrentHP(1);
-            victim.sendTitle("☠", "Guardian Angel — Résurrection 4s...", 5, 60, 10);
+            victim.showTitle(net.kyori.adventure.title.Title.title(
+                net.kyori.adventure.text.Component.text("☠"),
+                net.kyori.adventure.text.Component.text("Guardian Angel — Résurrection 4s..."),
+                net.kyori.adventure.title.Title.Times.times(
+                    java.time.Duration.ofMillis(250),
+                    java.time.Duration.ofMillis(3000),
+                    java.time.Duration.ofMillis(500))));
             new BukkitRunnable() {
                 @Override public void run() {
                     if (!victim.isOnline()) { state.gaActive = false; return; }
                     hp.setCurrentHP(hp.getMaxHP() * 0.50);
                     state.gaActive = false;
-                    victim.sendTitle("", "✅ Ressuscité!", 5, 30, 10);
+                    victim.showTitle(net.kyori.adventure.title.Title.title(
+                        net.kyori.adventure.text.Component.empty(),
+                        net.kyori.adventure.text.Component.text("✅ Ressuscité!"),
+                        net.kyori.adventure.title.Title.Times.times(
+                            java.time.Duration.ofMillis(250),
+                            java.time.Duration.ofMillis(1500),
+                            java.time.Duration.ofMillis(500))));
                     hudManager.updateHUD(victim, champ);
                 }
             }.runTaskLater(LolPlugin.getInstance(), 80L);
