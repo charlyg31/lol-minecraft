@@ -5,6 +5,7 @@ import fr.lolmc.ability.base.BaseAbility;
 import fr.lolmc.stats.ResourceSystem;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.stats.ChampionStats;
+import fr.lolmc.util.DamageUtil;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.*;
@@ -34,7 +35,7 @@ public class Leona extends BaseChampion {
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double dmg=s.calcAutoAttackDamage(null);
-            t.damage(dmg); s.applyVamp(dmg,false);
+            DamageUtil.damage(c, t, dmg, false);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             return String.format("Inflige %.0f dégâts.", s.getFinalAD());
@@ -48,7 +49,7 @@ public class Leona extends BaseChampion {
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double dmg=s.calcMagicalDamage(40+s.getFinalAP()*0.4,null);
-            t.damage(dmg);
+            DamageUtil.abilityDamage(c, t, dmg);
             t.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,25,10,false,true));
             t.sendActionBar(Component.text("☀ Stun 1.25s — Leona Q!",NamedTextColor.YELLOW));
             c.getWorld().spawnParticle(Particle.END_ROD,t.getLocation(),8,0.3,0.3,0.3);
@@ -78,7 +79,7 @@ public class Leona extends BaseChampion {
             Location dest=safeTeleport(c.getLocation(),t.getLocation());
             c.teleport(dest);
             double dmg=s.calcMagicalDamage(60+s.getFinalAP()*0.4,null);
-            t.damage(dmg);
+            DamageUtil.abilityDamage(c, t, dmg);
             t.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,15,10,false,true));
             c.getWorld().spawnParticle(Particle.END_ROD,dest,5,1,0,1);
         }
@@ -97,7 +98,7 @@ public class Leona extends BaseChampion {
             t.getWorld().getNearbyEntities(t.getLocation(),4,2,4).stream()
                 .filter(e->e instanceof Player)
                 .forEach(e->{
-                    ((Player)e).damage(s.calcMagicalDamage(dmg,null));
+                    DamageUtil.abilityDamage(c, (Player)e, s.calcMagicalDamage(dmg,null));
                     ((Player)e).addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,30,10,false,true));
                     ((Player)e).sendActionBar(Component.text("☀ ECLIPSE!",NamedTextColor.YELLOW));
                 });

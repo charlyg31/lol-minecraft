@@ -5,6 +5,7 @@ import fr.lolmc.ability.base.BaseAbility;
 import fr.lolmc.stats.ResourceSystem;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.stats.ChampionStats;
+import fr.lolmc.util.DamageUtil;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.*;
@@ -34,7 +35,7 @@ public class Sivir extends BaseChampion {
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double dmg=s.calcAutoAttackDamage(null);
-            t.damage(dmg); s.applyVamp(dmg,false);
+            DamageUtil.damage(c, t, dmg, false);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             return String.format("Inflige %.0f dégâts.", s.getFinalAD());
@@ -48,11 +49,11 @@ public class Sivir extends BaseChampion {
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double dmg=s.calcPhysicalDamage(50+s.getFinalAD()*0.5,null);
-            t.damage(dmg);
+            DamageUtil.abilityDamage(c, t, dmg);
             // Retour: dégâts réduits
             new BukkitRunnable(){@Override public void run(){
                 if(!t.isOnline())return;
-                t.damage(s.calcPhysicalDamage(dmg*0.7,null));
+                DamageUtil.abilityDamage(c, t, s.calcPhysicalDamage(dmg*0.7,null));
                 c.getWorld().spawnParticle(Particle.CRIT,t.getLocation(),5);
             }}.runTaskLater(LolPlugin.getInstance(),15L);
             c.getWorld().spawnParticle(Particle.CRIT,t.getLocation(),10);
@@ -64,7 +65,7 @@ public class Sivir extends BaseChampion {
     }
 
     static class W extends BaseAbility {
-        W(){super("w_sivir","Ricochets",Material.MUSIC_DISC_CAT,AbilitySlot.W,
+        W(){super("w_sivir","Ricochets",Material.MUSIC_DISC_13,AbilitySlot.W,
             new double[]{10,9,8,7,6},0,0,DamageType.PHYSICAL);
             resourceCost = 22;}
         @Override public void cast(Player c,ChampionStats s,Player t){

@@ -5,6 +5,7 @@ import fr.lolmc.ability.base.BaseAbility;
 import fr.lolmc.stats.ResourceSystem;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.stats.ChampionStats;
+import fr.lolmc.util.DamageUtil;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.*;
@@ -34,7 +35,7 @@ public class MissFortune extends BaseChampion {
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double dmg=s.calcAutoAttackDamage(null);
-            t.damage(dmg); s.applyVamp(dmg,false);
+            DamageUtil.damage(c, t, dmg, false);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             return String.format("Inflige %.0f dégâts.", s.getFinalAD());
@@ -49,7 +50,7 @@ public class MissFortune extends BaseChampion {
             if(t==null)return;
             double d1=s.calcPhysicalDamage(20+s.getFinalAD()*0.85,null);
             double d2=s.calcPhysicalDamage((20+s.getFinalAD()*0.85)*1.35,null);
-            t.damage(d1+d2);
+            DamageUtil.abilityDamage(c, t, d1+d2);
             c.getWorld().spawnParticle(Particle.CRIT,t.getLocation(),10,0.3,0.3,0.3);
         }
         @Override public String getDynamicDescription(ChampionStats s){
@@ -80,7 +81,7 @@ public class MissFortune extends BaseChampion {
             t.getWorld().getNearbyEntities(t.getLocation(),3,2,3).stream()
                 .filter(e->e instanceof Player)
                 .forEach(e->{
-                    ((Player)e).damage(dmg);
+                    DamageUtil.abilityDamage(c, (Player)e, dmg);
                     ((Player)e).addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,40,1,false,true));
                 });
             c.getWorld().spawnParticle(Particle.CRIT,t.getLocation(),20,1.5,1,1.5);
@@ -103,7 +104,7 @@ public class MissFortune extends BaseChampion {
                     double dmg=(110+s.getFinalAP()*0.2)/3.0;
                     c.getWorld().getNearbyEntities(c.getLocation(),8,2,8).stream()
                         .filter(e->e instanceof Player&&!e.equals(c))
-                        .forEach(e->((Player)e).damage(s.calcPhysicalDamage(dmg,null)));
+                        .forEach(e->DamageUtil.abilityDamage(c, (Player)e, s.calcPhysicalDamage(dmg,null)));
                     c.getWorld().spawnParticle(Particle.CRIT,c.getLocation().add(
                         c.getLocation().getDirection().multiply(4)),5,3,0,3);
                     tick+=20;

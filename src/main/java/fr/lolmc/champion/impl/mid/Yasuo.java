@@ -5,6 +5,7 @@ import fr.lolmc.ability.base.BaseAbility;
 import fr.lolmc.stats.ResourceSystem;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.stats.ChampionStats;
+import fr.lolmc.util.DamageUtil;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.*;
@@ -36,7 +37,7 @@ public class Yasuo extends BaseChampion {
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double dmg=s.calcAutoAttackDamage(null);
-            t.damage(dmg); s.applyVamp(dmg,false);
+            DamageUtil.damage(c, t, dmg, false);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             return String.format("Inflige %.0f dégâts.", s.getFinalAD());
@@ -55,7 +56,7 @@ public class Yasuo extends BaseChampion {
             c.getWorld().getNearbyEntities(front,3,1,3).stream()
                 .filter(e->e instanceof Player&&!e.equals(c))
                 .forEach(e->{
-                    ((Player)e).damage(dmg);
+                    DamageUtil.abilityDamage(c, (Player)e, dmg);
                     if(casts>=2) {
                         ((Player)e).setVelocity(new Vector(0,1.2,0));
                         ((Player)e).sendActionBar(Component.text("🌪 Knockup Yasuo!",NamedTextColor.YELLOW));
@@ -89,7 +90,7 @@ public class Yasuo extends BaseChampion {
             Location dest=safeTeleport(c.getLocation(),t.getLocation());
             c.teleport(dest);
             double dmg=s.calcPhysicalDamage(70+s.getFinalAD()*0.6,null);
-            t.damage(dmg);
+            DamageUtil.abilityDamage(c, t, dmg);
             c.getWorld().spawnParticle(Particle.SWEEP_ATTACK,dest,5);
         }
         @Override public String getDynamicDescription(ChampionStats s){
@@ -107,7 +108,7 @@ public class Yasuo extends BaseChampion {
             c.getWorld().getNearbyEntities(c.getLocation(),4,3,4).stream()
                 .filter(e->e instanceof Player&&!e.equals(c))
                 .forEach(e->{
-                    ((Player)e).damage(dmg);
+                    DamageUtil.abilityDamage(c, (Player)e, dmg);
                     ((Player)e).addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,20,10,false,true));
                     ((Player)e).sendActionBar(Component.text("⚔ Dernier Souffle!",NamedTextColor.DARK_GRAY));
                 });

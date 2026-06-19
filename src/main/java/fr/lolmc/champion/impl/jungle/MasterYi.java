@@ -5,6 +5,7 @@ import fr.lolmc.ability.base.BaseAbility;
 import fr.lolmc.stats.ResourceSystem;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.stats.ChampionStats;
+import fr.lolmc.util.DamageUtil;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.*;
@@ -34,7 +35,7 @@ public class MasterYi extends BaseChampion {
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double dmg=s.calcAutoAttackDamage(null);
-            t.damage(dmg); s.applyVamp(dmg,false);
+            DamageUtil.damage(c, t, dmg, false);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             return String.format("Inflige %.0f dégâts.", s.getFinalAD());
@@ -50,7 +51,7 @@ public class MasterYi extends BaseChampion {
             Location dest=safeTeleport(c.getLocation(),t.getLocation());
             c.teleport(dest);
             double dmg=s.calcTrueDamage(25+s.getFinalAD()*1.1);
-            t.damage(dmg);
+            DamageUtil.abilityDamage(c, t, dmg);
             c.getWorld().spawnParticle(Particle.CRIT,t.getLocation(),10,0.5,0.5,0.5);
         }
         @Override public String getDynamicDescription(ChampionStats s){

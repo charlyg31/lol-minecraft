@@ -5,6 +5,7 @@ import fr.lolmc.ability.base.BaseAbility;
 import fr.lolmc.stats.ResourceSystem;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.stats.ChampionStats;
+import fr.lolmc.util.DamageUtil;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.*;
@@ -34,7 +35,7 @@ public class Janna extends BaseChampion {
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double dmg=s.calcMagicalDamage(s.getFinalAP()*0.3,null);
-            t.damage(dmg); s.applyVamp(dmg,false);
+            DamageUtil.damage(c, t, dmg, false);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             return String.format("Inflige %.0f dégâts.", s.getFinalAP());
@@ -48,7 +49,7 @@ public class Janna extends BaseChampion {
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double dmg=s.calcMagicalDamage(60+s.getFinalAP()*0.35,null);
-            t.damage(dmg);
+            DamageUtil.abilityDamage(c, t, dmg);
             t.setVelocity(new Vector(0,0.8,0));
             t.sendActionBar(Component.text("🌪 Tornade!",NamedTextColor.WHITE));
         }
@@ -64,7 +65,7 @@ public class Janna extends BaseChampion {
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double dmg=s.calcMagicalDamage(55+s.getFinalAP()*0.5,null);
-            t.damage(dmg);
+            DamageUtil.abilityDamage(c, t, dmg);
             t.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,60,2,false,true));
             t.sendActionBar(Component.text("💨 Zéphyr -30%%!",NamedTextColor.AQUA));
         }

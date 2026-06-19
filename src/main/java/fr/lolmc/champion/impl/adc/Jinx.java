@@ -5,6 +5,7 @@ import fr.lolmc.ability.base.BaseAbility;
 import fr.lolmc.stats.ResourceSystem;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.stats.ChampionStats;
+import fr.lolmc.util.DamageUtil;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.*;
@@ -34,7 +35,7 @@ public class Jinx extends BaseChampion {
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double dmg=s.calcAutoAttackDamage(null);
-            t.damage(dmg); s.applyVamp(dmg,false);
+            DamageUtil.damage(c, t, dmg, false);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             return String.format("Inflige %.0f dégâts.", s.getFinalAD());
@@ -59,7 +60,7 @@ public class Jinx extends BaseChampion {
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double dmg=s.calcPhysicalDamage(20+s.getFinalAD()*1.6,null);
-            t.damage(dmg);
+            DamageUtil.abilityDamage(c, t, dmg);
             t.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,50,2,false,true));
             c.getWorld().spawnParticle(Particle.ELECTRIC_SPARK,t.getLocation(),15,0.5,0.5,0.5);
         }
@@ -75,7 +76,7 @@ public class Jinx extends BaseChampion {
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double dmg=s.calcMagicalDamage(80+s.getFinalAP()*0.7,null);
-            t.damage(dmg);
+            DamageUtil.abilityDamage(c, t, dmg);
             t.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,60,2,false,true));
             c.getWorld().spawnParticle(Particle.EXPLOSION,t.getLocation(),3,1,0,1);
         }
@@ -94,7 +95,7 @@ public class Jinx extends BaseChampion {
             double dmg=(300+s.getFinalAD()*1.5)*missing;
             t.getWorld().getNearbyEntities(t.getLocation(),5,2,5).stream()
                 .filter(e->e instanceof Player)
-                .forEach(e->((Player)e).damage(s.calcPhysicalDamage(dmg,null)));
+                .forEach(e->DamageUtil.abilityDamage(c, (Player)e, s.calcPhysicalDamage(dmg,null)));
             t.getWorld().createExplosion(t.getLocation(),2f,false,false);
             t.sendMessage(Component.text("🚀 SUPER MÉGA ROCKET!",NamedTextColor.RED));
         }

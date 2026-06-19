@@ -5,6 +5,7 @@ import fr.lolmc.ability.base.BaseAbility;
 import fr.lolmc.stats.ResourceSystem;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.stats.ChampionStats;
+import fr.lolmc.util.DamageUtil;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.*;
@@ -34,7 +35,7 @@ public class Annie extends BaseChampion {
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double dmg=s.calcMagicalDamage(s.getFinalAP()*0.2+s.getFinalAD(),null);
-            t.damage(dmg); s.applyVamp(dmg,false);
+            DamageUtil.damage(c, t, dmg, false);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             return String.format("Inflige %.0f dégâts.", s.getFinalAP());
@@ -48,7 +49,7 @@ public class Annie extends BaseChampion {
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double dmg=s.calcMagicalDamage(80+s.getFinalAP()*0.75,null);
-            t.damage(dmg);
+            DamageUtil.abilityDamage(c, t, dmg);
             t.getWorld().spawnParticle(Particle.FLAME,t.getLocation(),15,0.5,0.5,0.5,0.1);
         }
         @Override public String getDynamicDescription(ChampionStats s){
@@ -64,7 +65,7 @@ public class Annie extends BaseChampion {
             double dmg=70+s.getFinalAP()*0.65;
             c.getWorld().getNearbyEntities(c.getLocation(),4,2,4).stream()
                 .filter(e->e instanceof Player&&!e.equals(c))
-                .forEach(e->((Player)e).damage(s.calcMagicalDamage(dmg,null)));
+                .forEach(e->DamageUtil.abilityDamage(c, (Player)e, s.calcMagicalDamage(dmg,null)));
             c.getWorld().spawnParticle(Particle.FLAME,c.getLocation(),25,2,1,2,0.08);
         }
         @Override public String getDynamicDescription(ChampionStats s){
@@ -94,7 +95,7 @@ public class Annie extends BaseChampion {
             double dmg=s.calcMagicalDamage(200+s.getFinalAP()*0.7,null);
             t.getWorld().getNearbyEntities(t.getLocation(),3,2,3).stream()
                 .filter(e->e instanceof Player)
-                .forEach(e->{((Player)e).damage(dmg);((Player)e).setFireTicks(60);
+                .forEach(e->{DamageUtil.abilityDamage(c, (Player)e, dmg);((Player)e).setFireTicks(60);
                     ((Player)e).sendActionBar(Component.text("🔥 TIBBERS!",NamedTextColor.RED));});
             t.getWorld().spawnParticle(Particle.LAVA,t.getLocation(),30,2,1,2);
         }

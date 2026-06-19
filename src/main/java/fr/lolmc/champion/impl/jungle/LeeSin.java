@@ -5,6 +5,7 @@ import fr.lolmc.ability.base.BaseAbility;
 import fr.lolmc.stats.ResourceSystem;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.stats.ChampionStats;
+import fr.lolmc.util.DamageUtil;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.*;
@@ -34,7 +35,7 @@ public class LeeSin extends BaseChampion {
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double dmg=s.calcAutoAttackDamage(null);
-            t.damage(dmg); s.applyVamp(dmg,false);
+            DamageUtil.damage(c, t, dmg, false);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             return String.format("Inflige %.0f dégâts.", s.getFinalAD());
@@ -48,7 +49,7 @@ public class LeeSin extends BaseChampion {
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double dmg=s.calcPhysicalDamage(55+s.getFinalAD()*0.9,null);
-            t.damage(dmg);
+            DamageUtil.abilityDamage(c, t, dmg);
             t.sendActionBar(Component.text("🦵 Frappe Sonique!",NamedTextColor.YELLOW));
             c.getWorld().spawnParticle(Particle.SONIC_BOOM,t.getLocation(),1);
         }
@@ -83,7 +84,7 @@ public class LeeSin extends BaseChampion {
             c.getWorld().getNearbyEntities(c.getLocation(),4,2,4).stream()
                 .filter(e->e instanceof Player&&!e.equals(c))
                 .forEach(e->{
-                    ((Player)e).damage(s.calcPhysicalDamage(dmg,null));
+                    DamageUtil.abilityDamage(c, (Player)e, s.calcPhysicalDamage(dmg,null));
                     ((Player)e).addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,40,1,false,true));
                 });
             c.getWorld().spawnParticle(Particle.FLAME,c.getLocation(),20,2,1,2,0.05);
@@ -100,7 +101,7 @@ public class LeeSin extends BaseChampion {
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double dmg=s.calcPhysicalDamage(175+s.getFinalAD()*2.0,null);
-            t.damage(dmg);
+            DamageUtil.abilityDamage(c, t, dmg);
             Vector kb=t.getLocation().toVector().subtract(c.getLocation().toVector()).normalize().multiply(2.5);
             kb.setY(1.5); t.setVelocity(kb);
             t.sendActionBar(Component.text("🐉 Dragon's Rage!",NamedTextColor.RED));

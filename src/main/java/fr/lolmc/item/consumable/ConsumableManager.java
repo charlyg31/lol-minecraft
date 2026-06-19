@@ -225,7 +225,7 @@ public class ConsumableManager {
 
     /** Place une ward visible (bloc de lumière temporaire) */
     public boolean placeWard(Player player, boolean visible) {
-        Location loc = player.getTargetBlockLocation(20, false);
+        Location loc = (player.getTargetBlockExact(20) != null ? player.getTargetBlockExact(20).getLocation() : player.getLocation().add(player.getLocation().getDirection().multiply(20)));
         if (loc == null) loc = player.getLocation();
 
         final Location wardLoc = loc.clone().add(0, 1, 0);
@@ -254,14 +254,14 @@ public class ConsumableManager {
 
     /** Control Ward: révèle et détruit les wards ennemies proches */
     public void placeControlWard(Player player) {
-        Location loc = player.getTargetBlockLocation(15, false);
+        Location loc = (player.getTargetBlockExact(15) != null ? player.getTargetBlockExact(15).getLocation() : player.getLocation().add(player.getLocation().getDirection().multiply(15)));
         if (loc == null) loc = player.getLocation();
 
         final Location wardLoc = loc.clone().add(0, 1, 0);
         wardLoc.getBlock().setType(Material.PINK_CANDLE);
 
         // Révèle les wards ennemies (détruit les torches soul dans un rayon)
-        wardLoc.getWorld().getNearbyBlocks(wardLoc, 5).stream()
+        nearbyBlocks(wardLoc, 5).stream()
             .filter(b -> b.getType() == Material.SOUL_TORCH)
             .forEach(b -> {
                 b.setType(Material.AIR);
@@ -368,4 +368,15 @@ public class ConsumableManager {
     public int getRefillableCharges(Player p) { return refillableCharges.getOrDefault(p.getUniqueId(), 0); }
     public int getWardCharges(Player p) { return wardCharges.getOrDefault(p.getUniqueId(), 0); }
     public String getActiveElixir(Player p) { return activeElixir.get(p.getUniqueId()); }
+
+    /** Récupère les blocs dans un rayon (getNearbyBlocks n'existe pas en Paper). */
+    private static java.util.List<org.bukkit.block.Block> nearbyBlocks(Location center, int radius) {
+        java.util.List<org.bukkit.block.Block> blocks = new java.util.ArrayList<>();
+        for (int x = -radius; x <= radius; x++)
+            for (int y = -radius; y <= radius; y++)
+                for (int z = -radius; z <= radius; z++)
+                    blocks.add(center.clone().add(x, y, z).getBlock());
+        return blocks;
+    }
+
 }

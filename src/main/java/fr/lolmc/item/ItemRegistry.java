@@ -155,7 +155,7 @@ public class ItemRegistry {
         // ITEMS CRIT / AS FINAUX (MANQUANTS)
         // ════════════════════════════════════════════════════════════
 
-        reg(new LolItem("statikk_shiv",   "Statikk Shiv",      2900, Material.ELECTRIC_SPARK, ATTACK_SPEED).ad(45).as(0.45).crit(0.20).passive("Electroshock","Toutes les 3 AA: 60-190 dégâts magiques AoE."));
+        reg(new LolItem("statikk_shiv",   "Statikk Shiv",      2900, Material.LIGHTNING_ROD, ATTACK_SPEED).ad(45).as(0.45).crit(0.20).passive("Electroshock","Toutes les 3 AA: 60-190 dégâts magiques AoE."));
         reg(new LolItem("rapid_firecannon","Rapid Firecannon",  2600, Material.CROSSBOW,       ATTACK_SPEED).ad(35).as(0.35).crit(0.20).ms(5).passive("Sharpshooter","Charge: +50%% portée AA + électrique."));
         reg(new LolItem("runaans_hurricane","Runaan's Hurricane",2600,Material.BOW,            ATTACK_SPEED).ad(25).as(0.45).crit(0.20).ms(5).passive("Wind's Fury","AA envoient 2 projectiles latéraux."));
         reg(new LolItem("fiendhunter_bolts","Fiendhunter Bolts",2650,Material.ARROW,          ATTACK_SPEED).as(0.45).crit(0.20).passive("Hunt","AA garantis crit après ultime. +15%% vrais dégâts."));
@@ -286,7 +286,7 @@ public class ItemRegistry {
         // SUPPORT
         reg(new LolItem("redemption",      "Redemption",        2300, Material.BEACON,          SUPPORT).hp(300).mana(300).hpRegen(100).ah(20).passive("Actif","Soigne 250+4%%HP zone."));
         reg(new LolItem("locket",          "Locket of the Iron Solari",2200,Material.GOLDEN_CHESTPLATE,SUPPORT).hp(200).armor(30).mr(30).ah(15).passive("Devotion","Actif: bouclier alliés."));
-        reg(new LolItem("shurelyas",       "Shurelya's Battlesong",2500,Material.MUSIC_DISC_CAT,SUPPORT).hp(200).mana(300).ah(20).ms(5).passive("Inspire","+60%% vitesse alliés 4s."));
+        reg(new LolItem("shurelyas",       "Shurelya's Battlesong",2500,Material.MUSIC_DISC_13,SUPPORT).hp(200).mana(300).ah(20).ms(5).passive("Inspire","+60%% vitesse alliés 4s."));
         reg(new LolItem("mikaels",         "Mikael's Blessing", 2300, Material.AMETHYST_CLUSTER,SUPPORT).hp(250).mana(300).mr(40).passive("Purify","Cleanse CC allié."));
         reg(new LolItem("staff_flowing_water","Staff of Flowing Water",2300,Material.BAMBOO,   SUPPORT).ap(60).mana(300).ah(10).ms(5).passive("Rapids","Soin allié: +AS +AP."));
         reg(new LolItem("moonstone_renewer","Moonstone Renewer",2400, Material.WHITE_CONCRETE,  SUPPORT).hp(250).mana(400).hpRegen(150).ah(20).passive("Starlit Grace","+15%% puissance soin."));
