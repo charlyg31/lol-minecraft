@@ -1,4 +1,5 @@
 package fr.lolmc.manager;
+import fr.lolmc.util.Compat;
 
 import fr.lolmc.LolPlugin;
 import fr.lolmc.champion.base.BaseChampion;
@@ -131,7 +132,7 @@ public class HUDManager {
 
     private void syncMinecraftHP(Player player, HPSystem hp) {
         // Mettre maxHealth à 40 (fixe)
-        var attr = player.getAttribute(Attribute.GENERIC_MAX_HEALTH);
+        var attr = player.getAttribute(Compat.maxHealth());
         if (attr != null && attr.getValue() != 40.0) {
             attr.setBaseValue(40.0);
         }
@@ -243,7 +244,7 @@ public class HUDManager {
      */
     public void initPlayer(Player player, BaseChampion champ) {
         // HP max Minecraft = 40
-        var attr = player.getAttribute(Attribute.GENERIC_MAX_HEALTH);
+        var attr = player.getAttribute(Compat.maxHealth());
         if (attr != null) attr.setBaseValue(40.0);
         player.setHealth(40.0);
 

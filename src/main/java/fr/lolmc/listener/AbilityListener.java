@@ -1,4 +1,5 @@
 package fr.lolmc.listener;
+import fr.lolmc.util.Compat;
 
 import fr.lolmc.LolPlugin;
 import fr.lolmc.champion.base.BaseChampion;
@@ -107,10 +108,10 @@ public class AbilityListener implements Listener {
             var meta = item.getItemMeta();
             if (meta == null) continue;
             if (canUp) {
-                meta.addEnchant(org.bukkit.enchantments.Enchantment.UNBREAKING, 1, true);
+                meta.addEnchant(Compat.glowEnchant(), 1, true);
                 meta.addItemFlags(org.bukkit.inventory.ItemFlag.HIDE_ENCHANTS);
             } else {
-                meta.removeEnchant(org.bukkit.enchantments.Enchantment.UNBREAKING);
+                meta.removeEnchant(Compat.glowEnchant());
             }
             item.setItemMeta(meta);
         }

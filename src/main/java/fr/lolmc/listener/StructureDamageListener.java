@@ -124,9 +124,13 @@ public class StructureDamageListener implements Listener {
         Component msg = Component.text("🏆 VICTOIRE DE L'ÉQUIPE " + winner.name() + " ! 🏆",
                 winner.chatColor);
         for (Player p : LolPlugin.getInstance().getServer().getOnlinePlayers()) {
-            p.sendTitle(
-                    (winner == Team.BLUE ? "§9" : "§c") + "VICTOIRE " + winner.name(),
-                    "", 10, 80, 20);
+            p.showTitle(net.kyori.adventure.title.Title.title(
+                    Component.text("VICTOIRE " + winner.name(), winner.chatColor),
+                    Component.empty(),
+                    net.kyori.adventure.title.Title.Times.times(
+                        java.time.Duration.ofMillis(500),
+                        java.time.Duration.ofMillis(4000),
+                        java.time.Duration.ofMillis(1000))));
             p.sendMessage(msg);
         }
         // Arrêter la partie

@@ -1,4 +1,5 @@
 package fr.lolmc.game;
+import fr.lolmc.util.Compat;
 
 import fr.lolmc.LolPlugin;
 import fr.lolmc.champion.base.BaseChampion;
@@ -158,15 +159,15 @@ public class JungleManager {
         if (!(entity instanceof LivingEntity mob)) { entity.remove(); return; }
 
         // Stats
-        var hpAttr = mob.getAttribute(Attribute.GENERIC_MAX_HEALTH);
+        var hpAttr = mob.getAttribute(Compat.maxHealth());
         if (hpAttr != null) { hpAttr.setBaseValue(type.maxHP); mob.setHealth(type.maxHP); }
-        mob.setCustomName(legacyName(type));
+        mob.customName(net.kyori.adventure.text.Component.text(type.displayName));
         mob.setCustomNameVisible(true);
         mob.setRemoveWhenFarAway(false);
         if (mob instanceof Mob m) m.setAware(true);
 
         // Empêcher de bouger loin du camp (les monstres neutres restent sur place)
-        var speedAttr = mob.getAttribute(Attribute.GENERIC_MOVEMENT_SPEED);
+        var speedAttr = mob.getAttribute(Compat.movementSpeed());
         if (speedAttr != null && type != MonsterType.DRAGON && type != MonsterType.BARON) {
             speedAttr.setBaseValue(0.15);
         }
@@ -293,11 +294,6 @@ public class JungleManager {
     public static MonsterType getMonsterType(Entity e) {
         String t = e.getPersistentDataContainer().get(KEY_MONSTER, PersistentDataType.STRING);
         return t != null ? MonsterType.valueOf(t) : null;
-    }
-
-    @SuppressWarnings("deprecation")
-    private String legacyName(MonsterType type) {
-        return type.displayName;
     }
 
     public void clearAllMonsters() {

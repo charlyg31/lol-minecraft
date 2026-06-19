@@ -1,4 +1,5 @@
 package fr.lolmc.game;
+import fr.lolmc.util.Compat;
 
 import fr.lolmc.LolPlugin;
 import fr.lolmc.team.TeamManager.Team;
@@ -97,9 +98,9 @@ public class MinionManager {
             z.setBaby(false);
             z.setShouldBurnInDay(false);
             z.setCustomNameVisible(false);
-            z.getAttribute(org.bukkit.attribute.Attribute.GENERIC_MAX_HEALTH).setBaseValue(MINION_HP);
+            z.getAttribute(Compat.maxHealth()).setBaseValue(MINION_HP);
             z.setHealth(MINION_HP);
-            z.getAttribute(org.bukkit.attribute.Attribute.GENERIC_MOVEMENT_SPEED).setBaseValue(MINION_SPEED);
+            z.getAttribute(Compat.movementSpeed()).setBaseValue(MINION_SPEED);
             // Tag PDC
             z.getPersistentDataContainer().set(KEY_MINION, PersistentDataType.BYTE, (byte) 1);
             z.getPersistentDataContainer().set(KEY_TEAM, PersistentDataType.STRING, team.name());
