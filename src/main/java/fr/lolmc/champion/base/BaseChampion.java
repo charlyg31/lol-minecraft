@@ -3,6 +3,7 @@ package fr.lolmc.champion.base;
 import fr.lolmc.LolPlugin;
 import fr.lolmc.stats.HPSystem;
 import fr.lolmc.stats.ResourceSystem;
+import fr.lolmc.stats.LevelSystem;
 
 import fr.lolmc.ability.base.BaseAbility;
 import fr.lolmc.stats.ChampionStats;
@@ -19,6 +20,7 @@ public abstract class BaseChampion {
     protected final BaseAbility[] abilities = new BaseAbility[5];
     protected HPSystem hpSystem;
     protected ResourceSystem resourceSystem;
+    protected final LevelSystem levelSystem = new LevelSystem();
 
     public enum ChampionRole { TOP, JUNGLE, MID, SUPPORT, ADC }
 
@@ -64,6 +66,14 @@ public abstract class BaseChampion {
         BaseAbility ability = abilities[slot];
         if (ability == null) return;
 
+        // Le sort doit être débloqué (AA slot 0 toujours OK)
+        if (slot >= 1 && !levelSystem.isAbilityUnlocked(slot)) {
+            caster.sendActionBar(Component.text(
+                "🔒 " + ability.getName() + " pas encore débloqué (clique pour l'apprendre)",
+                NamedTextColor.GRAY));
+            return;
+        }
+
         if (ability.isOnCooldown(caster)) {
             caster.sendActionBar(Component.text(
                 String.format("⏳ %s — %.1fs", ability.getName(), ability.getRemainingCooldown(caster)),
@@ -90,6 +100,7 @@ public abstract class BaseChampion {
             }
         }
 
+        ability.setLevel(levelSystem.getAbilityRank(slot));
         ability.cast(caster, stats, target);
         ability.triggerCooldown(caster);
         // Déclencher passifs post-sort (Spellblade, Shojin, etc.)
@@ -113,6 +124,24 @@ public abstract class BaseChampion {
     public String            getDisplayName() { return displayName; }
     public ChampionRole      getRole()        { return role; }
     public ChampionStats     getStats()       { return stats; }
+    public LevelSystem       getLevelSystem() { return levelSystem; }
+
+    /**
+     * Améliore un sort si un point est disponible. Synchronise le level interne.
+     * @return true si réussi
+     */
+    public boolean levelUpAbility(Player player, int slot) {
+        if (levelSystem.levelUpAbility(slot)) {
+            BaseAbility a = abilities[slot];
+            if (a != null) {
+                a.setLevel(levelSystem.getAbilityRank(slot));
+                refreshSlot(player, slot);
+            }
+            return true;
+        }
+        return false;
+    }
+
     public BaseAbility[]     getAbilities()   { return abilities; }
     public BaseAbility       getAbility(int i){ return (i>=0&&i<5)?abilities[i]:null; }
 

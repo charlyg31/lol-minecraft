@@ -62,7 +62,58 @@ public class AbilityListener implements Listener {
         if (!HotbarManager.isLolItem(held)) return;
 
         e.setCancelled(true);
+
+        // Shift + clic droit sur un sort = apprendre / améliorer (dépenser un point)
+        if (caster.isSneaking() && "ability".equals(HotbarManager.getType(held))
+                && slot >= 1 && slot <= 4) {
+            tryLevelUpAbility(caster, slot);
+            return;
+        }
+
         handleSlotAction(caster, slot, held, null);
+    }
+
+    /**
+     * Améliore un sort et notifie le joueur.
+     */
+    private void tryLevelUpAbility(Player caster, int slot) {
+        BaseChampion champ = manager.getChampion(caster);
+        if (champ.levelUpAbility(caster, slot)) {
+            int rank = champ.getLevelSystem().getAbilityRank(slot);
+            String name = champ.getAbility(slot).getName();
+            caster.sendActionBar(net.kyori.adventure.text.Component.text(
+                "✨ " + name + " amélioré au rang " + rank + "!",
+                net.kyori.adventure.text.format.NamedTextColor.GREEN));
+            caster.playSound(caster.getLocation(),
+                org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 0.5f, 1.5f);
+            // Rafraîchir le clignotement
+            updateAbilityGlow(caster, champ);
+        } else {
+            caster.sendActionBar(net.kyori.adventure.text.Component.text(
+                "❌ Impossible d'améliorer (pas de point ou rang max / niveau requis)",
+                net.kyori.adventure.text.format.NamedTextColor.RED));
+        }
+    }
+
+    /**
+     * Fait clignoter les sorts améliorables (ajoute l'enchantement glow).
+     */
+    public void updateAbilityGlow(Player player, BaseChampion champ) {
+        if (hotbar().getPage(player) != 1) return;
+        for (int slot = 1; slot <= 4; slot++) {
+            ItemStack item = player.getInventory().getItem(slot);
+            if (item == null) continue;
+            boolean canUp = champ.getLevelSystem().canLevelUp(slot);
+            var meta = item.getItemMeta();
+            if (meta == null) continue;
+            if (canUp) {
+                meta.addEnchant(org.bukkit.enchantments.Enchantment.UNBREAKING, 1, true);
+                meta.addItemFlags(org.bukkit.inventory.ItemFlag.HIDE_ENCHANTS);
+            } else {
+                meta.removeEnchant(org.bukkit.enchantments.Enchantment.UNBREAKING);
+            }
+            item.setItemMeta(meta);
+        }
     }
 
     /**

@@ -187,10 +187,22 @@ public class HUDManager {
             resourceComp = Component.empty();
         }
 
-        Component actionBar = Component.text(
+        // ── Niveau du champion + indicateur de point de compétence ──
+        int champLevel = champ.getLevelSystem().getLevel();
+        boolean hasPoint = champ.getLevelSystem().hasSkillPoint();
+        Component levelComp = Component.text(
+            String.format("⭐%d ", champLevel),
+            NamedTextColor.AQUA
+        ).decoration(TextDecoration.ITALIC, false);
+        if (hasPoint) {
+            levelComp = levelComp.append(Component.text("[+] ", NamedTextColor.YELLOW)
+                .decoration(TextDecoration.ITALIC, false));
+        }
+
+        Component actionBar = levelComp.append(Component.text(
             String.format("❤ %d/%d  %s", hpCur, hpMax, bar),
             hpColor
-        ).decoration(TextDecoration.ITALIC, false)
+        ).decoration(TextDecoration.ITALIC, false))
          .append(resourceComp);
 
         player.sendActionBar(actionBar);

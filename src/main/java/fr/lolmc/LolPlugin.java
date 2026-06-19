@@ -16,6 +16,10 @@ import fr.lolmc.game.MapManager;
 import fr.lolmc.game.TurretManager;
 import fr.lolmc.game.MinionManager;
 import fr.lolmc.game.RoadManager;
+import fr.lolmc.game.RewardManager;
+import fr.lolmc.game.JungleManager;
+import fr.lolmc.listener.AbilityListener;
+import fr.lolmc.listener.EntityDeathListener;
 import fr.lolmc.item.consumable.ConsumableManager;
 import fr.lolmc.listener.ShopCommand;
 import fr.lolmc.listener.ShopListener;
@@ -54,6 +58,9 @@ public class LolPlugin extends JavaPlugin {
     private TurretManager turretManager;
     private MinionManager minionManager;
     private RoadManager roadManager;
+    private RewardManager rewardManager;
+    private JungleManager jungleManager;
+    private AbilityListener abilityListener;
 
     @Override
     public void onEnable() {
@@ -73,6 +80,8 @@ public class LolPlugin extends JavaPlugin {
         turretManager = new TurretManager(mapManager, championManager, teamManager);
         roadManager = new RoadManager();
         roadManager.applyToMinionManager();
+        rewardManager = new RewardManager(championManager, goldManager);
+        jungleManager = new JungleManager();
         hudManager = new HUDManager(championManager);
         shopGUI = new ShopGUI();
         goldManager = new GoldManager();
@@ -85,7 +94,8 @@ public class LolPlugin extends JavaPlugin {
         championGUI     = new ChampionGUI(championManager, headManager);
         guiListener     = new GUIListener(championGUI, championManager, headManager, hudManager);
 
-        getServer().getPluginManager().registerEvents(new AbilityListener(championManager), this);
+        abilityListener = new AbilityListener(championManager);
+        getServer().getPluginManager().registerEvents(abilityListener, this);
         getServer().getPluginManager().registerEvents(new HealthListener(championManager, hudManager), this);
         getServer().getPluginManager().registerEvents(shopListener, this);
         getServer().getPluginManager().registerEvents(guiListener, this);
@@ -126,6 +136,8 @@ public class LolPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(lolCmd, this);
         getServer().getPluginManager().registerEvents(
             new fr.lolmc.listener.StructureDamageListener(mapManager, championManager, teamManager), this);
+        getServer().getPluginManager().registerEvents(
+            new EntityDeathListener(championManager, rewardManager), this);
         getLogger().info("LoL MC activé — 20 champions + boutique chargés.");
     }
 
@@ -156,4 +168,7 @@ public class LolPlugin extends JavaPlugin {
     public TurretManager getTurretManager()     { return turretManager; }
     public MinionManager getMinionManager()     { return minionManager; }
     public RoadManager getRoadManager()         { return roadManager; }
+    public RewardManager getRewardManager()     { return rewardManager; }
+    public JungleManager getJungleManager()     { return jungleManager; }
+    public AbilityListener getAbilityListener() { return abilityListener; }
 }

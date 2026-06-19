@@ -64,14 +64,17 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
             case "position" -> handlePosition(player, args);
             case "lane" -> handleLane(player, args);
             case "road" -> handleRoad(player, args);
+            case "jungle" -> handleJungle(player, args);
             case "start" -> {
                 player.sendMessage(Component.text("⚔ Lancement de la partie...", NamedTextColor.GOLD));
                 mapManager.resetAllStructures();
                 LolPlugin.getInstance().getMinionManager().startWaves();
-                player.sendMessage(Component.text("✔ Structures réinitialisées, vagues de sbires lancées!", NamedTextColor.GREEN));
+                LolPlugin.getInstance().getJungleManager().startJungle();
+                player.sendMessage(Component.text("✔ Structures, sbires et jungle lancés!", NamedTextColor.GREEN));
             }
             case "stop" -> {
                 LolPlugin.getInstance().getMinionManager().stopWaves();
+                LolPlugin.getInstance().getJungleManager().stopJungle();
                 player.sendMessage(Component.text("⏹ Partie arrêtée.", NamedTextColor.YELLOW));
             }
             default -> sendHelp(player);
@@ -157,6 +160,47 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
                 + "Tape /lol lane done pour finir.", lane), NamedTextColor.AQUA));
     }
 
+
+
+    // ── /lol jungle ───────────────────────────────────────────────
+
+    private void handleJungle(Player player, String[] args) {
+        // /lol jungle <type> [blue|red]
+        // Types neutres: gromp, murkwolf, raptor, krug, red_buff, blue_buff
+        // Épiques (pas d'équipe): dragon, baron, herald
+        if (args.length < 2) {
+            player.sendMessage("§cUsage: /lol jungle <gromp|murkwolf|raptor|krug|red_buff|blue_buff|dragon|baron|herald> [blue|red]");
+            return;
+        }
+        fr.lolmc.game.JungleManager.MonsterType type;
+        try {
+            type = fr.lolmc.game.JungleManager.MonsterType.valueOf(args[1].toUpperCase());
+        } catch (IllegalArgumentException ex) {
+            player.sendMessage(Component.text("❌ Type de monstre inconnu: " + args[1], NamedTextColor.RED));
+            return;
+        }
+
+        // Les épiques sont neutres, les autres ont besoin d'une équipe
+        boolean isEpic = type == fr.lolmc.game.JungleManager.MonsterType.DRAGON
+                || type == fr.lolmc.game.JungleManager.MonsterType.BARON
+                || type == fr.lolmc.game.JungleManager.MonsterType.HERALD;
+
+        Team team = null;
+        if (!isEpic) {
+            if (args.length < 3) {
+                player.sendMessage("§cCe camp nécessite une équipe: /lol jungle " + args[1] + " <blue|red>");
+                return;
+            }
+            team = parseTeam(args[2]);
+            if (team == null) { player.sendMessage("§cÉquipe: blue ou red"); return; }
+        }
+
+        pending.put(player.getUniqueId(), new PendingSetup("jungle", null, team, args[1].toUpperCase(), 0, 0));
+        player.sendMessage(Component.text(String.format(
+                "👉 Clique au sol pour placer %s%s.",
+                type.displayName, team != null ? " (" + team.name() + ")" : " (neutre)"),
+                NamedTextColor.AQUA));
+    }
 
     // ── /lol road ─────────────────────────────────────────────────
 
@@ -254,6 +298,13 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
                     "✔ %s %s %s #%d placé en %d,%d,%d.",
                     setup.type().name().toLowerCase(), setup.team().name(), setup.lane(), setup.index(),
                     clicked.getBlockX(), clicked.getBlockY(), clicked.getBlockZ()), NamedTextColor.GREEN));
+        } else if (setup.kind().equals("jungle")) {
+            var type = fr.lolmc.game.JungleManager.MonsterType.valueOf(setup.lane());
+            Location campLoc = clicked.clone().add(0.5, 1, 0.5);
+            LolPlugin.getInstance().getJungleManager().setCamp(type, setup.team(), campLoc);
+            player.sendMessage(Component.text(String.format(
+                    "✔ %s placé en %d,%d,%d.", type.displayName,
+                    clicked.getBlockX(), clicked.getBlockY(), clicked.getBlockZ()), NamedTextColor.GREEN));
         } else if (setup.kind().equals("spawn")) {
             Location spawnLoc = clicked.clone().add(0.5, 1, 0.5);
             spawnLoc.setYaw(player.getLocation().getYaw());
@@ -300,12 +351,13 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
 
     @Override
     public List<String> onTabComplete(CommandSender sender, Command cmd, String alias, String[] args) {
-        if (args.length == 1) return List.of("set", "position", "lane", "road", "start", "stop");
+        if (args.length == 1) return List.of("set", "position", "lane", "road", "jungle", "start", "stop");
         if (args.length == 2) {
             return switch (args[0].toLowerCase()) {
                 case "set" -> List.of("turret", "nexus", "basenexus");
                 case "position", "lane" -> List.of("blue", "red");
                 case "road" -> List.of("top", "mid", "bot", "end");
+                case "jungle" -> List.of("gromp", "murkwolf", "raptor", "krug", "red_buff", "blue_buff", "dragon", "baron", "herald");
                 default -> List.of();
             };
         }
