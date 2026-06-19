@@ -59,6 +59,7 @@ public class LolItem {
     // ── Passif (description) ──
     private String passiveName;
     private String passiveDescription;
+    private boolean hasActive = false; // true si l'item a un actif cliquable
 
     public LolItem(String id, String displayName, int goldCost,
                    Material icon, ItemCategory category) {
@@ -270,6 +271,11 @@ public class LolItem {
     public LolItem passive(String name, String desc) {
         this.passiveName = name; this.passiveDescription = desc; return this;
     }
+    /** Marque l'item comme ayant un actif cliquable (apparaît dans la hotbar). */
+    public LolItem active(String name, String desc) {
+        this.passiveName = name; this.passiveDescription = desc; this.hasActive = true; return this;
+    }
+    public boolean hasActive() { return hasActive; }
 
     // ── Getters ───────────────────────────────────────────────────
 

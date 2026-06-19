@@ -57,6 +57,7 @@ public class GUIListener implements Listener {
         if (manager.hasChampion(player)) {
             hudManager.initPlayer(player, manager.getChampion(player));
             LolPlugin.getInstance().getShopListener().initPlayer(player);
+            LolPlugin.getInstance().getHotbarManager().initPlayer(player, manager.getChampion(player));
         }
 
         // Équiper la tête du champion
