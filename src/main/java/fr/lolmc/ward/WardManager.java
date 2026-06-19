@@ -152,27 +152,46 @@ public class WardManager {
      */
     private void drawBeam(Player revealed, Team revealedTeam, Team viewerTeam) {
         Location base = revealed.getLocation();
-        Particle.DustOptions dust = revealedTeam.dust();
+        // Particules grosses (taille 3) pour une colonne épaisse et très visible
+        Particle.DustOptions dust = new Particle.DustOptions(revealedTeam.particleColor, 3.0f);
 
-        // Colonne verticale au-dessus de la tête (de +2.5 à +8 blocs)
         List<Location> points = new ArrayList<>();
-        for (double y = 2.5; y <= 8.0; y += 0.4) {
+
+        // Colonne verticale ÉPAISSE de +2.5 à +12 blocs (pas fin = 0.25, dense)
+        for (double y = 2.5; y <= 12.0; y += 0.25) {
+            // Point central
             points.add(base.clone().add(0, y, 0));
-        }
-        // Halo circulaire à la base de la colonne (rayon 0.6)
-        double haloY = 2.4;
-        for (int i = 0; i < 12; i++) {
-            double angle = 2 * Math.PI * i / 12;
-            points.add(base.clone().add(Math.cos(angle) * 0.6, haloY, Math.sin(angle) * 0.6));
+            // 4 points en croix autour de l'axe (épaisseur 0.25) pour faire une vraie colonne
+            points.add(base.clone().add(0.25, y, 0));
+            points.add(base.clone().add(-0.25, y, 0));
+            points.add(base.clone().add(0, y, 0.25));
+            points.add(base.clone().add(0, y, -0.25));
         }
 
-        // Envoyer les particules UNIQUEMENT aux membres de l'équipe qui voit
+        // Double halo circulaire (rayons 0.6 et 1.0) à la base
+        for (double radius : new double[]{0.6, 1.0}) {
+            int count = radius > 0.8 ? 20 : 14;
+            for (int i = 0; i < count; i++) {
+                double angle = 2 * Math.PI * i / count;
+                points.add(base.clone().add(Math.cos(angle) * radius, 2.4, Math.sin(angle) * radius));
+            }
+        }
+
+        // Anneau tournant à mi-hauteur (effet "détecté")
+        double spin = (System.currentTimeMillis() % 2000L) / 2000.0 * 2 * Math.PI;
+        for (int i = 0; i < 8; i++) {
+            double angle = spin + 2 * Math.PI * i / 8;
+            points.add(base.clone().add(Math.cos(angle) * 0.8, 6.0, Math.sin(angle) * 0.8));
+        }
+
+        // Envoyer UNIQUEMENT aux membres de l'équipe qui voit (filtrage par joueur)
         for (UUID viewerId : teamManager.getTeamMembers(viewerTeam)) {
             Player viewer = Bukkit.getPlayer(viewerId);
             if (viewer == null || !viewer.isOnline()) continue;
             if (!viewer.getWorld().equals(revealed.getWorld())) continue;
             for (Location point : points) {
-                viewer.spawnParticle(Particle.DUST, point, 1, 0, 0, 0, 0, dust);
+                // count=2 + spread léger pour densifier encore
+                viewer.spawnParticle(Particle.DUST, point, 2, 0.05, 0.05, 0.05, 0, dust);
             }
         }
     }

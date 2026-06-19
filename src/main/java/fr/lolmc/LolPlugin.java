@@ -7,6 +7,9 @@ import fr.lolmc.item.HotbarManager;
 import fr.lolmc.item.FlashManager;
 import fr.lolmc.team.TeamManager;
 import fr.lolmc.ward.WardManager;
+import fr.lolmc.matchmaking.PartyManager;
+import fr.lolmc.matchmaking.MatchmakingManager;
+import fr.lolmc.listener.PartyCommand;
 import fr.lolmc.item.consumable.ConsumableManager;
 import fr.lolmc.listener.ShopCommand;
 import fr.lolmc.listener.ShopListener;
@@ -38,6 +41,8 @@ public class LolPlugin extends JavaPlugin {
     private FlashManager flashManager;
     private TeamManager teamManager;
     private WardManager wardManager;
+    private PartyManager partyManager;
+    private MatchmakingManager matchmakingManager;
 
     @Override
     public void onEnable() {
@@ -49,6 +54,8 @@ public class LolPlugin extends JavaPlugin {
         hotbarManager = new HotbarManager();
         teamManager = new TeamManager();
         wardManager = new WardManager(teamManager);
+        partyManager = new PartyManager();
+        matchmakingManager = new MatchmakingManager(partyManager, teamManager);
         hudManager = new HUDManager(championManager);
         shopGUI = new ShopGUI();
         goldManager = new GoldManager();
@@ -85,6 +92,15 @@ public class LolPlugin extends JavaPlugin {
             teamCmd.setExecutor(tc);
             teamCmd.setTabCompleter(tc);
         }
+        var partyCmd = new PartyCommand(partyManager, matchmakingManager);
+        if (getCommand("party") != null) {
+            getCommand("party").setExecutor(partyCmd);
+            getCommand("party").setTabCompleter(partyCmd);
+        }
+        if (getCommand("queue") != null) {
+            getCommand("queue").setExecutor(partyCmd);
+            getCommand("queue").setTabCompleter(partyCmd);
+        }
         getLogger().info("LoL MC activé — 20 champions + boutique chargés.");
     }
 
@@ -108,4 +124,6 @@ public class LolPlugin extends JavaPlugin {
     public FlashManager getFlashManager()       { return flashManager; }
     public TeamManager getTeamManager()         { return teamManager; }
     public WardManager getWardManager()         { return wardManager; }
+    public PartyManager getPartyManager()       { return partyManager; }
+    public MatchmakingManager getMatchmakingManager() { return matchmakingManager; }
 }
