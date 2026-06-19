@@ -105,6 +105,17 @@ public class HealthListener implements Listener {
         champ.getHPSystem().setCurrentHP(champ.getHPSystem().getMaxHP());
         champ.getResourceSystem().fill();
         champ.getStats().clearShields();
+        // Téléporter au spawn de l'équipe
+        var tm = LolPlugin.getInstance().getTeamManager();
+        var team = tm.getTeam(p);
+        if (team != null) {
+            // Position = index du joueur dans l'équipe (simplifié: position 1-5)
+            var spawn = LolPlugin.getInstance().getMapManager().getSpawn(team, 1);
+            if (spawn != null) {
+                LolPlugin.getInstance().getServer().getScheduler().runTaskLater(
+                    LolPlugin.getInstance(), () -> p.teleport(spawn), 2L);
+            }
+        }
 
         // Re-init le HUD
         LolPlugin.getInstance().getServer().getScheduler()
