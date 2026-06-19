@@ -3,6 +3,8 @@ package fr.lolmc;
 import fr.lolmc.listener.AbilityListener;
 import fr.lolmc.item.ItemRegistry;
 import fr.lolmc.item.PassiveManager;
+import fr.lolmc.item.HotbarManager;
+import fr.lolmc.item.FlashManager;
 import fr.lolmc.item.consumable.ConsumableManager;
 import fr.lolmc.listener.ShopCommand;
 import fr.lolmc.listener.ShopListener;
@@ -30,6 +32,8 @@ public class LolPlugin extends JavaPlugin {
     private ShopListener shopListener;
     private PassiveManager passiveManager;
     private ConsumableManager consumableManager;
+    private HotbarManager hotbarManager;
+    private FlashManager flashManager;
 
     @Override
     public void onEnable() {
@@ -37,6 +41,8 @@ public class LolPlugin extends JavaPlugin {
         saveDefaultConfig();
 
         championManager = new ChampionManager();
+        flashManager = new FlashManager();
+        hotbarManager = new HotbarManager();
         hudManager = new HUDManager(championManager);
         shopGUI = new ShopGUI();
         goldManager = new GoldManager();
@@ -86,4 +92,6 @@ public class LolPlugin extends JavaPlugin {
     public ShopListener getShopListener()       { return shopListener; }
     public PassiveManager getPassiveManager()   { return passiveManager; }
     public ConsumableManager getConsumableManager() { return consumableManager; }
+    public HotbarManager getHotbarManager()     { return hotbarManager; }
+    public FlashManager getFlashManager()       { return flashManager; }
 }

@@ -51,9 +51,13 @@ public class ShopListener implements Listener {
     }
 
     public void initPlayer(Player player) {
-        PlayerInventoryManager inv = getOrCreate(player);
-        inv.refreshAll(player);
+        getOrCreate(player);
         goldManager.initPlayer(player.getUniqueId());
+        // Le HotbarManager.initPlayer est appelé par GUIListener après pick champion
+    }
+
+    public void cleanup(java.util.UUID uuid) {
+        inventoryManagers.remove(uuid);
     }
 
     // ── Clics dans l'inventaire ───────────────────────────────────
@@ -143,10 +147,18 @@ public class ShopListener implements Listener {
             // Consommables: utilisation immédiate
             ConsumableManager cm = LolPlugin.getInstance().getConsumableManager();
             if (item.getCategory() == ItemCategory.CONSUMABLE && cm != null) {
-                useConsumable(player, item.getId(), cm);
-                hudManager.updateHUD(player, champ);
+                // Stocker le consommable dans la page 2 de la hotbar (utilisable plus tard)
+                var hb = LolPlugin.getInstance().getHotbarManager();
+                hb.addConsumable(player, item.getId());
+                hb.renderPage(player, champ);
+                player.sendActionBar(Component.text(
+                    "🧪 " + item.getDisplayName() + " ajouté (page 2)", NamedTextColor.GREEN));
             } else {
                 inv.equipItem(player, champ, item);
+                // Ajouter au HotbarManager (affichage hotbar des actifs)
+                var hb = LolPlugin.getInstance().getHotbarManager();
+                hb.addItem(player, item.getId());
+                hb.renderPage(player, champ);
                 hudManager.updateHUD(player, champ);
             }
             // Rafraîchir l'affichage de l'or dans la boutique
@@ -167,7 +179,13 @@ public class ShopListener implements Listener {
         if (inv.getItem(lolSlot) == null) return;
 
         BaseChampion champ = championManager.getChampion(player);
+        var soldItem = inv.getItem(lolSlot);
         int refund = inv.sellItem(player, champ, lolSlot);
+        if (soldItem != null) {
+            var hb = LolPlugin.getInstance().getHotbarManager();
+            hb.removeItem(player, soldItem.getId());
+            hb.renderPage(player, champ);
+        }
         goldManager.addGold(player.getUniqueId(), refund);
         hudManager.updateHUD(player, champ);
         player.sendActionBar(Component.text(
@@ -192,6 +210,27 @@ public class ShopListener implements Listener {
         int slot = p.getInventory().getHeldItemSlot();
         if (isLolItemSlot(slot) || slot <= 4) {
             event.setCancelled(true);
+        }
+    }
+
+    // ── Consommables ───────────────────────────────────────────────
+
+    /** Appelé par AbilityListener quand un consommable est cliqué dans la hotbar. */
+    public void useConsumablePublic(Player player, String id) {
+        ConsumableManager cm = LolPlugin.getInstance().getConsumableManager();
+        if (cm == null) return;
+        switch (id) {
+            case "health_potion", "health_potion2"         -> cm.useHealthPotion(player);
+            case "refillable_potion", "refillable_potion2"  -> cm.useRefillablePotion(player);
+            case "biscuit", "biscuit_will"                  -> cm.useBiscuit(player);
+            case "elixir_wrath", "elixir_wrath2"            -> cm.useElixirWrath(player);
+            case "elixir_iron", "elixir_iron2"              -> cm.useElixirIron(player);
+            case "elixir_sorcery", "elixir_sorcery2"        -> cm.useElixirSorcery(player);
+            case "stealth_ward", "stealth_ward2"            -> cm.placeWard(player, false);
+            case "control_ward", "control_ward2"            -> cm.placeControlWard(player);
+            case "farsight", "farsight2"                    -> cm.placeWard(player, true);
+            default -> player.sendActionBar(net.kyori.adventure.text.Component.text(
+                "Consommable: " + id, net.kyori.adventure.text.format.NamedTextColor.GRAY));
         }
     }
 

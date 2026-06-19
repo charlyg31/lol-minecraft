@@ -50,8 +50,7 @@ public class PlayerInventoryManager {
         }
         equippedItems[freeSlot] = item;
         item.applyStats(champ.getStats(), champ.getHPSystem(), champ.getResourceSystem());
-        updateSlot(player, freeSlot);
-        player.sendMessage(Component.text("✅ " + item.getDisplayName() + " équipé!", NamedTextColor.GREEN));
+        // L'affichage hotbar est géré par HotbarManager (pas ici)
         return true;
     }
 
@@ -63,9 +62,7 @@ public class PlayerInventoryManager {
         LolItem item = equippedItems[slotIndex];
         item.removeStats(champ.getStats(), champ.getHPSystem(), champ.getResourceSystem());
         equippedItems[slotIndex] = null;
-        clearSlot(player, slotIndex);
         int refund = (int)(item.getGoldCost() * 0.70);
-        player.sendMessage(Component.text("💰 " + item.getDisplayName() + " vendu pour " + refund + " or.", NamedTextColor.GOLD));
         return refund;
     }
 
@@ -73,7 +70,7 @@ public class PlayerInventoryManager {
      * Recharge tous les items dans l'inventaire (ex: après respawn).
      */
     public void refreshAll(Player player) {
-        for (int i = 0; i < 6; i++) updateSlot(player, i);
+        // Affichage géré par HotbarManager désormais
     }
 
     /**
