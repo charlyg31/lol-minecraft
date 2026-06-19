@@ -19,3 +19,13 @@ commands:
     description: Rejoindre une équipe (bleu/rouge)
     usage: /team <bleu|rouge|auto>
     aliases: [equipe]
+
+  party:
+    description: Gérer son groupe
+    usage: /party <invite|accept|leave|info>
+    aliases: [groupe, p]
+
+  queue:
+    description: Rejoindre la file d'attente
+    usage: /queue [leave]
+    aliases: [file, q]
