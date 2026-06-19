@@ -29,3 +29,18 @@ heads:
   sivir:       "PASTE_VALUE_HERE"
   jinx:        "PASTE_VALUE_HERE"
   missfortune: "PASTE_VALUE_HERE"
+
+# ═══════════════════════════════════════════════════════
+# BUSHES (buissons) — zones d'invisibilité
+# ═══════════════════════════════════════════════════════
+# Liste des blocs qui forment un bush. Tout bloc de ce type
+# (et les blocs identiques collés) constitue un buisson.
+# Quand un joueur est dans/sur un bush, il est invisible pour
+# les ennemis, SAUF si un ennemi est dans le même bush ou s'il
+# vient de prendre des dégâts (révélé 5s).
+bushes:
+  blocks:
+    - TALL_GRASS
+    - LARGE_FERN
+    - FERN
+    - SWEET_BERRY_BUSH

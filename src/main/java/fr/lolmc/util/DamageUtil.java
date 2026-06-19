@@ -57,6 +57,9 @@ public class DamageUtil {
 
         // 3. HP
         vc.getHPSystem().takeDamage(afterShield);
+        // Révéler la victime si elle est dans un bush (combat = visible)
+        var bushMgr = LolPlugin.getInstance().getBushManager();
+        if (bushMgr != null) bushMgr.revealOnDamage(victim);
 
         // 4. Vol de vie / omnivamp pour l'attaquant
         if (attacker != null && cm.hasChampion(attacker)) {
