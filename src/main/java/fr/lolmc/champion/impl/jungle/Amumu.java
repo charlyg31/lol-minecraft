@@ -101,7 +101,7 @@ public class Amumu extends BaseChampion {
     }
 
     static class R extends BaseAbility {
-        R(){super("r_amumu","Malédiction Éternelle",Material.CHAIN,AbilitySlot.R,
+        R(){super("r_amumu","Malédiction Éternelle",Material.IRON_NUGGET,AbilitySlot.R,
             new double[]{150,130,110},5,5,DamageType.MAGICAL);
             resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){

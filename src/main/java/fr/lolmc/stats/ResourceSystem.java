@@ -19,7 +19,7 @@ public class ResourceSystem {
     }
 
     private final ResourceType type;
-    private final double maxResource;
+    private double maxResource;
     private double currentResource;
     private double regenPer5s; // regen toutes les 5 secondes
 

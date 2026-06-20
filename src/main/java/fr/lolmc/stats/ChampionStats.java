@@ -289,6 +289,7 @@ public class ChampionStats {
     // Getters de base (affichage + passifs)
     public double getBaseAD()  { return baseAttackDamage; }
     public double getBaseAP()  { return baseAbilityPower; }
+    public double getBonusHP() { return bonusMaxHP; }
     public double getBonusAD() { return bonusAttackDamage; }
     public double getBonusAP() { return bonusAbilityPower; }
 }
