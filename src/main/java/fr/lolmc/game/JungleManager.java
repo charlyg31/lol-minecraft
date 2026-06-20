@@ -33,6 +33,7 @@ public class JungleManager {
 
     public static NamespacedKey KEY_MONSTER; // type du monstre
     public static NamespacedKey KEY_BUFF;    // buff accordé (red/blue/none)
+    public static NamespacedKey KEY_GOLD;    // or individuel du mob
 
     private final File jungleFile;
     private FileConfiguration config;
@@ -48,18 +49,27 @@ public class JungleManager {
     // ══════════════════════════════════════════════════════════════
 
     public enum MonsterType {
-        // Camps neutres
-        GROMP        (EntityType.SLIME,        500,  80,  60, 100, "none", "🐸 Gromp"),
-        MURKWOLF     (EntityType.WOLF,         450,  85,  55, 100, "none", "🐺 Loup"),
-        RAPTOR       (EntityType.VEX,          400,  75,  50,  95, "none", "🦅 Raptor"),
-        KRUG         (EntityType.SILVERFISH,   350,  70,  45,  90, "none", "🪨 Krug"),
-        // Buffs
-        RED_BUFF     (EntityType.MAGMA_CUBE,   1100, 100, 90, 130, "red",  "🔴 Sanglepince"),
-        BLUE_BUFF    (EntityType.IRON_GOLEM,   1200, 100, 90, 130, "blue", "🔵 Sentinelle bleue"),
-        // Épiques
-        DRAGON       (EntityType.RAVAGER,      3500, 150, 25, 100, "none", "🐉 Dragon"),
-        HERALD       (EntityType.RAVAGER,      4000, 200, 25,  0,  "none", "👁 Héraut"),
-        BARON        (EntityType.WARDEN,       8500, 300, 30, 100, "baron","🪱 Baron Nashor");
+        // ── Camps neutres (certains en groupes) ──
+        // Format: entity, maxHP, gold, xp, respawnSec, buff, groupCount, displayName
+        GROMP        (EntityType.SLIME,        500,  80,  60, 100, "none", 1, "🐸 Gromp"),
+        MURKWOLF     (EntityType.WOLF,         450,  85,  55, 100, "none", 3, "🐺 Loups"),       // 1 gros + 2 petits
+        RAPTOR       (EntityType.VEX,          400,  75,  50,  95, "none", 6, "🦅 Raptors"),     // 1 gros + 5 petits
+        KRUG         (EntityType.SILVERFISH,   350,  70,  45,  90, "none", 2, "🪨 Krugs"),       // 1 gros + 1 petit (se divise)
+        // ── Buffs ──
+        RED_BUFF     (EntityType.MAGMA_CUBE,   1100, 100, 90, 130, "red",  1, "🔴 Sanglepince"),
+        BLUE_BUFF    (EntityType.IRON_GOLEM,   1200, 100, 90, 130, "blue", 1, "🔵 Sentinelle bleue"),
+        // ── Crabe (rivière) ──
+        SCUTTLE_CRAB (EntityType.TURTLE,       400,  55,  40,  150,"none", 1, "🦀 Crabe Pillargot"),
+        // ── Dragons élémentaires (un seul à la fois sur la carte dans LoL) ──
+        DRAGON_INFERNAL (EntityType.RAVAGER,   3500, 150, 25, 300, "drake_infernal", 1, "🔥 Dragon Infernal"),
+        DRAGON_OCEAN    (EntityType.RAVAGER,   3500, 150, 25, 300, "drake_ocean",    1, "🌊 Dragon Océan"),
+        DRAGON_MOUNTAIN (EntityType.RAVAGER,   3500, 150, 25, 300, "drake_mountain", 1, "⛰ Dragon Montagne"),
+        DRAGON_CLOUD    (EntityType.RAVAGER,   3500, 150, 25, 300, "drake_cloud",    1, "☁ Dragon Foudre"),
+        DRAGON_CHEMTECH (EntityType.RAVAGER,   3500, 150, 25, 300, "drake_chemtech", 1, "☣ Dragon Chimtech"),
+        DRAGON_ELDER    (EntityType.RAVAGER,   5000, 200, 40, 360, "drake_elder",    1, "🐲 Dragon Ancien"),
+        // ── Épiques de la fosse ──
+        HERALD       (EntityType.RAVAGER,      4000, 200, 25,  0,  "none", 1, "👁 Héraut de la Faille"),
+        BARON        (EntityType.WARDEN,       8500, 300, 30, 420, "baron",1, "🪱 Baron Nashor");
 
         public final EntityType entity;
         public final double maxHP;
@@ -67,13 +77,22 @@ public class JungleManager {
         public final double xp;
         public final int respawnSeconds;
         public final String buff;
+        public final int groupCount;
         public final String displayName;
 
         MonsterType(EntityType entity, double maxHP, int gold, double xp,
-                    int respawnSeconds, String buff, String displayName) {
+                    int respawnSeconds, String buff, int groupCount, String displayName) {
             this.entity = entity; this.maxHP = maxHP; this.gold = gold;
             this.xp = xp; this.respawnSeconds = respawnSeconds;
-            this.buff = buff; this.displayName = displayName;
+            this.buff = buff; this.groupCount = groupCount; this.displayName = displayName;
+        }
+
+        public boolean isDragon() {
+            return name().startsWith("DRAGON_");
+        }
+
+        public boolean isEpic() {
+            return isDragon() || this == HERALD || this == BARON;
         }
     }
 
@@ -82,17 +101,20 @@ public class JungleManager {
         public final String id;
         public final MonsterType type;
         public final Location location;
-        public UUID liveEntity = null;   // entité actuellement vivante
+        public final Set<UUID> liveEntities = new HashSet<>();  // toutes les entités du camp
         public long respawnAt = 0;        // timestamp de réapparition
 
         public CampSpawn(String id, MonsterType type, Location location) {
             this.id = id; this.type = type; this.location = location;
         }
+
+        public boolean isAlive() { return !liveEntities.isEmpty(); }
     }
 
     public JungleManager() {
         KEY_MONSTER = new NamespacedKey(LolPlugin.getInstance(), "jungle_monster");
         KEY_BUFF = new NamespacedKey(LolPlugin.getInstance(), "jungle_buff");
+        KEY_GOLD = new NamespacedKey(LolPlugin.getInstance(), "jungle_gold");
         this.jungleFile = new File(LolPlugin.getInstance().getDataFolder(), "jungle.yml");
         if (!jungleFile.exists()) {
             try { jungleFile.createNewFile(); } catch (Exception ignored) {}
@@ -126,8 +148,8 @@ public class JungleManager {
     }
 
     private String campId(MonsterType type, Team team) {
-        // Les épiques (Dragon/Baron/Héraut) sont neutres → pas d'équipe
-        if (type == MonsterType.DRAGON || type == MonsterType.BARON || type == MonsterType.HERALD) {
+        // Les épiques (dragons/Baron/Héraut) et le crabe sont neutres → pas d'équipe
+        if (type.isEpic() || type == MonsterType.SCUTTLE_CRAB) {
             return type.name().toLowerCase();
         }
         return type.name().toLowerCase() + "_" + (team != null ? team.name().toLowerCase() : "neutral");
@@ -155,29 +177,48 @@ public class JungleManager {
         Location loc = camp.location;
         if (loc.getWorld() == null) return;
 
-        Entity entity = loc.getWorld().spawnEntity(loc, type.entity);
-        if (!(entity instanceof LivingEntity mob)) { entity.remove(); return; }
+        camp.liveEntities.clear();
 
-        // Stats
-        var hpAttr = mob.getAttribute(Compat.maxHealth());
-        if (hpAttr != null) { hpAttr.setBaseValue(type.maxHP); mob.setHealth(type.maxHP); }
-        mob.customName(net.kyori.adventure.text.Component.text(type.displayName));
-        mob.setCustomNameVisible(true);
-        mob.setRemoveWhenFarAway(false);
-        if (mob instanceof Mob m) m.setAware(true);
+        // Spawn de tous les mobs du groupe (groupCount)
+        for (int i = 0; i < type.groupCount; i++) {
+            // Décaler légèrement les mobs du groupe autour du centre
+            double angle = 2 * Math.PI * i / Math.max(1, type.groupCount);
+            double radius = type.groupCount > 1 ? 1.5 : 0;
+            Location spawnLoc = loc.clone().add(Math.cos(angle) * radius, 0, Math.sin(angle) * radius);
 
-        // Empêcher de bouger loin du camp (les monstres neutres restent sur place)
-        var speedAttr = mob.getAttribute(Compat.movementSpeed());
-        if (speedAttr != null && type != MonsterType.DRAGON && type != MonsterType.BARON) {
-            speedAttr.setBaseValue(0.15);
+            Entity entity = spawnLoc.getWorld().spawnEntity(spawnLoc, type.entity);
+            if (!(entity instanceof LivingEntity mob)) { entity.remove(); continue; }
+
+            // Le premier mob du groupe est le "gros" (plus de HP), les autres sont des petits
+            boolean isLarge = (i == 0);
+            double hp = isLarge ? type.maxHP : type.maxHP * 0.35;
+            int gold = isLarge ? type.gold : Math.max(5, type.gold / 4);
+
+            var hpAttr = mob.getAttribute(Compat.maxHealth());
+            if (hpAttr != null) { hpAttr.setBaseValue(hp); mob.setHealth(hp); }
+
+            String name = type.groupCount > 1
+                    ? type.displayName + (isLarge ? " (Grand)" : " (Petit)")
+                    : type.displayName;
+            mob.customName(net.kyori.adventure.text.Component.text(name));
+            mob.setCustomNameVisible(true);
+            mob.setRemoveWhenFarAway(false);
+            if (mob instanceof Mob m) m.setAware(true);
+
+            // Les épiques mobiles (dragons/baron) peuvent bouger, le reste est statique
+            var speedAttr = mob.getAttribute(Compat.movementSpeed());
+            if (speedAttr != null && !type.isEpic()) {
+                speedAttr.setBaseValue(0.15);
+            }
+
+            mob.getPersistentDataContainer().set(KEY_MONSTER, PersistentDataType.STRING, type.name());
+            mob.getPersistentDataContainer().set(KEY_BUFF, PersistentDataType.STRING, type.buff);
+            // Stocker l'or individuel du mob
+            mob.getPersistentDataContainer().set(KEY_GOLD, PersistentDataType.INTEGER, gold);
+
+            camp.liveEntities.add(mob.getUniqueId());
+            liveMonsters.put(mob.getUniqueId(), type);
         }
-
-        // Tags PDC
-        mob.getPersistentDataContainer().set(KEY_MONSTER, PersistentDataType.STRING, type.name());
-        mob.getPersistentDataContainer().set(KEY_BUFF, PersistentDataType.STRING, type.buff);
-
-        camp.liveEntity = mob.getUniqueId();
-        liveMonsters.put(mob.getUniqueId(), type);
     }
 
     /** Appelé quand un monstre meurt (depuis le listener). */
@@ -185,23 +226,31 @@ public class JungleManager {
         MonsterType type = liveMonsters.remove(entityId);
         if (type == null) return;
 
-        // Trouver le camp et programmer le respawn
-        for (CampSpawn camp : camps.values()) {
-            if (entityId.equals(camp.liveEntity)) {
-                camp.liveEntity = null;
-                camp.respawnAt = System.currentTimeMillis() + type.respawnSeconds * 1000L;
-                break;
-            }
+        // Retirer ce mob du camp ; respawn seulement quand TOUT le groupe est mort
+        CampSpawn camp = null;
+        for (CampSpawn c : camps.values()) {
+            if (c.liveEntities.remove(entityId)) { camp = c; break; }
+        }
+        if (camp != null && camp.liveEntities.isEmpty()) {
+            // Tout le camp est nettoyé → programmer le respawn
+            camp.respawnAt = System.currentTimeMillis() + type.respawnSeconds * 1000L;
         }
 
-        // Récompenses
+        // Récompenses (or individuel du mob, lu depuis le PDC si dispo)
         if (killer != null) {
+            int gold = type.gold;
+            Entity ent = LolPlugin.getInstance().getServer().getEntity(entityId);
+            // (l'entité est déjà morte, on utilise l'or du type par défaut)
             LolPlugin.getInstance().getRewardManager()
-                    .onJungleMonsterKill(killer, type.gold, type.xp);
-            // Appliquer le buff
-            applyBuff(killer, type.buff);
-            // Annonce pour les épiques
-            if (type == MonsterType.DRAGON || type == MonsterType.BARON || type == MonsterType.HERALD) {
+                    .onJungleMonsterKill(killer, gold, type.xp);
+
+            // Buff : seulement quand le porteur de buff meurt (gros mob = dernier du camp pour les buffs)
+            if (!type.buff.equals("none")) {
+                applyBuff(killer, type.buff);
+            }
+
+            // Annonce pour les épiques (uniquement quand le camp est vidé)
+            if (type.isEpic() && (camp == null || camp.liveEntities.isEmpty())) {
                 LolPlugin.getInstance().getServer().broadcast(Component.text(
                         "🌟 " + type.displayName + " tué par " + killer.getName() + "!",
                         NamedTextColor.GOLD));
@@ -215,7 +264,7 @@ public class JungleManager {
                 if (!active) return;
                 long now = System.currentTimeMillis();
                 for (CampSpawn camp : camps.values()) {
-                    if (camp.liveEntity == null && camp.respawnAt > 0 && now >= camp.respawnAt) {
+                    if (!camp.isAlive() && camp.respawnAt > 0 && now >= camp.respawnAt) {
                         spawnCamp(camp);
                         camp.respawnAt = 0;
                     }
@@ -249,6 +298,38 @@ public class JungleManager {
                         "🔵 Buff Bleu! +20 hâte de compétence et régén ressource (2min)",
                         NamedTextColor.BLUE));
                 scheduleBuffRemoval(player, () -> champ.getStats().addBonusAbilityHaste(-20), 120);
+            }
+            case "drake_infernal" -> {
+                champ.getStats().addBonusAD(8);
+                champ.getStats().addBonusAP(12);
+                player.sendActionBar(Component.text("🔥 Dragon Infernal: +dégâts!", NamedTextColor.RED));
+            }
+            case "drake_ocean" -> {
+                champ.getHPSystem().setHpRegen(champ.getHPSystem().getHpRegenPer5s() + 5);
+                player.sendActionBar(Component.text("🌊 Dragon Océan: +régénération!", NamedTextColor.AQUA));
+            }
+            case "drake_mountain" -> {
+                champ.getStats().addBonusArmor(10);
+                champ.getStats().addBonusMR(10);
+                player.sendActionBar(Component.text("⛰ Dragon Montagne: +résistances!", NamedTextColor.GOLD));
+            }
+            case "drake_cloud" -> {
+                champ.getStats().addBonusMoveSpeed(0.02);
+                player.sendActionBar(Component.text("☁ Dragon Foudre: +vitesse!", NamedTextColor.WHITE));
+            }
+            case "drake_chemtech" -> {
+                champ.getStats().multiplyHP(1.06);
+                player.sendActionBar(Component.text("☣ Dragon Chimtech: +6% PV!", NamedTextColor.GREEN));
+            }
+            case "drake_elder" -> {
+                champ.getStats().addBonusAD(20);
+                champ.getStats().addBonusAP(30);
+                player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 150*20, 0, false, true));
+                player.sendActionBar(Component.text("🐲 Dragon Ancien: bénédiction puissante!", NamedTextColor.LIGHT_PURPLE));
+                scheduleBuffRemoval(player, () -> {
+                    champ.getStats().addBonusAD(-20);
+                    champ.getStats().addBonusAP(-30);
+                }, 150);
             }
             case "baron" -> {
                 // Buff Baron : AD/AP bonus + renforce les sbires (180s)
@@ -303,7 +384,7 @@ public class JungleManager {
             }
         }
         liveMonsters.clear();
-        for (CampSpawn camp : camps.values()) { camp.liveEntity = null; camp.respawnAt = 0; }
+        for (CampSpawn camp : camps.values()) { camp.liveEntities.clear(); camp.respawnAt = 0; }
     }
 
     // ── Persistance ───────────────────────────────────────────────

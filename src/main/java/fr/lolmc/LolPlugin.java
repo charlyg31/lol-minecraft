@@ -85,6 +85,7 @@ public class LolPlugin extends JavaPlugin {
         rewardManager = new RewardManager(championManager, goldManager);
         jungleManager = new JungleManager();
         bushManager = new BushManager(teamManager);
+        getServer().getPluginManager().registerEvents(bushManager, this);
         hudManager = new HUDManager(championManager);
         shopGUI = new ShopGUI();
         goldManager = new GoldManager();

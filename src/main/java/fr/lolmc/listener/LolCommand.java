@@ -169,7 +169,10 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
         // Types neutres: gromp, murkwolf, raptor, krug, red_buff, blue_buff
         // Épiques (pas d'équipe): dragon, baron, herald
         if (args.length < 2) {
-            player.sendMessage("§cUsage: /lol jungle <gromp|murkwolf|raptor|krug|red_buff|blue_buff|dragon|baron|herald> [blue|red]");
+            player.sendMessage("§cUsage: /lol jungle <type> [blue|red]");
+            player.sendMessage("§7Camps: gromp, murkwolf, raptor, krug, red_buff, blue_buff");
+            player.sendMessage("§7Neutres: scuttle_crab, herald, baron");
+            player.sendMessage("§7Dragons: dragon_infernal, dragon_ocean, dragon_mountain, dragon_cloud, dragon_chemtech, dragon_elder");
             return;
         }
         fr.lolmc.game.JungleManager.MonsterType type;
@@ -181,9 +184,7 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
         }
 
         // Les épiques sont neutres, les autres ont besoin d'une équipe
-        boolean isEpic = type == fr.lolmc.game.JungleManager.MonsterType.DRAGON
-                || type == fr.lolmc.game.JungleManager.MonsterType.BARON
-                || type == fr.lolmc.game.JungleManager.MonsterType.HERALD;
+        boolean isEpic = type.isEpic() || type == fr.lolmc.game.JungleManager.MonsterType.SCUTTLE_CRAB;
 
         Team team = null;
         if (!isEpic) {
@@ -357,7 +358,9 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
                 case "set" -> List.of("turret", "nexus", "basenexus");
                 case "position", "lane" -> List.of("blue", "red");
                 case "road" -> List.of("top", "mid", "bot", "end");
-                case "jungle" -> List.of("gromp", "murkwolf", "raptor", "krug", "red_buff", "blue_buff", "dragon", "baron", "herald");
+                case "jungle" -> List.of("gromp", "murkwolf", "raptor", "krug", "red_buff", "blue_buff",
+                        "scuttle_crab", "dragon_infernal", "dragon_ocean", "dragon_mountain",
+                        "dragon_cloud", "dragon_chemtech", "dragon_elder", "herald", "baron");
                 default -> List.of();
             };
         }
