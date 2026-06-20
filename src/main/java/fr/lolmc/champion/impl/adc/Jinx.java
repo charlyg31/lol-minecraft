@@ -94,7 +94,12 @@ public class Jinx extends BaseChampion {
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double missing=1.0+(1.0-t.getHealth()/t.getMaxHealth())*1.5;
-            double dmg=(300+s.getFinalAD()*1.5)*missing;
+            double[] base={250,400,550};int rr=Math.min(getLevel()-1,2);
+            double[] missPct={0.25,0.30,0.35};
+            var cmJ=LolPlugin.getInstance().getChampionManager();
+            double miss=0;
+            if(cmJ.hasChampion(t)){var hpJ=cmJ.getChampion(t).getHPSystem();miss=hpJ.getMaxHP()-hpJ.getCurrentHP();}
+            double dmg=base[rr]+s.getFinalAD()*1.5+miss*missPct[rr];
             t.getWorld().getNearbyEntities(t.getLocation(),5,2,5).stream()
                 .filter(e->e instanceof Player)
                 .forEach(e->DamageUtil.abilityDamage(c, (Player)e, dmg));
