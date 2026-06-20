@@ -51,7 +51,7 @@ public class MasterYi extends BaseChampion {
             if(t==null)return;
             Location dest=safeTeleport(c.getLocation(),t.getLocation());
             c.teleport(dest);
-            double dmg=25+s.getFinalAD()*1.1;
+            double[] base={25,60,95,130,165};double dmg=base[getLevel()-1]+s.getFinalAD()*1.0;
             DamageUtil.trueDamage(c, t, dmg);
             c.getWorld().spawnParticle(Particle.CRIT,t.getLocation(),10,0.5,0.5,0.5);
         }

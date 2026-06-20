@@ -51,7 +51,7 @@ public class Amumu extends BaseChampion {
             if(t==null)return;
             Location dest=safeTeleport(c.getLocation(),t.getLocation());
             c.teleport(dest);
-            double dmg=80+s.getFinalAP()*0.7;
+            double[] base={70,95,120,145,170};double dmg=base[getLevel()-1]+s.getFinalAP()*0.85;
             DamageUtil.abilityDamageMagic(c, t, dmg);
             t.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,20,10,false,true));
             t.sendActionBar(Component.text("🧻 Bandage! Stun 1s!",NamedTextColor.YELLOW));
