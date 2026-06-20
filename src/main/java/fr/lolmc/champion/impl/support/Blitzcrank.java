@@ -49,7 +49,7 @@ public class Blitzcrank extends BaseChampion {
             resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
-            double dmg=75+s.getFinalAP()*0.6;
+            double[] base={90,130,170,210,250};double dmg=base[getLevel()-1]+s.getFinalAP()*1.2;
             DamageUtil.abilityDamageMagic(c, t, dmg);
             Vector pull=c.getLocation().toVector().subtract(t.getLocation().toVector()).normalize().multiply(1.8);
             pull.setY(0.3); t.setVelocity(pull);

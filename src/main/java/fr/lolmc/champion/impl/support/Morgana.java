@@ -50,7 +50,7 @@ public class Morgana extends BaseChampion {
             resourceCost = 50;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
-            double dmg=80+s.getFinalAP()*0.9;
+            double[] base={80,135,190,245,300};double dmg=base[getLevel()-1]+s.getFinalAP()*0.9;
             DamageUtil.abilityDamageMagic(c, t, dmg);
             t.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,40,10,false,true));
             t.sendActionBar(Component.text("🕸 Root 2s — Morgana Q!",NamedTextColor.DARK_PURPLE));
