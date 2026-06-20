@@ -8,6 +8,10 @@ import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.Listener;
+import org.bukkit.event.block.BlockPlaceEvent;
+import org.bukkit.event.block.BlockBreakEvent;
 
 import java.util.*;
 
@@ -21,7 +25,7 @@ import java.util.*;
  *  - Si le joueur prend des dégâts, il est révélé 5 secondes.
  *  - Les alliés voient toujours le joueur.
  */
-public class BushManager {
+public class BushManager implements Listener {
 
     private final TeamManager teamManager;
 
@@ -30,6 +34,10 @@ public class BushManager {
 
     // Joueur → identifiant du bush où il se trouve (null si hors bush)
     private final Map<UUID, String> playerBush = new HashMap<>();
+    // CACHE : clé de bloc "world:x,y,z" → identifiant du bush (évite de refaire le flood-fill)
+    private final Map<String, String> bushIdCache = new HashMap<>();
+    // CACHE inverse : identifiant de bush → ensemble des clés de blocs (pour invalidation)
+    private final Map<String, Set<String>> bushBlocksCache = new HashMap<>();
     // Joueur révélé suite à des dégâts → timestamp d'expiration
     private final Map<UUID, Long> revealedUntil = new HashMap<>();
 
@@ -92,13 +100,30 @@ public class BushManager {
         // Nettoyer les révélations expirées
         revealedUntil.entrySet().removeIf(e -> now > e.getValue());
 
-        // 2. Recalculer la visibilité pour chaque paire de joueurs
+        // 2. Recalculer la visibilité — uniquement pour les paires proches
+        //    et seulement si la cible est dans un bush (sinon toujours visible).
         var players = new ArrayList<>(LolPlugin.getInstance().getServer().getOnlinePlayers());
-        for (Player viewer : players) {
-            if (!champMgr.hasChampion(viewer)) continue;
-            for (Player target : players) {
+        for (Player target : players) {
+            if (!champMgr.hasChampion(target)) continue;
+            boolean targetInBush = playerBush.containsKey(target.getUniqueId());
+
+            for (Player viewer : players) {
                 if (viewer.equals(target)) continue;
-                if (!champMgr.hasChampion(target)) continue;
+                if (!champMgr.hasChampion(viewer)) continue;
+
+                // Si la cible n'est PAS dans un bush, elle est visible : on s'assure
+                // juste qu'elle n'est pas restée masquée d'un tick précédent.
+                if (!targetInBush) {
+                    if (!viewer.canSee(target)) showTo(viewer, target);
+                    continue;
+                }
+
+                // Optimisation distance : au-delà de 48 blocs, inutile de calculer
+                if (!viewer.getWorld().equals(target.getWorld())
+                        || viewer.getLocation().distanceSquared(target.getLocation()) > 48*48) {
+                    continue;
+                }
+
                 updateVisibility(viewer, target);
             }
         }
@@ -175,38 +200,87 @@ public class BushManager {
      * On calcule via un flood-fill limité.
      */
     private String bushId(Block start) {
-        // Flood-fill pour trouver tous les blocs connexes du même type
+        String startKey = blockKey(start);
+
+        // 1. Cache hit : on a déjà calculé le bush de ce bloc
+        String cached = bushIdCache.get(startKey);
+        if (cached != null) {
+            // Vérifier que le cache est encore valide (le bloc est toujours un bush)
+            if (isBushBlock(start)) return cached;
+            // Sinon invalider ce bush entier
+            invalidateBush(cached);
+        }
+
+        // 2. Cache miss : flood-fill pour trouver tous les blocs connexes
         Material type = start.getType();
         Set<String> visited = new HashSet<>();
+        Set<String> blockKeys = new HashSet<>();
         Deque<Block> queue = new ArrayDeque<>();
         queue.add(start);
         int minX = start.getX(), minZ = start.getZ();
 
         int safety = 0;
-        while (!queue.isEmpty() && safety < 200) {
+        while (!queue.isEmpty() && safety < 500) {
             Block b = queue.poll();
-            String key = b.getX() + "," + b.getY() + "," + b.getZ();
+            String key = blockKey(b);
             if (visited.contains(key)) continue;
             visited.add(key);
+            blockKeys.add(key);
             safety++;
 
-            // Garder le coin minimal comme ancre d'identifiant
             if (b.getX() < minX) minX = b.getX();
             if (b.getZ() < minZ) minZ = b.getZ();
 
-            // Voisins horizontaux (4 directions) et verticaux proches
             int[][] offsets = {{1,0,0},{-1,0,0},{0,0,1},{0,0,-1},{0,1,0},{0,-1,0}};
             for (int[] off : offsets) {
                 Block n = b.getRelative(off[0], off[1], off[2]);
-                String nKey = n.getX() + "," + n.getY() + "," + n.getZ();
+                String nKey = blockKey(n);
                 if (!visited.contains(nKey) && n.getType() == type) {
                     queue.add(n);
                 }
             }
         }
 
-        // L'ID du bush = monde + coin minimal (stable pour tout le groupe)
-        return start.getWorld().getName() + ":" + minX + "," + minZ;
+        String id = start.getWorld().getName() + ":" + minX + "," + minZ;
+
+        // 3. Mettre en cache tous les blocs de ce bush
+        for (String key : blockKeys) {
+            bushIdCache.put(key, id);
+        }
+        bushBlocksCache.put(id, blockKeys);
+
+        return id;
+    }
+
+    private String blockKey(Block b) {
+        return b.getWorld().getName() + ":" + b.getX() + "," + b.getY() + "," + b.getZ();
+    }
+
+    /** Invalide le cache d'un bush (quand un de ses blocs change). */
+    private void invalidateBush(String bushId) {
+        Set<String> keys = bushBlocksCache.remove(bushId);
+        if (keys != null) {
+            for (String key : keys) bushIdCache.remove(key);
+        }
+    }
+
+    /**
+     * Invalide le cache autour d'une position (appelé quand un bloc est posé/cassé).
+     * Public pour être branché sur les events block place/break.
+     */
+    public void invalidateAround(Location loc) {
+        String key = loc.getWorld().getName() + ":"
+                + loc.getBlockX() + "," + loc.getBlockY() + "," + loc.getBlockZ();
+        String bushId = bushIdCache.get(key);
+        if (bushId != null) invalidateBush(bushId);
+        // Invalider aussi les voisins immédiats (un nouveau bloc peut fusionner 2 bushes)
+        int[][] offsets = {{1,0,0},{-1,0,0},{0,0,1},{0,0,-1},{0,1,0},{0,-1,0}};
+        for (int[] off : offsets) {
+            String nKey = loc.getWorld().getName() + ":"
+                    + (loc.getBlockX()+off[0]) + "," + (loc.getBlockY()+off[1]) + "," + (loc.getBlockZ()+off[2]);
+            String nBush = bushIdCache.get(nKey);
+            if (nBush != null) invalidateBush(nBush);
+        }
     }
 
     // ══════════════════════════════════════════════════════════════
@@ -248,4 +322,19 @@ public class BushManager {
             }
         }
     }
+
+    // ── Invalidation du cache sur changement de blocs ─────────────
+
+    @EventHandler
+    public void onBlockPlace(BlockPlaceEvent e) {
+        if (isBushBlock(e.getBlock()) || bushBlocks.contains(e.getBlockReplacedState().getType())) {
+            invalidateAround(e.getBlock().getLocation());
+        }
+    }
+
+    @EventHandler
+    public void onBlockBreak(BlockBreakEvent e) {
+        invalidateAround(e.getBlock().getLocation());
+    }
+
 }
