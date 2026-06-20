@@ -29,12 +29,13 @@ public class TurretManager {
     private final ChampionManager championManager;
     private final TeamManager teamManager;
 
-    // Portée d'une tourelle : AA d'ADC (~5-6 blocs) + 2 blocs = ~8 blocs
-    private static final double TURRET_RANGE = 8.0;
     // Cadence de tir : 1 tir par seconde (20 ticks)
     private static final long ATTACK_PERIOD = 20L;
-    // Dégâts de base d'une tourelle (LoL: ~152 au début, augmente avec le temps)
-    private static final double TURRET_BASE_DAMAGE = 150.0;
+
+    // Valeurs lues depuis la config (mêmes pour toutes les tours)
+    private final double attackRadius;   // rayon horizontal du cylindre (blocs)
+    private final double attackHeight;   // hauteur du cylindre + origine du tir (blocs)
+    private final double baseDamage;     // dégâts de base d'un tir
 
     // Aggro tourelle : cible actuelle de chaque tourelle (UUID joueur visé)
     private final Map<String, UUID> turretAggro = new HashMap<>();
@@ -45,6 +46,10 @@ public class TurretManager {
         this.mapManager = mapManager;
         this.championManager = championManager;
         this.teamManager = teamManager;
+        var config = LolPlugin.getInstance().getConfig();
+        this.attackRadius = config.getDouble("turrets.attack-radius", 8.0);
+        this.attackHeight = config.getDouble("turrets.attack-height", 6.0);
+        this.baseDamage = config.getDouble("turrets.base-damage", 150.0);
         startTurretTask();
     }
 
@@ -60,7 +65,8 @@ public class TurretManager {
     }
 
     private void processTurret(GameStructure turret) {
-        Location center = turret.getCenter().clone().add(0.5, 1, 0.5);
+        // Origine du tir : point de pose + hauteur configurée (le "canon" de la tour)
+        Location center = turret.getCenter().clone().add(0.5, attackHeight, 0.5);
         Team turretTeam = turret.getTeam();
         String turretId = turret.getId();
 
@@ -91,6 +97,32 @@ public class TurretManager {
         }
     }
 
+
+    // ══════════════════════════════════════════════════════════════
+    // DÉTECTION CYLINDRIQUE (rayon horizontal + hauteur)
+    // ══════════════════════════════════════════════════════════════
+
+    /**
+     * Vérifie qu'une position est dans le cylindre d'attaque autour du centre.
+     * Le centre est au niveau du canon (point de pose + hauteur).
+     * Cylindre : distance horizontale <= rayon ET écart vertical <= hauteur.
+     */
+    private boolean inCylinder(Location turretCanon, Location target) {
+        if (!turretCanon.getWorld().equals(target.getWorld())) return false;
+        double dx = target.getX() - turretCanon.getX();
+        double dz = target.getZ() - turretCanon.getZ();
+        double horizontalDist = Math.sqrt(dx * dx + dz * dz);
+        if (horizontalDist > attackRadius) return false;
+        // Écart vertical : la zone s'étend de (canon - hauteur) à (canon + hauteur)
+        double dy = Math.abs(target.getY() - turretCanon.getY());
+        return dy <= attackHeight;
+    }
+
+    /** Boîte de pré-filtrage pour getNearbyEntities (on affine ensuite avec inCylinder). */
+    private double boxRange() {
+        return Math.max(attackRadius, attackHeight) + 1;
+    }
+
     // ── Recherche de cibles ───────────────────────────────────────
 
     /**
@@ -98,13 +130,13 @@ public class TurretManager {
      * (Détecté via le système de combat : un joueur ayant infligé des dégâts récemment.)
      */
     private Player findPriorityTarget(Location center, Team turretTeam) {
-        for (var entity : center.getWorld().getNearbyEntities(center, TURRET_RANGE, TURRET_RANGE, TURRET_RANGE)) {
+        for (var entity : center.getWorld().getNearbyEntities(center, boxRange(), boxRange(), boxRange())) {
             if (!(entity instanceof Player p)) continue;
             if (!championManager.hasChampion(p)) continue;
+            if (!inCylinder(center, p.getLocation())) continue;
             Team pTeam = teamManager.getTeam(p);
             if (pTeam == null || pTeam == turretTeam) continue; // pas un ennemi
 
-            // Ce joueur ennemi a-t-il attaqué un allié récemment ? (combat tag)
             BaseChampion champ = championManager.getChampion(p);
             if (champ.getHPSystem().isInCombat() && hasAlliedChampionNearby(center, turretTeam)) {
                 return p;
@@ -114,8 +146,9 @@ public class TurretManager {
     }
 
     private boolean hasAlliedChampionNearby(Location center, Team turretTeam) {
-        for (var entity : center.getWorld().getNearbyEntities(center, TURRET_RANGE, TURRET_RANGE, TURRET_RANGE)) {
+        for (var entity : center.getWorld().getNearbyEntities(center, boxRange(), boxRange(), boxRange())) {
             if (entity instanceof Player p && championManager.hasChampion(p)) {
+                if (!inCylinder(center, p.getLocation())) continue;
                 if (teamManager.getTeam(p) == turretTeam) return true;
             }
         }
@@ -125,9 +158,9 @@ public class TurretManager {
     private LivingEntity findEnemyMinion(Location center, Team turretTeam) {
         LivingEntity closest = null;
         double closestDist = Double.MAX_VALUE;
-        for (var entity : center.getWorld().getNearbyEntities(center, TURRET_RANGE, TURRET_RANGE, TURRET_RANGE)) {
-            // Les sbires sont des entités taggées par le MinionManager
+        for (var entity : center.getWorld().getNearbyEntities(center, boxRange(), boxRange(), boxRange())) {
             if (entity instanceof LivingEntity le && fr.lolmc.game.MinionManager.isMinion(le)) {
+                if (!inCylinder(center, le.getLocation())) continue;
                 Team minionTeam = fr.lolmc.game.MinionManager.getMinionTeam(le);
                 if (minionTeam != null && minionTeam != turretTeam) {
                     double d = le.getLocation().distance(center);
@@ -141,8 +174,9 @@ public class TurretManager {
     private Player findEnemyChampion(Location center, Team turretTeam) {
         Player closest = null;
         double closestDist = Double.MAX_VALUE;
-        for (var entity : center.getWorld().getNearbyEntities(center, TURRET_RANGE, TURRET_RANGE, TURRET_RANGE)) {
+        for (var entity : center.getWorld().getNearbyEntities(center, boxRange(), boxRange(), boxRange())) {
             if (entity instanceof Player p && championManager.hasChampion(p)) {
+                if (!inCylinder(center, p.getLocation())) continue;
                 Team pTeam = teamManager.getTeam(p);
                 if (pTeam != null && pTeam != turretTeam) {
                     double d = p.getLocation().distance(center);
@@ -164,7 +198,7 @@ public class TurretManager {
         turretAggro.put(turretId, target.getUniqueId());
         turretStacks.put(turretId, Math.min(stacks, 3));
 
-        double damage = TURRET_BASE_DAMAGE * (1.0 + stacks * 0.40);
+        double damage = baseDamage * (1.0 + stacks * 0.40);
 
         // Projectile visuel
         shootBeam(center, target.getLocation().add(0, 1, 0));
@@ -183,7 +217,7 @@ public class TurretManager {
     private void fireAtMinion(GameStructure turret, Location center, LivingEntity minion) {
         shootBeam(center, minion.getLocation().add(0, 0.5, 0));
         // Les sbires meurent en ~1-2 coups de tourelle
-        minion.damage(TURRET_BASE_DAMAGE);
+        minion.damage(baseDamage);
     }
 
     private void shootBeam(Location from, Location to) {
@@ -197,5 +231,5 @@ public class TurretManager {
         to.getWorld().spawnParticle(Particle.EXPLOSION, to, 1);
     }
 
-    public double getTurretRange() { return TURRET_RANGE; }
+    public double getTurretRange() { return attackRadius; }
 }
