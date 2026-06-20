@@ -49,7 +49,8 @@ public class Malphite extends BaseChampion {
             resourceCost = 70;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
-            double dmg=70+s.getFinalAP()*0.6+s.getFinalMaxHP()*0.1;
+            double[] base={70,120,170,220,270};
+            double dmg=base[getLevel()-1]+s.getFinalAP()*0.6;
             DamageUtil.abilityDamageMagic(c, t, dmg);
             t.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,40,1,false,true));
             t.getWorld().spawnParticle(Particle.BLOCK,t.getLocation(),15,0.3,0.3,0.3,
@@ -103,7 +104,7 @@ public class Malphite extends BaseChampion {
             if(t==null)return;
             Location dest=safeTeleport(c.getLocation(),t.getLocation());
             c.teleport(dest);
-            double dmg=200+s.getFinalAP()*0.7+s.getFinalArmor()*0.4;
+            double[] baseR={200,300,400};int rr=Math.min(getLevel()-1,2);double dmg=baseR[rr]+s.getFinalAP()*1.0;
             c.getWorld().getNearbyEntities(c.getLocation(),4,2,4).stream()
                 .filter(e->e instanceof Player&&!e.equals(c))
                 .forEach(e->{
