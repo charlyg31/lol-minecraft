@@ -49,7 +49,7 @@ public class Leona extends BaseChampion {
             resourceCost = 45;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
-            double dmg=40+s.getFinalAP()*0.4;
+            double[] base={10,35,60,85,110};double dmg=base[getLevel()-1]+s.getFinalAP()*0.3;
             DamageUtil.abilityDamageMagic(c, t, dmg);
             t.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,25,10,false,true));
             t.sendActionBar(Component.text("☀ Stun 1.25s — Leona Q!",NamedTextColor.YELLOW));

@@ -82,9 +82,13 @@ public class Janna extends BaseChampion {
             resourceCost = 70;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             Player dest=t!=null?t:c;
-            dest.addPotionEffect(new PotionEffect(PotionEffectType.ABSORPTION,100,2,false,true));
+            // Bouclier LoL : 75/100/125/150/175 + 50% AP
+            double[] shieldBase={75,100,125,150,175};
+            double shield=shieldBase[getLevel()-1]+s.getFinalAP()*0.5;
+            var cm=LolPlugin.getInstance().getChampionManager();
+            if(cm.hasChampion(dest)) cm.getChampion(dest).getStats().addShield(shield);
             dest.addPotionEffect(new PotionEffect(PotionEffectType.STRENGTH,100,0,false,true));
-            dest.sendActionBar(Component.text("🌀 Oeil de la Tempête!",NamedTextColor.AQUA));
+            dest.sendActionBar(Component.text("🌀 Oeil de la Tempête! Bouclier "+(int)shield,NamedTextColor.AQUA));
         }
         @Override public String getDynamicDescription(ChampionStats s){return "Bouclier + force sur soi ou un allié pendant 5s.";}
     }
