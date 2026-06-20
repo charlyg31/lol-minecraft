@@ -30,6 +30,20 @@ public class PlayerCommands implements CommandExecutor, TabCompleter {
                 }
                 LolPlugin.getInstance().getBaseManager().startRecall(player);
             }
+            case "pick" -> {
+                if (args.length < 1) { player.sendMessage("§cUsage: /pick <champion>"); return true; }
+                LolPlugin.getInstance().getChampSelectManager().chooseChampion(player, args[0].toLowerCase());
+            }
+            case "runes" -> {
+                LolPlugin.getInstance().getChampSelectGUI().openRuneMenu(player);
+            }
+            case "spell" -> {
+                if (args.length < 2) { player.sendMessage("§cUsage: /spell <sort1> <sort2>"); return true; }
+                LolPlugin.getInstance().getChampSelectManager().chooseSpells(player, args[0], args[1]);
+            }
+            case "lock" -> {
+                LolPlugin.getInstance().getChampSelectManager().lock(player);
+            }
             case "ping" -> {
                 // /ping seul = ping générique d'alerte
                 if (args.length < 1) {
