@@ -50,9 +50,11 @@ bushes:
 # ═══════════════════════════════════════════════════════
 # Zone d'attaque en forme de CYLINDRE depuis le point de pose du schématique.
 turrets:
-  # Rayon horizontal de la zone d'attaque (en blocs)
+  # Rayon horizontal de la zone de détection (en blocs)
   attack-radius: 8
-  # Hauteur de la zone d'attaque ET origine du tir (en blocs au-dessus du point de pose)
-  attack-height: 6
+  # Hauteur de la zone de DÉTECTION (cylindre, en blocs au-dessus/dessous du point de pose)
+  detection-height: 6
+  # Hauteur d'où part visuellement l'ANIMATION du tir (en blocs au-dessus du point de pose)
+  beam-height: 6
   # Dégâts de base d'un tir
   base-damage: 150
