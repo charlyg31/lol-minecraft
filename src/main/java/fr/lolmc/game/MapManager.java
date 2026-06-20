@@ -29,6 +29,7 @@ public class MapManager {
 
     // HP par défaut selon le type
     private static final double TURRET_HP = 3000;
+    private static final double INHIBITOR_HP = 4000;
     private static final double NEXUS_HP = 5000;
     private static final double NEXUS_BASE_HP = 5500;
 
@@ -132,6 +133,7 @@ public class MapManager {
 
             double maxHP = switch (type) {
                 case TURRET -> TURRET_HP;
+                case INHIBITOR -> INHIBITOR_HP;
                 case NEXUS -> NEXUS_HP;
                 case NEXUS_BASE -> NEXUS_BASE_HP;
             };
@@ -259,6 +261,7 @@ public class MapManager {
         String teamName = (team == Team.BLUE) ? "Blue" : "Red";
         return switch (type) {
             case TURRET -> "Turret" + teamName;
+            case INHIBITOR -> "Inhibitor" + teamName;
             case NEXUS -> "Nexus" + teamName;
             case NEXUS_BASE -> "NexusBase" + teamName;
         };
