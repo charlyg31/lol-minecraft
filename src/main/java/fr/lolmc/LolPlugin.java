@@ -26,6 +26,7 @@ import fr.lolmc.game.FogOfWarManager;
 import fr.lolmc.game.ShopNpcManager;
 import fr.lolmc.game.AutoAttackManager;
 import fr.lolmc.game.AnnouncementManager;
+import fr.lolmc.game.SummonerSpellManager;
 import fr.lolmc.game.MatchScoreboard;
 import fr.lolmc.stats.persistence.DatabaseManager;
 import fr.lolmc.stats.persistence.RankedManager;
@@ -80,6 +81,7 @@ public class LolPlugin extends JavaPlugin {
     private ShopNpcManager shopNpcManager;
     private AutoAttackManager autoAttackManager;
     private AnnouncementManager announcementManager;
+    private SummonerSpellManager summonerSpellManager;
     private MatchScoreboard matchScoreboard;
     private DatabaseManager databaseManager;
     private RankedManager rankedManager;
@@ -120,6 +122,7 @@ public class LolPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(shopNpcManager, this);
         autoAttackManager = new AutoAttackManager();
         announcementManager = new AnnouncementManager();
+        summonerSpellManager = new SummonerSpellManager();
         matchScoreboard = new MatchScoreboard();
         getServer().getPluginManager().registerEvents(new fr.lolmc.listener.MonsterPassiveListener(), this);
         getServer().getPluginManager().registerEvents(bushManager, this);
@@ -227,6 +230,7 @@ public class LolPlugin extends JavaPlugin {
     public ShopNpcManager getShopNpcManager()   { return shopNpcManager; }
     public AutoAttackManager getAutoAttackManager() { return autoAttackManager; }
     public AnnouncementManager getAnnouncementManager() { return announcementManager; }
+    public SummonerSpellManager getSummonerSpellManager() { return summonerSpellManager; }
     public MatchScoreboard getMatchScoreboard() { return matchScoreboard; }
     public DatabaseManager getDatabaseManager() { return databaseManager; }
     public RankedManager getRankedManager()     { return rankedManager; }

@@ -18,9 +18,10 @@ public class RewardManager {
     private final GoldManager goldManager;
 
     // Récompenses (proches de LoL)
-    public static final int GOLD_MINION_MELEE = 21;
-    public static final int GOLD_MINION_CASTER = 14;
-    public static final int GOLD_CHAMPION_KILL = 300;
+    public static final int GOLD_MINION_MELEE = 21;   // sbire mêlée (valeur LoL exacte)
+    public static final int GOLD_MINION_CASTER = 17;  // sbire caster (valeur LoL exacte)
+    public static final int GOLD_MINION_CANNON = 60;  // sbire canon/siège (60-90 selon temps)
+    public static final int GOLD_CHAMPION_KILL = 300; // kill de base (valeur LoL)
     public static final int GOLD_ASSIST = 150;
 
     public static final double XP_MINION = 60;
@@ -74,6 +75,8 @@ public class RewardManager {
         int levelsGained = champ.getLevelSystem().addXP(xp);
         if (levelsGained > 0) {
             int newLevel = champ.getLevelSystem().getLevel();
+            // Synchroniser le niveau avec les stats (déclenche la croissance LoL)
+            champ.getStats().setChampionLevel(newLevel);
             player.showTitle(net.kyori.adventure.title.Title.title(
                     net.kyori.adventure.text.Component.empty(),
                     net.kyori.adventure.text.Component.text("⬆ Niveau " + newLevel,

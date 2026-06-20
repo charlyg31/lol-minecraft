@@ -51,13 +51,13 @@ public class JungleManager {
     public enum MonsterType {
         // ── Camps neutres (certains en groupes) ──
         // Format: entity, maxHP, gold, xp, respawnSec, buff, groupCount, displayName
-        GROMP        (EntityType.SLIME,        500,  80,  60, 100, "none", 1, "🐸 Gromp"),
-        MURKWOLF     (EntityType.WOLF,         450,  85,  55, 100, "none", 3, "🐺 Loups"),       // 1 gros + 2 petits
-        RAPTOR       (EntityType.VEX,          400,  75,  50,  95, "none", 6, "🦅 Raptors"),     // 1 gros + 5 petits
-        KRUG         (EntityType.SILVERFISH,   350,  70,  45,  90, "none", 2, "🪨 Krugs"),       // 1 gros + 1 petit (se divise)
+        GROMP        (EntityType.SLIME,        500,  80,  60, 135, "none", 1, "🐸 Gromp"),
+        MURKWOLF     (EntityType.WOLF,         450,  85,  55, 135, "none", 3, "🐺 Loups"),       // 1 gros + 2 petits
+        RAPTOR       (EntityType.VEX,          400,  75,  50, 135, "none", 6, "🦅 Raptors"),     // 1 gros + 5 petits
+        KRUG         (EntityType.SILVERFISH,   350,  70,  45, 135, "none", 2, "🪨 Krugs"),       // 1 gros + 1 petit (se divise)
         // ── Buffs ──
-        RED_BUFF     (EntityType.MAGMA_CUBE,   1100, 100, 90, 130, "red",  1, "🔴 Sanglepince"),
-        BLUE_BUFF    (EntityType.IRON_GOLEM,   1200, 100, 90, 130, "blue", 1, "🔵 Sentinelle bleue"),
+        RED_BUFF     (EntityType.MAGMA_CUBE,   1100, 100, 90, 300, "red",  1, "🔴 Sanglepince"),
+        BLUE_BUFF    (EntityType.IRON_GOLEM,   1200, 100, 90, 300, "blue", 1, "🔵 Sentinelle bleue"),
         // ── Crabe (rivière) ──
         SCUTTLE_CRAB (EntityType.TURTLE,       400,  55,  40,  150,"none", 1, "🦀 Crabe Pillargot"),
         // ── Dragons élémentaires (un seul à la fois sur la carte dans LoL) ──
