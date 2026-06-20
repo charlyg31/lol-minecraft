@@ -68,6 +68,12 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
             case "jungle" -> handleJungle(player, args);
             case "shopnpc" -> handleShopNpc(player, args);
             case "mode" -> handleMode(player, args);
+            case "solo" -> handleSolo(player, args);
+            case "give" -> handleGive(player, args);
+            case "level" -> handleLevel(player, args);
+            case "gold" -> handleGold(player, args);
+            case "team" -> handleTeamCmd(player, args);
+            case "testgame" -> handleTestGame(player);
             case "select" -> {
                 // Lance une sélection avec tous les joueurs en ligne (test/manuel)
                 var ids = new java.util.ArrayList<java.util.UUID>();
@@ -195,6 +201,93 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
 
 
 
+
+
+    // ══════════════════════════════════════════════════════════════
+    // COMMANDES DE TEST ADMIN (mode solo)
+    // ══════════════════════════════════════════════════════════════
+
+    /** /lol solo <champion> : met l'admin en jeu, équipe BLEUE, avec un champion, et lance tout. */
+    private void handleSolo(Player player, String[] args) {
+        String champId = args.length >= 2 ? args[1].toLowerCase() : "garen";
+        var plugin = LolPlugin.getInstance();
+
+        // 1. Équipe bleue
+        plugin.getTeamManager().setTeam(player, fr.lolmc.team.TeamManager.Team.BLUE);
+        // 2. Champion
+        plugin.getChampionManager().assignChampion(player, champId);
+        // 3. Page de runes par défaut
+        plugin.getRuneManager().applyRuneStats(player);
+        // 4. Lancer la partie complète
+        mapManager.resetAllStructures();
+        plugin.getMinionManager().startWaves();
+        plugin.getJungleManager().startJungle();
+        plugin.getGameManager().startGame();
+        plugin.getMatchScoreboard().startMatch(false);
+        // 5. Téléporter au spawn bleu si défini
+        var spawn = plugin.getMapManager().getSpawn(fr.lolmc.team.TeamManager.Team.BLUE, 1);
+        if (spawn != null) player.teleport(spawn);
+
+        player.sendMessage(Component.text("🧪 MODE SOLO lancé!", NamedTextColor.GREEN));
+        player.sendMessage(Component.text("Équipe BLEUE • Champion: " + champId, NamedTextColor.AQUA));
+        player.sendMessage(Component.text("Commandes utiles: /lol give <champ>, /lol level <n>, /lol gold <n>, /lol team <blue/red>, /lol stop", NamedTextColor.GRAY));
+    }
+
+    /** /lol give <champion> : change le champion de l'admin instantanément. */
+    private void handleGive(Player player, String[] args) {
+        if (args.length < 2) { player.sendMessage("§cUsage: /lol give <champion>"); return; }
+        String champId = args[1].toLowerCase();
+        LolPlugin.getInstance().getChampionManager().assignChampion(player, champId);
+        LolPlugin.getInstance().getRuneManager().applyRuneStats(player);
+        player.sendMessage(Component.text("✔ Champion: " + champId, NamedTextColor.GREEN));
+    }
+
+    /** /lol level <n> : met le champion de l'admin au niveau voulu (1-18). */
+    private void handleLevel(Player player, String[] args) {
+        if (args.length < 2) { player.sendMessage("§cUsage: /lol level <1-18>"); return; }
+        var cm = LolPlugin.getInstance().getChampionManager();
+        if (!cm.hasChampion(player)) { player.sendMessage("§cTu n'as pas de champion (utilise /lol solo)."); return; }
+        int lvl;
+        try { lvl = Integer.parseInt(args[1]); }
+        catch (NumberFormatException e) { player.sendMessage("§cNiveau invalide."); return; }
+        lvl = Math.max(1, Math.min(18, lvl));
+        var champ = cm.getChampion(player);
+        champ.getLevelSystem().setLevel(lvl);
+        champ.getStats().setChampionLevel(lvl);
+        player.sendMessage(Component.text("✔ Niveau " + lvl, NamedTextColor.GREEN));
+    }
+
+    /** /lol gold <n> : donne de l'or à l'admin. */
+    private void handleGold(Player player, String[] args) {
+        if (args.length < 2) { player.sendMessage("§cUsage: /lol gold <montant>"); return; }
+        int amount;
+        try { amount = Integer.parseInt(args[1]); }
+        catch (NumberFormatException e) { player.sendMessage("§cMontant invalide."); return; }
+        LolPlugin.getInstance().getGoldManager().addGold(player.getUniqueId(), amount);
+        player.sendMessage(Component.text("✔ +" + amount + " or", NamedTextColor.GREEN));
+    }
+
+    /** /lol team <blue/red> : change l'admin d'équipe (pour tester les deux côtés). */
+    private void handleTeamCmd(Player player, String[] args) {
+        if (args.length < 2) { player.sendMessage("§cUsage: /lol team <blue/red>"); return; }
+        var team = parseTeam(args[1]);
+        if (team == null) { player.sendMessage("§cÉquipe: blue ou red"); return; }
+        LolPlugin.getInstance().getTeamManager().setTeam(player, team);
+        var spawn = LolPlugin.getInstance().getMapManager().getSpawn(team, 1);
+        if (spawn != null) player.teleport(spawn);
+        player.sendMessage(Component.text("✔ Équipe: " + team.name(), NamedTextColor.GREEN));
+    }
+
+    /** /lol testgame : lance la map (structures+sbires+jungle) sans toucher au joueur. */
+    private void handleTestGame(Player player) {
+        var plugin = LolPlugin.getInstance();
+        mapManager.resetAllStructures();
+        plugin.getMinionManager().startWaves();
+        plugin.getJungleManager().startJungle();
+        plugin.getGameManager().startGame();
+        plugin.getMatchScoreboard().startMatch(false);
+        player.sendMessage(Component.text("🧪 Map lancée (structures, sbires, jungle, timer).", NamedTextColor.GREEN));
+    }
 
     // ── /lol shopnpc ──────────────────────────────────────────────
 
@@ -415,7 +508,7 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
 
     @Override
     public List<String> onTabComplete(CommandSender sender, Command cmd, String alias, String[] args) {
-        if (args.length == 1) return List.of("set", "position", "lane", "road", "jungle", "shopnpc", "mode", "select", "start", "stop");
+        if (args.length == 1) return List.of("set", "position", "lane", "road", "jungle", "shopnpc", "mode", "select", "solo", "give", "level", "gold", "team", "testgame", "start", "stop");
         if (args.length == 2) {
             return switch (args[0].toLowerCase()) {
                 case "set" -> List.of("turret", "inhibitor", "nexus", "basenexus");

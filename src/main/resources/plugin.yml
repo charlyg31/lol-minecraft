@@ -9,48 +9,172 @@ commands:
     description: Gère les champions LoL
     usage: /champion <pick|list|info> [args]
     aliases: [champ]
-
+    permission: lolmc.champion.use
   shop:
     description: Ouvre la boutique LoL
     usage: /shop [gold|addgold <montant>]
     aliases: [boutique, b]
-
+    permission: lolmc.player.shop
   team:
     description: Rejoindre une équipe (bleu/rouge)
     usage: /team <bleu|rouge|auto>
     aliases: [equipe]
-
+    permission: lolmc.player.team
   party:
     description: Gérer son groupe
     usage: /party <invite|accept|leave|info>
     aliases: [groupe, p]
-
+    permission: lolmc.player.party
   queue:
     description: Rejoindre la file d'attente
     usage: /queue [leave]
     aliases: [file, q]
-
+    permission: lolmc.player.queue
   lol:
-    description: Configuration de la carte (admin)
-    usage: /lol <set|position|lane|start|stop>
+    description: Configuration de la carte et tests (admin)
+    usage: /lol <set|position|lane|start|stop|solo|give|level|gold|team|testgame>
     permission: lolmc.admin
   recall:
     description: Retour à la base
     usage: /recall
+    permission: lolmc.player.recall
   ping:
     description: Envoyer un ping à l'équipe
     usage: /ping <danger|omw|miss|assist|enemy>
+    permission: lolmc.player.ping
   pick:
     description: Choisir un champion
+    permission: lolmc.player.pick
   runes:
     description: Configurer ses runes
+    permission: lolmc.player.runes
   spell:
     description: Choisir ses sorts d'invocateur
+    permission: lolmc.player.spell
   lock:
     description: Verrouiller sa sélection
+    permission: lolmc.player.lock
   roles:
     description: Choisir ses roles preferes
+    permission: lolmc.player.roles
   lobby:
     description: Ouvrir le menu de preparation
+    permission: lolmc.player.lobby
   play:
     description: Ouvrir le menu de preparation
+    permission: lolmc.player.lobby
+
+permissions:
+  # ── Permission maître admin ──
+  lolmc.admin:
+    description: Accès à toutes les commandes admin (config carte, tests solo)
+    default: op
+    children:
+      lolmc.admin.config: true
+      lolmc.admin.test: true
+  lolmc.admin.config:
+    description: Configurer la carte (tourelles, nexus, routes, jungle, npc)
+    default: op
+  lolmc.admin.test:
+    description: Commandes de test (solo, give, level, gold, testgame)
+    default: op
+
+  # ── Permissions joueur (regroupées) ──
+  lolmc.player:
+    description: Toutes les commandes joueur de base
+    default: true
+    children:
+      lolmc.player.shop: true
+      lolmc.player.team: true
+      lolmc.player.party: true
+      lolmc.player.queue: true
+      lolmc.player.recall: true
+      lolmc.player.ping: true
+      lolmc.player.pick: true
+      lolmc.player.runes: true
+      lolmc.player.spell: true
+      lolmc.player.lock: true
+      lolmc.player.roles: true
+      lolmc.player.lobby: true
+  lolmc.player.shop:
+    description: Ouvrir la boutique
+    default: true
+  lolmc.player.team:
+    description: Rejoindre une équipe
+    default: true
+  lolmc.player.party:
+    description: Gérer son groupe
+    default: true
+  lolmc.player.queue:
+    description: Rejoindre la file
+    default: true
+  lolmc.player.recall:
+    description: Utiliser le recall
+    default: true
+  lolmc.player.ping:
+    description: Envoyer des pings
+    default: true
+  lolmc.player.pick:
+    description: Choisir un champion en sélection
+    default: true
+  lolmc.player.runes:
+    description: Configurer ses runes
+    default: true
+  lolmc.player.spell:
+    description: Choisir ses sorts d'invocateur
+    default: true
+  lolmc.player.lock:
+    description: Verrouiller sa sélection
+    default: true
+  lolmc.player.roles:
+    description: Choisir ses rôles
+    default: true
+  lolmc.player.lobby:
+    description: Ouvrir le menu de préparation
+    default: true
+
+  # ── Permissions champion ──
+  lolmc.champion.use:
+    description: Utiliser la commande champion et jouer tous les champions
+    default: true
+    children:
+      lolmc.champion.garen: true
+      lolmc.champion.darius: true
+      lolmc.champion.malphite: true
+      lolmc.champion.nasus: true
+      lolmc.champion.warwick: true
+      lolmc.champion.amumu: true
+      lolmc.champion.masteryi: true
+      lolmc.champion.leesin: true
+      lolmc.champion.annie: true
+      lolmc.champion.veigar: true
+      lolmc.champion.zed: true
+      lolmc.champion.yasuo: true
+      lolmc.champion.morgana: true
+      lolmc.champion.leona: true
+      lolmc.champion.blitzcrank: true
+      lolmc.champion.janna: true
+      lolmc.champion.ashe: true
+      lolmc.champion.sivir: true
+      lolmc.champion.jinx: true
+      lolmc.champion.missfortune: true
+  lolmc.champion.garen: {description: Jouer Garen, default: true}
+  lolmc.champion.darius: {description: Jouer Darius, default: true}
+  lolmc.champion.malphite: {description: Jouer Malphite, default: true}
+  lolmc.champion.nasus: {description: Jouer Nasus, default: true}
+  lolmc.champion.warwick: {description: Jouer Warwick, default: true}
+  lolmc.champion.amumu: {description: Jouer Amumu, default: true}
+  lolmc.champion.masteryi: {description: Jouer Master Yi, default: true}
+  lolmc.champion.leesin: {description: Jouer Lee Sin, default: true}
+  lolmc.champion.annie: {description: Jouer Annie, default: true}
+  lolmc.champion.veigar: {description: Jouer Veigar, default: true}
+  lolmc.champion.zed: {description: Jouer Zed, default: true}
+  lolmc.champion.yasuo: {description: Jouer Yasuo, default: true}
+  lolmc.champion.morgana: {description: Jouer Morgana, default: true}
+  lolmc.champion.leona: {description: Jouer Leona, default: true}
+  lolmc.champion.blitzcrank: {description: Jouer Blitzcrank, default: true}
+  lolmc.champion.janna: {description: Jouer Janna, default: true}
+  lolmc.champion.ashe: {description: Jouer Ashe, default: true}
+  lolmc.champion.sivir: {description: Jouer Sivir, default: true}
+  lolmc.champion.jinx: {description: Jouer Jinx, default: true}
+  lolmc.champion.missfortune: {description: Jouer Miss Fortune, default: true}

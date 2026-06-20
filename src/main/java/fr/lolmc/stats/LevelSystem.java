@@ -41,6 +41,19 @@ public class LevelSystem {
         return levelsGained;
     }
 
+    /**
+     * Force le niveau du champion (pour les tests admin).
+     * Ajuste les points de compétence disponibles en conséquence.
+     */
+    public void setLevel(int newLevel) {
+        newLevel = Math.max(1, Math.min(MAX_LEVEL, newLevel));
+        int diff = newLevel - level;
+        level = newLevel;
+        currentXP = 0;
+        if (diff > 0) skillPoints += diff; // donne les points gagnés
+        if (skillPoints < 0) skillPoints = 0;
+    }
+
     // ── Points de compétence ──────────────────────────────────────
 
     public boolean hasSkillPoint() {
