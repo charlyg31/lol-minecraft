@@ -20,7 +20,8 @@ import java.util.*;
 public class Morgana extends BaseChampion {
     public Morgana() {
         super("morgana", "Morgana", ChampionRole.SUPPORT,
-            new ChampionStats(560,55,0,20,32,0.625,0,335,20,7));
+            new ChampionStats(630,56,0,25,30,0.625,0,335,4.5,5.5));
+        getStats().setGrowthStats(104.0,3.5,4.5,1.30,0.01530,0.55);
     }
     @Override protected void registerAbilities() {
         setAbility(0,new AA()); setAbility(1,new Q());

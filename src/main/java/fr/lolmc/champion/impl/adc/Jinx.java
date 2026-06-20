@@ -20,7 +20,8 @@ import java.util.*;
 public class Jinx extends BaseChampion {
     public Jinx() {
         super("jinx", "Jinx", ChampionRole.ADC,
-            new ChampionStats(516,57,0,21,30,0.625,0,325,25,3));
+            new ChampionStats(630,59,0,26,30,0.625,0,325,5.25,3.8));
+        getStats().setGrowthStats(100.0,3.4,4.7,1.30,0.01360,0.50);
     }
     @Override protected void registerAbilities() {
         setAbility(0,new AA()); setAbility(1,new Q());

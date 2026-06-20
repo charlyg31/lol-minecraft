@@ -20,7 +20,8 @@ import java.util.*;
 public class Ashe extends BaseChampion {
     public Ashe() {
         super("ashe", "Ashe", ChampionRole.ADC,
-            new ChampionStats(528,59,0,26,30,0.658,0.15,325,25,3));
+            new ChampionStats(610,59,0,26,30,0.658,0,325,6.0,3.5));
+        getStats().setGrowthStats(101.0,3.5,4.6,1.30,0.03000,0.55);
     }
     @Override protected void registerAbilities() {
         setAbility(0,new AA()); setAbility(1,new Q());

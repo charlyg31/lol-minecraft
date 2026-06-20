@@ -20,7 +20,8 @@ import java.util.*;
 public class Darius extends BaseChampion {
     public Darius() {
         super("darius", "Darius", ChampionRole.TOP,
-            new ChampionStats(582,64,0,39,32,0.625,0,340,5,8));
+            new ChampionStats(652,64,0,37,32,0.625,0,340,1.75,10.0));
+        getStats().setGrowthStats(114.0,5.0,5.2,2.05,0.01000,0.95);
     }
     @Override protected void registerAbilities() {
         setAbility(0,new AA()); setAbility(1,new Q());

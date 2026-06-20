@@ -20,7 +20,8 @@ import java.util.*;
 public class Garen extends BaseChampion {
     public Garen() {
         super("garen", "Garen", ChampionRole.TOP,
-            new ChampionStats(620,66,0,36,32,0.625,0,345,5,8));
+            new ChampionStats(690,66,0,36,32,0.625,0,340,1.75,8.0));
+        getStats().setGrowthStats(98.0,5.0,4.5,2.05,0.03650,0.50);
     }
     @Override protected void registerAbilities() {
         setAbility(0,new AA()); setAbility(1,new Q());
