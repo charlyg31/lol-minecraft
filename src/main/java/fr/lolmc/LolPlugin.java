@@ -19,6 +19,7 @@ import fr.lolmc.game.RoadManager;
 import fr.lolmc.game.RewardManager;
 import fr.lolmc.game.JungleManager;
 import fr.lolmc.game.BushManager;
+import fr.lolmc.game.MonsterAbilities;
 import fr.lolmc.listener.AbilityListener;
 import fr.lolmc.listener.EntityDeathListener;
 import fr.lolmc.item.consumable.ConsumableManager;
@@ -62,6 +63,7 @@ public class LolPlugin extends JavaPlugin {
     private RewardManager rewardManager;
     private JungleManager jungleManager;
     private BushManager bushManager;
+    private MonsterAbilities monsterAbilities;
     private AbilityListener abilityListener;
 
     @Override
@@ -85,6 +87,8 @@ public class LolPlugin extends JavaPlugin {
         rewardManager = new RewardManager(championManager, goldManager);
         jungleManager = new JungleManager();
         bushManager = new BushManager(teamManager);
+        monsterAbilities = new MonsterAbilities();
+        getServer().getPluginManager().registerEvents(new fr.lolmc.listener.MonsterPassiveListener(), this);
         getServer().getPluginManager().registerEvents(bushManager, this);
         hudManager = new HUDManager(championManager);
         shopGUI = new ShopGUI();
@@ -175,5 +179,6 @@ public class LolPlugin extends JavaPlugin {
     public RewardManager getRewardManager()     { return rewardManager; }
     public JungleManager getJungleManager()     { return jungleManager; }
     public BushManager getBushManager()         { return bushManager; }
+    public MonsterAbilities getMonsterAbilities() { return monsterAbilities; }
     public AbilityListener getAbilityListener() { return abilityListener; }
 }
