@@ -38,6 +38,7 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
 
     // Mode setup en attente d'un clic, par joueur
     private final Map<UUID, PendingSetup> pending = new HashMap<>();
+    private final Map<UUID, fr.lolmc.game.GameStructure.TurretTier> pendingTier = new HashMap<>();
     // Waypoints en cours de définition (mode lane)
     private final Map<UUID, List<Location>> laneSetup = new HashMap<>();
     private final Map<UUID, String> laneSetupName = new HashMap<>();
@@ -65,16 +66,23 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
             case "lane" -> handleLane(player, args);
             case "road" -> handleRoad(player, args);
             case "jungle" -> handleJungle(player, args);
+            case "shopnpc" -> handleShopNpc(player, args);
+            case "mode" -> handleMode(player, args);
             case "start" -> {
                 player.sendMessage(Component.text("⚔ Lancement de la partie...", NamedTextColor.GOLD));
                 mapManager.resetAllStructures();
                 LolPlugin.getInstance().getMinionManager().startWaves();
                 LolPlugin.getInstance().getJungleManager().startJungle();
-                player.sendMessage(Component.text("✔ Structures, sbires et jungle lancés!", NamedTextColor.GREEN));
+                LolPlugin.getInstance().getGameManager().startGame();
+                // Si aucun mode défini, démarrer en amical par défaut
+                LolPlugin.getInstance().getMatchScoreboard().startMatch(
+                        LolPlugin.getInstance().getMatchScoreboard().isRanked());
+                player.sendMessage(Component.text("✔ Partie lancée (structures, sbires, jungle, timer)!", NamedTextColor.GREEN));
             }
             case "stop" -> {
                 LolPlugin.getInstance().getMinionManager().stopWaves();
                 LolPlugin.getInstance().getJungleManager().stopJungle();
+                LolPlugin.getInstance().getGameManager().stopGame();
                 player.sendMessage(Component.text("⏹ Partie arrêtée.", NamedTextColor.YELLOW));
             }
             default -> sendHelp(player);
@@ -105,7 +113,11 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
             player.sendMessage("§cUsage: /lol set " + what + " <blue|red> <top|mid|bot|base> <index>");
             return;
         }
-        Type type = what.equals("turret") ? Type.TURRET : Type.NEXUS;
+        Type type = switch (what) {
+            case "turret" -> Type.TURRET;
+            case "inhibitor" -> Type.INHIBITOR;
+            default -> Type.NEXUS;
+        };
         Team team = parseTeam(args[2]);
         if (team == null) { player.sendMessage("§cÉquipe: blue ou red"); return; }
         String lane = args[3].toLowerCase();
@@ -113,6 +125,18 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
         try { index = Integer.parseInt(args[4]); }
         catch (NumberFormatException e) { player.sendMessage("§cIndex invalide."); return; }
 
+        // Niveau de tourelle optionnel (5e argument) : outer/inner/inhibitor/nexus
+        fr.lolmc.game.GameStructure.TurretTier tier = fr.lolmc.game.GameStructure.TurretTier.OUTER;
+        if (type == Type.TURRET && args.length >= 6) {
+            try {
+                tier = fr.lolmc.game.GameStructure.TurretTier.valueOf(args[5].toUpperCase());
+            } catch (IllegalArgumentException ex) {
+                player.sendMessage("§cNiveau invalide. Utilise: outer, inner, inhibitor, nexus");
+                return;
+            }
+        }
+        // Stocker le tier dans le PendingSetup (réutilise le champ position pour l'ordinal)
+        pendingTier.put(player.getUniqueId(), tier);
         pending.put(player.getUniqueId(), new PendingSetup("structure", type, team, lane, index, 0));
         player.sendMessage(Component.text(String.format(
                 "👉 Clique sur la case centrale de %s %s %s #%d.",
@@ -161,6 +185,31 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
     }
 
 
+
+
+    // ── /lol shopnpc ──────────────────────────────────────────────
+
+    private void handleShopNpc(Player player, String[] args) {
+        // /lol shopnpc <blue|red>
+        if (args.length < 2) { player.sendMessage("§cUsage: /lol shopnpc <blue|red>"); return; }
+        Team team = parseTeam(args[1]);
+        if (team == null) { player.sendMessage("§cÉquipe: blue ou red"); return; }
+        LolPlugin.getInstance().getShopNpcManager().spawnShopNpc(player.getLocation(), team);
+        player.sendMessage(Component.text("✔ PNJ boutique " + team.name() + " créé à ta position.",
+                NamedTextColor.GREEN));
+    }
+
+    // ── /lol mode ─────────────────────────────────────────────────
+
+    private void handleMode(Player player, String[] args) {
+        // /lol mode <ranked|normal>
+        if (args.length < 2) { player.sendMessage("§cUsage: /lol mode <ranked|normal>"); return; }
+        boolean ranked = args[1].equalsIgnoreCase("ranked") || args[1].equalsIgnoreCase("classe");
+        LolPlugin.getInstance().getMatchScoreboard().startMatch(ranked);
+        player.sendMessage(Component.text("✔ Mode de partie : "
+                + (ranked ? "CLASSÉ (compte dans l'Elo)" : "AMICAL (hors classement)"),
+                NamedTextColor.GREEN));
+    }
 
     // ── /lol jungle ───────────────────────────────────────────────
 
@@ -293,6 +342,11 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
 
         if (setup.kind().equals("structure")) {
             mapManager.setStructure(setup.type(), setup.team(), setup.lane(), setup.index(), clicked);
+            // Appliquer le niveau de tourelle si défini
+            var tier = pendingTier.remove(player.getUniqueId());
+            if (tier != null) {
+                mapManager.setStructureTier(setup.type(), setup.team(), setup.lane(), setup.index(), tier);
+            }
             // Marqueur visuel temporaire (bloc de verre coloré)
             showMarker(clicked.clone().add(0, 1, 0), setup.team());
             player.sendMessage(Component.text(String.format(
@@ -352,10 +406,12 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
 
     @Override
     public List<String> onTabComplete(CommandSender sender, Command cmd, String alias, String[] args) {
-        if (args.length == 1) return List.of("set", "position", "lane", "road", "jungle", "start", "stop");
+        if (args.length == 1) return List.of("set", "position", "lane", "road", "jungle", "shopnpc", "mode", "start", "stop");
         if (args.length == 2) {
             return switch (args[0].toLowerCase()) {
-                case "set" -> List.of("turret", "nexus", "basenexus");
+                case "set" -> List.of("turret", "inhibitor", "nexus", "basenexus");
+                case "shopnpc" -> List.of("blue", "red");
+                case "mode" -> List.of("ranked", "normal");
                 case "position", "lane" -> List.of("blue", "red");
                 case "road" -> List.of("top", "mid", "bot", "end");
                 case "jungle" -> List.of("gromp", "murkwolf", "raptor", "krug", "red_buff", "blue_buff",

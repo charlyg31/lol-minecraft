@@ -38,6 +38,8 @@ public class MinionManager {
     private static final double MINION_SPEED = 0.25;
 
     private boolean spawning = false;
+    // Inhibiteurs détruits → super-sbires sur cette lane (clé: "BLUE_top")
+    private final java.util.Set<String> superMinionLanes = new java.util.HashSet<>();
 
     public MinionManager(MapManager mapManager) {
         this.mapManager = mapManager;
@@ -74,6 +76,25 @@ public class MinionManager {
         clearAllMinions();
     }
 
+
+    /**
+     * Active les super-sbires sur une lane après destruction d'un inhibiteur.
+     * @param losingTeam l'équipe dont l'inhibiteur est tombé (ses ennemis gagnent des super-sbires)
+     */
+    public void enableSuperMinions(Team losingTeam, String lane) {
+        // L'équipe ADVERSE de losingTeam gagne des super-sbires sur cette lane
+        Team attackingTeam = (losingTeam == Team.BLUE) ? Team.RED : Team.BLUE;
+        superMinionLanes.add(attackingTeam.name() + "_" + lane);
+    }
+
+    public void disableSuperMinions(Team team, String lane) {
+        superMinionLanes.remove(team.name() + "_" + lane);
+    }
+
+    private boolean hasSuperMinions(Team team, String lane) {
+        return superMinionLanes.contains(team.name() + "_" + lane);
+    }
+
     // ── Spawn ─────────────────────────────────────────────────────
 
     private void spawnWave(Team team) {
@@ -89,6 +110,15 @@ public class MinionManager {
                         if (spawning) spawnMinion(team, lane, spawnPoint);
                     }
                 }.runTaskLater(LolPlugin.getInstance(), delay);
+            }
+            // Super-sbire si l'inhibiteur ennemi est détruit sur cette lane
+            if (hasSuperMinions(team, lane)) {
+                final Location sp = spawnPoint;
+                new BukkitRunnable() {
+                    @Override public void run() {
+                        if (spawning) spawnSuperMinion(team, lane, sp);
+                    }
+                }.runTaskLater(LolPlugin.getInstance(), MINIONS_PER_WAVE * 8 + 4);
             }
         }
     }
@@ -112,6 +142,30 @@ public class MinionManager {
             if (z.getEquipment() != null) {
                 z.getEquipment().setHelmet(new org.bukkit.inventory.ItemStack(
                         team == Team.BLUE ? org.bukkit.Material.BLUE_WOOL : org.bukkit.Material.RED_WOOL));
+            }
+        });
+    }
+
+
+    /** Spawn un super-sbire (Husk costaud, beaucoup de HP). */
+    private void spawnSuperMinion(Team team, String lane, Location loc) {
+        org.bukkit.entity.Husk superMinion = loc.getWorld().spawn(loc, org.bukkit.entity.Husk.class, h -> {
+            h.setShouldBurnInDay(false);
+            h.setCustomNameVisible(true);
+            h.getAttribute(Compat.maxHealth()).setBaseValue(MINION_HP * 3);
+            h.setHealth(MINION_HP * 3);
+            h.getAttribute(Compat.movementSpeed()).setBaseValue(MINION_SPEED);
+            h.getPersistentDataContainer().set(KEY_MINION, PersistentDataType.BYTE, (byte) 1);
+            h.getPersistentDataContainer().set(KEY_TEAM, PersistentDataType.STRING, team.name());
+            h.getPersistentDataContainer().set(KEY_LANE, PersistentDataType.STRING, lane);
+            h.customName(net.kyori.adventure.text.Component.text(
+                    (team == Team.BLUE ? "🔵 " : "🔴 ") + "Super-Sbire",
+                    team == Team.BLUE ? net.kyori.adventure.text.format.NamedTextColor.BLUE
+                            : net.kyori.adventure.text.format.NamedTextColor.RED));
+            if (h.getEquipment() != null) {
+                h.getEquipment().setHelmet(new org.bukkit.inventory.ItemStack(org.bukkit.Material.DIAMOND_HELMET));
+                h.getEquipment().setChestplate(new org.bukkit.inventory.ItemStack(
+                        team == Team.BLUE ? org.bukkit.Material.DIAMOND_CHESTPLATE : org.bukkit.Material.NETHERITE_CHESTPLATE));
             }
         });
     }

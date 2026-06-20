@@ -82,6 +82,14 @@ public class MapManager {
         save();
     }
 
+    /** Définit le niveau (tier) d'une tourelle, persisté. */
+    public void setStructureTier(Type type, Team team, String lane, int index,
+                                 GameStructure.TurretTier tier) {
+        String key = structureKey(type, team, lane, index);
+        config.set("structures." + key + ".tier", tier.name());
+        save();
+    }
+
     public Location getSpawn(Team team, int position) {
         return spawns.get(team.name().toLowerCase() + "_" + position);
     }
@@ -129,6 +137,13 @@ public class MapManager {
             };
 
             GameStructure structure = new GameStructure(type, team, lane, index, center, maxHP, phases);
+            // Appliquer le niveau de tourelle si défini
+            String tierName = config.getString(path + "tier");
+            if (tierName != null && type == Type.TURRET) {
+                try {
+                    structure.setTier(GameStructure.TurretTier.valueOf(tierName));
+                } catch (IllegalArgumentException ignored) {}
+            }
             structures.add(structure);
 
             // Coller la schématique de base (100%)

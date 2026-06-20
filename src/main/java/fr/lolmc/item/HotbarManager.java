@@ -35,6 +35,7 @@ public class HotbarManager {
     public static NamespacedKey KEY_TYPE;
     public static NamespacedKey KEY_ID;
     public static NamespacedKey KEY_SLOT;
+    public static NamespacedKey KEY_RECALL;
 
     // Page actuelle par joueur
     private final Map<UUID, Integer> currentPage = new HashMap<>();
@@ -43,6 +44,7 @@ public class HotbarManager {
         KEY_TYPE = new NamespacedKey(LolPlugin.getInstance(), "lol_type");
         KEY_ID   = new NamespacedKey(LolPlugin.getInstance(), "lol_id");
         KEY_SLOT = new NamespacedKey(LolPlugin.getInstance(), "lol_slot");
+        KEY_RECALL = new NamespacedKey(LolPlugin.getInstance(), "lol_recall");
     }
     // Items achetés par joueur (max 6) — index 0..5
     private final Map<UUID, List<String>> ownedItems = new HashMap<>();
@@ -159,10 +161,38 @@ public class HotbarManager {
             }
         }
 
-        // Slot 7 vide
-        inv.setItem(7, emptySlot());
+        // Slot 7 : Recall (retour à la base)
+        inv.setItem(7, buildRecallItem());
         // Slot 8 : retour page 1
         inv.setItem(PAGE_BUTTON_SLOT, buildPageButton(1));
+    }
+
+    /** Construit l'item de Recall (retour à la base). */
+    private ItemStack buildRecallItem() {
+        ItemStack item = new ItemStack(Material.ENDER_PEARL);
+        var meta = item.getItemMeta();
+        if (meta != null) {
+            meta.displayName(net.kyori.adventure.text.Component.text("🌀 Recall",
+                    net.kyori.adventure.text.format.NamedTextColor.AQUA)
+                    .decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
+            meta.lore(java.util.List.of(
+                net.kyori.adventure.text.Component.text("Clic droit : retour à la base (8s)",
+                    net.kyori.adventure.text.format.NamedTextColor.GRAY)
+                    .decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false),
+                net.kyori.adventure.text.Component.text("Interrompu par les dégâts ou le mouvement",
+                    net.kyori.adventure.text.format.NamedTextColor.DARK_GRAY)
+                    .decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false)));
+            meta.getPersistentDataContainer().set(KEY_RECALL, PersistentDataType.BYTE, (byte) 1);
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
+    /** Vrai si l'item est le bouton de recall. */
+    public static boolean isRecallItem(ItemStack item) {
+        if (item == null || !item.hasItemMeta()) return false;
+        return item.getItemMeta().getPersistentDataContainer()
+                .has(KEY_RECALL, PersistentDataType.BYTE);
     }
 
     // ════════════════════════════════════════════════════════

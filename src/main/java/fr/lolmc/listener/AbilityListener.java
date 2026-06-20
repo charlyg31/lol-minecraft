@@ -32,6 +32,48 @@ public class AbilityListener implements Listener {
                 }
             }
         }.runTaskTimer(LolPlugin.getInstance(), 0L, 2L);
+
+        // Tâche d'affichage des cooldowns sur les items de sort (chaque 5 ticks)
+        new BukkitRunnable() {
+            @Override public void run() {
+                for (Player p : LolPlugin.getInstance().getServer().getOnlinePlayers()) {
+                    if (!manager.hasChampion(p)) continue;
+                    if (LolPlugin.getInstance().getHotbarManager().getPage(p) != 1) continue;
+                    updateCooldownDisplay(p, manager.getChampion(p));
+                }
+            }
+        }.runTaskTimer(LolPlugin.getInstance(), 0L, 5L);
+    }
+
+    /**
+     * Affiche le cooldown restant sur les items de sort (slots 1-4).
+     * Le nombre = secondes restantes (via la quantité de l'item).
+     */
+    private void updateCooldownDisplay(Player player, BaseChampion champ) {
+        for (int slot = 1; slot <= 4; slot++) {
+            var ability = champ.getAbility(slot);
+            if (ability == null) continue;
+            ItemStack item = player.getInventory().getItem(slot);
+            if (item == null || !HotbarManager.isLolItem(item)) continue;
+
+            double remaining = ability.getRemainingCooldown(player);
+            if (remaining > 0) {
+                // Afficher les secondes restantes via la quantité (1-64) + nom rouge
+                int secs = (int) Math.ceil(remaining);
+                item.setAmount(Math.max(1, Math.min(64, secs)));
+                var meta = item.getItemMeta();
+                if (meta != null) {
+                    meta.displayName(net.kyori.adventure.text.Component.text(
+                        "⏳ " + ability.getName() + " (" + secs + "s)",
+                        net.kyori.adventure.text.format.NamedTextColor.RED)
+                        .decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
+                    item.setItemMeta(meta);
+                }
+            } else {
+                // Prêt : quantité 1, nom normal
+                if (item.getAmount() != 1) item.setAmount(1);
+            }
+        }
     }
 
     private HotbarManager hotbar() { return LolPlugin.getInstance().getHotbarManager(); }
@@ -68,6 +110,12 @@ public class AbilityListener implements Listener {
         if (caster.isSneaking() && "ability".equals(HotbarManager.getType(held))
                 && slot >= 1 && slot <= 4) {
             tryLevelUpAbility(caster, slot);
+            return;
+        }
+
+        // Item Recall (slot 7 page 2)
+        if (HotbarManager.isRecallItem(held)) {
+            LolPlugin.getInstance().getBaseManager().startRecall(caster);
             return;
         }
 
@@ -160,9 +208,8 @@ public class AbilityListener implements Listener {
         ItemStack held = caster.getInventory().getItem(slot);
         // Auto-attaque uniquement si on tient le slot AA (type ability slot 0)
         if ("ability".equals(HotbarManager.getType(held)) && slot == 0) {
-            manager.getChampion(caster).tryUseAbility(caster, 0, target);
-            PassiveManager pm = LolPlugin.getInstance().getPassiveManager();
-            if (pm != null) pm.onAutoAttack(caster, target);
+            // Auto-attaque LoL : portée + cadence gérées par AutoAttackManager
+            LolPlugin.getInstance().getAutoAttackManager().tryAutoAttack(caster, target);
         }
     }
 

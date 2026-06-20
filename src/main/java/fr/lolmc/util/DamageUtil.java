@@ -60,6 +60,8 @@ public class DamageUtil {
         // Révéler la victime si elle est dans un bush (combat = visible)
         var bushMgr = LolPlugin.getInstance().getBushManager();
         if (bushMgr != null) bushMgr.revealOnDamage(victim);
+        var baseMgr = LolPlugin.getInstance().getBaseManager();
+        if (baseMgr != null) baseMgr.onDamage(victim);
 
         // 4. Vol de vie / omnivamp pour l'attaquant
         if (attacker != null && cm.hasChampion(attacker)) {

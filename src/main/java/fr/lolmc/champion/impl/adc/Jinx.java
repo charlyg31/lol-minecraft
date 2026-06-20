@@ -26,6 +26,7 @@ public class Jinx extends BaseChampion {
         setAbility(0,new AA()); setAbility(1,new Q());
         setAbility(2,new W()); setAbility(3,new E()); setAbility(4,new R());
         initSystems(516, 3.0, ResourceSystem.ResourceType.NONE, 0, 0.0);
+        setAutoAttackRange(6.0);
     }
 
     static class AA extends BaseAbility {

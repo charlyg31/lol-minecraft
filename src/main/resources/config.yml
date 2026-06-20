@@ -58,3 +58,33 @@ turrets:
   beam-height: 6
   # Dégâts de base d'un tir
   base-damage: 150
+
+# ═══════════════════════════════════════════════════════
+# BASE DE DONNÉES
+# ═══════════════════════════════════════════════════════
+database:
+  # Type de base : "sqlite" (local, simple), "mysql", ou "mongodb"
+  type: sqlite
+  mysql:
+    host: localhost
+    port: 3306
+    database: lolmc
+    user: root
+    password: ""
+
+# ═══════════════════════════════════════════════════════
+# API WEB (stats des joueurs)
+# ═══════════════════════════════════════════════════════
+# IMPORTANT: nécessite un port ouvert sur l'hébergeur pour être
+# accessible depuis un site web externe.
+api:
+  enabled: false
+  port: 8080
+
+# ═══════════════════════════════════════════════════════
+# FOG OF WAR (brouillard de guerre)
+# ═══════════════════════════════════════════════════════
+fog:
+  enabled: true
+  # Distance de vision en blocs (les ennemis au-delà sont invisibles)
+  vision-range: 30
