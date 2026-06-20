@@ -68,6 +68,15 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
             case "jungle" -> handleJungle(player, args);
             case "shopnpc" -> handleShopNpc(player, args);
             case "mode" -> handleMode(player, args);
+            case "select" -> {
+                // Lance une sélection avec tous les joueurs en ligne (test/manuel)
+                var ids = new java.util.ArrayList<java.util.UUID>();
+                for (var pl : LolPlugin.getInstance().getServer().getOnlinePlayers()) {
+                    ids.add(pl.getUniqueId());
+                }
+                LolPlugin.getInstance().getChampSelectManager().startSelection(ids);
+                player.sendMessage(Component.text("✔ Sélection lancée pour " + ids.size() + " joueurs.", NamedTextColor.GREEN));
+            }
             case "start" -> {
                 player.sendMessage(Component.text("⚔ Lancement de la partie...", NamedTextColor.GOLD));
                 mapManager.resetAllStructures();
@@ -406,7 +415,7 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
 
     @Override
     public List<String> onTabComplete(CommandSender sender, Command cmd, String alias, String[] args) {
-        if (args.length == 1) return List.of("set", "position", "lane", "road", "jungle", "shopnpc", "mode", "start", "stop");
+        if (args.length == 1) return List.of("set", "position", "lane", "road", "jungle", "shopnpc", "mode", "select", "start", "stop");
         if (args.length == 2) {
             return switch (args[0].toLowerCase()) {
                 case "set" -> List.of("turret", "inhibitor", "nexus", "basenexus");
