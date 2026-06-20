@@ -50,9 +50,11 @@ public class Garen extends BaseChampion {
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
-            double dmg=30+s.getFinalAD()*1.4;
+            double[] base={30,55,80,105,130};
+            double dmg=base[getLevel()-1]+s.getFinalAD()*0.5;
             DamageUtil.abilityDamage(c, t, dmg);
-            t.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,30,4,false,true));
+            // Silence appliqué (slow Minecraft comme approximation du silence)
+            t.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,30,2,false,true));
             c.addPotionEffect(new PotionEffect(PotionEffectType.SPEED,30,1,false,true));
             t.sendActionBar(Component.text("⚠ Silence — Garen Q",NamedTextColor.RED));
             c.getWorld().spawnParticle(Particle.SWEEP_ATTACK,t.getLocation(),3);
@@ -109,8 +111,13 @@ public class Garen extends BaseChampion {
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
-            double missing=1.0-t.getHealth()/t.getMaxHealth();
-            double dmg=(150+level*20)*(1+missing*1.5);
+            double[] base={150,300,450};
+            int r=Math.min(getLevel()-1,2);
+            // Dégâts vrais : base + 25% PV manquants de la cible (formule LoL)
+            var cm=LolPlugin.getInstance().getChampionManager();
+            double missingHP=0;
+            if(cm.hasChampion(t)){var hp=cm.getChampion(t).getHPSystem();missingHP=hp.getMaxHP()-hp.getCurrentHP();}
+            double dmg=base[r]+missingHP*0.25;
             t.getWorld().strikeLightningEffect(t.getLocation());
             DamageUtil.trueDamage(c, t, dmg);
             t.sendMessage(Component.text("☠ Exécution de Garen!",NamedTextColor.DARK_RED));

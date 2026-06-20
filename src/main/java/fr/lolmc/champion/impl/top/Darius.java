@@ -102,7 +102,9 @@ public class Darius extends BaseChampion {
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
-            double dmg=100+level*40+s.getFinalAD()*0.75;
+            double[] base={125,250,375};
+            int r=Math.min(getLevel()-1,2);
+            double dmg=base[r]+s.getFinalAD()*0.75;
             t.getWorld().strikeLightningEffect(t.getLocation());
             DamageUtil.trueDamage(c, t, dmg);
             t.sendMessage(Component.text("☠ Guillotine Noxienne!",NamedTextColor.DARK_RED));
