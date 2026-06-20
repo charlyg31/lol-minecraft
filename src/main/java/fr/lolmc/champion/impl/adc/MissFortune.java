@@ -20,7 +20,8 @@ import java.util.*;
 public class MissFortune extends BaseChampion {
     public MissFortune() {
         super("missfortune", "Miss Fortune", ChampionRole.ADC,
-            new ChampionStats(523,56,0,23,30,0.656,0,325,25,3));
+            new ChampionStats(640,52,0,28,30,0.656,0,325,5.5,3.8));
+        getStats().setGrowthStats(103.0,3.0,4.5,1.30,0.03010,0.65);
     }
     @Override protected void registerAbilities() {
         setAbility(0,new AA()); setAbility(1,new Q());

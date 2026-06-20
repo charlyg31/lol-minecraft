@@ -20,7 +20,8 @@ import java.util.*;
 public class Sivir extends BaseChampion {
     public Sivir() {
         super("sivir", "Sivir", ChampionRole.ADC,
-            new ChampionStats(532,57,0,24,30,0.658,0,345,25,3));
+            new ChampionStats(600,58,0,26,30,0.625,0,335,5.0,3.2));
+        getStats().setGrowthStats(104.0,3.3,4.5,1.30,0.02000,0.55);
     }
     @Override protected void registerAbilities() {
         setAbility(0,new AA()); setAbility(1,new Q());

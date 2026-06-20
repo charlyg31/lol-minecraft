@@ -20,7 +20,8 @@ import java.util.*;
 public class Annie extends BaseChampion {
     public Annie() {
         super("annie", "Annie", ChampionRole.MID,
-            new ChampionStats(528,50,0,21,30,0.579,0,335,20,5.5));
+            new ChampionStats(560,50,0,23,30,0.610,0,335,6.25,5.5));
+        getStats().setGrowthStats(96.0,2.6,4.0,1.30,0.01360,0.55);
     }
     @Override protected void registerAbilities() {
         setAbility(0,new AA()); setAbility(1,new Q());

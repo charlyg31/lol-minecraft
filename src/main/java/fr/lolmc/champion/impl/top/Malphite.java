@@ -20,7 +20,8 @@ import java.util.*;
 public class Malphite extends BaseChampion {
     public Malphite() {
         super("malphite", "Malphite", ChampionRole.TOP,
-            new ChampionStats(574,52,0,36,32,0.625,0,335,5,8.5));
+            new ChampionStats(644,62,0,37,32,0.736,0,335,1.25,7.0));
+        getStats().setGrowthStats(90.0,4.0,4.2,2.05,0.02600,0.55);
     }
     @Override protected void registerAbilities() {
         setAbility(0,new AA()); setAbility(1,new Q());

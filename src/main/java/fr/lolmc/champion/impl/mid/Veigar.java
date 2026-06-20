@@ -20,7 +20,8 @@ import java.util.*;
 public class Veigar extends BaseChampion {
     public Veigar() {
         super("veigar", "Veigar", ChampionRole.MID,
-            new ChampionStats(491,50,0,18,30,0.625,0,325,20,6));
+            new ChampionStats(550,52,0,18,30,0.625,0,340,5.5,6.0));
+        getStats().setGrowthStats(108.0,2.6,4.0,1.30,0.02240,0.60);
     }
     @Override protected void registerAbilities() {
         setAbility(0,new AA()); setAbility(1,new Q());

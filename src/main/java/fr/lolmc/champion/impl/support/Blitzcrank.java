@@ -20,7 +20,8 @@ import java.util.*;
 public class Blitzcrank extends BaseChampion {
     public Blitzcrank() {
         super("blitzcrank", "Blitzcrank", ChampionRole.SUPPORT,
-            new ChampionStats(623,66,0,45,32,0.625,0,325,5,8));
+            new ChampionStats(600,62,0,37,32,0.625,0,325,1.25,7.5));
+        getStats().setGrowthStats(109.0,3.5,4.7,2.05,0.01130,0.75);
     }
     @Override protected void registerAbilities() {
         setAbility(0,new AA()); setAbility(1,new Q());
