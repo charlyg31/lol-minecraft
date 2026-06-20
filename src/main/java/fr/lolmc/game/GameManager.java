@@ -32,9 +32,13 @@ public class GameManager {
     // BossBar individuelle de respawn
     private final Map<UUID, BossBar> respawnBars = new HashMap<>();
 
-    // Or passif : 1 or toutes les secondes (comme LoL ~2.4/s après 110s, simplifié)
-    private static final int PASSIVE_GOLD_PER_TICK = 2;
-    private static final long PASSIVE_GOLD_PERIOD = 20L; // chaque seconde
+    // Or passif LoL : 20.4 or / 10s, démarre à 1:50, distribué toutes les 0.5s
+    // 20.4 / 20 ticks-de-0.5s = 1.02 or par demi-seconde
+    private static final double PASSIVE_GOLD_PER_HALFSEC = 20.4 / 20.0; // = 1.02
+    private static final long PASSIVE_GOLD_PERIOD = 10L; // toutes les 0.5s (10 ticks)
+    private static final long PASSIVE_GOLD_START_SECONDS = 110; // 1:50
+    // Accumulateur d'or fractionnaire par joueur (pour gérer le 1.02)
+    private final Map<UUID, Double> goldAccumulator = new HashMap<>();
 
     public GameManager() {
         startTimerTask();
@@ -100,11 +104,21 @@ public class GameManager {
         new BukkitRunnable() {
             @Override public void run() {
                 if (!gameRunning) return;
+                // L'or passif ne démarre qu'à 1:50 (comme LoL)
+                if (getElapsedSeconds() < PASSIVE_GOLD_START_SECONDS) return;
                 var goldManager = LolPlugin.getInstance().getGoldManager();
                 var cm = LolPlugin.getInstance().getChampionManager();
                 for (Player p : Bukkit.getOnlinePlayers()) {
                     if (cm.hasChampion(p) && !isDead(p)) {
-                        goldManager.addGold(p.getUniqueId(), PASSIVE_GOLD_PER_TICK);
+                        // Accumuler l'or fractionnaire (1.02/demi-sec) et verser les entiers
+                        double acc = goldAccumulator.getOrDefault(p.getUniqueId(), 0.0)
+                                + PASSIVE_GOLD_PER_HALFSEC;
+                        int whole = (int) acc;
+                        if (whole > 0) {
+                            goldManager.addGold(p.getUniqueId(), whole);
+                            acc -= whole;
+                        }
+                        goldAccumulator.put(p.getUniqueId(), acc);
                     }
                 }
             }
@@ -119,15 +133,35 @@ public class GameManager {
      * Calcule le temps de respawn selon le niveau (formule LoL simplifiée).
      * Base ~10s au niveau 1, augmente avec le niveau.
      */
+    // Table officielle LoL des temps de respawn de base (BRW) par niveau 1-18
+    private static final double[] BRW_TABLE = {
+        10, 10, 12, 12, 14, 16, 20, 25, 28, 32.5, 35, 37.5, 40, 42.5, 45, 47.5, 50, 52.5
+    };
+
     public int computeRespawnSeconds(int level) {
-        // LoL : BRW (Base Respawn Wait) augmente par paliers
-        // Approximation : 6 + niveau * 2.5, plafonné
-        double seconds = 6 + level * 2.5;
-        // Augmentation selon le temps de jeu (plus la partie avance, plus c'est long)
+        // BRW de base selon le niveau (table officielle LoL)
+        int idx = Math.max(1, Math.min(18, level)) - 1;
+        double brw = BRW_TABLE[idx];
+
+        // Time Increase Factor (TIFx) : augmente le timer selon le temps de jeu
         double minutes = getElapsedSeconds() / 60.0;
-        if (minutes > 15) seconds *= 1.3;
-        if (minutes > 30) seconds *= 1.5;
-        return (int) Math.min(seconds, 60); // plafond 60s
+        double tifx = 0;
+        if (minutes >= 15) {
+            // Formule officielle LoL (par paliers de temps)
+            // Entre 15 et 30 min : +0.425% par demi-minute écoulée depuis 15min
+            tifx += (Math.ceil((minutes - 15) * 2) * 0.425) / 100.0;
+        }
+        if (minutes >= 30) {
+            tifx += (Math.ceil((minutes - 30) * 2) * 0.30) / 100.0;
+        }
+        if (minutes >= 45) {
+            tifx += (Math.ceil((minutes - 45) * 2) * 1.45) / 100.0;
+        }
+        // Plafond du TIFx à 50%
+        tifx = Math.min(tifx, 0.50);
+
+        double total = brw + brw * tifx;
+        return (int) Math.round(total);
     }
 
     /**

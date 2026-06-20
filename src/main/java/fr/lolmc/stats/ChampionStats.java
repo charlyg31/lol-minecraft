@@ -43,6 +43,11 @@ public class ChampionStats {
     private double multAttackDamage = 1.0, multAbilityPower = 1.0;
     private double multMovementSpeed = 1.0, multAttackSpeed = 1.0, multMaxHP = 1.0;
 
+    // ── Stats de croissance (growth) par niveau (façon LoL) ──
+    private double growthHP = 0, growthAD = 0, growthArmor = 0, growthMR = 0;
+    private double growthAttackSpeed = 0, growthHPRegen = 0;
+    private int championLevel = 1; // niveau actuel (mis à jour par le LevelSystem)
+
     // ── HP & bouclier ──
     private double currentHP;
     private double shieldAmount = 0;        // bouclier général (absorbe tout)
@@ -57,21 +62,49 @@ public class ChampionStats {
         this.currentHP = getFinalMaxHP();
     }
 
+    /**
+     * Définit les stats de croissance par niveau (façon LoL).
+     * Ces valeurs sont les coefficients 'g' de la formule officielle.
+     */
+    public void setGrowthStats(double hp, double ad, double armor, double mr,
+                               double attackSpeed, double hpRegen) {
+        this.growthHP = hp; this.growthAD = ad; this.growthArmor = armor;
+        this.growthMR = mr; this.growthAttackSpeed = attackSpeed; this.growthHPRegen = hpRegen;
+    }
+
+    /** Met à jour le niveau du champion (recalcule les stats de croissance). */
+    public void setChampionLevel(int level) {
+        this.championLevel = Math.max(1, Math.min(18, level));
+    }
+
+    public int getChampionLevel() { return championLevel; }
+
+    /**
+     * Formule de croissance officielle LoL :
+     *   bonus de croissance = g × (n−1) × (0.7025 + 0.0175 × (n−1))
+     * où g = stat de croissance, n = niveau.
+     */
+    private double growthBonus(double g) {
+        if (championLevel <= 1 || g == 0) return 0;
+        double n = championLevel;
+        return g * (n - 1) * (0.7025 + 0.0175 * (n - 1));
+    }
+
     // ══════════════════════════════════════════════
     // GETTERS FINAUX
     // ══════════════════════════════════════════════
 
-    public double getFinalMaxHP()        { return (baseMaxHP + bonusMaxHP) * multMaxHP; }
-    public double getFinalAD()           { return (baseAttackDamage + bonusAttackDamage) * multAttackDamage; }
+    public double getFinalMaxHP()        { return (baseMaxHP + growthBonus(growthHP) + bonusMaxHP) * multMaxHP; }
+    public double getFinalAD()           { return (baseAttackDamage + growthBonus(growthAD) + bonusAttackDamage) * multAttackDamage; }
     public double getFinalAP()           { return (baseAbilityPower + bonusAbilityPower) * multAbilityPower; }
-    public double getFinalArmor()        { return baseArmor + bonusArmor; }
-    public double getFinalMagicResist()  { return baseMagicResist + bonusMagicResist; }
-    public double getFinalAttackSpeed()  { return Math.min((baseAttackSpeed + bonusAttackSpeed) * multAttackSpeed, 2.5); }
+    public double getFinalArmor()        { return baseArmor + growthBonus(growthArmor) + bonusArmor; }
+    public double getFinalMagicResist()  { return baseMagicResist + growthBonus(growthMR) + bonusMagicResist; }
+    public double getFinalAttackSpeed()  { return Math.min((baseAttackSpeed + growthBonus(growthAttackSpeed) + bonusAttackSpeed) * multAttackSpeed, 2.5); }
     public double getFinalCritChance()   { return Math.min(baseCritChance + bonusCritChance, 1.0); }
     public double getFinalCritDamage()   { return baseCritDamage + bonusCritDamage; }
     public double getFinalMovementSpeed(){ return (baseMovementSpeed + bonusMovementSpeed) * multMovementSpeed; }
     public double getFinalRange()        { return baseRange + bonusRange; }
-    public double getFinalHPRegen()      { return baseHPRegen + bonusHPRegen; }
+    public double getFinalHPRegen()      { return baseHPRegen + growthBonus(growthHPRegen) + bonusHPRegen; }
     public double getFinalLethality()    { return baseLethality + bonusLethality; }
     public double getFinalLifeSteal()    { return Math.min(bonusLifeSteal, 1.0); }
     public double getFinalOmnivamp()     { return Math.min(bonusOmnivamp, 1.0); }
