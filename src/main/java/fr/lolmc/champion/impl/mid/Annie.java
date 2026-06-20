@@ -50,12 +50,14 @@ public class Annie extends BaseChampion {
             resourceCost = 60;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
-            double dmg=80+s.getFinalAP()*0.75;
+            double[] base={80,130,180,230,280};
+            double dmg=base[getLevel()-1]+s.getFinalAP()*0.85;
             DamageUtil.abilityDamageMagic(c, t, dmg);
             t.getWorld().spawnParticle(Particle.FLAME,t.getLocation(),15,0.5,0.5,0.5,0.1);
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            return String.format("%.0f dégâts magiques (80+75%%AP).",80+s.getFinalAP()*0.75);
+            double[] base={80,130,180,230,280};
+            return String.format("%.0f dégâts magiques (%.0f+85%%AP).",base[getLevel()-1]+s.getFinalAP()*0.85,base[getLevel()-1]);
         }
     }
 
@@ -64,14 +66,16 @@ public class Annie extends BaseChampion {
             new double[]{8,7,6,5,4},6,4,DamageType.MAGICAL);
             resourceCost = 70;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            double dmg=70+s.getFinalAP()*0.65;
+            double[] base={70,115,160,205,250};
+            double dmg=base[getLevel()-1]+s.getFinalAP()*0.75;
             c.getWorld().getNearbyEntities(c.getLocation(),4,2,4).stream()
                 .filter(e->e instanceof Player&&!e.equals(c))
                 .forEach(e->DamageUtil.abilityDamageMagic(c, (Player)e, dmg));
             c.getWorld().spawnParticle(Particle.FLAME,c.getLocation(),25,2,1,2,0.08);
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            return String.format("Cône de feu: %.0f dégâts magiques (70+65%%AP) dans 4 blocs.",70+s.getFinalAP()*0.65);
+            double[] base={70,115,160,205,250};
+            return String.format("Cône de feu: %.0f dégâts (%.0f+75%%AP) dans 4 blocs.",base[getLevel()-1]+s.getFinalAP()*0.75,base[getLevel()-1]);
         }
     }
 
@@ -94,7 +98,9 @@ public class Annie extends BaseChampion {
             resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
-            double dmg=200+s.getFinalAP()*0.7;
+            double[] base={175,300,425};
+            int r=Math.min(getLevel()-1,2);
+            double dmg=base[r]+s.getFinalAP()*0.75;
             t.getWorld().getNearbyEntities(t.getLocation(),3,2,3).stream()
                 .filter(e->e instanceof Player)
                 .forEach(e->{DamageUtil.abilityDamageMagic(c, (Player)e, dmg);((Player)e).setFireTicks(60);
@@ -102,7 +108,9 @@ public class Annie extends BaseChampion {
             t.getWorld().spawnParticle(Particle.LAVA,t.getLocation(),30,2,1,2);
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            return String.format("%.0f dégâts AoE + brûlure 3s (200+70%%AP).",200+s.getFinalAP()*0.7);
+            double[] base={175,300,425};
+            int r=Math.min(getLevel()-1,2);
+            return String.format("%.0f dégâts AoE + brûlure (%.0f+75%%AP).",base[r]+s.getFinalAP()*0.75,base[r]);
         }
     }
 }
