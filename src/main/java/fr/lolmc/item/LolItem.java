@@ -190,6 +190,7 @@ public class LolItem {
             case ATTACK_SPEED -> NamedTextColor.YELLOW;
             case SUPPORT      -> NamedTextColor.AQUA;
             case UTILITY      -> NamedTextColor.LIGHT_PURPLE;
+            case CONSUMABLE   -> NamedTextColor.WHITE;
         };
 
         meta.displayName(Component.text(displayName, catColor)
