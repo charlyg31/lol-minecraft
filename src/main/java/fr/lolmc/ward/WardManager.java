@@ -8,6 +8,7 @@ import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Particle;
+import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
 
@@ -108,9 +109,16 @@ public class WardManager {
                         // Seuls les ENNEMIS de la ward sont révélés
                         if (pTeam == ward.team) continue;
                         if (p.getLocation().distance(ward.location) <= WARD_RADIUS) {
+                            // Détecter la transition : l'ennemi n'était pas révélé avant ?
+                            boolean wasRevealed = revealedUntil.containsKey(p.getUniqueId())
+                                    && now < revealedUntil.get(p.getUniqueId());
                             // Révéler ce joueur à l'équipe propriétaire de la ward
                             revealedUntil.put(p.getUniqueId(), now + REVEAL_DURATION_MS);
                             revealedToTeam.put(p.getUniqueId(), ward.team);
+                            // Son d'alerte pour l'équipe propriétaire, uniquement à la 1ère détection
+                            if (!wasRevealed) {
+                                playDetectionSound(ward.team);
+                            }
                         }
                     }
                 }
@@ -119,6 +127,22 @@ public class WardManager {
                 revealedUntil.entrySet().removeIf(e -> now > e.getValue());
             }
         }.runTaskTimer(LolPlugin.getInstance(), 0L, 10L);
+    }
+
+
+    /**
+     * Joue un son d'alerte pour tous les membres de l'équipe qui a détecté un ennemi.
+     */
+    private void playDetectionSound(Team team) {
+        for (UUID memberId : teamManager.getTeamMembers(team)) {
+            Player member = Bukkit.getPlayer(memberId);
+            if (member == null || !member.isOnline()) continue;
+            member.playSound(member.getLocation(),
+                    Sound.BLOCK_NOTE_BLOCK_PLING, 1f, 1.5f);
+            member.sendActionBar(net.kyori.adventure.text.Component.text(
+                    "👁 Ennemi détecté par une ward!",
+                    net.kyori.adventure.text.format.NamedTextColor.YELLOW));
+        }
     }
 
     // ── Tâche du faisceau (toutes les 2 ticks pour fluidité) ──────
