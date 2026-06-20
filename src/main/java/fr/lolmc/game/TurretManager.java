@@ -33,9 +33,10 @@ public class TurretManager {
     private static final long ATTACK_PERIOD = 20L;
 
     // Valeurs lues depuis la config (mêmes pour toutes les tours)
-    private final double attackRadius;   // rayon horizontal du cylindre (blocs)
-    private final double attackHeight;   // hauteur du cylindre + origine du tir (blocs)
-    private final double baseDamage;     // dégâts de base d'un tir
+    private final double attackRadius;     // rayon horizontal du cylindre (blocs)
+    private final double detectionHeight;  // hauteur de la zone de détection (blocs)
+    private final double beamHeight;       // hauteur d'où part l'animation du tir (blocs)
+    private final double baseDamage;       // dégâts de base d'un tir
 
     // Aggro tourelle : cible actuelle de chaque tourelle (UUID joueur visé)
     private final Map<String, UUID> turretAggro = new HashMap<>();
@@ -48,7 +49,8 @@ public class TurretManager {
         this.teamManager = teamManager;
         var config = LolPlugin.getInstance().getConfig();
         this.attackRadius = config.getDouble("turrets.attack-radius", 8.0);
-        this.attackHeight = config.getDouble("turrets.attack-height", 6.0);
+        this.detectionHeight = config.getDouble("turrets.detection-height", 6.0);
+        this.beamHeight = config.getDouble("turrets.beam-height", 6.0);
         this.baseDamage = config.getDouble("turrets.base-damage", 150.0);
         startTurretTask();
     }
@@ -65,8 +67,10 @@ public class TurretManager {
     }
 
     private void processTurret(GameStructure turret) {
-        // Origine du tir : point de pose + hauteur configurée (le "canon" de la tour)
-        Location center = turret.getCenter().clone().add(0.5, attackHeight, 0.5);
+        // Centre de détection : point de pose + hauteur de détection (pour le cylindre)
+        Location center = turret.getCenter().clone().add(0.5, detectionHeight, 0.5);
+        // Origine de l'animation : point de pose + hauteur du faisceau
+        Location beamOrigin = turret.getCenter().clone().add(0.5, beamHeight, 0.5);
         Team turretTeam = turret.getTeam();
         String turretId = turret.getId();
 
@@ -75,14 +79,14 @@ public class TurretManager {
 
         if (priorityTarget != null) {
             // Aggro sur le joueur ennemi
-            fireAtPlayer(turret, center, priorityTarget);
+            fireAtPlayer(turret, beamOrigin, priorityTarget);
             return;
         }
 
         // 2. Sinon, taper les sbires ennemis dans la zone (priorité par défaut)
         LivingEntity minion = findEnemyMinion(center, turretTeam);
         if (minion != null) {
-            fireAtMinion(turret, center, minion);
+            fireAtMinion(turret, beamOrigin, minion);
             turretAggro.remove(turretId);
             return;
         }
@@ -90,7 +94,7 @@ public class TurretManager {
         // 3. Sinon, taper un champion ennemi qui traîne dans la zone
         Player champTarget = findEnemyChampion(center, turretTeam);
         if (champTarget != null) {
-            fireAtPlayer(turret, center, champTarget);
+            fireAtPlayer(turret, beamOrigin, champTarget);
         } else {
             turretAggro.remove(turretId);
             turretStacks.remove(turretId);
@@ -113,14 +117,14 @@ public class TurretManager {
         double dz = target.getZ() - turretCanon.getZ();
         double horizontalDist = Math.sqrt(dx * dx + dz * dz);
         if (horizontalDist > attackRadius) return false;
-        // Écart vertical : la zone s'étend de (canon - hauteur) à (canon + hauteur)
+        // Écart vertical : la zone s'étend de (centre - hauteur) à (centre + hauteur)
         double dy = Math.abs(target.getY() - turretCanon.getY());
-        return dy <= attackHeight;
+        return dy <= detectionHeight;
     }
 
     /** Boîte de pré-filtrage pour getNearbyEntities (on affine ensuite avec inCylinder). */
     private double boxRange() {
-        return Math.max(attackRadius, attackHeight) + 1;
+        return Math.max(attackRadius, detectionHeight) + 1;
     }
 
     // ── Recherche de cibles ───────────────────────────────────────
@@ -189,7 +193,7 @@ public class TurretManager {
 
     // ── Tir ───────────────────────────────────────────────────────
 
-    private void fireAtPlayer(GameStructure turret, Location center, Player target) {
+    private void fireAtPlayer(GameStructure turret, Location beamFrom, Player target) {
         String turretId = turret.getId();
         // Stacks : +40% dégâts par tir consécutif sur un champion (comme LoL)
         UUID lastTarget = turretAggro.get(turretId);
@@ -201,7 +205,7 @@ public class TurretManager {
         double damage = baseDamage * (1.0 + stacks * 0.40);
 
         // Projectile visuel
-        shootBeam(center, target.getLocation().add(0, 1, 0));
+        shootBeam(beamFrom, target.getLocation().add(0, 1, 0));
 
         // Dégâts via le système LoL (dégâts vrais de tourelle, mais ici on passe par HPSystem)
         if (championManager.hasChampion(target)) {
@@ -214,8 +218,8 @@ public class TurretManager {
         }
     }
 
-    private void fireAtMinion(GameStructure turret, Location center, LivingEntity minion) {
-        shootBeam(center, minion.getLocation().add(0, 0.5, 0));
+    private void fireAtMinion(GameStructure turret, Location beamFrom, LivingEntity minion) {
+        shootBeam(beamFrom, minion.getLocation().add(0, 0.5, 0));
         // Les sbires meurent en ~1-2 coups de tourelle
         minion.damage(baseDamage);
     }
