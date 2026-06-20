@@ -20,6 +20,16 @@ import fr.lolmc.game.RewardManager;
 import fr.lolmc.game.JungleManager;
 import fr.lolmc.game.BushManager;
 import fr.lolmc.game.MonsterAbilities;
+import fr.lolmc.game.GameManager;
+import fr.lolmc.game.BaseManager;
+import fr.lolmc.game.FogOfWarManager;
+import fr.lolmc.game.ShopNpcManager;
+import fr.lolmc.game.AutoAttackManager;
+import fr.lolmc.game.AnnouncementManager;
+import fr.lolmc.game.MatchScoreboard;
+import fr.lolmc.stats.persistence.DatabaseManager;
+import fr.lolmc.stats.persistence.RankedManager;
+import fr.lolmc.stats.persistence.ApiServer;
 import fr.lolmc.listener.AbilityListener;
 import fr.lolmc.listener.EntityDeathListener;
 import fr.lolmc.item.consumable.ConsumableManager;
@@ -64,6 +74,16 @@ public class LolPlugin extends JavaPlugin {
     private JungleManager jungleManager;
     private BushManager bushManager;
     private MonsterAbilities monsterAbilities;
+    private GameManager gameManager;
+    private BaseManager baseManager;
+    private FogOfWarManager fogOfWarManager;
+    private ShopNpcManager shopNpcManager;
+    private AutoAttackManager autoAttackManager;
+    private AnnouncementManager announcementManager;
+    private MatchScoreboard matchScoreboard;
+    private DatabaseManager databaseManager;
+    private RankedManager rankedManager;
+    private ApiServer apiServer;
     private AbilityListener abilityListener;
 
     @Override
@@ -88,6 +108,19 @@ public class LolPlugin extends JavaPlugin {
         jungleManager = new JungleManager();
         bushManager = new BushManager(teamManager);
         monsterAbilities = new MonsterAbilities();
+        databaseManager = new DatabaseManager();
+        databaseManager.init();
+        rankedManager = new RankedManager(databaseManager);
+        apiServer = new ApiServer(databaseManager);
+        apiServer.start();
+        gameManager = new GameManager();
+        baseManager = new BaseManager();
+        fogOfWarManager = new FogOfWarManager(teamManager);
+        shopNpcManager = new ShopNpcManager();
+        getServer().getPluginManager().registerEvents(shopNpcManager, this);
+        autoAttackManager = new AutoAttackManager();
+        announcementManager = new AnnouncementManager();
+        matchScoreboard = new MatchScoreboard();
         getServer().getPluginManager().registerEvents(new fr.lolmc.listener.MonsterPassiveListener(), this);
         getServer().getPluginManager().registerEvents(bushManager, this);
         hudManager = new HUDManager(championManager);
@@ -142,6 +175,12 @@ public class LolPlugin extends JavaPlugin {
             getCommand("lol").setTabCompleter(lolCmd);
         }
         getServer().getPluginManager().registerEvents(lolCmd, this);
+        var playerCmds = new fr.lolmc.listener.PlayerCommands();
+        if (getCommand("recall") != null) getCommand("recall").setExecutor(playerCmds);
+        if (getCommand("ping") != null) {
+            getCommand("ping").setExecutor(playerCmds);
+            getCommand("ping").setTabCompleter(playerCmds);
+        }
         getServer().getPluginManager().registerEvents(
             new fr.lolmc.listener.StructureDamageListener(mapManager, championManager, teamManager), this);
         getServer().getPluginManager().registerEvents(
@@ -151,6 +190,8 @@ public class LolPlugin extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if (apiServer != null) apiServer.stop();
+        if (databaseManager != null) databaseManager.close();
         getLogger().info("LoL MC désactivé.");
     }
 
@@ -180,5 +221,15 @@ public class LolPlugin extends JavaPlugin {
     public JungleManager getJungleManager()     { return jungleManager; }
     public BushManager getBushManager()         { return bushManager; }
     public MonsterAbilities getMonsterAbilities() { return monsterAbilities; }
+    public GameManager getGameManager()         { return gameManager; }
+    public BaseManager getBaseManager()         { return baseManager; }
+    public FogOfWarManager getFogOfWarManager() { return fogOfWarManager; }
+    public ShopNpcManager getShopNpcManager()   { return shopNpcManager; }
+    public AutoAttackManager getAutoAttackManager() { return autoAttackManager; }
+    public AnnouncementManager getAnnouncementManager() { return announcementManager; }
+    public MatchScoreboard getMatchScoreboard() { return matchScoreboard; }
+    public DatabaseManager getDatabaseManager() { return databaseManager; }
+    public RankedManager getRankedManager()     { return rankedManager; }
+
     public AbilityListener getAbilityListener() { return abilityListener; }
 }

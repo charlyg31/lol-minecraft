@@ -26,6 +26,7 @@ public class Veigar extends BaseChampion {
         setAbility(0,new AA()); setAbility(1,new Q());
         setAbility(2,new W()); setAbility(3,new E()); setAbility(4,new R());
         initSystems(491, 6.0, ResourceSystem.ResourceType.MANA, 490, 11.0);
+        setAutoAttackRange(5.5);
     }
 
     public static final Map<UUID,Integer> apStacks=new HashMap<>();

@@ -97,6 +97,15 @@ public class StructureDamageListener implements Listener {
         String name = structureName(structure);
         Team enemyTeam = structure.getTeam();
 
+        // Inhibiteur détruit → super-sbires sur cette lane pour l'équipe adverse
+        if (structure.getType() == Type.INHIBITOR) {
+            LolPlugin.getInstance().getMinionManager()
+                    .enableSuperMinions(enemyTeam, structure.getLane());
+            LolPlugin.getInstance().getServer().broadcast(net.kyori.adventure.text.Component.text(
+                    "💎 Inhibiteur " + structure.getLane() + " (" + enemyTeam.name()
+                    + ") détruit! Super-sbires activés!", NamedTextColor.AQUA));
+        }
+
         // Annonce
         LolPlugin.getInstance().getServer().broadcast(Component.text(
                 "💥 " + name + " (" + enemyTeam.name() + ") détruit par " + destroyer.getName() + "!",
@@ -133,13 +142,18 @@ public class StructureDamageListener implements Listener {
                         java.time.Duration.ofMillis(1000))));
             p.sendMessage(msg);
         }
+        // Afficher le tableau de score de fin de partie
+        LolPlugin.getInstance().getMatchScoreboard().showEndScreen(winner);
         // Arrêter la partie
         LolPlugin.getInstance().getMinionManager().stopWaves();
+        LolPlugin.getInstance().getJungleManager().stopJungle();
+        LolPlugin.getInstance().getGameManager().stopGame();
     }
 
     private String structureName(GameStructure s) {
         return switch (s.getType()) {
             case TURRET -> "Tourelle " + s.getLane() + " #" + s.getIndex();
+            case INHIBITOR -> "Inhibiteur " + s.getLane();
             case NEXUS -> "Nexus " + s.getLane();
             case NEXUS_BASE -> "Nexus Principal";
         };

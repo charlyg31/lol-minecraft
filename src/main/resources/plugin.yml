@@ -34,3 +34,9 @@ commands:
     description: Configuration de la carte (admin)
     usage: /lol <set|position|lane|start|stop>
     permission: lolmc.admin
+  recall:
+    description: Retour à la base
+    usage: /recall
+  ping:
+    description: Envoyer un ping à l'équipe
+    usage: /ping <danger|omw|miss|assist|enemy>

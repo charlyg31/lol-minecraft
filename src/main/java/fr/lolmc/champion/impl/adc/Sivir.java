@@ -26,6 +26,7 @@ public class Sivir extends BaseChampion {
         setAbility(0,new AA()); setAbility(1,new Q());
         setAbility(2,new W()); setAbility(3,new E()); setAbility(4,new R());
         initSystems(532, 3.0, ResourceSystem.ResourceType.MANA, 450, 11.0);
+        setAutoAttackRange(5.5);
     }
 
     static class AA extends BaseAbility {

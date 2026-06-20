@@ -18,9 +18,22 @@ import java.util.List;
 public class GameStructure {
 
     public enum Type {
-        TURRET,      // tourelle
-        NEXUS,       // nexus de lane (petit nexus / inhibiteur)
-        NEXUS_BASE   // nexus principal
+        TURRET,       // tourelle
+        INHIBITOR,    // inhibiteur (sa destruction fait spawn des super-sbires)
+        NEXUS,        // nexus de lane
+        NEXUS_BASE    // nexus principal
+    }
+
+    /** Niveau d'une tourelle (façon LoL : stats différentes). */
+    public enum TurretTier {
+        OUTER(3000, 100),    // tourelle extérieure
+        INNER(3500, 130),    // tourelle intérieure
+        INHIBITOR(4000, 150),// tourelle d'inhibiteur
+        NEXUS(4500, 180);    // tourelles de nexus
+
+        public final double hp;
+        public final double damage;
+        TurretTier(double hp, double damage) { this.hp = hp; this.damage = damage; }
     }
 
     private final Type type;
@@ -28,6 +41,7 @@ public class GameStructure {
     private final String lane;        // "top", "mid", "bot" (pour les tourelles/nexus)
     private final int index;          // 1, 2, 3...
     private final Location center;    // case centrale où coller la schématique
+    private TurretTier tier = TurretTier.OUTER; // niveau (tourelles uniquement)
 
     private double maxHP;
     private double currentHP;
@@ -107,6 +121,13 @@ public class GameStructure {
     public List<Phase> getPhases()  { return phases; }
 
     public void setMaxHP(double hp) { this.maxHP = hp; this.currentHP = hp; }
+
+    public TurretTier getTier()          { return tier; }
+    public void setTier(TurretTier t)    {
+        this.tier = t;
+        if (type == Type.TURRET) setMaxHP(t.hp);
+    }
+    public double getTierDamage()        { return tier.damage; }
 
     /** Identifiant unique de la structure (ex: "turret_blue_top_1"). */
     public String getId() {

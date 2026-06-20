@@ -21,6 +21,7 @@ public abstract class BaseChampion {
     protected HPSystem hpSystem;
     protected ResourceSystem resourceSystem;
     protected final LevelSystem levelSystem = new LevelSystem();
+    protected double autoAttackRange = 2.5; // portée AA par défaut (mêlée), surchargée par champion
 
     public enum ChampionRole { TOP, JUNGLE, MID, SUPPORT, ADC }
 
@@ -125,6 +126,9 @@ public abstract class BaseChampion {
     public ChampionRole      getRole()        { return role; }
     public ChampionStats     getStats()       { return stats; }
     public LevelSystem       getLevelSystem() { return levelSystem; }
+
+    public double getAutoAttackRange()       { return autoAttackRange; }
+    protected void setAutoAttackRange(double r) { this.autoAttackRange = r; }
 
     /**
      * Améliore un sort si un point est disponible. Synchronise le level interne.

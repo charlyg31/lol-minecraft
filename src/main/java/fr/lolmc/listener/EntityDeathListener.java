@@ -59,6 +59,14 @@ public class EntityDeathListener implements Listener {
                 && championManager.hasChampion(killer)
                 && championManager.hasChampion(victim)) {
             rewardManager.onChampionKill(killer, victim);
+            // Annonce (Premier Sang, multi-kills)
+            LolPlugin.getInstance().getAnnouncementManager().announceKill(killer, victim);
+            LolPlugin.getInstance().getAnnouncementManager().onPlayerDeath(victim);
+            // Scoreboard de partie
+            LolPlugin.getInstance().getMatchScoreboard().addKill(killer);
+            LolPlugin.getInstance().getMatchScoreboard().addDeath(victim);
+            // Timer de respawn
+            LolPlugin.getInstance().getGameManager().onPlayerDeath(victim);
         }
     }
 }
