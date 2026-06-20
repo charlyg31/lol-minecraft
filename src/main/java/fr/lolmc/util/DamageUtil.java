@@ -62,12 +62,15 @@ public class DamageUtil {
         if (bushMgr != null) bushMgr.revealOnDamage(victim);
         var baseMgr = LolPlugin.getInstance().getBaseManager();
         if (baseMgr != null) baseMgr.onDamage(victim);
+        var runeMgr = LolPlugin.getInstance().getRuneManager();
+        if (runeMgr != null) runeMgr.onDamageTaken(victim, afterShield);
         // Effets de runes (keystones) si l'attaquant est un joueur
         if (attacker != null) {
             var rm = LolPlugin.getInstance().getRuneManager();
             if (rm != null) {
                 rm.onDamageToChampion(attacker, victim, isAbility);
                 rm.onConquerorHeal(attacker, afterShield);
+                rm.onHitEffects(attacker, victim, afterShield, isAbility);
             }
         }
 

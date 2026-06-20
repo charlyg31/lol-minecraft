@@ -67,6 +67,8 @@ public class EntityDeathListener implements Listener {
             LolPlugin.getInstance().getMatchScoreboard().addDeath(victim);
             // Timer de respawn
             LolPlugin.getInstance().getGameManager().onPlayerDeath(victim);
+            // Runes : Triomphe, Absorption (soin/or sur takedown)
+            LolPlugin.getInstance().getRuneManager().onTakedown(killer);
         }
     }
 }

@@ -129,13 +129,100 @@ public class RuneManager {
 
     /** Applique les runes à effet passif permanent sur les stats. */
     private void applyPassiveRune(BaseChampion champ, String runeId) {
+        var s = champ.getStats();
         switch (runeId) {
-            case "gathering_storm" -> { /* géré dynamiquement avec le temps */ }
-            case "transcendence" -> champ.getStats().addBonusAbilityHaste(5);
-            case "absolute_focus" -> champ.getStats().addBonusAD(3);
-            case "conditioning" -> { /* géré après 12 min */ }
-            case "overgrowth" -> { /* géré par stacks de morts */ }
+            // ── PRÉCISION ──
+            case "legend_alacrity" -> s.multiplyAS(1.10);        // +10% vitesse d'attaque
+            case "legend_haste" -> s.addBonusAbilityHaste(10);   // +hâte
+            case "legend_bloodline" -> { /* vol de vie géré on-hit */ }
+            // ── DOMINATION ──
+            case "eyeball_collection" -> s.addBonusAD(6);        // force adaptative par takedowns (simplifié: flat)
+            case "ravenous_hunter" -> { /* omnivamp géré on-damage */ }
+            case "ultimate_hunter" -> s.addBonusAbilityHaste(6); // hâte de l'ultime
+            case "relentless_hunter" -> { /* vitesse hors combat, géré dynamiquement */ }
+            // ── SORCELLERIE ──
+            case "transcendence" -> s.addBonusAbilityHaste(5);
+            case "absolute_focus" -> s.addBonusAD(3);
+            case "gathering_storm" -> { /* croissance avec le temps, géré dynamiquement */ }
+            case "manaflow_band" -> { /* mana géré on-hit */ }
+            case "scorch" -> { /* dégâts géré on-ability */ }
+            // ── DÉTERMINATION ──
+            case "conditioning" -> { /* +résistances après 12min, géré dynamiquement */ }
+            case "overgrowth" -> { /* PV par monstres morts, géré dynamiquement */ }
+            case "second_wind" -> { /* soin après dégâts, géré on-damage-taken */ }
+            case "bone_plating" -> { /* réduction dégâts, géré on-damage-taken */ }
+            case "font_life" -> { /* soin de zone */ }
+            // ── INSPIRATION ──
+            case "cosmic_insight" -> s.addBonusAbilityHaste(18); // +hâte invocateur/objets (approx)
+            case "absolute_focus_alt" -> {}
             default -> {}
+        }
+    }
+
+    /**
+     * Effets de runes au moment où le porteur SUBIT des dégâts.
+     * (Second Souffle, Plaques Osseuses, Réplique...)
+     */
+    public void onDamageTaken(Player victim, double amount) {
+        RunePage page = getPage(victim.getUniqueId());
+        var cm = LolPlugin.getInstance().getChampionManager();
+        if (!cm.hasChampion(victim)) return;
+        var champ = cm.getChampion(victim);
+
+        if (page.has("second_wind")) {
+            // Soigne 6% PV manquants sur 10s après avoir subi des dégâts (simplifié: soin direct léger)
+            new org.bukkit.scheduler.BukkitRunnable() {
+                int ticks = 0;
+                @Override public void run() {
+                    if (ticks >= 5 || !victim.isOnline()) { cancel(); return; }
+                    double missing = champ.getHPSystem().getMaxHP() - champ.getHPSystem().getCurrentHP();
+                    champ.getHPSystem().heal(missing * 0.012);
+                    ticks++;
+                }
+            }.runTaskTimer(LolPlugin.getInstance(), 20L, 20L);
+        }
+        if (page.has("bone_plating")) {
+            // Les 3 prochaines sources de dégâts sont réduites (marqueur simplifié: petit bouclier)
+            champ.getStats().addFlatDamageReduction(8);
+        }
+    }
+
+    /**
+     * Effets on-hit additionnels (vol de vie, mana, dégâts de sort).
+     */
+    public void onHitEffects(Player attacker, Player victim, double damage, boolean isAbility) {
+        RunePage page = getPage(attacker.getUniqueId());
+        var cm = LolPlugin.getInstance().getChampionManager();
+        if (!cm.hasChampion(attacker)) return;
+        var champ = cm.getChampion(attacker);
+
+        if (page.has("legend_bloodline")) {
+            champ.getHPSystem().heal(damage * 0.04); // ~4% vol de vie
+        }
+        if (page.has("ravenous_hunter")) {
+            champ.getHPSystem().heal(damage * 0.03); // omnivampirisme
+        }
+        if (page.has("manaflow_band") && isAbility) {
+            champ.getResourceSystem().fill(); // restaure un peu de ressource (simplifié)
+        }
+        if (page.has("scorch") && isAbility) {
+            // Premier sort touchant inflige des dégâts bonus (CD 10s géré via stacks)
+            long now = System.currentTimeMillis();
+            Long last = keystoneLastProc.get(attacker.getUniqueId());
+            if (last == null || (now - last) > 10000) {
+                keystoneLastProc.put(attacker.getUniqueId(), now);
+                int level = champ.getLevelSystem().getLevel();
+                DamageUtil.damage(attacker, victim, 15 + level * 1.5, true, DamageUtil.Type.MAGICAL);
+            }
+        }
+        if (page.has("cheap_shot")) {
+            // Dégâts vrais bonus si la cible est sous contrôle (ralentie/immobilisée)
+            if (victim.hasPotionEffect(PotionEffectType.SLOWNESS)) {
+                DamageUtil.damage(attacker, victim, 10, false, DamageUtil.Type.TRUE);
+            }
+        }
+        if (page.has("taste_blood")) {
+            champ.getHPSystem().heal(8); // petit soin en touchant un champion
         }
     }
 
