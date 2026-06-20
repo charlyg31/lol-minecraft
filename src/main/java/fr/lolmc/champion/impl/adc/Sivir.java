@@ -50,7 +50,7 @@ public class Sivir extends BaseChampion {
             resourceCost = 70;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
-            double dmg=50+s.getFinalAD()*0.5;
+            double[] base={25,45,65,85,105};double dmg=base[getLevel()-1]+s.getFinalAD()*1.0;
             DamageUtil.abilityDamage(c, t, dmg);
             // Retour: dégâts réduits
             new BukkitRunnable(){@Override public void run(){

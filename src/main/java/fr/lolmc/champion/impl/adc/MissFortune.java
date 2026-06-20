@@ -50,7 +50,7 @@ public class MissFortune extends BaseChampion {
             resourceCost = 43;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
-            double d1=20+s.getFinalAD()*0.85;
+            double[] base={20,40,60,80,100};double d1=base[getLevel()-1]+s.getFinalAD()*1.0;
             double d2=(20+s.getFinalAD()*0.85)*1.35;
             DamageUtil.abilityDamage(c, t, d1+d2);
             c.getWorld().spawnParticle(Particle.CRIT,t.getLocation(),10,0.3,0.3,0.3);
