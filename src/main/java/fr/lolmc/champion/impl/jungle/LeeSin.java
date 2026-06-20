@@ -101,7 +101,9 @@ public class LeeSin extends BaseChampion {
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
-            double dmg=175+s.getFinalAD()*2.0;
+            double[] base={150,300,450};
+            int r=Math.min(getLevel()-1,2);
+            double dmg=base[r]+s.getFinalAD()*2.0;
             DamageUtil.abilityDamage(c, t, dmg);
             Vector kb=t.getLocation().toVector().subtract(c.getLocation().toVector()).normalize().multiply(2.5);
             kb.setY(1.5); t.setVelocity(kb);

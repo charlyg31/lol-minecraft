@@ -49,7 +49,7 @@ public class Warwick extends BaseChampion {
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
-            double dmg=10+s.getFinalAD()+s.getFinalAP()*0.5;
+            double[] pct={0.06,0.07,0.08,0.09,0.10};double dmg=t.getMaxHealth()*pct[getLevel()-1]*4+s.getFinalAD()*1.0;
             DamageUtil.abilityDamageMagic(c, t, dmg);
             double heal=dmg*0.7;
             c.setHealth(Math.min(c.getMaxHealth(),c.getHealth()+heal));
