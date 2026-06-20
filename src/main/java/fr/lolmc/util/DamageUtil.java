@@ -62,6 +62,14 @@ public class DamageUtil {
         if (bushMgr != null) bushMgr.revealOnDamage(victim);
         var baseMgr = LolPlugin.getInstance().getBaseManager();
         if (baseMgr != null) baseMgr.onDamage(victim);
+        // Effets de runes (keystones) si l'attaquant est un joueur
+        if (attacker != null) {
+            var rm = LolPlugin.getInstance().getRuneManager();
+            if (rm != null) {
+                rm.onDamageToChampion(attacker, victim, isAbility);
+                rm.onConquerorHeal(attacker, afterShield);
+            }
+        }
 
         // 4. Vol de vie / omnivamp pour l'attaquant
         if (attacker != null && cm.hasChampion(attacker)) {
