@@ -48,15 +48,11 @@ public final class Compat {
                 if (a != null) return a;
             } catch (Throwable ignored) {}
         }
-        // Dernier recours : valueOf sur les noms d'enum connus (déprécié mais fonctionne)
+        // Dernier recours : parcourir le registre des attributs
         for (String key : keys) {
-            String enumName = key.toUpperCase().replace('.', '_');
             try {
-                return Attribute.valueOf(enumName);
-            } catch (Throwable ignored) {}
-            // Avec préfixe GENERIC_ pour les anciennes versions
-            try {
-                return Attribute.valueOf("GENERIC_" + enumName);
+                Attribute a = Registry.ATTRIBUTE.get(NamespacedKey.minecraft(key.toLowerCase().replace('_', '.')));
+                if (a != null) return a;
             } catch (Throwable ignored) {}
         }
         return null;
@@ -75,17 +71,16 @@ public final class Compat {
      * On utilise un enchantement quelconque (Unbreaking) résolu via Registry.
      */
     public static Enchantment glowEnchant() {
-        // Essai via Registry moderne
+        // Registry moderne (Enchantment n'est plus une enum en 26.1.2)
         try {
             Enchantment e = Registry.ENCHANTMENT.get(NamespacedKey.minecraft("unbreaking"));
             if (e != null) return e;
         } catch (Throwable ignored) {}
-        // Fallback : ancienne constante
+        // Fallback : premier enchantement disponible dans le registre
         try {
-            return Enchantment.valueOf("UNBREAKING");
-        } catch (Throwable ignored) {}
-        try {
-            return Enchantment.valueOf("DURABILITY"); // très ancien nom
+            for (Enchantment e : Registry.ENCHANTMENT) {
+                if (e != null) return e;
+            }
         } catch (Throwable ignored) {}
         return null;
     }

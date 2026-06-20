@@ -87,7 +87,7 @@ public class Zed extends BaseChampion {
     }
 
     static class E extends BaseAbility {
-        E(){super("e_zed","Ombre Tranchante",Material.DARK_OAK_SWORD,AbilitySlot.E,
+        E(){super("e_zed","Ombre Tranchante",Material.IRON_SWORD,AbilitySlot.E,
             new double[]{4,3,2,1,0.5},5,4,DamageType.PHYSICAL);
             resourceCost = 50;}
         @Override public void cast(Player c,ChampionStats s,Player t){

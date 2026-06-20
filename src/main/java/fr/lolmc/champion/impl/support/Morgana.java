@@ -100,7 +100,7 @@ public class Morgana extends BaseChampion {
     }
 
     static class R extends BaseAbility {
-        R(){super("r_morgana","Chaînes de la Corruption",Material.CHAIN,AbilitySlot.R,
+        R(){super("r_morgana","Chaînes de la Corruption",Material.IRON_NUGGET,AbilitySlot.R,
             new double[]{120,110,100},20,5,DamageType.MAGICAL);
             resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){

@@ -41,7 +41,8 @@ public class FogOfWarManager {
         var wardMgr = LolPlugin.getInstance().getWardManager();
         var bushMgr = LolPlugin.getInstance().getBushManager();
 
-        var players = new java.util.ArrayList<>(LolPlugin.getInstance().getServer().getOnlinePlayers());
+        java.util.List<Player> players = new java.util.ArrayList<>();
+        for (Player __p : LolPlugin.getInstance().getServer().getOnlinePlayers()) players.add(__p);
 
         for (Player viewer : players) {
             if (!cm.hasChampion(viewer)) continue;
