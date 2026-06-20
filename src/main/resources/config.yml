@@ -44,3 +44,15 @@ bushes:
     - LARGE_FERN
     - FERN
     - SWEET_BERRY_BUSH
+
+# ═══════════════════════════════════════════════════════
+# TOURELLES — portée d'attaque (mêmes valeurs pour toutes)
+# ═══════════════════════════════════════════════════════
+# Zone d'attaque en forme de CYLINDRE depuis le point de pose du schématique.
+turrets:
+  # Rayon horizontal de la zone d'attaque (en blocs)
+  attack-radius: 8
+  # Hauteur de la zone d'attaque ET origine du tir (en blocs au-dessus du point de pose)
+  attack-height: 6
+  # Dégâts de base d'un tir
+  base-damage: 150
