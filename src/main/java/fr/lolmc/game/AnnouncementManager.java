@@ -44,7 +44,7 @@ public class AnnouncementManager {
         if (!firstBloodDone) {
             firstBloodDone = true;
             broadcastTitle("§4PREMIER SANG", "§7" + killer.getName() + " a frappé en premier!",
-                    Sound.sound(org.bukkit.Sound.ENTITY_WITHER_SPAWN.getKey(), Sound.Source.MASTER, 1f, 1f));
+                    Sound.sound(net.kyori.adventure.key.Key.key("entity.wither.spawn"), Sound.Source.MASTER, 1f, 1f));
         }
 
         // ── Kills multiples ──
@@ -65,7 +65,7 @@ public class AnnouncementManager {
 
         if (multiKill != null) {
             broadcastTitle(multiKill, "§7" + killer.getName(),
-                    Sound.sound(org.bukkit.Sound.ENTITY_ENDER_DRAGON_GROWL.getKey(), Sound.Source.MASTER, 1f, 1f));
+                    Sound.sound(net.kyori.adventure.key.Key.key("entity.ender_dragon.growl"), Sound.Source.MASTER, 1f, 1f));
         }
     }
 
