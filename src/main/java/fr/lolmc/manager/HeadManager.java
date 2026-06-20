@@ -25,6 +25,7 @@ public class HeadManager {
      * Utilise l'API Paper moderne (PlayerProfile / PlayerTextures),
      * sans dépendance NMS (com.mojang.authlib).
      */
+    @SuppressWarnings("deprecation")
     public ItemStack getChampionHead(String championId) {
         FileConfiguration config = plugin.getConfig();
         String texture = config.getString("heads." + championId, "");
