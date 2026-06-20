@@ -191,18 +191,24 @@ public class MinionManager {
                         && roadPoint.getWorld().equals(z.getLocation().getWorld())
                         && roadPoint.distance(z.getLocation()) > MAX_DEVIATION;
 
-                // Chercher un ennemi proche
+                // Chercher un ennemi proche (sbire ou champion)
                 LivingEntity enemy = findNearbyEnemy(z, team);
+                // Chercher une tourelle/structure ennemie à portée
+                GameStructure enemyStructure = findNearbyEnemyStructure(z, team);
 
                 if (tooFar) {
-                    // Trop loin du chemin → revenir, ignorer l'ennemi
+                    // Trop loin du chemin → revenir, ignorer tout le reste
                     z.setTarget(null);
                     z.getPathfinder().moveTo(roadPoint, 1.2);
                 } else if (enemy != null) {
-                    // Dévier pour attaquer (dans la limite des 10 blocs)
+                    // Priorité 1 : attaquer un ennemi vivant (sbire/champion)
                     z.setTarget(enemy);
+                } else if (enemyStructure != null) {
+                    // Priorité 2 : attaquer la tourelle ennemie (structure, pas une entité)
+                    z.setTarget(null);
+                    attackStructure(z, enemyStructure);
                 } else {
-                    // Avancer le long du chemin vers la base ennemie
+                    // Sinon : avancer le long du chemin vers la base ennemie
                     z.setTarget(null);
                     Location next = getNextRoadWaypoint(team, lane, z.getLocation());
                     if (next != null) z.getPathfinder().moveTo(next, 1.0);
@@ -229,6 +235,52 @@ public class MinionManager {
             }
         }
         return path.get(path.size() - 1); // dernier point = base ennemie
+    }
+
+    // Portée d'attaque d'un sbire sur une tourelle (blocs)
+    private static final double MINION_TURRET_RANGE = 6.0;
+    // Dégâts d'un sbire à une tourelle par coup (LoL: mêlée ~12, caster ~23 environ)
+    private static final double MINION_DAMAGE_TO_TURRET = 14.0;
+    // Cadence d'attaque sur les tourelles (cooldown en ms par sbire)
+    private final Map<java.util.UUID, Long> lastTurretHit = new HashMap<>();
+    private static final long TURRET_HIT_COOLDOWN = 1000L; // 1 coup/seconde
+
+    /** Cherche une structure ENNEMIE à portée d'un sbire. */
+    private GameStructure findNearbyEnemyStructure(Zombie minion, Team team) {
+        var mapManager = LolPlugin.getInstance().getMapManager();
+        GameStructure s = mapManager.getStructureAt(minion.getLocation(), MINION_TURRET_RANGE);
+        if (s == null) return null;
+        // La structure doit appartenir à l'équipe ADVERSE
+        if (s.getTeam() == team) return null;
+        return s;
+    }
+
+    /** Le sbire s'approche et inflige des dégâts à la structure (tourelle). */
+    private void attackStructure(Zombie minion, GameStructure structure) {
+        // Se déplacer vers la structure si pas assez proche
+        Location target = structure.getCenter();
+        double dist = minion.getLocation().distance(target);
+        if (dist > 2.5) {
+            minion.getPathfinder().moveTo(target, 1.0);
+        }
+        // Infliger des dégâts à cadence limitée
+        long now = System.currentTimeMillis();
+        Long last = lastTurretHit.get(minion.getUniqueId());
+        if (last == null || (now - last) >= TURRET_HIT_COOLDOWN) {
+            lastTurretHit.put(minion.getUniqueId(), now);
+            // Animation : le sbire "frappe" + particule
+            minion.swingMainHand();
+            target.getWorld().spawnParticle(org.bukkit.Particle.CRIT,
+                    target.clone().add(0.5, 1, 0.5), 5, 0.3, 0.3, 0.3);
+            boolean phaseChanged = structure.takeDamage(MINION_DAMAGE_TO_TURRET);
+            if (phaseChanged) {
+                LolPlugin.getInstance().getMapManager().updateStructurePhase(structure);
+            }
+            // Si détruite, déclencher la logique de destruction
+            if (structure.isDestroyed()) {
+                LolPlugin.getInstance().getMapManager().updateStructurePhase(structure);
+            }
+        }
     }
 
     private LivingEntity findNearbyEnemy(Zombie minion, Team team) {
