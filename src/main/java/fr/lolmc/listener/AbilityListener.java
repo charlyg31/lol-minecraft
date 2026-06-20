@@ -269,5 +269,7 @@ public class AbilityListener implements Listener {
         LolPlugin.getInstance().getPartyManager().cleanup(p.getUniqueId());
         LolPlugin.getInstance().getMatchmakingManager().cleanup(p.getUniqueId());
         LolPlugin.getInstance().getBushManager().cleanup(p.getUniqueId());
+        LolPlugin.getInstance().getRoleQueueManager().cleanup(p.getUniqueId());
+        LolPlugin.getInstance().getRuneManager().cleanup(p.getUniqueId());
     }
 }

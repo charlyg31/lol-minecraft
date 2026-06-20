@@ -48,3 +48,9 @@ commands:
     description: Choisir ses sorts d'invocateur
   lock:
     description: Verrouiller sa sélection
+  roles:
+    description: Choisir ses roles preferes
+  lobby:
+    description: Ouvrir le menu de preparation
+  play:
+    description: Ouvrir le menu de preparation

@@ -1,6 +1,7 @@
 package fr.lolmc.rune;
 
 import fr.lolmc.LolPlugin;
+import fr.lolmc.rune.RuneRegistry;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.util.DamageUtil;
 import net.kyori.adventure.text.Component;
@@ -22,17 +23,69 @@ import java.util.UUID;
  */
 public class RuneManager {
 
-    // Page de runes par joueur
+    // Page de runes par joueur (page active)
     private final Map<UUID, RunePage> playerPages = new HashMap<>();
+    // Fichier de sauvegarde des pages
+    private final java.io.File runeFile;
+    private org.bukkit.configuration.file.FileConfiguration runeConfig;
 
     // Stacks de keystones par joueur (Conqueror, Electrocute, etc.)
     private final Map<UUID, Integer> keystoneStacks = new HashMap<>();
     private final Map<UUID, Long> keystoneLastProc = new HashMap<>();
 
+    public RuneManager() {
+        this.runeFile = new java.io.File(LolPlugin.getInstance().getDataFolder(), "runes.yml");
+        if (!runeFile.exists()) {
+            try { runeFile.createNewFile(); } catch (Exception ignored) {}
+        }
+        this.runeConfig = org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(runeFile);
+        loadAllPages();
+    }
+
     // ── Gestion des pages ─────────────────────────────────────────
 
     public void setPage(UUID uuid, RunePage page) {
         playerPages.put(uuid, page);
+        savePage(uuid, page);
+    }
+
+    /** Sauvegarde la page d'un joueur dans runes.yml. */
+    private void savePage(UUID uuid, RunePage page) {
+        String base = "pages." + uuid + ".";
+        runeConfig.set(base + "primaryPath", page.primaryPath != null ? page.primaryPath.name() : null);
+        runeConfig.set(base + "keystone", page.keystone);
+        runeConfig.set(base + "primaryRunes", new java.util.ArrayList<>(page.primaryRunes));
+        runeConfig.set(base + "secondaryPath", page.secondaryPath != null ? page.secondaryPath.name() : null);
+        runeConfig.set(base + "secondaryRunes", new java.util.ArrayList<>(page.secondaryRunes));
+        runeConfig.set(base + "shard1", page.statShard1);
+        runeConfig.set(base + "shard2", page.statShard2);
+        runeConfig.set(base + "shard3", page.statShard3);
+        try { runeConfig.save(runeFile); }
+        catch (Exception e) { LolPlugin.getInstance().getLogger().warning("Erreur runes.yml: " + e.getMessage()); }
+    }
+
+    /** Charge toutes les pages sauvegardées au démarrage. */
+    private void loadAllPages() {
+        var section = runeConfig.getConfigurationSection("pages");
+        if (section == null) return;
+        for (String uuidStr : section.getKeys(false)) {
+            try {
+                UUID uuid = UUID.fromString(uuidStr);
+                String base = "pages." + uuidStr + ".";
+                RunePage page = new RunePage();
+                String pp = runeConfig.getString(base + "primaryPath");
+                if (pp != null) page.primaryPath = RuneRegistry.Path.valueOf(pp);
+                page.keystone = runeConfig.getString(base + "keystone");
+                page.primaryRunes.addAll(runeConfig.getStringList(base + "primaryRunes"));
+                String sp = runeConfig.getString(base + "secondaryPath");
+                if (sp != null) page.secondaryPath = RuneRegistry.Path.valueOf(sp);
+                page.secondaryRunes.addAll(runeConfig.getStringList(base + "secondaryRunes"));
+                page.statShard1 = runeConfig.getString(base + "shard1", "adaptive");
+                page.statShard2 = runeConfig.getString(base + "shard2", "adaptive");
+                page.statShard3 = runeConfig.getString(base + "shard3", "health");
+                playerPages.put(uuid, page);
+            } catch (Exception ignored) {}
+        }
     }
 
     public RunePage getPage(UUID uuid) {
