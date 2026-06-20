@@ -52,7 +52,7 @@ public class Veigar extends BaseChampion {
             resourceCost = 40;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
-            double dmg=90+s.getFinalAP()*0.6;
+            double[] base={80,120,160,200,240};double dmg=base[getLevel()-1]+s.getFinalAP()*0.6;
             DamageUtil.abilityDamageMagic(c, t, dmg);
             apStacks.merge(c.getUniqueId(),5,Integer::sum);
             s.addBonusAP(5);
@@ -74,7 +74,7 @@ public class Veigar extends BaseChampion {
             loc.getWorld().spawnParticle(Particle.ENCHANT,loc,30,2,2,2);
             new BukkitRunnable(){
                 @Override public void run(){
-                    double dmg=120+s.getFinalAP()*0.7;
+                    double[] base={100,150,200,250,300};double dmg=base[getLevel()-1]+s.getFinalAP()*1.0;
                     loc.getWorld().getNearbyEntities(loc,3,2,3).stream()
                         .filter(e->e instanceof Player)
                         .forEach(e->DamageUtil.abilityDamageMagic(c, (Player)e, dmg));
@@ -115,7 +115,7 @@ public class Veigar extends BaseChampion {
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
             double missing=1.0+(1.0-t.getHealth()/t.getMaxHealth())*0.75;
-            double dmg=(250+s.getFinalAP()*0.75)*missing;
+            double[] base={175,250,325};int rr=Math.min(getLevel()-1,2);double dmg=base[rr]+s.getFinalAP()*0.75;
             t.getWorld().strikeLightningEffect(t.getLocation());
             DamageUtil.abilityDamageMagic(c, t, dmg);
             t.sendMessage(Component.text("☠ DOOM!",NamedTextColor.DARK_PURPLE));

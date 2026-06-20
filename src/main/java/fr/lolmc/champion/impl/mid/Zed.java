@@ -52,7 +52,7 @@ public class Zed extends BaseChampion {
             resourceCost = 40;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             if(t==null)return;
-            double dmg=70+s.getFinalAD()*0.9;
+            double[] base={80,120,160,200,240};double dmg=base[getLevel()-1]+s.getFinalAD()*1.1;
             DamageUtil.abilityDamage(c, t, dmg);
             c.getWorld().spawnParticle(Particle.CRIT,t.getLocation(),8,0.3,0.3,0.3);
         }

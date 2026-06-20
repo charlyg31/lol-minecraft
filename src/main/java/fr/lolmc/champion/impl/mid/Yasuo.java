@@ -51,7 +51,7 @@ public class Yasuo extends BaseChampion {
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             int casts=qCasts.merge(c.getUniqueId(),1,Integer::sum);
-            double dmg=20+s.getFinalAD();
+            double[] base={20,45,70,95,120};double dmg=base[getLevel()-1]+s.getFinalAD()*1.0;
             // Tornade linéaire devant
             Location front=c.getLocation().add(c.getLocation().getDirection().multiply(3));
             c.getWorld().getNearbyEntities(front,3,1,3).stream()
