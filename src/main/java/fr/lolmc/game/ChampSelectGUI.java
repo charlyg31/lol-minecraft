@@ -158,7 +158,8 @@ public class ChampSelectGUI implements Listener {
                 csm.chooseChampion(player, CHAMPIONS[slot]);
                 player.closeInventory();
             } else if (slot == 25) {
-                openRuneMenu(player); // bouton runes
+                player.closeInventory();
+                LolPlugin.getInstance().getRuneGUI().open(player); // éditeur de runes complet
             } else if (slot == 26) {
                 csm.lock(player); // bouton verrouiller
                 player.closeInventory();

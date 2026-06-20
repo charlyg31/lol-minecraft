@@ -30,6 +30,9 @@ import fr.lolmc.game.SummonerSpellManager;
 import fr.lolmc.rune.RuneManager;
 import fr.lolmc.game.ChampSelectManager;
 import fr.lolmc.game.ChampSelectGUI;
+import fr.lolmc.rune.RuneGUI;
+import fr.lolmc.game.RoleQueueManager;
+import fr.lolmc.game.PreGameGUI;
 import fr.lolmc.game.MatchScoreboard;
 import fr.lolmc.stats.persistence.DatabaseManager;
 import fr.lolmc.stats.persistence.RankedManager;
@@ -88,6 +91,9 @@ public class LolPlugin extends JavaPlugin {
     private RuneManager runeManager;
     private ChampSelectManager champSelectManager;
     private ChampSelectGUI champSelectGUI;
+    private RuneGUI runeGUI;
+    private RoleQueueManager roleQueueManager;
+    private PreGameGUI preGameGUI;
     private MatchScoreboard matchScoreboard;
     private DatabaseManager databaseManager;
     private RankedManager rankedManager;
@@ -133,6 +139,11 @@ public class LolPlugin extends JavaPlugin {
         champSelectManager = new ChampSelectManager();
         champSelectGUI = new ChampSelectGUI();
         getServer().getPluginManager().registerEvents(champSelectGUI, this);
+        runeGUI = new RuneGUI();
+        getServer().getPluginManager().registerEvents(runeGUI, this);
+        roleQueueManager = new RoleQueueManager();
+        preGameGUI = new PreGameGUI();
+        getServer().getPluginManager().registerEvents(preGameGUI, this);
         matchScoreboard = new MatchScoreboard();
         getServer().getPluginManager().registerEvents(new fr.lolmc.listener.MonsterPassiveListener(), this);
         getServer().getPluginManager().registerEvents(bushManager, this);
@@ -244,6 +255,9 @@ public class LolPlugin extends JavaPlugin {
     public RuneManager getRuneManager()         { return runeManager; }
     public ChampSelectManager getChampSelectManager() { return champSelectManager; }
     public ChampSelectGUI getChampSelectGUI()   { return champSelectGUI; }
+    public RuneGUI getRuneGUI()                 { return runeGUI; }
+    public RoleQueueManager getRoleQueueManager() { return roleQueueManager; }
+    public PreGameGUI getPreGameGUI()           { return preGameGUI; }
     public MatchScoreboard getMatchScoreboard() { return matchScoreboard; }
     public DatabaseManager getDatabaseManager() { return databaseManager; }
     public RankedManager getRankedManager()     { return rankedManager; }
