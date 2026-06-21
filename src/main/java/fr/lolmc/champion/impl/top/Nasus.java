@@ -22,6 +22,7 @@ public class Nasus extends BaseChampion {
         super("nasus", "Nasus", ChampionRole.TOP,
             new ChampionStats(631,67,0,34,32,0.638,0,350,1.25,9.0));
         getStats().setGrowthStats(104.0,3.5,4.3,2.05,0.03480,0.90);
+        setAutoAttackRange(2.0);
     }
     @Override protected void registerAbilities() {
         setAbility(0,new AA()); setAbility(1,new Q());

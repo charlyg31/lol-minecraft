@@ -203,7 +203,18 @@ public class JungleManager {
             mob.customName(net.kyori.adventure.text.Component.text(name));
             mob.setCustomNameVisible(true);
             mob.setRemoveWhenFarAway(false);
-            if (mob instanceof Mob m) m.setAware(true);
+            // Monstre passif : ne poursuit pas, reste à son camp (réveillé quand attaqué)
+            if (mob instanceof Mob m) {
+                m.setAware(false);  // ne se déplace pas tout seul
+                m.setTarget(null);
+            }
+            // Mémoriser la position du camp pour le reset
+            mob.getPersistentDataContainer().set(
+                new org.bukkit.NamespacedKey(LolPlugin.getInstance(), "camp_x"),
+                org.bukkit.persistence.PersistentDataType.DOUBLE, mob.getLocation().getX());
+            mob.getPersistentDataContainer().set(
+                new org.bukkit.NamespacedKey(LolPlugin.getInstance(), "camp_z"),
+                org.bukkit.persistence.PersistentDataType.DOUBLE, mob.getLocation().getZ());
 
             // Les épiques mobiles (dragons/baron) peuvent bouger, le reste est statique
             var speedAttr = mob.getAttribute(Compat.movementSpeed());

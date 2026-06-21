@@ -22,6 +22,7 @@ public class Malphite extends BaseChampion {
         super("malphite", "Malphite", ChampionRole.TOP,
             new ChampionStats(644,62,0,37,32,0.736,0,335,1.25,7.0));
         getStats().setGrowthStats(90.0,4.0,4.2,2.05,0.02600,0.55);
+        setAutoAttackRange(2.0);
     }
     @Override protected void registerAbilities() {
         setAbility(0,new AA()); setAbility(1,new Q());

@@ -22,6 +22,7 @@ public class Zed extends BaseChampion {
         super("zed", "Zed", ChampionRole.MID,
             new ChampionStats(654,63,0,32,32,0.651,0,345,1.25,7.0));
         getStats().setGrowthStats(99.0,3.4,4.7,2.05,0.03300,0.65);
+        setAutoAttackRange(2.0);
     }
     @Override protected void registerAbilities() {
         setAbility(0,new AA()); setAbility(1,new Q());

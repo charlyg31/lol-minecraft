@@ -32,7 +32,8 @@ public class MinionManager {
     private final Map<String, List<Location>> blueLaneWaypoints = new HashMap<>();
     private final Map<String, List<Location>> redLaneWaypoints = new HashMap<>();
 
-    private static final long WAVE_PERIOD = 600L;   // 30s entre vagues
+    private static final long WAVE_PERIOD = 600L;        // 30s entre vagues (fidèle LoL)
+    private static final long FIRST_WAVE_DELAY = 1300L;  // 1ère vague à 1:05 (fidèle LoL)
     private static final int MINIONS_PER_WAVE = 6;
     private static final double MINION_HP = 477;
     private static final double MINION_SPEED = 0.25;
@@ -60,7 +61,7 @@ public class MinionManager {
                 spawnWave(Team.BLUE);
                 spawnWave(Team.RED);
             }
-        }.runTaskTimer(LolPlugin.getInstance(), 100L, WAVE_PERIOD);
+        }.runTaskTimer(LolPlugin.getInstance(), FIRST_WAVE_DELAY, WAVE_PERIOD);
 
         // Tâche de déplacement des sbires (toutes les 10 ticks)
         new BukkitRunnable() {

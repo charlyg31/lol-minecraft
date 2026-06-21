@@ -22,6 +22,7 @@ public class Darius extends BaseChampion {
         super("darius", "Darius", ChampionRole.TOP,
             new ChampionStats(652,64,0,37,32,0.625,0,340,1.75,10.0));
         getStats().setGrowthStats(114.0,5.0,5.2,2.05,0.01000,0.95);
+        setAutoAttackRange(2.5);
     }
     @Override protected void registerAbilities() {
         setAbility(0,new AA()); setAbility(1,new Q());
