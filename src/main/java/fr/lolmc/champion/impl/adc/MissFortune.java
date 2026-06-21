@@ -81,12 +81,11 @@ public class MissFortune extends BaseChampion {
         @Override public void cast(Player c,ChampionStats s,Player t){
             org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
             double dmg=60+s.getFinalAD()*0.8;
-            tgt.getWorld().getNearbyEntities(tgt.getLocation(),3,2,3).stream()
-                .filter(e->e instanceof Player)
-                .forEach(e->{
-                    DamageUtil.abilityDamage(c, (Player)e, dmg);
-                    ((Player)e).addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,40,1,false,true));
-                });
+            for(var __t : TargetingUtil.entitiesInRadius(c, tgt.getLocation(), 3.0)){
+                TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.PHYSICAL);
+                if(__t instanceof Player __p)
+                    __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,40,1,false,true));
+            }
             c.getWorld().spawnParticle(Particle.CRIT,tgt.getLocation(),20,1.5,1,1.5);
         }
         @Override public String getDynamicDescription(ChampionStats s){

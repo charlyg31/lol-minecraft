@@ -101,9 +101,8 @@ public class Jinx extends BaseChampion {
             double miss=0;
             if((tgt instanceof Player && cmJ.hasChampion((Player)tgt))){var hpJ=cmJ.getChampion((Player)tgt).getHPSystem();miss=hpJ.getMaxHP()-hpJ.getCurrentHP();}
             double dmg=base[rr]+s.getFinalAD()*1.5+miss*missPct[rr];
-            tgt.getWorld().getNearbyEntities(tgt.getLocation(),5,2,5).stream()
-                .filter(e->e instanceof Player)
-                .forEach(e->DamageUtil.abilityDamage(c, (Player)e, dmg));
+            TargetingUtil.dealDamageAll(c,
+                TargetingUtil.entitiesInRadius(c, tgt.getLocation(), 5.0), dmg, TargetingUtil.DmgType.PHYSICAL);
             tgt.getWorld().createExplosion(tgt.getLocation(),2f,false,false);
             if(tgt instanceof Player _tp)_tp.sendMessage(Component.text("🚀 SUPER MÉGA ROCKET!",NamedTextColor.RED));
         }
