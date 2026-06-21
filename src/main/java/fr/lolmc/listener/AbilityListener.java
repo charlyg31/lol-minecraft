@@ -120,9 +120,6 @@ public class AbilityListener implements Listener {
         e.setCancelled(true);
     }
 
-    // ── CLIC DROIT dans le vide → améliorer le sort / Flash / actif / page ──
-    @EventHandler
-
     // ── CLIC GAUCHE FIABLE via PlayerAnimationEvent ──
     // LEFT_CLICK_AIR n'est pas toujours envoyé par le client ; l'animation
     // de balancement du bras (arm swing) l'est à chaque clic gauche.
