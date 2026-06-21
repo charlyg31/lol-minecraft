@@ -97,12 +97,11 @@ public class Blitzcrank extends BaseChampion {
             resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             double dmg=275+s.getFinalAP()*0.7;
-            c.getWorld().getNearbyEntities(c.getLocation(),4,2,4).stream()
-                .filter(e->e instanceof Player&&!e.equals(c))
-                .forEach(e->{
-                    DamageUtil.abilityDamageMagic(c, (Player)e, dmg);
-                    ((Player)e).addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,10,10,false,true));
-                });
+            for(var __t : TargetingUtil.enemiesAround(c, 4.0)){
+                TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);
+                if(__t instanceof Player __p)
+                    __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,10,10,false,true));
+            }
             c.getWorld().strikeLightningEffect(c.getLocation());
         }
         @Override public String getDynamicDescription(ChampionStats s){

@@ -98,13 +98,13 @@ public class Leona extends BaseChampion {
         @Override public void cast(Player c,ChampionStats s,Player t){
             org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
             double dmg=100+s.getFinalAP()*0.7;
-            tgt.getWorld().getNearbyEntities(tgt.getLocation(),4,2,4).stream()
-                .filter(e->e instanceof Player)
-                .forEach(e->{
-                    DamageUtil.abilityDamageMagic(c, (Player)e, dmg);
-                    ((Player)e).addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,30,10,false,true));
-                    ((Player)e).sendActionBar(Component.text("☀ ECLIPSE!",NamedTextColor.YELLOW));
-                });
+            for(var __t : TargetingUtil.entitiesInRadius(c, tgt.getLocation(), 4.0)){
+                TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);
+                if(__t instanceof Player __p){
+                    __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,30,10,false,true));
+                    __p.sendActionBar(Component.text("☀ ECLIPSE!",NamedTextColor.YELLOW));
+                }
+            }
             tgt.getWorld().spawnParticle(Particle.END_ROD,tgt.getLocation(),30,2,1,2);
         }
         @Override public String getDynamicDescription(ChampionStats s){
