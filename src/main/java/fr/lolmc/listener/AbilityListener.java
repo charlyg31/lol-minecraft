@@ -176,7 +176,9 @@ public class AbilityListener implements Listener {
                 return;
             }
             // Recall
-            if (HotbarManager.isRecallItem(held)) {
+            boolean isRecall = HotbarManager.isRecallItem(held);
+            fr.lolmc.util.DebugLogger.log("Interact", "  -> isRecallItem=" + isRecall + " slot=" + slot);
+            if (isRecall) {
                 LolPlugin.getInstance().getBaseManager().startRecall(caster);
                 return;
             }

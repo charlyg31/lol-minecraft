@@ -79,14 +79,22 @@ public class BaseManager {
 
     private void completeRecall(Player player) {
         Team team = LolPlugin.getInstance().getTeamManager().getTeam(player);
-        if (team != null) {
-            Location spawn = LolPlugin.getInstance().getMapManager().getSpawn(team, 1);
-            if (spawn != null) {
-                player.teleport(spawn);
-                player.playSound(spawn, Sound.ENTITY_ENDERMAN_TELEPORT, 1f, 1f);
-                player.sendActionBar(Component.text("✔ De retour à la base!", NamedTextColor.GREEN));
-            }
+        fr.lolmc.util.DebugLogger.log("Recall", "completeRecall: team=" + team);
+        if (team == null) {
+            player.sendActionBar(Component.text("❌ Recall: aucune équipe", NamedTextColor.RED));
+            return;
         }
+        Location spawn = LolPlugin.getInstance().getMapManager().getSpawn(team, 1);
+        fr.lolmc.util.DebugLogger.log("Recall", "completeRecall: spawn=" + spawn);
+        if (spawn == null) {
+            player.sendActionBar(Component.text(
+                "❌ Recall: spawn équipe non défini (/lol position " + team.name().toLowerCase() + ")",
+                NamedTextColor.RED));
+            return;
+        }
+        player.teleport(spawn);
+        player.playSound(spawn, Sound.ENTITY_ENDERMAN_TELEPORT, 1f, 1f);
+        player.sendActionBar(Component.text("✔ De retour à la base!", NamedTextColor.GREEN));
     }
 
     public void cancelRecall(Player player, String reason) {
