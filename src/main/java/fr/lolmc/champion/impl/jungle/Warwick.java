@@ -79,12 +79,12 @@ public class Warwick extends BaseChampion {
             new double[]{22,20,18,16,14},5,3,DamageType.PHYSICAL);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            c.getWorld().getNearbyEntities(c.getLocation(),3,2,3).stream()
-                .filter(e->e instanceof Player&&!e.equals(c))
-                .forEach(e->{
-                    ((Player)e).addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,30,4,false,true));
-                    ((Player)e).sendActionBar(Component.text("😱 Peur!",NamedTextColor.DARK_RED));
-                });
+            for(var __t : TargetingUtil.enemiesAround(c, 3.0)){
+                if(__t instanceof Player __p){
+                    __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,30,4,false,true));
+                    __p.sendActionBar(Component.text("😱 Peur!",NamedTextColor.DARK_RED));
+                }
+            }
         }
         @Override public String getDynamicDescription(ChampionStats s){return "Terrifie les ennemis dans 3 blocs pendant 1.5s (ralentissement extrême).";}
     }
