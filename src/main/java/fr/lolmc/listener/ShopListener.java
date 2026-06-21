@@ -116,11 +116,8 @@ public class ShopListener implements Listener {
             return;
         }
 
-        // DEBUG : afficher ce qui est cliqué
-        if (fr.lolmc.listener.AbilityListener.DEBUG) {
-            String dbgId = shopGUI.getClickedItemId(player, slot);
-            player.sendMessage(Component.text("[ac] shop clic slot=" + slot + " item=" + dbgId, NamedTextColor.DARK_GRAY));
-        }
+        fr.lolmc.util.DebugLogger.log("Shop", player.getName() + " clic slot=" + slot
+            + " item=" + shopGUI.getClickedItemId(player, slot));
 
         // Clic sur un onglet ?
         LolItem.ItemCategory cat = shopGUI.getClickedCategory(slot);

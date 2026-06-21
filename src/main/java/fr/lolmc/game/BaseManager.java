@@ -40,9 +40,7 @@ public class BaseManager {
     // ══════════════════════════════════════════════════════════════
 
     public void startRecall(Player player) {
-        if (fr.lolmc.listener.AbilityListener.DEBUG) player.sendMessage(
-            net.kyori.adventure.text.Component.text("[ac] startRecall appelé",
-            net.kyori.adventure.text.format.NamedTextColor.AQUA));
+        fr.lolmc.util.DebugLogger.log("Recall", "startRecall appelé par " + player.getName());
         if (activeRecalls.containsKey(player.getUniqueId())) {
             cancelRecall(player, "Recall déjà en cours");
             return;

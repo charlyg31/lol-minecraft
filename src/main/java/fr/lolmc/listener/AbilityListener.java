@@ -128,17 +128,20 @@ public class AbilityListener implements Listener {
     @EventHandler
     public void onArmSwing(org.bukkit.event.player.PlayerAnimationEvent e) {
         Player caster = e.getPlayer();
+        // Log AVANT le filtre hasChampion : confirme que l'event se déclenche
+        fr.lolmc.util.DebugLogger.log("ArmSwing-RAW", caster.getName()
+            + " a déclenché PlayerAnimationEvent (hasChampion="
+            + manager.hasChampion(caster) + ")");
         if (!manager.hasChampion(caster)) return;
 
-        // DEBUG
-        if (DEBUG) caster.sendMessage(net.kyori.adventure.text.Component.text(
-            "[ac] armswing type=" + e.getAnimationType(), net.kyori.adventure.text.format.NamedTextColor.DARK_GRAY));
+        fr.lolmc.util.DebugLogger.log("ArmSwing", caster.getName()
+            + " animation=" + e.getAnimationType());
 
         int slot = caster.getInventory().getHeldItemSlot();
         ItemStack held = caster.getInventory().getItem(slot);
         String t = HotbarManager.getType(held);
-        if (DEBUG) caster.sendMessage(net.kyori.adventure.text.Component.text(
-            "[ac] slot=" + slot + " type=" + t, net.kyori.adventure.text.format.NamedTextColor.DARK_GRAY));
+        fr.lolmc.util.DebugLogger.log("ArmSwing", "slot=" + slot + " type=" + t
+            + " item=" + (held != null ? held.getType() : "null"));
         if (!"ability".equals(t)) return;
         if (!canCast(caster)) return; // anti-double-déclenchement
 
@@ -153,6 +156,9 @@ public class AbilityListener implements Listener {
         Action a = e.getAction();
         int slot = caster.getInventory().getHeldItemSlot();
         ItemStack held = caster.getInventory().getItem(slot);
+        fr.lolmc.util.DebugLogger.log("Interact", caster.getName() + " action=" + a
+            + " slot=" + slot + " type=" + HotbarManager.getType(held)
+            + " isLol=" + HotbarManager.isLolItem(held));
         if (!HotbarManager.isLolItem(held)) return;
 
         // (Le clic gauche est géré par onArmSwing, plus fiable.)
@@ -180,8 +186,7 @@ public class AbilityListener implements Listener {
     private void onLeftClickCast(Player caster, int slot, ItemStack held, Player target) {
         String type = HotbarManager.getType(held);
         if (!"ability".equals(type)) return;
-        if (DEBUG) caster.sendMessage(net.kyori.adventure.text.Component.text(
-            "[ac] cast slot=" + slot, net.kyori.adventure.text.format.NamedTextColor.AQUA));
+        fr.lolmc.util.DebugLogger.log("LeftClickCast", "slot=" + slot + " caster=" + caster.getName());
 
         if (slot == 0) {
             // Slot 0 = auto-attaque : cherche la cible visée
