@@ -116,6 +116,10 @@ public class ShopListener implements Listener {
             return;
         }
 
+        // DEBUG temporaire : afficher ce qui est cliqué
+        String dbgId = shopGUI.getClickedItemId(player, slot);
+        player.sendMessage(Component.text("[debug] slot=" + slot + " item=" + dbgId, NamedTextColor.GRAY));
+
         // Clic sur un onglet ?
         LolItem.ItemCategory cat = shopGUI.getClickedCategory(slot);
         if (cat != null) {
@@ -134,8 +138,9 @@ public class ShopListener implements Listener {
         int gold = goldManager.getGold(player.getUniqueId());
         if (gold < item.getGoldCost()) {
             player.sendMessage(Component.text(
-                String.format("❌ Or insuffisant! (%d/%d)", gold, item.getGoldCost()),
+                String.format("❌ Or insuffisant! Tu as %d or, il en faut %d.", gold, item.getGoldCost()),
                 NamedTextColor.RED));
+            player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 1f, 1f);
             return;
         }
 

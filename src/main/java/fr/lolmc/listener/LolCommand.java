@@ -224,6 +224,8 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
         }
         // 4. Page de runes par défaut
         plugin.getRuneManager().applyRuneStats(player);
+        // 5. Or de départ généreux pour tester la boutique
+        plugin.getGoldManager().addGold(player.getUniqueId(), 20000);
         // 4. Lancer la partie complète
         mapManager.resetAllStructures();
         plugin.getMinionManager().startWaves();
