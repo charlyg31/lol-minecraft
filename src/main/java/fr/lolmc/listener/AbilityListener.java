@@ -69,6 +69,9 @@ public class AbilityListener implements Listener {
 
             // Ne rien faire si l'affichage est déjà à jour (anti-clignotement)
             if (shown[slot] == secs) continue;
+            fr.lolmc.util.DebugLogger.log("CooldownDisplay", "slot=" + slot
+                + " sort=" + ability.getName() + " remaining=" + String.format("%.1f", remaining)
+                + "s -> affiche " + secs + "s (item type=" + HotbarManager.getType(item) + ")");
             shown[slot] = secs;
 
             if (secs > 0) {
