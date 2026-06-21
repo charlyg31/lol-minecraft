@@ -306,8 +306,42 @@ public class AbilityListener implements Listener {
     @EventHandler
     public void onDamage(EntityDamageByEntityEvent e) {
         if (!(e.getDamager() instanceof Player caster)) return;
-        if (!(e.getEntity() instanceof Player target)) return;
         if (!manager.hasChampion(caster)) return;
+
+        var entity = e.getEntity();
+        var tm = LolPlugin.getInstance().getTeamManager();
+        Team myTeam = tm.getTeam(caster);
+
+        // ── Cible = SBIRE ──
+        if (entity instanceof org.bukkit.entity.Zombie z
+                && fr.lolmc.game.MinionManager.isMinion(z)) {
+            Team minionTeam = fr.lolmc.game.MinionManager.getMinionTeam(z);
+            // Bloquer les dégâts sur ses PROPRES sbires
+            if (minionTeam != null && minionTeam == myTeam) {
+                e.setCancelled(true);
+                return;
+            }
+            // Sbire ennemi : laisser passer le dégât vanilla (ou l'AA)
+            // On annule le dégât vanilla et on applique l'auto-attaque LoL
+            e.setCancelled(true);
+            int slotM = caster.getInventory().getHeldItemSlot();
+            ItemStack heldM = caster.getInventory().getItem(slotM);
+            if ("ability".equals(HotbarManager.getType(heldM)) && slotM == 0) {
+                // Dégâts via DamageUtil sur le sbire (auto-attaque)
+                double dmg = manager.getChampion(caster).getStats().getFinalAD();
+                z.damage(dmg, caster);
+            }
+            return;
+        }
+
+        // ── Cible = JOUEUR ──
+        if (!(entity instanceof Player target)) return;
+        // Bloquer les dégâts sur les alliés
+        Team targetTeam = tm.getTeam(target);
+        if (targetTeam != null && targetTeam == myTeam) {
+            e.setCancelled(true);
+            return;
+        }
 
         e.setCancelled(true);
         int slot = caster.getInventory().getHeldItemSlot();
@@ -315,10 +349,8 @@ public class AbilityListener implements Listener {
         if (!"ability".equals(HotbarManager.getType(held))) return;
 
         if (slot == 0) {
-            // Slot 0 = auto-attaque (portée + cadence gérées par AutoAttackManager)
             LolPlugin.getInstance().getAutoAttackManager().tryAutoAttack(caster, target);
         } else if (slot >= 1 && slot <= 4) {
-            // Clic gauche sur ennemi avec un sort sélectionné = lancer le sort sur lui
             if (canCast(caster)) manager.getChampion(caster).tryUseAbility(caster, slot, target);
         }
     }
