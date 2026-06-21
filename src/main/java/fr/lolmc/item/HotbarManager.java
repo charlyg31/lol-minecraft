@@ -299,6 +299,22 @@ public class HotbarManager {
         stack.setItemMeta(meta);
     }
 
+    /**
+     * Reconstruit ET re-marque un item de sort dans la hotbar (slots 0-4).
+     * À appeler après un cast pour que l'item garde son marquage PDC
+     * (sinon getType() renvoie null et les clics suivants sont ignorés).
+     * Ne fait rien si le joueur n'est pas sur la page 1.
+     */
+    public void refreshAbilitySlot(Player player, BaseChampion champ, int slot) {
+        if (slot < 0 || slot > 4) return;
+        if (getPage(player) != 1) return; // les sorts ne sont visibles qu'en page 1
+        var ability = champ.getAbility(slot);
+        if (ability == null) return;
+        ItemStack stack = ability.buildItemStack(champ.getStats());
+        tag(stack, "ability", ability.getId(), slot);
+        player.getInventory().setItem(slot, stack);
+    }
+
     public static String getType(ItemStack stack) {
         if (stack == null) return null;
         ItemMeta meta = stack.getItemMeta();
