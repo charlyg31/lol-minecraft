@@ -1,5 +1,6 @@
 package fr.lolmc.manager;
 
+import fr.lolmc.LolPlugin;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.champion.impl.adc.*;
 import fr.lolmc.champion.impl.jungle.*;
