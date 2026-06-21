@@ -128,13 +128,22 @@ public class ShopListener implements Listener {
 
         // Clic sur un item à acheter ?
         String itemId = shopGUI.getClickedItemId(player, slot);
-        if (itemId == null) return;
+        if (itemId == null) {
+            fr.lolmc.util.DebugLogger.log("Shop", "  itemId=null (slot pas un item)");
+            return;
+        }
 
         LolItem item = ItemRegistry.get(itemId);
-        if (item == null) return;
+        if (item == null) {
+            fr.lolmc.util.DebugLogger.log("Shop", "  ItemRegistry.get('" + itemId + "')=NULL !");
+            player.sendMessage(Component.text("❌ Item introuvable: " + itemId, NamedTextColor.RED));
+            return;
+        }
 
         // Vérifier l'or
         int gold = goldManager.getGold(player.getUniqueId());
+        fr.lolmc.util.DebugLogger.log("Shop", "  item=" + item.getDisplayName()
+            + " cout=" + item.getGoldCost() + " or_joueur=" + gold);
         if (gold < item.getGoldCost()) {
             player.sendMessage(Component.text(
                 String.format("❌ Or insuffisant! Tu as %d or, il en faut %d.", gold, item.getGoldCost()),
@@ -152,7 +161,9 @@ public class ShopListener implements Listener {
 
         // Acheter
         BaseChampion champ = championManager.getChampion(player);
-        if (goldManager.spendGold(player.getUniqueId(), item.getGoldCost())) {
+        boolean spent = goldManager.spendGold(player.getUniqueId(), item.getGoldCost());
+        fr.lolmc.util.DebugLogger.log("Shop", "  spendGold=" + spent + " champ=" + (champ != null));
+        if (spent) {
             // Consommables: utilisation immédiate
             ConsumableManager cm = LolPlugin.getInstance().getConsumableManager();
             if (item.getCategory() == ItemCategory.CONSUMABLE && cm != null) {
@@ -163,12 +174,17 @@ public class ShopListener implements Listener {
                 player.sendActionBar(Component.text(
                     "🧪 " + item.getDisplayName() + " ajouté (page 2)", NamedTextColor.GREEN));
             } else {
-                inv.equipItem(player, champ, item);
-                // Ajouter au HotbarManager (affichage hotbar des actifs)
-                var hb = LolPlugin.getInstance().getHotbarManager();
-                hb.addItem(player, item.getId());
-                hb.renderPage(player, champ);
-                hudManager.updateHUD(player, champ);
+                try {
+                    inv.equipItem(player, champ, item);
+                    var hb = LolPlugin.getInstance().getHotbarManager();
+                    hb.addItem(player, item.getId());
+                    hb.renderPage(player, champ);
+                    hudManager.updateHUD(player, champ);
+                    fr.lolmc.util.DebugLogger.log("Shop", "  ACHAT REUSSI: " + item.getDisplayName());
+                } catch (Exception ex) {
+                    fr.lolmc.util.DebugLogger.log("Shop", "  EXCEPTION equipItem: " + ex);
+                    player.sendMessage(Component.text("❌ Erreur achat: " + ex.getMessage(), NamedTextColor.RED));
+                }
             }
             // Rafraîchir l'affichage de l'or dans la boutique
             player.sendActionBar(Component.text(
