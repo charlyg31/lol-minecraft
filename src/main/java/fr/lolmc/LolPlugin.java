@@ -104,6 +104,7 @@ public class LolPlugin extends JavaPlugin {
     public void onEnable() {
         instance = this;
         saveDefaultConfig();
+        fr.lolmc.util.DebugLogger.init();
 
         championManager = new ChampionManager();
         flashManager = new FlashManager();

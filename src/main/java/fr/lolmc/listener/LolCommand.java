@@ -74,7 +74,7 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
             case "gold" -> handleGold(player, args);
             case "team" -> handleTeamCmd(player, args);
             case "testgame" -> handleTestGame(player);
-            case "debug" -> handleDebug(player);
+            case "debug" -> handleDebug(player, args);
             case "select" -> {
                 // Lance une sélection avec tous les joueurs en ligne (test/manuel)
                 var ids = new java.util.ArrayList<java.util.UUID>();
@@ -209,10 +209,49 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
     // ══════════════════════════════════════════════════════════════
 
 
-    /** /lol debug : affiche l'état complet du joueur pour diagnostic. */
-    private void handleDebug(Player player) {
+    /** /lol debug [on|off|clear|state] : gère le log de débug et affiche l'état. */
+    private void handleDebug(Player player, String[] args) {
         var plugin = LolPlugin.getInstance();
         var cm = plugin.getChampionManager();
+
+        // Sous-commandes de gestion du fichier de log
+        if (args.length >= 2) {
+            String sub = args[1].toLowerCase();
+            switch (sub) {
+                case "on" -> {
+                    fr.lolmc.util.DebugLogger.setEnabled(true);
+                    fr.lolmc.listener.AbilityListener.DEBUG = true;
+                    player.sendMessage(Component.text("✔ Débug ACTIVÉ. Log: " 
+                        + fr.lolmc.util.DebugLogger.getPath(), NamedTextColor.GREEN));
+                    return;
+                }
+                case "off" -> {
+                    fr.lolmc.util.DebugLogger.setEnabled(false);
+                    fr.lolmc.listener.AbilityListener.DEBUG = false;
+                    player.sendMessage(Component.text("✔ Débug DÉSACTIVÉ.", NamedTextColor.YELLOW));
+                    return;
+                }
+                case "clear" -> {
+                    fr.lolmc.util.DebugLogger.clear();
+                    player.sendMessage(Component.text("✔ Fichier debug.log vidé.", NamedTextColor.GREEN));
+                    return;
+                }
+                case "state" -> {
+                    player.sendMessage(Component.text("Débug: "
+                        + (fr.lolmc.util.DebugLogger.isEnabled() ? "ACTIF" : "inactif")
+                        + " | Fichier: " + fr.lolmc.util.DebugLogger.getPath(), NamedTextColor.AQUA));
+                    return;
+                }
+                default -> {
+                    player.sendMessage(Component.text(
+                        "Usage: /lol debug [on|off|clear|state] — sans argument: rapport d'état du joueur",
+                        NamedTextColor.GRAY));
+                    return;
+                }
+            }
+        }
+
+        // Sans argument : rapport d'état complet du joueur
         player.sendMessage(Component.text("══════ DEBUG ══════", NamedTextColor.YELLOW));
 
         // Champion
