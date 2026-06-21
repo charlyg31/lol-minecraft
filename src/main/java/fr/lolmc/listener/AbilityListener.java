@@ -52,7 +52,12 @@ public class AbilityListener implements Listener {
      * Affiche le cooldown restant sur les items de sort (slots 1-4).
      * Le nombre = secondes restantes (via la quantité de l'item).
      */
+    // Mémorise le dernier nombre de secondes affiché par slot, pour ne rafraîchir
+    // l'item QUE lorsque la valeur change (évite le clignotement).
+    private final java.util.Map<java.util.UUID, int[]> cdShown = new java.util.HashMap<>();
+
     private void updateCooldownDisplay(Player player, BaseChampion champ) {
+        int[] shown = cdShown.computeIfAbsent(player.getUniqueId(), k -> new int[]{-1, -1, -1, -1, -1});
         for (int slot = 1; slot <= 4; slot++) {
             var ability = champ.getAbility(slot);
             if (ability == null) continue;
@@ -60,9 +65,14 @@ public class AbilityListener implements Listener {
             if (item == null || !HotbarManager.isLolItem(item)) continue;
 
             double remaining = ability.getRemainingCooldown(player);
-            if (remaining > 0) {
-                // Afficher les secondes restantes via la quantité (1-64) + nom rouge
-                int secs = (int) Math.ceil(remaining);
+            int secs = remaining > 0 ? (int) Math.ceil(remaining) : 0;
+
+            // Ne rien faire si l'affichage est déjà à jour (anti-clignotement)
+            if (shown[slot] == secs) continue;
+            shown[slot] = secs;
+
+            if (secs > 0) {
+                // Quantité = secondes restantes (chiffre rouge visible sur l'item)
                 item.setAmount(Math.max(1, Math.min(64, secs)));
                 var meta = item.getItemMeta();
                 if (meta != null) {
@@ -73,13 +83,24 @@ public class AbilityListener implements Listener {
                     item.setItemMeta(meta);
                 }
             } else {
-                // Prêt : quantité 1, nom normal
-                if (item.getAmount() != 1) item.setAmount(1);
+                // Prêt : quantité 1, nom rétabli par le refresh normal
+                item.setAmount(1);
+                champ.refreshSlot(player, slot);
             }
         }
     }
 
     private HotbarManager hotbar() { return LolPlugin.getInstance().getHotbarManager(); }
+
+    // Anti-rebond : évite le double déclenchement clic gauche (animation + attaque entité)
+    private final java.util.Map<java.util.UUID, Long> lastCastTime = new java.util.HashMap<>();
+    private boolean canCast(Player p) {
+        long now = System.currentTimeMillis();
+        Long last = lastCastTime.get(p.getUniqueId());
+        if (last != null && (now - last) < 150) return false;
+        lastCastTime.put(p.getUniqueId(), now);
+        return true;
+    }
 
     // ══════════════════════════════════════════════════════════════
     // SYSTÈME D'INPUT LoL
@@ -101,6 +122,26 @@ public class AbilityListener implements Listener {
 
     // ── CLIC DROIT dans le vide → améliorer le sort / Flash / actif / page ──
     @EventHandler
+
+    // ── CLIC GAUCHE FIABLE via PlayerAnimationEvent ──
+    // LEFT_CLICK_AIR n'est pas toujours envoyé par le client ; l'animation
+    // de balancement du bras (arm swing) l'est à chaque clic gauche.
+    @EventHandler
+    public void onArmSwing(org.bukkit.event.player.PlayerAnimationEvent e) {
+        if (e.getAnimationType() != org.bukkit.event.player.PlayerAnimationType.ARM_SWING) return;
+        Player caster = e.getPlayer();
+        if (!manager.hasChampion(caster)) return;
+
+        int slot = caster.getInventory().getHeldItemSlot();
+        ItemStack held = caster.getInventory().getItem(slot);
+        if (!"ability".equals(HotbarManager.getType(held))) return;
+        if (!canCast(caster)) return; // anti-double-déclenchement
+
+        // Lancer le sort (ou auto-attaque slot 0), avec la cible visée s'il y en a une
+        onLeftClickCast(caster, slot, held, null);
+    }
+
+    @EventHandler
     public void onInteract(PlayerInteractEvent e) {
         Player caster = e.getPlayer();
         if (!manager.hasChampion(caster)) return;
@@ -110,13 +151,7 @@ public class AbilityListener implements Listener {
         ItemStack held = caster.getInventory().getItem(slot);
         if (!HotbarManager.isLolItem(held)) return;
 
-        // ── CLIC GAUCHE (air) → lancer le sort ──
-        if (a == Action.LEFT_CLICK_AIR || a == Action.LEFT_CLICK_BLOCK) {
-            e.setCancelled(true);
-            onLeftClickCast(caster, slot, held, null);
-            return;
-        }
-
+        // (Le clic gauche est géré par onArmSwing, plus fiable.)
         // ── CLIC DROIT → améliorer le sort ou activer un item ──
         if (a == Action.RIGHT_CLICK_AIR || a == Action.RIGHT_CLICK_BLOCK) {
             e.setCancelled(true);
@@ -267,7 +302,7 @@ public class AbilityListener implements Listener {
             LolPlugin.getInstance().getAutoAttackManager().tryAutoAttack(caster, target);
         } else if (slot >= 1 && slot <= 4) {
             // Clic gauche sur ennemi avec un sort sélectionné = lancer le sort sur lui
-            manager.getChampion(caster).tryUseAbility(caster, slot, target);
+            if (canCast(caster)) manager.getChampion(caster).tryUseAbility(caster, slot, target);
         }
     }
 
