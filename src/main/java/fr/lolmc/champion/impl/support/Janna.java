@@ -100,12 +100,10 @@ public class Janna extends BaseChampion {
             resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // Repousse ennemis
-            c.getWorld().getNearbyEntities(c.getLocation(),4,2,4).stream()
-                .filter(e->e instanceof Player&&!e.equals(c))
-                .forEach(e->{
-                    Vector kb=e.getLocation().toVector().subtract(c.getLocation().toVector()).normalize().multiply(2.5);
-                    kb.setY(0.5); e.setVelocity(kb);
-                });
+            for(var __t : TargetingUtil.enemiesAround(c, 4.0)){
+                Vector kb=__t.getLocation().toVector().subtract(c.getLocation().toVector()).normalize().multiply(2.5);
+                kb.setY(0.5); __t.setVelocity(kb);
+            }
             // Soigne alliés proches
             c.addPotionEffect(new PotionEffect(PotionEffectType.REGENERATION,60,3,false,true));
             c.sendActionBar(Component.text("🌪 RÉVEIL!",NamedTextColor.WHITE));
