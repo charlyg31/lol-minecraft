@@ -327,9 +327,11 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
         plugin.getTeamManager().setTeam(player, fr.lolmc.team.TeamManager.Team.BLUE);
         // 2. Champion
         plugin.getChampionManager().assignChampion(player, champId);
-        // 3. Niveau 1 avec le premier sort débloqué (sinon rien ne se lance)
+        // 3. Niveau 18 + tous les sorts débloqués au max (mode test : tout est jouable)
         var soloChamp = plugin.getChampionManager().getChampion(player);
         if (soloChamp != null) {
+            soloChamp.getLevelSystem().setLevel(18);
+            soloChamp.getStats().setChampionLevel(18);
             soloChamp.getLevelSystem().maxOutAbilities();
             plugin.getHotbarManager().renderPage(player, soloChamp);
         }
