@@ -50,14 +50,12 @@ public class Darius extends BaseChampion {
             new double[]{9,8,7,6,5},5,5,DamageType.PHYSICAL);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            c.getWorld().getNearbyEntities(c.getLocation(),5,2,5).stream()
-                .filter(e->e instanceof Player&&!e.equals(c))
-                .forEach(e->{
-                    double dist=e.getLocation().distance(c.getLocation());
-                    double mult=dist>3?1.5:1.0; // bord = +50%
-                    double dmg=(40+s.getFinalAD()*0.6)*mult;
-                    DamageUtil.abilityDamage(c, (Player)e, dmg);
-                });
+            for(var __t : TargetingUtil.enemiesAround(c, 5.0)){
+                double dist=__t.getLocation().distance(c.getLocation());
+                double mult=dist>3?1.5:1.0; // bord = +50%
+                double dmg=(40+s.getFinalAD()*0.6)*mult;
+                TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.PHYSICAL);
+            }
             c.getWorld().spawnParticle(Particle.SWEEP_ATTACK,c.getLocation(),5,2,1,2);
         }
         @Override public String getDynamicDescription(ChampionStats s){
@@ -86,14 +84,14 @@ public class Darius extends BaseChampion {
             new double[]{24,21,18,15,12},5,5,DamageType.PHYSICAL);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            c.getWorld().getNearbyEntities(c.getLocation(),5,2,5).stream()
-                .filter(e->e instanceof Player&&!e.equals(c))
-                .forEach(e->{
-                    Vector pull=c.getLocation().toVector().subtract(e.getLocation().toVector()).normalize().multiply(1.0);
-                    pull.setY(0.25); e.setVelocity(pull);
-                    ((Player)e).addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,20,2,false,true));
-                    ((Player)e).sendActionBar(Component.text("🪝 Appréhension!",NamedTextColor.DARK_RED));
-                });
+            for(var __t : TargetingUtil.enemiesAround(c, 5.0)){
+                Vector pull=c.getLocation().toVector().subtract(__t.getLocation().toVector()).normalize().multiply(1.0);
+                pull.setY(0.25); __t.setVelocity(pull);
+                if(__t instanceof Player __p){
+                    __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,20,2,false,true));
+                    __p.sendActionBar(Component.text("🪝 Appréhension!",NamedTextColor.DARK_RED));
+                }
+            }
         }
         @Override public String getDynamicDescription(ChampionStats s){return "Attire les ennemis dans 5 blocs + ralentit 1s.";}
     }

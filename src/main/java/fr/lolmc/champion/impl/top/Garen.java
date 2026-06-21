@@ -92,9 +92,8 @@ public class Garen extends BaseChampion {
                 @Override public void run(){
                     if(tick>=60){cancel();return;}
                     double dmg=(4+s.getFinalAD()*0.14)/10.0;
-                    c.getWorld().getNearbyEntities(c.getLocation(),4,2,4).stream()
-                        .filter(e->e instanceof Player&&!e.equals(c))
-                        .forEach(e->{Player v=(Player)e;DamageUtil.abilityDamage(c, v, dmg);});
+                    TargetingUtil.dealDamageAll(c,
+                        TargetingUtil.enemiesAround(c, 4.0), dmg, TargetingUtil.DmgType.PHYSICAL);
                     c.getWorld().spawnParticle(Particle.SWEEP_ATTACK,c.getLocation(),2,1.5,0.5,1.5);
                     tick+=2;
                 }
