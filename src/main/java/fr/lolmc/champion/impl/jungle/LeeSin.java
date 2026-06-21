@@ -84,12 +84,11 @@ public class LeeSin extends BaseChampion {
             resourceCost = 50;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             double dmg=60+s.getFinalAD()*0.5;
-            c.getWorld().getNearbyEntities(c.getLocation(),4,2,4).stream()
-                .filter(e->e instanceof Player&&!e.equals(c))
-                .forEach(e->{
-                    DamageUtil.abilityDamage(c, (Player)e, dmg);
-                    ((Player)e).addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,40,1,false,true));
-                });
+            for(var __t : TargetingUtil.enemiesAround(c, 4.0)){
+                TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.PHYSICAL);
+                if(__t instanceof Player __p)
+                    __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,40,1,false,true));
+            }
             c.getWorld().spawnParticle(Particle.FLAME,c.getLocation(),20,2,1,2,0.05);
         }
         @Override public String getDynamicDescription(ChampionStats s){

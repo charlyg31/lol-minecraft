@@ -104,13 +104,13 @@ public class Amumu extends BaseChampion {
             resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             double dmg=150+s.getFinalAP()*0.8;
-            c.getWorld().getNearbyEntities(c.getLocation(),5,2,5).stream()
-                .filter(e->e instanceof Player&&!e.equals(c))
-                .forEach(e->{
-                    DamageUtil.abilityDamageMagic(c, (Player)e, dmg);
-                    ((Player)e).addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,40,10,false,true));
-                    ((Player)e).sendActionBar(Component.text("⛓ Malédiction Amumu! Root 2s",NamedTextColor.DARK_PURPLE));
-                });
+            for(var __t : TargetingUtil.enemiesAround(c, 5.0)){
+                TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);
+                if(__t instanceof Player __p){
+                    __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,40,10,false,true));
+                    __p.sendActionBar(Component.text("⛓ Malédiction Amumu! Root 2s",NamedTextColor.DARK_PURPLE));
+                }
+            }
             c.getWorld().spawnParticle(Particle.END_ROD,c.getLocation(),20,3,1,3);
         }
         @Override public String getDynamicDescription(ChampionStats s){
