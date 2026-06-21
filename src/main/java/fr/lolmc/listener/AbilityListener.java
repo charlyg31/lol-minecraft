@@ -93,6 +93,8 @@ public class AbilityListener implements Listener {
     private HotbarManager hotbar() { return LolPlugin.getInstance().getHotbarManager(); }
 
     // Anti-rebond : évite le double déclenchement clic gauche (animation + attaque entité)
+    // Active les messages de diagnostic en jeu (à désactiver en prod)
+    public static boolean DEBUG = true;
     private final java.util.Map<java.util.UUID, Long> lastCastTime = new java.util.HashMap<>();
     private boolean canCast(Player p) {
         long now = System.currentTimeMillis();
@@ -125,16 +127,21 @@ public class AbilityListener implements Listener {
     // de balancement du bras (arm swing) l'est à chaque clic gauche.
     @EventHandler
     public void onArmSwing(org.bukkit.event.player.PlayerAnimationEvent e) {
-        if (e.getAnimationType() != org.bukkit.event.player.PlayerAnimationType.ARM_SWING) return;
         Player caster = e.getPlayer();
         if (!manager.hasChampion(caster)) return;
 
+        // DEBUG
+        if (DEBUG) caster.sendMessage(net.kyori.adventure.text.Component.text(
+            "[ac] armswing type=" + e.getAnimationType(), net.kyori.adventure.text.format.NamedTextColor.DARK_GRAY));
+
         int slot = caster.getInventory().getHeldItemSlot();
         ItemStack held = caster.getInventory().getItem(slot);
-        if (!"ability".equals(HotbarManager.getType(held))) return;
+        String t = HotbarManager.getType(held);
+        if (DEBUG) caster.sendMessage(net.kyori.adventure.text.Component.text(
+            "[ac] slot=" + slot + " type=" + t, net.kyori.adventure.text.format.NamedTextColor.DARK_GRAY));
+        if (!"ability".equals(t)) return;
         if (!canCast(caster)) return; // anti-double-déclenchement
 
-        // Lancer le sort (ou auto-attaque slot 0), avec la cible visée s'il y en a une
         onLeftClickCast(caster, slot, held, null);
     }
 
@@ -173,6 +180,8 @@ public class AbilityListener implements Listener {
     private void onLeftClickCast(Player caster, int slot, ItemStack held, Player target) {
         String type = HotbarManager.getType(held);
         if (!"ability".equals(type)) return;
+        if (DEBUG) caster.sendMessage(net.kyori.adventure.text.Component.text(
+            "[ac] cast slot=" + slot, net.kyori.adventure.text.format.NamedTextColor.AQUA));
 
         if (slot == 0) {
             // Slot 0 = auto-attaque : cherche la cible visée

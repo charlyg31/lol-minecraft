@@ -65,7 +65,17 @@ public abstract class BaseChampion {
     public void tryUseAbility(Player caster, int slot, Player target) {
         if (slot < 0 || slot > 4) return;
         BaseAbility ability = abilities[slot];
-        if (ability == null) return;
+        if (ability == null) {
+            if (fr.lolmc.listener.AbilityListener.DEBUG) caster.sendMessage(
+                net.kyori.adventure.text.Component.text("[ac] ability NULL slot=" + slot,
+                net.kyori.adventure.text.format.NamedTextColor.RED));
+            return;
+        }
+        if (fr.lolmc.listener.AbilityListener.DEBUG) caster.sendMessage(
+            net.kyori.adventure.text.Component.text("[ac] tryUse " + ability.getName()
+            + " rang=" + levelSystem.getAbilityRank(slot)
+            + " unlocked=" + (slot==0 || levelSystem.isAbilityUnlocked(slot)),
+            net.kyori.adventure.text.format.NamedTextColor.AQUA));
 
         // Le sort doit être débloqué (AA slot 0 toujours OK)
         if (slot >= 1 && !levelSystem.isAbilityUnlocked(slot)) {
