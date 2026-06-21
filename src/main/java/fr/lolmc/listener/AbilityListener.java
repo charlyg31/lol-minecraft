@@ -309,6 +309,11 @@ public class AbilityListener implements Listener {
         if (!(e.getDamager() instanceof Player caster)) return;
         if (!manager.hasChampion(caster)) return;
 
+        // ANTI-SPAM ÉPÉE : un joueur-champion ne fait JAMAIS de dégât de mêlée vanilla.
+        // Tous les dégâts passent par le système LoL (AA cadencée ou sorts).
+        // On annule donc systématiquement le dégât vanilla ici.
+        e.setCancelled(true);
+
         var entity = e.getEntity();
         var tm = LolPlugin.getInstance().getTeamManager();
         Team myTeam = tm.getTeam(caster);
@@ -321,34 +326,26 @@ public class AbilityListener implements Listener {
             if (fr.lolmc.game.MinionManager.isMinion(le)) {
                 Team minionTeam = fr.lolmc.game.MinionManager.getMinionTeam(le);
                 if (minionTeam != null && minionTeam == myTeam) {
-                    e.setCancelled(true);
                     return;
                 }
             }
-            // Annuler le dégât vanilla, appliquer l'AA LoL (dégât direct, pas de reboucle)
-            e.setCancelled(true);
-            double dmg = manager.getChampion(caster).getStats().getFinalAD();
-            double newHealth = Math.max(0, le.getHealth() - dmg);
-            le.setHealth(newHealth);
-            // Effet visuel de coup
-            le.getWorld().spawnParticle(org.bukkit.Particle.CRIT,
-                le.getLocation().add(0, 1, 0), 6, 0.3, 0.3, 0.3);
-            le.playEffect(org.bukkit.EntityEffect.HURT);
-            fr.lolmc.util.DebugLogger.log("AutoAttack", caster.getName()
-                + " AA sbire/monstre dmg=" + dmg + " HP restant=" + newHealth);
+            // AA LoL uniquement si on tient le slot 0 (l'auto-attaque), avec cadence respectée
+            int slotM = caster.getInventory().getHeldItemSlot();
+            ItemStack heldM = caster.getInventory().getItem(slotM);
+            if ("ability".equals(HotbarManager.getType(heldM)) && slotM == 0) {
+                LolPlugin.getInstance().getAutoAttackManager().tryAutoAttackEntity(caster, le);
+            }
             return;
         }
 
         // ── Cible = JOUEUR ──
         if (!(entity instanceof Player target)) return;
-        // Bloquer les dégâts sur les alliés
+        // Bloquer les dégâts sur les alliés (déjà annulé vanilla en début de méthode)
         Team targetTeam = tm.getTeam(target);
         if (targetTeam != null && targetTeam == myTeam) {
-            e.setCancelled(true);
             return;
         }
 
-        e.setCancelled(true);
         int slot = caster.getInventory().getHeldItemSlot();
         ItemStack held = caster.getInventory().getItem(slot);
         if (!"ability".equals(HotbarManager.getType(held))) return;
