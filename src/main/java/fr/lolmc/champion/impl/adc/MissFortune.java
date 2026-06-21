@@ -36,9 +36,8 @@ public class MissFortune extends BaseChampion {
             new double[]{0.5},5,0,DamageType.PHYSICAL);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
-            double dmg=s.calcAutoAttackDamage(null);
-            DamageUtil.damage(c, t, dmg, false);
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,5.5); if(tgt==null)return;
+            TargetingUtil.dealDamage(c, tgt, s.getFinalAD(), TargetingUtil.DmgType.PHYSICAL);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             return String.format("Inflige %.0f dégâts.", s.getFinalAD());
@@ -46,19 +45,32 @@ public class MissFortune extends BaseChampion {
     }
 
     static class Q extends BaseAbility {
-        Q(){super("q_missfortune","Double Tir",Material.FLINT_AND_STEEL,AbilitySlot.Q,
+        Q(){super("q_missfortune","Doublé",Material.FLINT_AND_STEEL,AbilitySlot.Q,
             new double[]{7,6,5,4,3},25,0,DamageType.PHYSICAL);
             resourceCost = 43;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
+            // LoL : tir sur 1 cible qui ricoche sur celle derrière. 1ère: 20-100+100%AD. 2ème: 20-80+85%AD +crit
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.0); if(tgt==null){c.sendActionBar(Component.text("🔫 Aucune cible",NamedTextColor.GRAY));return;}
             double[] base={20,40,60,80,100};double d1=base[getLevel()-1]+s.getFinalAD()*1.0;
-            double d2=(20+s.getFinalAD()*0.85)*1.35;
-            DamageUtil.abilityDamageEntity(c, tgt, d1+d2);
-            c.getWorld().spawnParticle(Particle.CRIT,tgt.getLocation(),10,0.3,0.3,0.3);
+            TargetingUtil.dealDamage(c, tgt, d1, TargetingUtil.DmgType.PHYSICAL);
+            // Ricochet : 2e cible la plus proche derrière la 1ère
+            double[] base2={20,35,50,65,80};double d2=(base2[getLevel()-1]+s.getFinalAD()*0.85)*1.35;
+            org.bukkit.entity.LivingEntity second=null; double best=Double.MAX_VALUE;
+            for(var __t : TargetingUtil.entitiesInRadius(c, tgt.getLocation(), 5.0)){
+                if(__t.equals(tgt)) continue;
+                double dd=__t.getLocation().distance(tgt.getLocation());
+                if(dd<best){best=dd;second=__t;}
+            }
+            if(second!=null){
+                TargetingUtil.dealDamage(c, second, d2, TargetingUtil.DmgType.PHYSICAL);
+                second.getWorld().spawnParticle(Particle.CRIT,second.getLocation().add(0,1,0),8);
+            }
+            tgt.getWorld().spawnParticle(Particle.CRIT,tgt.getLocation().add(0,1,0),10,0.3,0.3,0.3);
+            c.getWorld().playSound(c.getLocation(), Sound.ENTITY_FIREWORK_ROCKET_BLAST, 1f, 1.5f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            double d=20+s.getFinalAD()*0.85;
-            return String.format("1ère balle: %.0f. 2ème balle: %.0f (+35%%).",d,d*1.35);
+            double[] base={20,40,60,80,100};
+            return String.format("1ère balle: %.0f (+100%%AD). Ricoche sur la 2ème cible (+35%%).",base[getLevel()-1]+s.getFinalAD());
         }
     }
 
@@ -76,43 +88,68 @@ public class MissFortune extends BaseChampion {
 
     static class E extends BaseAbility {
         E(){super("e_missfortune","Pluie de Balles",Material.GUNPOWDER,AbilitySlot.E,
-            new double[]{18,15,12,9,6},25,3,DamageType.PHYSICAL);
+            new double[]{14.5,13,11.5,10,8.5},25,3,DamageType.MAGICAL);
             resourceCost = 80;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
-            double dmg=60+s.getFinalAD()*0.8;
-            for(var __t : TargetingUtil.entitiesInRadius(c, tgt.getLocation(), 3.0)){
-                TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.PHYSICAL);
-                if(__t instanceof Player __p)
-                    __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,40,1,false,true));
-            }
-            c.getWorld().spawnParticle(Particle.CRIT,tgt.getLocation(),20,1.5,1,1.5);
+            // LoL : zone au sol visée, dégâts magiques toutes les 0.25s sur 2s + ralentit 40-60%
+            Location loc=TargetingUtil.getAimedGroundLocation(c, 8.0);
+            double[] tickBase={15,20,25,30,35};
+            double perTick=tickBase[getLevel()-1]+s.getFinalAP()*0.1;
+            loc.getWorld().spawnParticle(Particle.ENCHANT,loc,20,3,0.2,3);
+            new BukkitRunnable(){
+                int ticks=0;
+                @Override public void run(){
+                    if(ticks>=8){cancel();return;} // 8 ticks sur 2s
+                    for(var __t : TargetingUtil.entitiesInRadius(c, loc, 3.5)){
+                        TargetingUtil.dealDamage(c, __t, perTick, TargetingUtil.DmgType.MAGICAL);
+                        if(__t instanceof Player __p)
+                            __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,10,2,false,true));
+                    }
+                    loc.getWorld().spawnParticle(Particle.CRIT,loc,15,3,0.2,3);
+                    ticks++;
+                }
+            }.runTaskTimer(LolPlugin.getInstance(),0L,5L); // toutes les 0.25s
+            c.getWorld().playSound(loc, Sound.ENTITY_FIREWORK_ROCKET_LAUNCH, 1f, 1.2f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            return String.format("Zone 3 blocs: %.0f dégâts + ralentit 2s (60+80%%AD).",60+s.getFinalAD()*0.8);
+            double[] tickBase={15,20,25,30,35};
+            return String.format("Zone visée: %.0f dégâts/0.25s sur 2s + ralentit (zone de contrôle).",tickBase[getLevel()-1]+s.getFinalAP()*0.1);
         }
     }
 
     static class R extends BaseAbility {
-        R(){super("r_missfortune","Pluie de Balles R",Material.NETHERITE_HOE,AbilitySlot.R,
+        R(){super("r_missfortune","Déluge de Balles",Material.NETHERITE_HOE,AbilitySlot.R,
             new double[]{120,100,80},25,8,DamageType.PHYSICAL);
             resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            c.sendActionBar(Component.text("🔫 PLUIE DE BALLES! 3s",NamedTextColor.RED));
+            // LoL : canalise 3s, ~8 vagues de balles en CÔNE devant. Chaque vague = 75% AD + 35% AP (peut critiquer)
+            c.sendActionBar(Component.text("🔫 DÉLUGE DE BALLES! 3s",NamedTextColor.RED));
+            double perWave=s.getFinalAD()*0.75+s.getFinalAP()*0.35;
             new BukkitRunnable(){
-                int tick=0;
+                int waves=0;
                 @Override public void run(){
-                    if(tick>=60){cancel();return;}
-                    double dmg=(110+s.getFinalAP()*0.2)/3.0;
-                    TargetingUtil.dealDamageAll(c, TargetingUtil.entitiesInRadius(c, c.getLocation(), 8), dmg, TargetingUtil.DmgType.PHYSICAL);
-                    c.getWorld().spawnParticle(Particle.CRIT,c.getLocation().add(
-                        c.getLocation().getDirection().multiply(4)),5,3,0,3);
-                    tick+=20;
+                    if(waves>=8){cancel();return;} // 8 vagues sur 3s
+                    // Vague en cône devant
+                    var targets=TargetingUtil.enemiesInCone(c, 9.0, 40);
+                    for(var __t : targets){
+                        double dmg=perWave;
+                        // Chaque vague peut critiquer
+                        if(Math.random()<s.getFinalCritChance()) dmg*=1.3;
+                        TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.PHYSICAL);
+                    }
+                    // Animation : balles en éventail devant
+                    var dir=c.getEyeLocation().getDirection().normalize();
+                    for(double d=1; d<=9; d+=1){
+                        c.getWorld().spawnParticle(Particle.CRIT,c.getEyeLocation().add(dir.clone().multiply(d)),3,1.5,0.3,1.5,0);
+                    }
+                    c.getWorld().playSound(c.getLocation(), Sound.ENTITY_FIREWORK_ROCKET_BLAST, 0.8f, 1.5f);
+                    waves++;
                 }
-            }.runTaskTimer(LolPlugin.getInstance(),0L,20L);
+            }.runTaskTimer(LolPlugin.getInstance(),0L,7L); // 8 vagues × 7 ticks ≈ 3s
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            return String.format("%.0f dégâts/s dans 8 blocs pendant 3s.",(110+s.getFinalAP()*0.2)/3.0);
+            double perWave=s.getFinalAD()*0.75+s.getFinalAP()*0.35;
+            return String.format("Canalise 3s: 8 vagues en cône, %.0f dégâts/vague (peut critiquer).",perWave);
         }
     }
 }
