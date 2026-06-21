@@ -6,6 +6,7 @@ import fr.lolmc.stats.ResourceSystem;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.stats.ChampionStats;
 import fr.lolmc.util.DamageUtil;
+import fr.lolmc.util.TargetingUtil;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.*;
@@ -35,7 +36,7 @@ public class MasterYi extends BaseChampion {
             new double[]{0.5},5,0,DamageType.PHYSICAL);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            if(t==null)return;
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
             double dmg=s.calcAutoAttackDamage(null);
             DamageUtil.damage(c, t, dmg, false);
         }
@@ -49,12 +50,12 @@ public class MasterYi extends BaseChampion {
             new double[]{18,16,14,12,10},15,0,DamageType.TRUE);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            if(t==null)return;
-            Location dest=safeTeleport(c.getLocation(),t.getLocation());
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
+            Location dest=safeTeleport(c.getLocation(),tgt.getLocation());
             c.teleport(dest);
             double[] base={25,60,95,130,165};double dmg=base[getLevel()-1]+s.getFinalAD()*1.0;
-            DamageUtil.trueDamage(c, t, dmg);
-            c.getWorld().spawnParticle(Particle.CRIT,t.getLocation(),10,0.5,0.5,0.5);
+            DamageUtil.trueDamageEntity(c, tgt, dmg);
+            c.getWorld().spawnParticle(Particle.CRIT,tgt.getLocation(),10,0.5,0.5,0.5);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             return String.format("%.0f dégâts vrais (25+110%%AD). Dash sur la cible.",25+s.getFinalAD()*1.1);

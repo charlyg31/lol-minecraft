@@ -6,6 +6,7 @@ import fr.lolmc.stats.ResourceSystem;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.stats.ChampionStats;
 import fr.lolmc.util.DamageUtil;
+import fr.lolmc.util.TargetingUtil;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.*;
@@ -35,7 +36,7 @@ public class Sivir extends BaseChampion {
             new double[]{0.5},5,0,DamageType.PHYSICAL);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            if(t==null)return;
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
             double dmg=s.calcAutoAttackDamage(null);
             DamageUtil.damage(c, t, dmg, false);
         }
@@ -49,16 +50,16 @@ public class Sivir extends BaseChampion {
             new double[]{9,8,7,6,5},25,0,DamageType.PHYSICAL);
             resourceCost = 70;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            if(t==null)return;
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
             double[] base={25,45,65,85,105};double dmg=base[getLevel()-1]+s.getFinalAD()*1.0;
-            DamageUtil.abilityDamage(c, t, dmg);
+            DamageUtil.abilityDamageEntity(c, tgt, dmg);
             // Retour: dégâts réduits
             new BukkitRunnable(){@Override public void run(){
-                if(!t.isOnline())return;
-                DamageUtil.abilityDamage(c, t, dmg*0.7);
-                c.getWorld().spawnParticle(Particle.CRIT,t.getLocation(),5);
+                if(!(!tgt.isDead()))return;
+                DamageUtil.abilityDamageEntity(c, tgt, dmg*0.7);
+                c.getWorld().spawnParticle(Particle.CRIT,tgt.getLocation(),5);
             }}.runTaskLater(LolPlugin.getInstance(),15L);
-            c.getWorld().spawnParticle(Particle.CRIT,t.getLocation(),10);
+            c.getWorld().spawnParticle(Particle.CRIT,tgt.getLocation(),10);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double d=50+s.getFinalAD()*0.5;

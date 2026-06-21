@@ -6,6 +6,7 @@ import fr.lolmc.stats.ResourceSystem;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.stats.ChampionStats;
 import fr.lolmc.util.DamageUtil;
+import fr.lolmc.util.TargetingUtil;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.*;
@@ -35,7 +36,7 @@ public class Garen extends BaseChampion {
             new double[]{0.5},5,0,DamageType.PHYSICAL);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            if(t==null)return;
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
             double dmg=s.calcAutoAttackDamage(null);
             DamageUtil.damage(c, t, dmg, false);
         }
@@ -50,15 +51,15 @@ public class Garen extends BaseChampion {
             new double[]{8,7.5,7,6.5,6},5,0,DamageType.PHYSICAL);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            if(t==null)return;
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
             double[] base={30,55,80,105,130};
             double dmg=base[getLevel()-1]+s.getFinalAD()*0.5;
-            DamageUtil.abilityDamage(c, t, dmg);
+            DamageUtil.abilityDamageEntity(c, tgt, dmg);
             // Silence appliqué (slow Minecraft comme approximation du silence)
-            t.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,30,2,false,true));
+            tgt.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,30,2,false,true));
             c.addPotionEffect(new PotionEffect(PotionEffectType.SPEED,30,1,false,true));
-            t.sendActionBar(Component.text("⚠ Silence — Garen Q",NamedTextColor.RED));
-            c.getWorld().spawnParticle(Particle.SWEEP_ATTACK,t.getLocation(),3);
+            if(tgt instanceof Player _tp)_tp.sendActionBar(Component.text("⚠ Silence — Garen Q",NamedTextColor.RED));
+            c.getWorld().spawnParticle(Particle.SWEEP_ATTACK,tgt.getLocation(),3);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             return String.format("%.0f dégâts physiques (30+140%%AD). Silence 1.5s + boost vitesse.",30+s.getFinalAD()*1.4);
@@ -111,17 +112,17 @@ public class Garen extends BaseChampion {
             new double[]{120,100,80},25,0,DamageType.TRUE);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            if(t==null)return;
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
             double[] base={150,300,450};
             int r=Math.min(getLevel()-1,2);
             // Dégâts vrais : base + 25% PV manquants de la cible (formule LoL)
             var cm=LolPlugin.getInstance().getChampionManager();
             double missingHP=0;
-            if(cm.hasChampion(t)){var hp=cm.getChampion(t).getHPSystem();missingHP=hp.getMaxHP()-hp.getCurrentHP();}
+            if((tgt instanceof Player && cm.hasChampion((Player)tgt))){var hp=cm.getChampion((Player)tgt).getHPSystem();missingHP=hp.getMaxHP()-hp.getCurrentHP();}
             double dmg=base[r]+missingHP*0.25;
-            t.getWorld().strikeLightningEffect(t.getLocation());
-            DamageUtil.trueDamage(c, t, dmg);
-            t.sendMessage(Component.text("☠ Exécution de Garen!",NamedTextColor.DARK_RED));
+            tgt.getWorld().strikeLightningEffect(tgt.getLocation());
+            DamageUtil.trueDamageEntity(c, tgt, dmg);
+            if(tgt instanceof Player _tp)_tp.sendMessage(Component.text("☠ Exécution de Garen!",NamedTextColor.DARK_RED));
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] base={150,300,450};int r=Math.min(getLevel()-1,2);return String.format("%.0f dégâts vrais + 25%% PV manquants.",base[r]);

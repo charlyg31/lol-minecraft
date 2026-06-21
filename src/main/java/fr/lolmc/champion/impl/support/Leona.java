@@ -6,6 +6,7 @@ import fr.lolmc.stats.ResourceSystem;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.stats.ChampionStats;
 import fr.lolmc.util.DamageUtil;
+import fr.lolmc.util.TargetingUtil;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.*;
@@ -35,7 +36,7 @@ public class Leona extends BaseChampion {
             new double[]{0.5},5,0,DamageType.PHYSICAL);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            if(t==null)return;
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
             double dmg=s.calcAutoAttackDamage(null);
             DamageUtil.damage(c, t, dmg, false, DamageUtil.Type.MAGICAL);
         }
@@ -49,12 +50,12 @@ public class Leona extends BaseChampion {
             new double[]{11,10,9,8,7},5,0,DamageType.MAGICAL);
             resourceCost = 45;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            if(t==null)return;
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
             double[] base={10,35,60,85,110};double dmg=base[getLevel()-1]+s.getFinalAP()*0.3;
-            DamageUtil.abilityDamageMagic(c, t, dmg);
-            t.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,25,10,false,true));
-            t.sendActionBar(Component.text("☀ Stun 1.25s — Leona Q!",NamedTextColor.YELLOW));
-            c.getWorld().spawnParticle(Particle.END_ROD,t.getLocation(),8,0.3,0.3,0.3);
+            DamageUtil.abilityDamageMagicEntity(c, tgt, dmg);
+            tgt.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,25,10,false,true));
+            if(tgt instanceof Player _tp)_tp.sendActionBar(Component.text("☀ Stun 1.25s — Leona Q!",NamedTextColor.YELLOW));
+            c.getWorld().spawnParticle(Particle.END_ROD,tgt.getLocation(),8,0.3,0.3,0.3);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             return String.format("%.0f dégâts + stun 1.25s.",40+s.getFinalAP()*0.4);
@@ -77,12 +78,12 @@ public class Leona extends BaseChampion {
             new double[]{13,12,11,10,9},20,0,DamageType.MAGICAL);
             resourceCost = 55;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            if(t==null)return;
-            Location dest=safeTeleport(c.getLocation(),t.getLocation());
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
+            Location dest=safeTeleport(c.getLocation(),tgt.getLocation());
             c.teleport(dest);
             double dmg=60+s.getFinalAP()*0.4;
-            DamageUtil.abilityDamageMagic(c, t, dmg);
-            t.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,15,10,false,true));
+            DamageUtil.abilityDamageMagicEntity(c, tgt, dmg);
+            tgt.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,15,10,false,true));
             c.getWorld().spawnParticle(Particle.END_ROD,dest,5,1,0,1);
         }
         @Override public String getDynamicDescription(ChampionStats s){
@@ -95,16 +96,16 @@ public class Leona extends BaseChampion {
             new double[]{130,105,80},25,4,DamageType.MAGICAL);
             resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            if(t==null)return;
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
             double dmg=100+s.getFinalAP()*0.7;
-            t.getWorld().getNearbyEntities(t.getLocation(),4,2,4).stream()
+            tgt.getWorld().getNearbyEntities(tgt.getLocation(),4,2,4).stream()
                 .filter(e->e instanceof Player)
                 .forEach(e->{
                     DamageUtil.abilityDamageMagic(c, (Player)e, dmg);
                     ((Player)e).addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,30,10,false,true));
                     ((Player)e).sendActionBar(Component.text("☀ ECLIPSE!",NamedTextColor.YELLOW));
                 });
-            t.getWorld().spawnParticle(Particle.END_ROD,t.getLocation(),30,2,1,2);
+            tgt.getWorld().spawnParticle(Particle.END_ROD,tgt.getLocation(),30,2,1,2);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             return String.format("%.0f dégâts AoE + stun 1.5s au centre.",100+s.getFinalAP()*0.7);

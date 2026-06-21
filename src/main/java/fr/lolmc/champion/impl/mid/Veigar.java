@@ -6,6 +6,7 @@ import fr.lolmc.stats.ResourceSystem;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.stats.ChampionStats;
 import fr.lolmc.util.DamageUtil;
+import fr.lolmc.util.TargetingUtil;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.*;
@@ -37,7 +38,7 @@ public class Veigar extends BaseChampion {
             new double[]{0.5},5,0,DamageType.MAGICAL);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            if(t==null)return;
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
             double dmg=s.getFinalAP()*0.6;
             DamageUtil.damage(c, t, dmg, false, DamageUtil.Type.MAGICAL);
         }
@@ -51,12 +52,12 @@ public class Veigar extends BaseChampion {
             new double[]{5,4.5,4,3.5,3},20,0,DamageType.MAGICAL);
             resourceCost = 40;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            if(t==null)return;
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
             double[] base={80,120,160,200,240};double dmg=base[getLevel()-1]+s.getFinalAP()*0.6;
-            DamageUtil.abilityDamageMagic(c, t, dmg);
+            DamageUtil.abilityDamageMagicEntity(c, tgt, dmg);
             apStacks.merge(c.getUniqueId(),5,Integer::sum);
             s.addBonusAP(5);
-            t.getWorld().spawnParticle(Particle.WITCH,t.getLocation(),10,0.3,0.3,0.3);
+            tgt.getWorld().spawnParticle(Particle.WITCH,tgt.getLocation(),10,0.3,0.3,0.3);
             c.sendActionBar(Component.text("📈 +5 AP Veigar! Total: "+(s.getFinalAP()),NamedTextColor.DARK_PURPLE));
         }
         @Override public String getDynamicDescription(ChampionStats s){
@@ -69,8 +70,8 @@ public class Veigar extends BaseChampion {
             new double[]{10,9,8,7,6},20,3,DamageType.MAGICAL);
             resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            if(t==null)return;
-            Location loc=t.getLocation();
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
+            Location loc=tgt.getLocation();
             loc.getWorld().spawnParticle(Particle.ENCHANT,loc,30,2,2,2);
             new BukkitRunnable(){
                 @Override public void run(){
@@ -92,8 +93,8 @@ public class Veigar extends BaseChampion {
             new double[]{18,16,14,12,10},20,4,DamageType.TRUE);
             resourceCost = 80;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            if(t==null)return;
-            Location center=t.getLocation();
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
+            Location center=tgt.getLocation();
             List<org.bukkit.block.Block> cage=new ArrayList<>();
             int r=4;
             for(int dx=-r;dx<=r;dx++) for(int dz=-r;dz<=r;dz++) {
@@ -102,7 +103,7 @@ public class Veigar extends BaseChampion {
                     if(b.getType().isAir()) { b.setType(Material.IRON_BARS); cage.add(b); }
                 }
             }
-            t.sendActionBar(Component.text("⬛ Cage Veigar 3s!",NamedTextColor.DARK_PURPLE));
+            if(tgt instanceof Player _tp)_tp.sendActionBar(Component.text("⬛ Cage Veigar 3s!",NamedTextColor.DARK_PURPLE));
             new BukkitRunnable(){@Override public void run(){cage.forEach(b->b.setType(Material.AIR));}}.runTaskLater(LolPlugin.getInstance(),60L);
         }
         @Override public String getDynamicDescription(ChampionStats s){return "Cage de barreaux autour de la cible pendant 3s.";}
@@ -113,12 +114,12 @@ public class Veigar extends BaseChampion {
             new double[]{120,100,80},20,0,DamageType.MAGICAL);
             resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            if(t==null)return;
-            double missing=1.0+(1.0-t.getHealth()/t.getMaxHealth())*0.75;
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
+            double missing=1.0+(1.0-tgt.getHealth()/tgt.getMaxHealth())*0.75;
             double[] base={175,250,325};int rr=Math.min(getLevel()-1,2);double dmg=base[rr]+s.getFinalAP()*0.75;
-            t.getWorld().strikeLightningEffect(t.getLocation());
-            DamageUtil.abilityDamageMagic(c, t, dmg);
-            t.sendMessage(Component.text("☠ DOOM!",NamedTextColor.DARK_PURPLE));
+            tgt.getWorld().strikeLightningEffect(tgt.getLocation());
+            DamageUtil.abilityDamageMagicEntity(c, tgt, dmg);
+            if(tgt instanceof Player _tp)_tp.sendMessage(Component.text("☠ DOOM!",NamedTextColor.DARK_PURPLE));
         }
         @Override public String getDynamicDescription(ChampionStats s){
             return String.format("%.0f dégâts (250+75%%AP x bonus HP manquants).",250+s.getFinalAP()*0.75);

@@ -6,6 +6,7 @@ import fr.lolmc.stats.ResourceSystem;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.stats.ChampionStats;
 import fr.lolmc.util.DamageUtil;
+import fr.lolmc.util.TargetingUtil;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.*;
@@ -35,7 +36,7 @@ public class Morgana extends BaseChampion {
             new double[]{0.5},5,0,DamageType.MAGICAL);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            if(t==null)return;
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
             double dmg=s.getFinalAP()*0.3;
             DamageUtil.damage(c, t, dmg, false, DamageUtil.Type.MAGICAL);
         }
@@ -49,12 +50,12 @@ public class Morgana extends BaseChampion {
             new double[]{11,10.5,10,9.5,9},20,0,DamageType.MAGICAL);
             resourceCost = 50;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            if(t==null)return;
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
             double[] base={80,135,190,245,300};double dmg=base[getLevel()-1]+s.getFinalAP()*0.9;
-            DamageUtil.abilityDamageMagic(c, t, dmg);
-            t.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,40,10,false,true));
-            t.sendActionBar(Component.text("🕸 Root 2s — Morgana Q!",NamedTextColor.DARK_PURPLE));
-            c.getWorld().spawnParticle(Particle.WITCH,t.getLocation(),10,0.5,0.5,0.5);
+            DamageUtil.abilityDamageMagicEntity(c, tgt, dmg);
+            tgt.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,40,10,false,true));
+            if(tgt instanceof Player _tp)_tp.sendActionBar(Component.text("🕸 Root 2s — Morgana Q!",NamedTextColor.DARK_PURPLE));
+            c.getWorld().spawnParticle(Particle.WITCH,tgt.getLocation(),10,0.5,0.5,0.5);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             return String.format("%.0f dégâts + root 2s (80+90%%AP).",80+s.getFinalAP()*0.9);
@@ -66,8 +67,8 @@ public class Morgana extends BaseChampion {
             new double[]{10,9,8,7,6},20,4,DamageType.MAGICAL);
             resourceCost = 25;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            if(t==null)return;
-            Location loc=t.getLocation();
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
+            Location loc=tgt.getLocation();
             new BukkitRunnable(){
                 int tick=0;
                 @Override public void run(){
@@ -92,9 +93,9 @@ public class Morgana extends BaseChampion {
             resourceCost = 80;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             Player dest=t!=null?t:c;
-            dest.addPotionEffect(new PotionEffect(PotionEffectType.ABSORPTION,100,2,false,true));
-            dest.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE,80,1,false,true));
-            dest.sendActionBar(Component.text("🛡 Bouclier Noir!",NamedTextColor.DARK_GRAY));
+            destgt.addPotionEffect(new PotionEffect(PotionEffectType.ABSORPTION,100,2,false,true));
+            destgt.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE,80,1,false,true));
+            desif(tgt instanceof Player _tp)_tp.sendActionBar(Component.text("🛡 Bouclier Noir!",NamedTextColor.DARK_GRAY));
         }
         @Override public String getDynamicDescription(ChampionStats s){return "Bouclier anti-dégâts magiques + immunité CC sur allié.";}
     }

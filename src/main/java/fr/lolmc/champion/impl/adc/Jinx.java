@@ -6,6 +6,7 @@ import fr.lolmc.stats.ResourceSystem;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.stats.ChampionStats;
 import fr.lolmc.util.DamageUtil;
+import fr.lolmc.util.TargetingUtil;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.*;
@@ -35,7 +36,7 @@ public class Jinx extends BaseChampion {
             new double[]{0.5},5,0,DamageType.PHYSICAL);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            if(t==null)return;
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
             double dmg=s.calcAutoAttackDamage(null);
             DamageUtil.damage(c, t, dmg, false, DamageUtil.Type.MAGICAL);
         }
@@ -60,11 +61,11 @@ public class Jinx extends BaseChampion {
             new double[]{10,9,8,7,6},25,0,DamageType.PHYSICAL);
             resourceCost = 20;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            if(t==null)return;
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
             double dmg=20+s.getFinalAD()*1.6;
-            DamageUtil.abilityDamage(c, t, dmg);
-            t.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,50,2,false,true));
-            c.getWorld().spawnParticle(Particle.ELECTRIC_SPARK,t.getLocation(),15,0.5,0.5,0.5);
+            DamageUtil.abilityDamageEntity(c, tgt, dmg);
+            tgt.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,50,2,false,true));
+            c.getWorld().spawnParticle(Particle.ELECTRIC_SPARK,tgt.getLocation(),15,0.5,0.5,0.5);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             return String.format("%.0f dégâts + ralentit 2.5s (20+160%%AD).",20+s.getFinalAD()*1.6);
@@ -76,11 +77,11 @@ public class Jinx extends BaseChampion {
             new double[]{20,18,16,14,12},25,2,DamageType.MAGICAL);
             resourceCost = 50;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            if(t==null)return;
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
             double dmg=80+s.getFinalAP()*0.7;
-            DamageUtil.abilityDamageMagic(c, t, dmg);
-            t.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,60,2,false,true));
-            c.getWorld().spawnParticle(Particle.EXPLOSION,t.getLocation(),3,1,0,1);
+            DamageUtil.abilityDamageMagicEntity(c, tgt, dmg);
+            tgt.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,60,2,false,true));
+            c.getWorld().spawnParticle(Particle.EXPLOSION,tgt.getLocation(),3,1,0,1);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             return String.format("Mine: %.0f dégâts + ralentit 3s (80+70%%AP).",80+s.getFinalAP()*0.7);
@@ -92,19 +93,19 @@ public class Jinx extends BaseChampion {
             new double[]{90,75,60},25,5,DamageType.PHYSICAL);
             resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            if(t==null)return;
-            double missing=1.0+(1.0-t.getHealth()/t.getMaxHealth())*1.5;
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
+            double missing=1.0+(1.0-tgt.getHealth()/tgt.getMaxHealth())*1.5;
             double[] base={250,400,550};int rr=Math.min(getLevel()-1,2);
             double[] missPct={0.25,0.30,0.35};
             var cmJ=LolPlugin.getInstance().getChampionManager();
             double miss=0;
-            if(cmJ.hasChampion(t)){var hpJ=cmJ.getChampion(t).getHPSystem();miss=hpJ.getMaxHP()-hpJ.getCurrentHP();}
+            if((tgt instanceof Player && cmJ.hasChampion((Player)tgt))){var hpJ=cmJ.getChampion((Player)tgt).getHPSystem();miss=hpJ.getMaxHP()-hpJ.getCurrentHP();}
             double dmg=base[rr]+s.getFinalAD()*1.5+miss*missPct[rr];
-            t.getWorld().getNearbyEntities(t.getLocation(),5,2,5).stream()
+            tgt.getWorld().getNearbyEntities(tgt.getLocation(),5,2,5).stream()
                 .filter(e->e instanceof Player)
                 .forEach(e->DamageUtil.abilityDamage(c, (Player)e, dmg));
-            t.getWorld().createExplosion(t.getLocation(),2f,false,false);
-            t.sendMessage(Component.text("🚀 SUPER MÉGA ROCKET!",NamedTextColor.RED));
+            tgt.getWorld().createExplosion(tgt.getLocation(),2f,false,false);
+            if(tgt instanceof Player _tp)_tp.sendMessage(Component.text("🚀 SUPER MÉGA ROCKET!",NamedTextColor.RED));
         }
         @Override public String getDynamicDescription(ChampionStats s){
             return String.format("%.0f dégâts AoE 5 blocs (x2.5 sur cible basse vie).",300+s.getFinalAD()*1.5);

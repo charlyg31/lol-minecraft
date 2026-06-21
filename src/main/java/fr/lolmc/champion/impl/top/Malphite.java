@@ -6,6 +6,7 @@ import fr.lolmc.stats.ResourceSystem;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.stats.ChampionStats;
 import fr.lolmc.util.DamageUtil;
+import fr.lolmc.util.TargetingUtil;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.*;
@@ -35,7 +36,7 @@ public class Malphite extends BaseChampion {
             new double[]{0.5},5,0,DamageType.PHYSICAL);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            if(t==null)return;
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
             double dmg=s.calcAutoAttackDamage(null);
             DamageUtil.damage(c, t, dmg, false, DamageUtil.Type.MAGICAL);
         }
@@ -49,12 +50,12 @@ public class Malphite extends BaseChampion {
             new double[]{8,7.5,7,6.5,6},20,0,DamageType.MAGICAL);
             resourceCost = 70;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            if(t==null)return;
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
             double[] base={70,120,170,220,270};
             double dmg=base[getLevel()-1]+s.getFinalAP()*0.6;
-            DamageUtil.abilityDamageMagic(c, t, dmg);
-            t.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,40,1,false,true));
-            t.getWorld().spawnParticle(Particle.BLOCK,t.getLocation(),15,0.3,0.3,0.3,
+            DamageUtil.abilityDamageMagicEntity(c, tgt, dmg);
+            tgt.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,40,1,false,true));
+            tgt.getWorld().spawnParticle(Particle.BLOCK,tgt.getLocation(),15,0.3,0.3,0.3,
                 Material.STONE.createBlockData());
         }
         @Override public String getDynamicDescription(ChampionStats s){
@@ -102,8 +103,8 @@ public class Malphite extends BaseChampion {
             new double[]{130,105,80},20,4,DamageType.MAGICAL);
             resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            if(t==null)return;
-            Location dest=safeTeleport(c.getLocation(),t.getLocation());
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
+            Location dest=safeTeleport(c.getLocation(),tgt.getLocation());
             c.teleport(dest);
             double[] baseR={200,300,400};int rr=Math.min(getLevel()-1,2);double dmg=baseR[rr]+s.getFinalAP()*1.0;
             c.getWorld().getNearbyEntities(c.getLocation(),4,2,4).stream()

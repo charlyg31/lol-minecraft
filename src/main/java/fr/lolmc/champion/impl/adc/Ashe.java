@@ -6,6 +6,7 @@ import fr.lolmc.stats.ResourceSystem;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.stats.ChampionStats;
 import fr.lolmc.util.DamageUtil;
+import fr.lolmc.util.TargetingUtil;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.*;
@@ -35,7 +36,7 @@ public class Ashe extends BaseChampion {
             new double[]{0.5},5,0,DamageType.PHYSICAL);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            if(t==null)return;
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
             double dmg=s.calcAutoAttackDamage(null);
             DamageUtil.damage(c, t, dmg, false);
         }
@@ -61,15 +62,15 @@ public class Ashe extends BaseChampion {
             new double[]{14,12,10,8,6},25,4,DamageType.PHYSICAL);
             resourceCost = 50;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            if(t==null)return;
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
             double[] base={60,95,130,165,200};double dmg=base[getLevel()-1]+s.getFinalAD()*1.0;
-            t.getWorld().getNearbyEntities(t.getLocation(),4,2,4).stream()
+            tgt.getWorld().getNearbyEntities(tgt.getLocation(),4,2,4).stream()
                 .filter(e->e instanceof Player)
                 .forEach(e->{
                     DamageUtil.abilityDamage(c, (Player)e, dmg);
                     ((Player)e).addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,40,1,false,true));
                 });
-            c.getWorld().spawnParticle(Particle.CRIT,t.getLocation(),20,2,1,2);
+            c.getWorld().spawnParticle(Particle.CRIT,tgt.getLocation(),20,2,1,2);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             return String.format("%.0f dégâts AoE + ralentit (110%%AD).",s.getFinalAD()*1.1);
@@ -91,12 +92,12 @@ public class Ashe extends BaseChampion {
             new double[]{100,80,60},25,2,DamageType.PHYSICAL);
             resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            if(t==null)return;
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
             double[] base={200,400,600};int rr=Math.min(getLevel()-1,2);double dmg=base[rr]+s.getFinalAP()*1.0;
-            DamageUtil.abilityDamage(c, t, dmg);
-            t.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,70,10,false,true));
-            t.getWorld().spawnParticle(Particle.END_ROD,t.getLocation(),30,1,1,1);
-            t.sendMessage(Component.text("❄ Flèche de Cristal!",NamedTextColor.AQUA));
+            DamageUtil.abilityDamageEntity(c, tgt, dmg);
+            tgt.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,70,10,false,true));
+            tgt.getWorld().spawnParticle(Particle.END_ROD,tgt.getLocation(),30,1,1,1);
+            if(tgt instanceof Player _tp)_tp.sendMessage(Component.text("❄ Flèche de Cristal!",NamedTextColor.AQUA));
         }
         @Override public String getDynamicDescription(ChampionStats s){
             return String.format("%.0f dégâts + stun 3.5s (portée infinie).",250+s.getFinalAP());

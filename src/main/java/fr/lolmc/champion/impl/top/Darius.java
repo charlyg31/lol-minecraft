@@ -6,6 +6,7 @@ import fr.lolmc.stats.ResourceSystem;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.stats.ChampionStats;
 import fr.lolmc.util.DamageUtil;
+import fr.lolmc.util.TargetingUtil;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.*;
@@ -35,7 +36,7 @@ public class Darius extends BaseChampion {
             new double[]{0.5},5,0,DamageType.PHYSICAL);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            if(t==null)return;
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
             double dmg=s.calcAutoAttackDamage(null);
             DamageUtil.damage(c, t, dmg, false);
         }
@@ -70,10 +71,10 @@ public class Darius extends BaseChampion {
             new double[]{9,8,7,6,5},5,0,DamageType.PHYSICAL);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            if(t==null)return;
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
             double dmg=s.getFinalAD()*2.0;
-            DamageUtil.abilityDamage(c, t, dmg);
-            c.getWorld().spawnParticle(Particle.CRIT,t.getLocation(),10);
+            DamageUtil.abilityDamageEntity(c, tgt, dmg);
+            c.getWorld().spawnParticle(Particle.CRIT,tgt.getLocation(),10);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             return String.format("Frappe puissante: %.0f dégâts physiques (200%% AD).",s.getFinalAD()*2);
@@ -102,13 +103,13 @@ public class Darius extends BaseChampion {
             new double[]{120,100,80},5,0,DamageType.TRUE);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            if(t==null)return;
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
             double[] base={125,250,375};
             int r=Math.min(getLevel()-1,2);
             double dmg=base[r]+s.getFinalAD()*0.75;
-            t.getWorld().strikeLightningEffect(t.getLocation());
-            DamageUtil.trueDamage(c, t, dmg);
-            t.sendMessage(Component.text("☠ Guillotine Noxienne!",NamedTextColor.DARK_RED));
+            tgt.getWorld().strikeLightningEffect(tgt.getLocation());
+            DamageUtil.trueDamageEntity(c, tgt, dmg);
+            if(tgt instanceof Player _tp)_tp.sendMessage(Component.text("☠ Guillotine Noxienne!",NamedTextColor.DARK_RED));
         }
         @Override public String getDynamicDescription(ChampionStats s){
             return String.format("%.0f dégâts vrais (100+40/niv+75%%AD). Reset CD si kill.",(100+level*40+s.getFinalAD()*0.75));
