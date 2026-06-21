@@ -36,9 +36,11 @@ public class Ashe extends BaseChampion {
             new double[]{0.5},5,0,DamageType.PHYSICAL);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
-            double dmg=s.calcAutoAttackDamage(null);
-            DamageUtil.damage(c, t, dmg, false);
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.0); if(tgt==null)return;
+            TargetingUtil.dealDamage(c, tgt, s.getFinalAD(), TargetingUtil.DmgType.PHYSICAL);
+            // Passif Tir de Givre : les attaques ralentissent la cible
+            if(tgt instanceof Player __p)
+                __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,30,0,false,true));
         }
         @Override public String getDynamicDescription(ChampionStats s){
             return String.format("Inflige %.0f dégâts.", s.getFinalAD());
@@ -58,21 +60,28 @@ public class Ashe extends BaseChampion {
     }
 
     static class W extends BaseAbility {
-        W(){super("w_ashe","Tir de Volée",Material.TIPPED_ARROW,AbilitySlot.W,
-            new double[]{14,12,10,8,6},25,4,DamageType.PHYSICAL);
+        W(){super("w_ashe","Volée",Material.TIPPED_ARROW,AbilitySlot.W,
+            new double[]{18,14.5,11,7.5,4},25,4,DamageType.PHYSICAL);
             resourceCost = 50;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
+            // LoL : tire des flèches en cône. 60/95/130/165/200 + 100% AD, applique Tir de Givre (ralentit)
             double[] base={60,95,130,165,200};double dmg=base[getLevel()-1]+s.getFinalAD()*1.0;
-            for(var __t : TargetingUtil.entitiesInRadius(c, tgt.getLocation(), 4.0)){
+            var targets=TargetingUtil.enemiesInCone(c, 8.0, 45);
+            for(var __t : targets){
                 TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.PHYSICAL);
                 if(__t instanceof Player __p)
                     __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,40,1,false,true));
             }
-            c.getWorld().spawnParticle(Particle.CRIT,tgt.getLocation(),20,2,1,2);
+            // Animation : flèches en éventail devant
+            var dir=c.getEyeLocation().getDirection().normalize();
+            for(double d=1; d<=8; d+=0.7){
+                c.getWorld().spawnParticle(Particle.CRIT,c.getEyeLocation().add(dir.clone().multiply(d)),2,1.2,0.3,1.2,0);
+            }
+            c.getWorld().playSound(c.getLocation(), Sound.ENTITY_ARROW_SHOOT, 1f, 1.2f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            return String.format("%.0f dégâts AoE + ralentit (110%%AD).",s.getFinalAD()*1.1);
+            double[] base={60,95,130,165,200};
+            return String.format("Cône de flèches: %.0f dégâts (+100%%AD) + ralentit.",base[getLevel()-1]+s.getFinalAD());
         }
     }
 
@@ -87,19 +96,35 @@ public class Ashe extends BaseChampion {
     }
 
     static class R extends BaseAbility {
-        R(){super("r_ashe","Flèche de Cristal",Material.DIAMOND,AbilitySlot.R,
-            new double[]{100,80,60},25,2,DamageType.PHYSICAL);
+        R(){super("r_ashe","Flèche de Cristal Enchantée",Material.DIAMOND,AbilitySlot.R,
+            new double[]{100,80,60},25,2,DamageType.MAGICAL);
             resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
-            double[] base={200,400,600};int rr=Math.min(getLevel()-1,2);double dmg=base[rr]+s.getFinalAP()*1.0;
-            DamageUtil.abilityDamageEntity(c, tgt, dmg);
-            tgt.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,70,10,false,true));
-            tgt.getWorld().spawnParticle(Particle.END_ROD,tgt.getLocation(),30,1,1,1);
-            if(tgt instanceof Player _tp)_tp.sendMessage(Component.text("❄ Flèche de Cristal!",NamedTextColor.AQUA));
+            // LoL : skillshot longue portée. Stun 1-3.5s selon distance parcourue. Zone autour = 50% dégâts + slow
+            double[] base={200,400,600};int rr=Math.min(getLevel()-1,2);double dmg=base[rr]+s.getFinalAP()*1.2;
+            var hits=TargetingUtil.skillshot(c, 25.0, 1.2, false); // s'arrête au 1er champion
+            if(hits.isEmpty()){c.sendActionBar(Component.text("❄ Flèche tirée (aucune cible touchée)",NamedTextColor.AQUA));return;}
+            var main=hits.get(0);
+            // Distance parcourue → durée du stun (1 à 3.5s = 20 à 70 ticks)
+            double dist=c.getLocation().distance(main.getLocation());
+            int stunTicks=(int)Math.min(70, 20+dist*2.5);
+            TargetingUtil.dealDamage(c, main, dmg, TargetingUtil.DmgType.MAGICAL);
+            if(main instanceof Player __p){
+                __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,stunTicks,10,false,true)); // stun approx
+                __p.sendActionBar(Component.text("❄ ÉTOURDI par la Flèche de Cristal!",NamedTextColor.AQUA));
+            }
+            // Zone autour de la cible principale : 50% dégâts + ralentissement
+            for(var __t : TargetingUtil.entitiesInRadius(c, main.getLocation(), 3.0)){
+                if(__t.equals(main)) continue;
+                TargetingUtil.dealDamage(c, __t, dmg*0.5, TargetingUtil.DmgType.MAGICAL);
+                if(__t instanceof Player __p2)__p2.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,60,2,false,true));
+            }
+            main.getWorld().spawnParticle(Particle.END_ROD,main.getLocation().add(0,1,0),30,1.5,1,1.5);
+            main.getWorld().playSound(main.getLocation(), Sound.BLOCK_GLASS_BREAK, 1.5f, 0.8f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            return String.format("%.0f dégâts + stun 3.5s (portée infinie).",250+s.getFinalAP());
+            double[] base={200,400,600};int r=Math.min(getLevel()-1,2);
+            return String.format("Skillshot: %.0f dégâts (+120%%AP) + étourdit 1-3.5s selon distance + zone.",base[r]+s.getFinalAP()*1.2);
         }
     }
 }
