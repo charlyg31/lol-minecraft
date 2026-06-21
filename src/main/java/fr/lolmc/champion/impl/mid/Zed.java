@@ -94,12 +94,11 @@ public class Zed extends BaseChampion {
             resourceCost = 50;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             double dmg=45+s.getFinalAD()*0.8;
-            c.getWorld().getNearbyEntities(c.getLocation(),4,2,4).stream()
-                .filter(e->e instanceof Player&&!e.equals(c))
-                .forEach(e->{
-                    DamageUtil.abilityDamage(c, (Player)e, dmg);
-                    ((Player)e).addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,30,1,false,true));
-                });
+            for(var __t : TargetingUtil.enemiesAround(c, 4.0)){
+                TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.PHYSICAL);
+                if(__t instanceof Player __p)
+                    __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,30,1,false,true));
+            }
             c.getWorld().spawnParticle(Particle.CRIT,c.getLocation(),10,2,1,2);
         }
         @Override public String getDynamicDescription(ChampionStats s){

@@ -76,9 +76,8 @@ public class Veigar extends BaseChampion {
             new BukkitRunnable(){
                 @Override public void run(){
                     double[] base={100,150,200,250,300};double dmg=base[getLevel()-1]+s.getFinalAP()*1.0;
-                    loc.getWorld().getNearbyEntities(loc,3,2,3).stream()
-                        .filter(e->e instanceof Player)
-                        .forEach(e->DamageUtil.abilityDamageMagic(c, (Player)e, dmg));
+                    TargetingUtil.dealDamageAll(c,
+                        TargetingUtil.entitiesInRadius(c, loc, 3.0), dmg, TargetingUtil.DmgType.MAGICAL);
                     loc.getWorld().spawnParticle(Particle.EXPLOSION,loc,5,1,0,1);
                 }
             }.runTaskLater(LolPlugin.getInstance(),25L);
