@@ -25,7 +25,7 @@ import java.util.*;
  */
 public class ShopGUI {
 
-    public static final String TITLE_PREFIX = "§6🏪 Boutique — ";
+    public static final String TITLE_PREFIX = "🏪 Boutique — ";
 
     // Catégorie par défaut affichée à l'ouverture
     private static final LolItem.ItemCategory DEFAULT_CAT = LolItem.ItemCategory.DAMAGE;
@@ -51,7 +51,8 @@ public class ShopGUI {
     public void open(Player player, LolItem.ItemCategory cat) {
         currentCategory.put(player.getUniqueId(), cat);
         String title = TITLE_PREFIX + getCategoryLabel(cat);
-        Inventory inv = Bukkit.createInventory(null, 54, Component.text(title));
+        Inventory inv = Bukkit.createInventory(null, 54,
+            Component.text(title, NamedTextColor.GOLD));
 
         // Remplir les onglets
         buildTabs(inv, cat);
