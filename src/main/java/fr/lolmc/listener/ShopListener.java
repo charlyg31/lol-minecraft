@@ -69,8 +69,13 @@ public class ShopListener implements Listener {
 
         // ── BOUTIQUE ──
         if (ShopGUI.isShopInventory(title)) {
+            // Annuler TOUT clic (y compris shift-clic, double-clic, nombre)
             event.setCancelled(true);
-            handleShopClick(player, event.getRawSlot());
+            // Seuls les clics dans le menu haut (slots 0-53) déclenchent un achat
+            int raw = event.getRawSlot();
+            if (raw >= 0 && raw < event.getView().getTopInventory().getSize()) {
+                handleShopClick(player, raw);
+            }
             return;
         }
 
