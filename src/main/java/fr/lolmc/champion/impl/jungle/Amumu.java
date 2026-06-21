@@ -22,6 +22,7 @@ public class Amumu extends BaseChampion {
         super("amumu", "Amumu", ChampionRole.JUNGLE,
             new ChampionStats(685,57,0,33,32,0.736,0,335,1.25,9.0));
         getStats().setGrowthStats(94.0,3.8,4.0,2.05,0.02180,0.85);
+        setAutoAttackRange(2.0);
     }
     @Override protected void registerAbilities() {
         setAbility(0,new AA()); setAbility(1,new Q());

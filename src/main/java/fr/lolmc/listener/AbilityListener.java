@@ -313,25 +313,29 @@ public class AbilityListener implements Listener {
         var tm = LolPlugin.getInstance().getTeamManager();
         Team myTeam = tm.getTeam(caster);
 
-        // ── Cible = SBIRE ──
-        if (entity instanceof org.bukkit.entity.Zombie z
-                && fr.lolmc.game.MinionManager.isMinion(z)) {
-            Team minionTeam = fr.lolmc.game.MinionManager.getMinionTeam(z);
+        // ── Cible = SBIRE ou MONSTRE de jungle ──
+        if (entity instanceof org.bukkit.entity.LivingEntity le
+                && (fr.lolmc.game.MinionManager.isMinion(le)
+                    || fr.lolmc.game.JungleManager.isJungleMonster(le))) {
             // Bloquer les dégâts sur ses PROPRES sbires
-            if (minionTeam != null && minionTeam == myTeam) {
-                e.setCancelled(true);
-                return;
+            if (fr.lolmc.game.MinionManager.isMinion(le)) {
+                Team minionTeam = fr.lolmc.game.MinionManager.getMinionTeam(le);
+                if (minionTeam != null && minionTeam == myTeam) {
+                    e.setCancelled(true);
+                    return;
+                }
             }
-            // Sbire ennemi : laisser passer le dégât vanilla (ou l'AA)
-            // On annule le dégât vanilla et on applique l'auto-attaque LoL
+            // Annuler le dégât vanilla, appliquer l'AA LoL (dégât direct, pas de reboucle)
             e.setCancelled(true);
-            int slotM = caster.getInventory().getHeldItemSlot();
-            ItemStack heldM = caster.getInventory().getItem(slotM);
-            if ("ability".equals(HotbarManager.getType(heldM)) && slotM == 0) {
-                // Dégâts via DamageUtil sur le sbire (auto-attaque)
-                double dmg = manager.getChampion(caster).getStats().getFinalAD();
-                z.damage(dmg, caster);
-            }
+            double dmg = manager.getChampion(caster).getStats().getFinalAD();
+            double newHealth = Math.max(0, le.getHealth() - dmg);
+            le.setHealth(newHealth);
+            // Effet visuel de coup
+            le.getWorld().spawnParticle(org.bukkit.Particle.CRIT,
+                le.getLocation().add(0, 1, 0), 6, 0.3, 0.3, 0.3);
+            le.playEffect(org.bukkit.EntityEffect.HURT);
+            fr.lolmc.util.DebugLogger.log("AutoAttack", caster.getName()
+                + " AA sbire/monstre dmg=" + dmg + " HP restant=" + newHealth);
             return;
         }
 

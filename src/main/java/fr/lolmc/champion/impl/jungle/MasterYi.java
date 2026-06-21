@@ -22,6 +22,7 @@ public class MasterYi extends BaseChampion {
         super("masteryi", "Master Yi", ChampionRole.JUNGLE,
             new ChampionStats(669,68,0,33,32,0.679,0,355,1.25,7.0));
         getStats().setGrowthStats(100.0,3.3,4.3,2.05,0.02000,0.65);
+        setAutoAttackRange(2.0);
     }
     @Override protected void registerAbilities() {
         setAbility(0,new AA()); setAbility(1,new Q());

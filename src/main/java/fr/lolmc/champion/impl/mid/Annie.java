@@ -6,6 +6,7 @@ import fr.lolmc.stats.ResourceSystem;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.stats.ChampionStats;
 import fr.lolmc.util.DamageUtil;
+import fr.lolmc.util.TargetingUtil;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.*;
@@ -49,11 +50,14 @@ public class Annie extends BaseChampion {
             new double[]{4,3.5,3,2.5,2},20,0,DamageType.MAGICAL);
             resourceCost = 60;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            if(t==null)return;
+            // Brasier : cible l'ennemi visé (champion, sbire ou monstre)
+            var target = TargetingUtil.getTargetedEnemy(c, 6.5);
+            if(target==null){ c.sendActionBar(net.kyori.adventure.text.Component.text("Aucune cible",net.kyori.adventure.text.format.NamedTextColor.GRAY)); return; }
             double[] base={80,130,180,230,280};
             double dmg=base[getLevel()-1]+s.getFinalAP()*0.85;
-            DamageUtil.abilityDamageMagic(c, t, dmg);
-            t.getWorld().spawnParticle(Particle.FLAME,t.getLocation(),15,0.5,0.5,0.5,0.1);
+            TargetingUtil.dealDamage(c, target, dmg, TargetingUtil.DmgType.MAGICAL);
+            target.getWorld().spawnParticle(Particle.FLAME,target.getLocation().add(0,1,0),20,0.5,0.5,0.5,0.1);
+            target.getWorld().spawnParticle(Particle.SMALL_FLAME,target.getLocation().add(0,1,0),15,0.3,0.5,0.3,0.05);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] base={80,130,180,230,280};
@@ -66,12 +70,17 @@ public class Annie extends BaseChampion {
             new double[]{8,7,6,5,4},6,4,DamageType.MAGICAL);
             resourceCost = 70;}
         @Override public void cast(Player c,ChampionStats s,Player t){
+            // Incinération : cône de feu devant Annie (touche tout)
             double[] base={70,115,160,205,250};
             double dmg=base[getLevel()-1]+s.getFinalAP()*0.75;
-            c.getWorld().getNearbyEntities(c.getLocation(),4,2,4).stream()
-                .filter(e->e instanceof Player&&!e.equals(c))
-                .forEach(e->DamageUtil.abilityDamageMagic(c, (Player)e, dmg));
-            c.getWorld().spawnParticle(Particle.FLAME,c.getLocation(),25,2,1,2,0.08);
+            var targets = TargetingUtil.enemiesInCone(c, 6.0, 50);
+            TargetingUtil.dealDamageAll(c, targets, dmg, TargetingUtil.DmgType.MAGICAL);
+            // Effet visuel : cône de flammes devant
+            var dir = c.getEyeLocation().getDirection().normalize();
+            for(double d=1; d<=6; d+=0.5){
+                var p=c.getEyeLocation().add(dir.clone().multiply(d));
+                c.getWorld().spawnParticle(Particle.FLAME,p,8,0.6,0.4,0.6,0.02);
+            }
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] base={70,115,160,205,250};
@@ -97,15 +106,20 @@ public class Annie extends BaseChampion {
             new double[]{100,80,60},20,3,DamageType.MAGICAL);
             resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            if(t==null)return;
+            // Tibbers : zone d'explosion là où on vise (touche tout dans le rayon)
             double[] base={175,300,425};
             int r=Math.min(getLevel()-1,2);
             double dmg=base[r]+s.getFinalAP()*0.75;
-            t.getWorld().getNearbyEntities(t.getLocation(),3,2,3).stream()
-                .filter(e->e instanceof Player)
-                .forEach(e->{DamageUtil.abilityDamageMagic(c, (Player)e, dmg);((Player)e).setFireTicks(60);
-                    ((Player)e).sendActionBar(Component.text("🔥 TIBBERS!",NamedTextColor.RED));});
-            t.getWorld().spawnParticle(Particle.LAVA,t.getLocation(),30,2,1,2);
+            var ground = TargetingUtil.getAimedGroundLocation(c, 7.0);
+            var targets = TargetingUtil.entitiesInRadius(c, ground, 4.0);
+            for(var e: targets){
+                TargetingUtil.dealDamage(c, e, dmg, TargetingUtil.DmgType.MAGICAL);
+                e.setFireTicks(60);
+            }
+            // Explosion visuelle
+            ground.getWorld().spawnParticle(Particle.LAVA,ground,40,3,1,3);
+            ground.getWorld().spawnParticle(Particle.FLAME,ground,50,3,1.5,3,0.1);
+            ground.getWorld().playSound(ground, org.bukkit.Sound.ENTITY_BLAZE_SHOOT, 1.5f, 0.6f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] base={175,300,425};

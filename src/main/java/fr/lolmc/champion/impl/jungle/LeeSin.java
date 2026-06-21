@@ -22,6 +22,7 @@ public class LeeSin extends BaseChampion {
         super("leesin", "Lee Sin", ChampionRole.JUNGLE,
             new ChampionStats(645,68,0,36,32,0.651,0,345,1.25,7.5));
         getStats().setGrowthStats(109.0,3.7,4.5,2.05,0.03000,0.70);
+        setAutoAttackRange(2.0);
     }
     @Override protected void registerAbilities() {
         setAbility(0,new AA()); setAbility(1,new Q());

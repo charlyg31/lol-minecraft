@@ -22,6 +22,7 @@ public class Leona extends BaseChampion {
         super("leona", "Leona", ChampionRole.SUPPORT,
             new ChampionStats(646,60,0,38,32,0.625,0,335,1.25,8.5));
         getStats().setGrowthStats(104.0,3.0,4.7,2.05,0.02900,0.85);
+        setAutoAttackRange(2.0);
     }
     @Override protected void registerAbilities() {
         setAbility(0,new AA()); setAbility(1,new Q());
