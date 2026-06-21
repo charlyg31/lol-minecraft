@@ -54,6 +54,40 @@ public class LevelSystem {
         if (skillPoints < 0) skillPoints = 0;
     }
 
+    /**
+     * Débloque/monte automatiquement les sorts en fonction du niveau actuel.
+     * Pratique pour les tests : Q/W/E montés autant que possible, R selon niveau (6/11/16).
+     * Répartit les rangs disponibles sur Q, W, E puis R.
+     */
+    public void maxOutAbilities() {
+        // Réinitialiser
+        for (int i = 0; i < 5; i++) abilityRanks[i] = 0;
+        // Rangs max : Q/W/E = 5, R = 3
+        // R débloqué aux niveaux 6/11/16
+        int[] rMax = {6, 11, 16};
+        // Monter Q, W, E au max possible selon le niveau (1 point par niveau)
+        int pointsAvailable = level;
+        // R d'abord (selon paliers)
+        int rRank = 0;
+        for (int lvl : rMax) if (level >= lvl) rRank++;
+        abilityRanks[4] = rRank;
+        pointsAvailable -= rRank;
+        // Répartir le reste sur Q(1), W(2), E(3)
+        int[] order = {1, 2, 3};
+        int idx = 0;
+        while (pointsAvailable > 0) {
+            int slot = order[idx % 3];
+            if (abilityRanks[slot] < 5) {
+                abilityRanks[slot]++;
+                pointsAvailable--;
+            }
+            idx++;
+            // Sécurité : si Q/W/E sont au max (15 points utilisés), stop
+            if (abilityRanks[1] == 5 && abilityRanks[2] == 5 && abilityRanks[3] == 5) break;
+        }
+        skillPoints = Math.max(0, pointsAvailable);
+    }
+
     // ── Points de compétence ──────────────────────────────────────
 
     public boolean hasSkillPoint() {

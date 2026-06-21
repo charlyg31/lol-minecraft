@@ -216,7 +216,13 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
         plugin.getTeamManager().setTeam(player, fr.lolmc.team.TeamManager.Team.BLUE);
         // 2. Champion
         plugin.getChampionManager().assignChampion(player, champId);
-        // 3. Page de runes par défaut
+        // 3. Niveau 1 avec le premier sort débloqué (sinon rien ne se lance)
+        var soloChamp = plugin.getChampionManager().getChampion(player);
+        if (soloChamp != null) {
+            soloChamp.getLevelSystem().maxOutAbilities();
+            plugin.getHotbarManager().renderPage(player, soloChamp);
+        }
+        // 4. Page de runes par défaut
         plugin.getRuneManager().applyRuneStats(player);
         // 4. Lancer la partie complète
         mapManager.resetAllStructures();
@@ -253,8 +259,11 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
         lvl = Math.max(1, Math.min(18, lvl));
         var champ = cm.getChampion(player);
         champ.getLevelSystem().setLevel(lvl);
+        champ.getLevelSystem().maxOutAbilities();   // débloque les sorts pour le test
         champ.getStats().setChampionLevel(lvl);
-        player.sendMessage(Component.text("✔ Niveau " + lvl, NamedTextColor.GREEN));
+        // Re-poser la hotbar pour refléter les sorts débloqués
+        LolPlugin.getInstance().getHotbarManager().renderPage(player, champ);
+        player.sendMessage(Component.text("✔ Niveau " + lvl + " — sorts débloqués", NamedTextColor.GREEN));
     }
 
     /** /lol gold <n> : donne de l'or à l'admin. */
