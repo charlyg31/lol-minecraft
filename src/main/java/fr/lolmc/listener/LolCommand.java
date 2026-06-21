@@ -74,6 +74,7 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
             case "gold" -> handleGold(player, args);
             case "team" -> handleTeamCmd(player, args);
             case "testgame" -> handleTestGame(player);
+            case "debug" -> handleDebug(player);
             case "select" -> {
                 // Lance une sélection avec tous les joueurs en ligne (test/manuel)
                 var ids = new java.util.ArrayList<java.util.UUID>();
@@ -206,6 +207,77 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
     // ══════════════════════════════════════════════════════════════
     // COMMANDES DE TEST ADMIN (mode solo)
     // ══════════════════════════════════════════════════════════════
+
+
+    /** /lol debug : affiche l'état complet du joueur pour diagnostic. */
+    private void handleDebug(Player player) {
+        var plugin = LolPlugin.getInstance();
+        var cm = plugin.getChampionManager();
+        player.sendMessage(Component.text("══════ DEBUG ══════", NamedTextColor.YELLOW));
+
+        // Champion
+        boolean hasChamp = cm.hasChampion(player);
+        player.sendMessage(Component.text("Champion: " + (hasChamp ? "OUI" : "NON"),
+                hasChamp ? NamedTextColor.GREEN : NamedTextColor.RED));
+        if (hasChamp) {
+            var champ = cm.getChampion(player);
+            player.sendMessage(Component.text("  Nom: " + champ.getDisplayName(), NamedTextColor.GRAY));
+            var ls = champ.getLevelSystem();
+            player.sendMessage(Component.text("  Niveau: " + ls.getLevel(), NamedTextColor.GRAY));
+            // Rangs des sorts
+            String ranks = "  Sorts Q/W/E/R: "
+                + ls.getAbilityRank(1) + "/" + ls.getAbilityRank(2) + "/"
+                + ls.getAbilityRank(3) + "/" + ls.getAbilityRank(4);
+            player.sendMessage(Component.text(ranks, NamedTextColor.GRAY));
+            // Sorts débloqués ?
+            for (int s = 1; s <= 4; s++) {
+                var ab = champ.getAbility(s);
+                String slotName = switch(s) { case 1->"Q"; case 2->"W"; case 3->"E"; default->"R"; };
+                boolean unlocked = ls.isAbilityUnlocked(s);
+                player.sendMessage(Component.text("    " + slotName + " (" + (ab!=null?ab.getName():"null") + "): "
+                    + (unlocked ? "débloqué" : "VERROUILLÉ"),
+                    unlocked ? NamedTextColor.GREEN : NamedTextColor.RED));
+            }
+            // Stats clés
+            var st = champ.getStats();
+            player.sendMessage(Component.text(String.format("  PV: %.0f/%.0f | AD: %.0f | AP: %.0f",
+                champ.getHPSystem().getCurrentHP(), champ.getHPSystem().getMaxHP(),
+                st.getFinalAD(), st.getFinalAP()), NamedTextColor.GRAY));
+        }
+
+        // Or
+        int gold = plugin.getGoldManager().getGold(player.getUniqueId());
+        player.sendMessage(Component.text("Or: " + gold, NamedTextColor.GOLD));
+
+        // Équipe
+        var team = plugin.getTeamManager().getTeam(player);
+        player.sendMessage(Component.text("Équipe: " + (team != null ? team.name() : "AUCUNE"),
+                team != null ? NamedTextColor.AQUA : NamedTextColor.RED));
+
+        // Hotbar page
+        int page = plugin.getHotbarManager().getPage(player);
+        player.sendMessage(Component.text("Page hotbar: " + page, NamedTextColor.GRAY));
+
+        // Slot tenu + type d'item
+        int heldSlot = player.getInventory().getHeldItemSlot();
+        var held = player.getInventory().getItem(heldSlot);
+        String type = fr.lolmc.item.HotbarManager.getType(held);
+        String id = fr.lolmc.item.HotbarManager.getId(held);
+        player.sendMessage(Component.text("Slot tenu: " + heldSlot
+            + " | type=" + type + " | id=" + id, NamedTextColor.GRAY));
+
+        // Partie en cours ?
+        boolean running = plugin.getGameManager().isRunning();
+        player.sendMessage(Component.text("Partie active: " + running, NamedTextColor.GRAY));
+
+        // Spawn défini ?
+        if (team != null) {
+            var spawn = plugin.getMapManager().getSpawn(team, 1);
+            player.sendMessage(Component.text("Spawn équipe défini: " + (spawn != null),
+                spawn != null ? NamedTextColor.GREEN : NamedTextColor.RED));
+        }
+        player.sendMessage(Component.text("═══════════════════", NamedTextColor.YELLOW));
+    }
 
     /** /lol solo <champion> : met l'admin en jeu, équipe BLEUE, avec un champion, et lance tout. */
     private void handleSolo(Player player, String[] args) {
@@ -519,7 +591,7 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
 
     @Override
     public List<String> onTabComplete(CommandSender sender, Command cmd, String alias, String[] args) {
-        if (args.length == 1) return List.of("set", "position", "lane", "road", "jungle", "shopnpc", "mode", "select", "solo", "give", "level", "gold", "team", "testgame", "start", "stop");
+        if (args.length == 1) return List.of("set", "position", "lane", "road", "jungle", "shopnpc", "mode", "select", "solo", "give", "level", "gold", "team", "testgame", "debug", "start", "stop");
         if (args.length == 2) {
             return switch (args[0].toLowerCase()) {
                 case "set" -> List.of("turret", "inhibitor", "nexus", "basenexus");
