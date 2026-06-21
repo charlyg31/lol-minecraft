@@ -11,6 +11,9 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
+import org.bukkit.event.entity.ProjectileLaunchEvent;
+import org.bukkit.event.player.PlayerTeleportEvent;
+import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.player.*;
 import org.bukkit.inventory.ItemStack;
@@ -78,48 +81,99 @@ public class AbilityListener implements Listener {
 
     private HotbarManager hotbar() { return LolPlugin.getInstance().getHotbarManager(); }
 
-    // ── Clic droit sur un joueur → sort ciblé OU item actif ──
+    // ══════════════════════════════════════════════════════════════
+    // SYSTÈME D'INPUT LoL
+    //   • CLIC GAUCHE  (air ou ennemi) → lance le sort du slot tenu (1-4)
+    //                                     slot 0 = auto-attaque
+    //   • CLIC DROIT   sur un sort (1-4) → améliore le sort
+    //   • CLIC DROIT   sur Flash/actif/recall/page → action de l'item
+    // ══════════════════════════════════════════════════════════════
+
+    // ── CLIC DROIT sur un joueur (rien : on cible au clic gauche) ──
     @EventHandler
     public void onInteractEntity(PlayerInteractEntityEvent e) {
         Player caster = e.getPlayer();
         if (!manager.hasChampion(caster)) return;
-        if (!(e.getRightClicked() instanceof Player target)) return;
-
+        // Clic droit sur entité : on annule juste l'interaction vanilla.
+        // Le ciblage des sorts se fait au CLIC GAUCHE (voir onLeftClick).
         e.setCancelled(true);
-        int slot = caster.getInventory().getHeldItemSlot();
-        ItemStack held = caster.getInventory().getItem(slot);
-        handleSlotAction(caster, slot, held, target);
     }
 
-    // ── Clic droit dans le vide → self-cast / Flash / actif / page ──
+    // ── CLIC DROIT dans le vide → améliorer le sort / Flash / actif / page ──
     @EventHandler
     public void onInteract(PlayerInteractEvent e) {
         Player caster = e.getPlayer();
         if (!manager.hasChampion(caster)) return;
 
         Action a = e.getAction();
-        if (a != Action.RIGHT_CLICK_AIR && a != Action.RIGHT_CLICK_BLOCK) return;
-
         int slot = caster.getInventory().getHeldItemSlot();
         ItemStack held = caster.getInventory().getItem(slot);
         if (!HotbarManager.isLolItem(held)) return;
 
-        e.setCancelled(true);
-
-        // Shift + clic droit sur un sort = apprendre / améliorer (dépenser un point)
-        if (caster.isSneaking() && "ability".equals(HotbarManager.getType(held))
-                && slot >= 1 && slot <= 4) {
-            tryLevelUpAbility(caster, slot);
+        // ── CLIC GAUCHE (air) → lancer le sort ──
+        if (a == Action.LEFT_CLICK_AIR || a == Action.LEFT_CLICK_BLOCK) {
+            e.setCancelled(true);
+            onLeftClickCast(caster, slot, held, null);
             return;
         }
 
-        // Item Recall (slot 7 page 2)
-        if (HotbarManager.isRecallItem(held)) {
-            LolPlugin.getInstance().getBaseManager().startRecall(caster);
-            return;
-        }
+        // ── CLIC DROIT → améliorer le sort ou activer un item ──
+        if (a == Action.RIGHT_CLICK_AIR || a == Action.RIGHT_CLICK_BLOCK) {
+            e.setCancelled(true);
+            String type = HotbarManager.getType(held);
 
-        handleSlotAction(caster, slot, held, null);
+            // Clic droit sur un sort (slot 1-4) = améliorer
+            if ("ability".equals(type) && slot >= 1 && slot <= 4) {
+                tryLevelUpAbility(caster, slot);
+                return;
+            }
+            // Recall
+            if (HotbarManager.isRecallItem(held)) {
+                LolPlugin.getInstance().getBaseManager().startRecall(caster);
+                return;
+            }
+            // Flash / actif / consommable / bouton page
+            handleSlotAction(caster, slot, held, null);
+        }
+    }
+
+    /** Gère le clic gauche : auto-attaque (slot 0) ou lancement de sort (1-4). */
+    private void onLeftClickCast(Player caster, int slot, ItemStack held, Player target) {
+        String type = HotbarManager.getType(held);
+        if (!"ability".equals(type)) return;
+
+        if (slot == 0) {
+            // Slot 0 = auto-attaque : cherche la cible visée
+            Player aimed = target != null ? target : getTargetedPlayer(caster);
+            if (aimed != null) {
+                LolPlugin.getInstance().getAutoAttackManager().tryAutoAttack(caster, aimed);
+            }
+        } else if (slot >= 1 && slot <= 4) {
+            // Lancer le sort, avec la cible visée s'il y en a une
+            Player aimed = target != null ? target : getTargetedPlayer(caster);
+            manager.getChampion(caster).tryUseAbility(caster, slot, aimed);
+        }
+    }
+
+    /** Trouve le joueur visé par le caster (raycast simple, portée 30 blocs). */
+    private Player getTargetedPlayer(Player caster) {
+        var eye = caster.getEyeLocation();
+        var dir = eye.getDirection();
+        Player closest = null;
+        double closestDist = Double.MAX_VALUE;
+        for (Player other : caster.getWorld().getPlayers()) {
+            if (other.equals(caster)) continue;
+            var toTarget = other.getLocation().toVector().subtract(eye.toVector());
+            double dist = toTarget.length();
+            if (dist > 30) continue;
+            // Angle entre le regard et la cible
+            double dot = toTarget.normalize().dot(dir);
+            if (dot > 0.96 && dist < closestDist) { // ~16° de tolérance
+                closest = other;
+                closestDist = dist;
+            }
+        }
+        return closest;
     }
 
     /**
@@ -206,10 +260,14 @@ public class AbilityListener implements Listener {
         e.setCancelled(true);
         int slot = caster.getInventory().getHeldItemSlot();
         ItemStack held = caster.getInventory().getItem(slot);
-        // Auto-attaque uniquement si on tient le slot AA (type ability slot 0)
-        if ("ability".equals(HotbarManager.getType(held)) && slot == 0) {
-            // Auto-attaque LoL : portée + cadence gérées par AutoAttackManager
+        if (!"ability".equals(HotbarManager.getType(held))) return;
+
+        if (slot == 0) {
+            // Slot 0 = auto-attaque (portée + cadence gérées par AutoAttackManager)
             LolPlugin.getInstance().getAutoAttackManager().tryAutoAttack(caster, target);
+        } else if (slot >= 1 && slot <= 4) {
+            // Clic gauche sur ennemi avec un sort sélectionné = lancer le sort sur lui
+            manager.getChampion(caster).tryUseAbility(caster, slot, target);
         }
     }
 
@@ -272,4 +330,55 @@ public class AbilityListener implements Listener {
         LolPlugin.getInstance().getRoleQueueManager().cleanup(p.getUniqueId());
         LolPlugin.getInstance().getRuneManager().cleanup(p.getUniqueId());
     }
+
+    // ══════════════════════════════════════════════════════════════
+    // BLOCAGE DES COMPORTEMENTS VANILLA DES ITEMS LoL
+    //   Empêche : téléportation Ender Pearl, canne à pêche, tir d'arc,
+    //   consommation, pose de blocs — tant que le joueur a un champion.
+    // ══════════════════════════════════════════════════════════════
+
+    /** Bloque la téléportation par Ender Pearl (utilisée comme icône Flash/Recall). */
+    @EventHandler
+    public void onPearlTeleport(PlayerTeleportEvent e) {
+        if (e.getCause() == PlayerTeleportEvent.TeleportCause.ENDER_PEARL
+                && manager.hasChampion(e.getPlayer())) {
+            e.setCancelled(true);
+        }
+    }
+
+    /** Bloque le lancement de projectiles vanilla (perles, cannes à pêche, arcs) pour les champions. */
+    @EventHandler
+    public void onProjectile(ProjectileLaunchEvent e) {
+        if (e.getEntity().getShooter() instanceof Player p && manager.hasChampion(p)) {
+            e.setCancelled(true);
+        }
+    }
+
+    /** Bloque la pose de blocs (certains items LoL sont des blocs). */
+    @EventHandler
+    public void onBlockPlace(BlockPlaceEvent e) {
+        if (manager.hasChampion(e.getPlayer())) {
+            ItemStack held = e.getItemInHand();
+            if (HotbarManager.isLolItem(held)) e.setCancelled(true);
+        }
+    }
+
+    /** Bloque la consommation vanilla d'items LoL (potions, etc. gérées par le plugin). */
+    @EventHandler
+    public void onConsume(PlayerItemConsumeEvent e) {
+        if (manager.hasChampion(e.getPlayer())
+                && HotbarManager.isLolItem(e.getItem())) {
+            e.setCancelled(true);
+        }
+    }
+
+    /** Empêche de lâcher les items LoL au sol (touche Q). */
+    @EventHandler
+    public void onDropItem(PlayerDropItemEvent e) {
+        if (manager.hasChampion(e.getPlayer())
+                && HotbarManager.isLolItem(e.getItemDrop().getItemStack())) {
+            e.setCancelled(true);
+        }
+    }
+
 }
