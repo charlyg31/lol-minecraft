@@ -39,9 +39,15 @@ public class Zed extends BaseChampion {
             new double[]{0.5},5,0,DamageType.PHYSICAL);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
-            double dmg=s.calcAutoAttackDamage(null);
-            DamageUtil.damage(c, t, dmg, false);
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,2.5); if(tgt==null)return;
+            double dmg=s.getFinalAD();
+            TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.PHYSICAL);
+            // Passif Mépris des Faibles : cible sous 50% PV = dégâts magiques bonus (8% PV max)
+            if(tgt.getHealth() < tgt.getMaxHealth()*0.5){
+                double bonus=tgt.getMaxHealth()*0.08;
+                TargetingUtil.dealDamage(c, tgt, bonus, TargetingUtil.DmgType.MAGICAL);
+                tgt.getWorld().spawnParticle(Particle.SMOKE,tgt.getLocation().add(0,1,0),8,0.3,0.5,0.3);
+            }
         }
         @Override public String getDynamicDescription(ChampionStats s){
             return String.format("Inflige %.0f dégâts.", s.getFinalAD());
@@ -49,17 +55,27 @@ public class Zed extends BaseChampion {
     }
 
     static class Q extends BaseAbility {
-        Q(){super("q_zed","Lames Tourbillonnantes",Material.ARROW,AbilitySlot.Q,
+        Q(){super("q_zed","Shuriken Tranchant",Material.ARROW,AbilitySlot.Q,
             new double[]{6,5.5,5,4.5,4},20,0,DamageType.PHYSICAL);
             resourceCost = 40;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
-            double[] base={80,120,160,200,240};double dmg=base[getLevel()-1]+s.getFinalAD()*1.1;
-            DamageUtil.abilityDamageEntity(c, tgt, dmg);
-            c.getWorld().spawnParticle(Particle.CRIT,tgt.getLocation(),8,0.3,0.3,0.3);
+            // LoL : skillshot ligne droite. 1er ennemi: 80-240 +100% AD bonus. Suivants: 48-144 +60% AD
+            double[] baseFirst={80,120,160,200,240};
+            double[] baseNext={48,72,96,120,144};
+            int rank=getLevel()-1;
+            double dmgFirst=baseFirst[rank]+s.getFinalAD()*1.0;
+            double dmgNext=baseNext[rank]+s.getFinalAD()*0.6;
+            var hits=TargetingUtil.skillshot(c, 12.0, 1.0, true); // traverse tous
+            boolean first=true;
+            for(var __t : hits){
+                TargetingUtil.dealDamage(c, __t, first?dmgFirst:dmgNext, TargetingUtil.DmgType.PHYSICAL);
+                first=false;
+            }
+            c.getWorld().playSound(c.getLocation(), Sound.ENTITY_ARROW_SHOOT, 1f, 1.3f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            return String.format("%.0f dégâts physiques (70+90%%AD).",70+s.getFinalAD()*0.9);
+            double[] baseFirst={80,120,160,200,240};
+            return String.format("Skillshot: %.0f dégâts au 1er ennemi (+100%%AD), réduit aux suivants.",baseFirst[getLevel()-1]+s.getFinalAD());
         }
     }
 
@@ -89,43 +105,62 @@ public class Zed extends BaseChampion {
     }
 
     static class E extends BaseAbility {
-        E(){super("e_zed","Ombre Tranchante",Material.IRON_SWORD,AbilitySlot.E,
+        E(){super("e_zed","Taillade des Ombres",Material.IRON_SWORD,AbilitySlot.E,
             new double[]{4,3,2,1,0.5},5,4,DamageType.PHYSICAL);
             resourceCost = 50;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            double dmg=45+s.getFinalAD()*0.8;
+            // LoL : 70/92.5/115/137.5/160 + 70% AD bonus, ralentit 20-40% 1.5s
+            double[] base={70,92.5,115,137.5,160};
+            double dmg=base[getLevel()-1]+s.getFinalAD()*0.7;
+            int rank=getLevel()-1;
             for(var __t : TargetingUtil.enemiesAround(c, 4.0)){
                 TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.PHYSICAL);
                 if(__t instanceof Player __p)
-                    __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,30,1,false,true));
+                    __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,30,rank,false,true)); // 20%->40%
             }
-            c.getWorld().spawnParticle(Particle.CRIT,c.getLocation(),10,2,1,2);
+            c.getWorld().spawnParticle(Particle.SWEEP_ATTACK,c.getLocation().add(0,1,0),6,2,0.5,2);
+            c.getWorld().playSound(c.getLocation(), Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 0.9f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            return String.format("%.0f dégâts + ralentit 1.5s AoE (45+80%%AD).",45+s.getFinalAD()*0.8);
+            double[] base={70,92.5,115,137.5,160};
+            return String.format("%.0f dégâts AoE (+70%%AD) + ralentit 20-40%% 1.5s.",base[getLevel()-1]+s.getFinalAD()*0.7);
         }
     }
 
     static class R extends BaseAbility {
-        R(){super("r_zed","Mort en Sursis",Material.WITHER_ROSE,AbilitySlot.R,
+        R(){super("r_zed","Marque de Mort",Material.WITHER_ROSE,AbilitySlot.R,
             new double[]{120,100,80},20,0,DamageType.TRUE);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
-            if(tgt instanceof Player _tp)_tp.sendActionBar(Component.text("💀 Mort en Sursis — 3s...",NamedTextColor.DARK_RED));
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,8.0); if(tgt==null){c.sendActionBar(Component.text("💀 Aucune cible visée",NamedTextColor.GRAY));return;}
+            // Dash derrière la cible (intouchable approx)
+            var dest=tgt.getLocation().clone().add(tgt.getLocation().getDirection().multiply(1.5));
+            dest.setY(c.getLocation().getY());
+            c.teleport(dest);
+            // Marque : on note les PV de la cible au début pour calculer les dégâts subis
+            final double startHP=tgt.getHealth();
+            if(tgt instanceof Player _tp)_tp.sendActionBar(Component.text("💀 MARQUE DE MORT — 3s...",NamedTextColor.DARK_RED));
+            tgt.getWorld().spawnParticle(Particle.SMOKE,tgt.getLocation().add(0,1,0),20,0.5,1,0.5);
+            double[] ampPct={0.25,0.40,0.55};
+            int rank=Math.min(getLevel()-1,2);
+            double ad=s.getFinalAD();
             new BukkitRunnable(){
                 @Override public void run(){
-                    if(!(!tgt.isDead()))return;
-                    double dmg=tgt.getMaxHealth()*0.2+s.getFinalAD()*0.75;
+                    if(tgt.isDead())return;
+                    // Dégâts subis pendant la marque = startHP - HP actuel (approx des dégâts infligés)
+                    double subis=Math.max(0, startHP - tgt.getHealth());
+                    double dmg=ad*0.65 + subis*ampPct[rank];
                     tgt.getWorld().strikeLightningEffect(tgt.getLocation());
-                    DamageUtil.trueDamageEntity(c, tgt, dmg);
-                    if(tgt instanceof Player _tp)_tp.sendMessage(Component.text("☠ Mort en Sursis!",NamedTextColor.DARK_RED));
+                    tgt.getWorld().spawnParticle(Particle.FLASH,tgt.getLocation().add(0,1,0),2);
+                    TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.TRUE);
+                    if(tgt instanceof Player _tp)_tp.sendMessage(Component.text("☠ DÉTONATION! Marque de Mort",NamedTextColor.DARK_RED));
                 }
-            }.runTaskLater(LolPlugin.getInstance(),60L);
+            }.runTaskLater(LolPlugin.getInstance(),60L); // 3s
+            c.getWorld().playSound(c.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 1f, 0.7f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            return String.format("Marque la cible. Après 3s: %.0f dégâts vrais (20%% HP + 75%% AD).",
-                s.getFinalAD()*0.75);
+            double[] ampPct={25,40,55};int r=Math.min(getLevel()-1,2);
+            return String.format("Dash + marque 3s. Détonation: 65%%AD + %.0f%% des dégâts infligés.",ampPct[r]);
         }
     }
 }
