@@ -128,6 +128,8 @@ public class MinionManager {
             z.setBaby(false);
             z.setShouldBurnInDay(false);
             z.setCustomNameVisible(false);
+            // Empêcher le zombie de cibler les joueurs tout seul (IA vanilla)
+            z.setTarget(null);
             z.getAttribute(Compat.maxHealth()).setBaseValue(MINION_HP);
             z.setHealth(MINION_HP);
             z.getAttribute(Compat.movementSpeed()).setBaseValue(MINION_SPEED);
@@ -191,6 +193,15 @@ public class MinionManager {
                         && roadPoint.getWorld().equals(z.getLocation().getWorld())
                         && roadPoint.distance(z.getLocation()) > MAX_DEVIATION;
 
+                // Couper toute cible vanilla parasite (zombie qui cible un joueur tout seul)
+                if (z.getTarget() instanceof Player tp) {
+                    var tmCheck = LolPlugin.getInstance().getTeamManager();
+                    // Si la cible n'est pas un ennemi valide, l'annuler
+                    if (tmCheck.getTeam(tp) == null || tmCheck.getTeam(tp) == team) {
+                        z.setTarget(null);
+                    }
+                }
+
                 // Chercher un ennemi proche (sbire ou champion)
                 LivingEntity enemy = findNearbyEnemy(z, team);
                 // Chercher une tourelle/structure ennemie à portée
@@ -228,13 +239,22 @@ public class MinionManager {
         List<Location> path = new ArrayList<>(road);
         if (team == Team.RED) Collections.reverse(path); // rouge va dans l'autre sens
 
-        // Trouver le 1er waypoint encore "devant" (non atteint)
-        for (Location wp : path) {
-            if (wp.getWorld().equals(current.getWorld()) && wp.distance(current) > 3.0) {
-                return wp;
-            }
+        // 1. Trouver l'INDEX du waypoint le plus proche du sbire
+        int closestIdx = 0;
+        double closestDist = Double.MAX_VALUE;
+        for (int i = 0; i < path.size(); i++) {
+            Location wp = path.get(i);
+            if (!wp.getWorld().equals(current.getWorld())) continue;
+            double d = wp.distance(current);
+            if (d < closestDist) { closestDist = d; closestIdx = i; }
         }
-        return path.get(path.size() - 1); // dernier point = base ennemie
+
+        // 2. Viser le waypoint SUIVANT (progression le long du chemin)
+        //    Si on est proche du waypoint courant (<4 blocs), passer au suivant.
+        int targetIdx = closestIdx;
+        if (closestDist < 4.0) targetIdx = Math.min(closestIdx + 1, path.size() - 1);
+
+        return path.get(targetIdx);
     }
 
     // Portée d'attaque d'un sbire sur une tourelle (blocs)
