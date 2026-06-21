@@ -36,9 +36,9 @@ public class Garen extends BaseChampion {
             new double[]{0.5},5,0,DamageType.PHYSICAL);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
-            double dmg=s.calcAutoAttackDamage(null);
-            DamageUtil.damage(c, t, dmg, false);
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,2.5); if(tgt==null)return;
+            double dmg=s.getFinalAD();
+            TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.PHYSICAL);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             return String.format("Inflige %.0f dégâts.", s.getFinalAD());
@@ -51,18 +51,21 @@ public class Garen extends BaseChampion {
             new double[]{8,7.5,7,6.5,6},5,0,DamageType.PHYSICAL);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,2.5); if(tgt==null){c.sendActionBar(Component.text("⚔ Aucune cible à portée",NamedTextColor.GRAY));return;}
+            // LoL : 30/55/80/105/130 + 50% AD bonus, silence 1.5s, boost vitesse
             double[] base={30,55,80,105,130};
             double dmg=base[getLevel()-1]+s.getFinalAD()*0.5;
-            DamageUtil.abilityDamageEntity(c, tgt, dmg);
-            // Silence appliqué (slow Minecraft comme approximation du silence)
+            TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.PHYSICAL);
+            // Silence 1.5s (approx via lenteur+faiblesse) + boost de vitesse pour Garen
             tgt.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,30,2,false,true));
             c.addPotionEffect(new PotionEffect(PotionEffectType.SPEED,30,1,false,true));
             if(tgt instanceof Player _tp)_tp.sendActionBar(Component.text("⚠ Silence — Garen Q",NamedTextColor.RED));
-            c.getWorld().spawnParticle(Particle.SWEEP_ATTACK,tgt.getLocation(),3);
+            c.getWorld().spawnParticle(Particle.SWEEP_ATTACK,tgt.getLocation().add(0,1,0),3);
+            c.getWorld().playSound(c.getLocation(), Sound.ENTITY_PLAYER_ATTACK_CRIT, 1f, 1f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            return String.format("%.0f dégâts physiques (30+140%%AD). Silence 1.5s + boost vitesse.",30+s.getFinalAD()*1.4);
+            double[] base={30,55,80,105,130};
+            return String.format("%.0f dégâts physiques (+50%%AD). Silence 1.5s + boost vitesse.",base[getLevel()-1]+s.getFinalAD()*0.5);
         }
     }
 
@@ -72,36 +75,55 @@ public class Garen extends BaseChampion {
             new double[]{23,21,19,17,15},0,0,DamageType.TRUE);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            c.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE,40,1,false,true));
+            // LoL : réduction de dégâts 30% (4s), bouclier + ténacité (0.75s initial)
+            c.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE,80,1,false,true)); // ~30% réduction 4s
+            // Bouclier (absorption) : approximé via PV temporaires d'absorption
+            c.addPotionEffect(new PotionEffect(PotionEffectType.ABSORPTION,40,1,false,true));
+            // Ténacité (immunité aux ralentissements 0.75s) via nettoyage
+            c.removePotionEffect(PotionEffectType.SLOWNESS);
+            c.getWorld().spawnParticle(Particle.ENCHANTED_HIT,c.getLocation().add(0,1,0),20,0.5,1,0.5);
+            c.getWorld().playSound(c.getLocation(), Sound.ITEM_SHIELD_BLOCK, 1f, 1.2f);
             c.sendActionBar(Component.text("🛡 Courage actif!",NamedTextColor.GOLD));
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            return "Réduit les dégâts reçus de 30%% pendant 2s.";
+            return "Réduit les dégâts reçus de 30%% (4s) + bouclier + ténacité.";
         }
     }
 
-    // E — Tournoiement
+    // E — Tournoiement (Jugement) : 7 frappes sur 3s, +25% au plus proche
     static class E extends BaseAbility {
-        E(){super("e_garen","Tournoiement",Material.COMPASS,AbilitySlot.E,
+        E(){super("e_garen","Jugement",Material.COMPASS,AbilitySlot.E,
             new double[]{9,8,7,6,5},5,4,DamageType.PHYSICAL);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            c.sendActionBar(Component.text("⚔ Tournoiement!",NamedTextColor.GOLD));
+            c.sendActionBar(Component.text("⚔ Jugement!",NamedTextColor.GOLD));
+            // LoL : dégâts par tick = base[rang] + ratio AD, 7 frappes réparties sur 3s (~tous les 8.5 ticks)
+            double[] baseTick={14,18,22,26,30};
+            double[] adRatio={0.34,0.35,0.36,0.37,0.38};
+            int rank=getLevel()-1;
+            double perTick=baseTick[rank]+s.getFinalAD()*adRatio[rank];
             new BukkitRunnable(){
-                int tick=0;
+                int hits=0;
                 @Override public void run(){
-                    if(tick>=60){cancel();return;}
-                    double dmg=(4+s.getFinalAD()*0.14)/10.0;
-                    TargetingUtil.dealDamageAll(c,
-                        TargetingUtil.enemiesAround(c, 4.0), dmg, TargetingUtil.DmgType.PHYSICAL);
-                    c.getWorld().spawnParticle(Particle.SWEEP_ATTACK,c.getLocation(),2,1.5,0.5,1.5);
-                    tick+=2;
+                    if(hits>=7){cancel();return;}
+                    // Trouver l'ennemi le plus proche pour le bonus +25%
+                    var nearest=TargetingUtil.getNearestEnemy(c, 4.0);
+                    for(var __t : TargetingUtil.enemiesAround(c, 4.0)){
+                        double dmg=perTick;
+                        if(__t.equals(nearest)) dmg*=1.25; // le plus proche prend +25%
+                        TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.PHYSICAL);
+                    }
+                    // Animation de tournoiement
+                    c.getWorld().spawnParticle(Particle.SWEEP_ATTACK,c.getLocation().add(0,1,0),3,1.5,0.3,1.5);
+                    c.getWorld().playSound(c.getLocation(), Sound.ENTITY_PLAYER_ATTACK_SWEEP, 0.5f, 1.2f);
+                    hits++;
                 }
-            }.runTaskTimer(LolPlugin.getInstance(),0L,2L);
+            }.runTaskTimer(LolPlugin.getInstance(),0L,8L); // 7 frappes × 8 ticks ≈ 3s
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            return String.format("Dégâts AoE rayon 4 pendant 3s. Total: %.0f dégâts physiques.",
-                (4+s.getFinalAD()*0.14)*3);
+            double[] baseTick={14,18,22,26,30};double[] adRatio={0.34,0.35,0.36,0.37,0.38};int r=getLevel()-1;
+            double total=(baseTick[r]+s.getFinalAD()*adRatio[r])*7;
+            return String.format("7 frappes sur 3s, total %.0f dégâts (rayon 4). Plus proche: +25%%.",total);
         }
     }
 
@@ -111,7 +133,8 @@ public class Garen extends BaseChampion {
             new double[]{120,100,80},25,0,DamageType.TRUE);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
+            // Justice Démacienne : porté plus loin (sort à distance moyenne), cible visée
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,8.0); if(tgt==null){c.sendActionBar(Component.text("☠ Aucune cible visée",NamedTextColor.GRAY));return;}
             double[] base={150,300,450};
             int r=Math.min(getLevel()-1,2);
             // Dégâts vrais : base + 25% PV manquants de la cible (formule LoL)
@@ -120,8 +143,9 @@ public class Garen extends BaseChampion {
             if((tgt instanceof Player && cm.hasChampion((Player)tgt))){var hp=cm.getChampion((Player)tgt).getHPSystem();missingHP=hp.getMaxHP()-hp.getCurrentHP();}
             double dmg=base[r]+missingHP*0.25;
             tgt.getWorld().strikeLightningEffect(tgt.getLocation());
-            DamageUtil.trueDamageEntity(c, tgt, dmg);
-            if(tgt instanceof Player _tp)_tp.sendMessage(Component.text("☠ Exécution de Garen!",NamedTextColor.DARK_RED));
+            tgt.getWorld().spawnParticle(Particle.FLASH,tgt.getLocation().add(0,1,0),3);
+            TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.TRUE);
+            if(tgt instanceof Player _tp)_tp.sendMessage(Component.text("☠ DEMACIA! Exécution de Garen!",NamedTextColor.DARK_RED));
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] base={150,300,450};int r=Math.min(getLevel()-1,2);return String.format("%.0f dégâts vrais + 25%% PV manquants.",base[r]);
