@@ -183,6 +183,8 @@ public class HotbarManager {
                     net.kyori.adventure.text.format.NamedTextColor.DARK_GRAY)
                     .decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false)));
             meta.getPersistentDataContainer().set(KEY_RECALL, PersistentDataType.BYTE, (byte) 1);
+            // Marquer AUSSI avec KEY_TYPE pour passer le filtre isLolItem dans onInteract
+            meta.getPersistentDataContainer().set(KEY_TYPE, PersistentDataType.STRING, "recall");
             item.setItemMeta(meta);
         }
         return item;

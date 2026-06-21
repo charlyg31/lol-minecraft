@@ -297,6 +297,7 @@ public class AbilityListener implements Listener {
                 hotbar().removeConsumable(caster, consId);
                 hotbar().renderPage(caster, champ);
             }
+            case "recall" -> LolPlugin.getInstance().getBaseManager().startRecall(caster);
             case "page" -> hotbar().switchPage(caster, champ);
         }
     }
