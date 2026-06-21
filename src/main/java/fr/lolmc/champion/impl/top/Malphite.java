@@ -36,9 +36,8 @@ public class Malphite extends BaseChampion {
             new double[]{0.5},5,0,DamageType.PHYSICAL);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
-            double dmg=s.calcAutoAttackDamage(null);
-            DamageUtil.damage(c, t, dmg, false, DamageUtil.Type.MAGICAL);
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,2.5); if(tgt==null)return;
+            TargetingUtil.dealDamage(c, tgt, s.getFinalAD(), TargetingUtil.DmgType.PHYSICAL);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             return String.format("Inflige %.0f dégâts.", s.getFinalAD());
@@ -50,13 +49,16 @@ public class Malphite extends BaseChampion {
             new double[]{8,7.5,7,6.5,6},20,0,DamageType.MAGICAL);
             resourceCost = 70;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null){c.sendActionBar(Component.text("🪨 Aucune cible",NamedTextColor.GRAY));return;}
             double[] base={70,120,170,220,270};
             double dmg=base[getLevel()-1]+s.getFinalAP()*0.6;
-            DamageUtil.abilityDamageMagicEntity(c, tgt, dmg);
-            tgt.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,40,1,false,true));
-            tgt.getWorld().spawnParticle(Particle.BLOCK,tgt.getLocation(),15,0.3,0.3,0.3,
+            TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.MAGICAL);
+            // LoL : ralentit la cible ET donne un boost de vitesse à Malphite
+            if(tgt instanceof Player __p) __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,60,1,false,true));
+            c.addPotionEffect(new PotionEffect(PotionEffectType.SPEED,60,0,false,true));
+            tgt.getWorld().spawnParticle(Particle.BLOCK,tgt.getLocation().add(0,1,0),15,0.3,0.3,0.3,
                 Material.STONE.createBlockData());
+            c.getWorld().playSound(c.getLocation(), Sound.BLOCK_STONE_BREAK, 1f, 0.8f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             return String.format("%.0f dégâts magiques (70+60%%AP+10%%HP). Ralentit 2s.",
