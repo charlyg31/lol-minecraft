@@ -36,9 +36,8 @@ public class Jinx extends BaseChampion {
             new double[]{0.5},5,0,DamageType.PHYSICAL);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
-            double dmg=s.calcAutoAttackDamage(null);
-            DamageUtil.damage(c, t, dmg, false, DamageUtil.Type.MAGICAL);
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.0); if(tgt==null)return;
+            TargetingUtil.dealDamage(c, tgt, s.getFinalAD(), TargetingUtil.DmgType.PHYSICAL);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             return String.format("Inflige %.0f dégâts.", s.getFinalAD());
@@ -57,57 +56,83 @@ public class Jinx extends BaseChampion {
     }
 
     static class W extends BaseAbility {
-        W(){super("w_jinx","Zap",Material.LIGHTNING_ROD,AbilitySlot.W,
-            new double[]{10,9,8,7,6},25,0,DamageType.PHYSICAL);
+        W(){super("w_jinx","Zap!",Material.LIGHTNING_ROD,AbilitySlot.W,
+            new double[]{8,7,6,5,4},25,0,DamageType.PHYSICAL);
             resourceCost = 20;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
-            double dmg=20+s.getFinalAD()*1.6;
-            DamageUtil.abilityDamageEntity(c, tgt, dmg);
-            tgt.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,50,2,false,true));
-            c.getWorld().spawnParticle(Particle.ELECTRIC_SPARK,tgt.getLocation(),15,0.5,0.5,0.5);
+            // LoL : skillshot ligne. 10/80/150/220/290 + 160% AD au 1er touché + ralentit 30-60%
+            double[] base={10,80,150,220,290};double dmg=base[getLevel()-1]+s.getFinalAD()*1.6;
+            var hits=TargetingUtil.skillshot(c, 14.0, 0.8, false); // s'arrête au 1er
+            if(hits.isEmpty()){c.sendActionBar(Component.text("⚡ Zap manqué!",NamedTextColor.GRAY));return;}
+            var main=hits.get(0);
+            TargetingUtil.dealDamage(c, main, dmg, TargetingUtil.DmgType.PHYSICAL);
+            if(main instanceof Player __p)
+                __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,40,2,false,true)); // ralentit fort
+            main.getWorld().spawnParticle(Particle.ELECTRIC_SPARK,main.getLocation().add(0,1,0),15,0.5,0.5,0.5);
+            c.getWorld().playSound(c.getLocation(), Sound.ENTITY_FIREWORK_ROCKET_BLAST, 1f, 1.4f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            return String.format("%.0f dégâts + ralentit 2.5s (20+160%%AD).",20+s.getFinalAD()*1.6);
+            double[] base={10,80,150,220,290};
+            return String.format("Skillshot: %.0f dégâts (+160%%AD) au 1er touché + ralentit.",base[getLevel()-1]+s.getFinalAD()*1.6);
         }
     }
 
     static class E extends BaseAbility {
-        E(){super("e_jinx","Champ de Mines",Material.TRIPWIRE_HOOK,AbilitySlot.E,
-            new double[]{20,18,16,14,12},25,2,DamageType.MAGICAL);
-            resourceCost = 50;}
+        E(){super("e_jinx","Croque-Flammes!",Material.TRIPWIRE_HOOK,AbilitySlot.E,
+            new double[]{24,20.5,17,13.5,10},25,2,DamageType.MAGICAL);
+            resourceCost = 70;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
-            double dmg=80+s.getFinalAP()*0.7;
-            DamageUtil.abilityDamageMagicEntity(c, tgt, dmg);
-            tgt.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,60,2,false,true));
-            c.getWorld().spawnParticle(Particle.EXPLOSION,tgt.getLocation(),3,1,0,1);
+            // LoL : lance 3 pièges sur zone visée. Enracinent les ennemis + dégâts magiques 70-270
+            Location loc=TargetingUtil.getAimedGroundLocation(c, 9.0);
+            double[] base={70,120,170,220,270};double dmg=base[getLevel()-1]+s.getFinalAP()*1.0;
+            for(var __t : TargetingUtil.entitiesInRadius(c, loc, 4.0)){
+                TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);
+                // Root (enracinement) : lenteur extrême brève
+                if(__t instanceof Player __p){
+                    __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,35,10,false,true));
+                    __p.sendActionBar(Component.text("🦷 ENRACINÉ par les Croque-Flammes!",NamedTextColor.RED));
+                }
+            }
+            // Animation : pièges-mâchoires sur la zone
+            loc.getWorld().spawnParticle(Particle.FLAME,loc,30,3,0.3,3,0.02);
+            loc.getWorld().spawnParticle(Particle.LAVA,loc,10,3,0.2,3);
+            c.getWorld().playSound(loc, Sound.ENTITY_BLAZE_SHOOT, 1f, 1f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            return String.format("Mine: %.0f dégâts + ralentit 3s (80+70%%AP).",80+s.getFinalAP()*0.7);
+            double[] base={70,120,170,220,270};
+            return String.format("Pièges (zone visée): %.0f dégâts magiques + enracine.",base[getLevel()-1]+s.getFinalAP());
         }
     }
 
     static class R extends BaseAbility {
-        R(){super("r_jinx","Super Méga Rocket",Material.FIREWORK_ROCKET,AbilitySlot.R,
-            new double[]{90,75,60},25,5,DamageType.PHYSICAL);
+        R(){super("r_jinx","Super Méga Roquette de la Mort!",Material.FIREWORK_ROCKET,AbilitySlot.R,
+            new double[]{75,65,55},25,5,DamageType.PHYSICAL);
             resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
-            double missing=1.0+(1.0-tgt.getHealth()/tgt.getMaxHealth())*1.5;
-            double[] base={250,400,550};int rr=Math.min(getLevel()-1,2);
+            // LoL : roquette skillshot longue portée. 25-250/40-400/55-550 selon distance + 15-150% AD + % PV manquants. Explose en zone
+            var hits=TargetingUtil.skillshot(c, 30.0, 1.2, false);
+            if(hits.isEmpty()){c.sendActionBar(Component.text("🚀 Roquette tirée (aucune cible)",NamedTextColor.GRAY));return;}
+            var main=hits.get(0);
+            // Dégâts selon distance parcourue (10% à 100%)
+            double dist=c.getLocation().distance(main.getLocation());
+            double distMult=Math.min(1.0, 0.1+dist*0.06); // monte avec la distance
+            double[] baseMax={250,400,550};int rr=Math.min(getLevel()-1,2);
             double[] missPct={0.25,0.30,0.35};
-            var cmJ=LolPlugin.getInstance().getChampionManager();
-            double miss=0;
-            if((tgt instanceof Player && cmJ.hasChampion((Player)tgt))){var hpJ=cmJ.getChampion((Player)tgt).getHPSystem();miss=hpJ.getMaxHP()-hpJ.getCurrentHP();}
-            double dmg=base[rr]+s.getFinalAD()*1.5+miss*missPct[rr];
-            TargetingUtil.dealDamageAll(c,
-                TargetingUtil.entitiesInRadius(c, tgt.getLocation(), 5.0), dmg, TargetingUtil.DmgType.PHYSICAL);
-            tgt.getWorld().createExplosion(tgt.getLocation(),2f,false,false);
-            if(tgt instanceof Player _tp)_tp.sendMessage(Component.text("🚀 SUPER MÉGA ROCKET!",NamedTextColor.RED));
+            double baseDmg=baseMax[rr]*distMult+s.getFinalAD()*1.5*distMult;
+            // Explosion en zone : chaque cible prend dégâts + bonus selon SES PV manquants
+            for(var __t : TargetingUtil.entitiesInRadius(c, main.getLocation(), 5.0)){
+                double missingHP=__t.getMaxHealth()-__t.getHealth();
+                double dmg=baseDmg+missingHP*missPct[rr];
+                TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.PHYSICAL);
+            }
+            main.getWorld().spawnParticle(Particle.EXPLOSION,main.getLocation(),8,2,1,2);
+            main.getWorld().spawnParticle(Particle.FLAME,main.getLocation(),50,3,2,3,0.1);
+            main.getWorld().playSound(main.getLocation(), Sound.ENTITY_GENERIC_EXPLODE, 2f, 0.6f);
+            if(main instanceof Player _tp)_tp.sendMessage(Component.text("🚀 SUPER MÉGA ROQUETTE DE LA MORT!",NamedTextColor.RED));
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            return String.format("%.0f dégâts AoE 5 blocs (x2.5 sur cible basse vie).",300+s.getFinalAD()*1.5);
+            double[] base={250,400,550};int r=Math.min(getLevel()-1,2);
+            return String.format("Roquette globale: jusqu'à %.0f dégâts (+150%%AD) selon distance + %% PV manquants. Explose en zone.",base[r]+s.getFinalAD()*1.5);
         }
     }
 }
