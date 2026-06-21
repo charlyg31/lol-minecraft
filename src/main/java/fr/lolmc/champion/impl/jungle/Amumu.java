@@ -6,6 +6,7 @@ import fr.lolmc.stats.ResourceSystem;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.stats.ChampionStats;
 import fr.lolmc.util.DamageUtil;
+import fr.lolmc.util.TargetingUtil;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.*;
@@ -35,7 +36,7 @@ public class Amumu extends BaseChampion {
             new double[]{0.5},5,0,DamageType.PHYSICAL);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            if(t==null)return;
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
             double dmg=s.calcAutoAttackDamage(null);
             DamageUtil.damage(c, t, dmg, false, DamageUtil.Type.MAGICAL);
         }
@@ -49,13 +50,13 @@ public class Amumu extends BaseChampion {
             new double[]{10,9,8,7,6},20,0,DamageType.MAGICAL);
             resourceCost = 70;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            if(t==null)return;
-            Location dest=safeTeleport(c.getLocation(),t.getLocation());
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
+            Location dest=safeTeleport(c.getLocation(),tgt.getLocation());
             c.teleport(dest);
             double[] base={70,95,120,145,170};double dmg=base[getLevel()-1]+s.getFinalAP()*0.85;
-            DamageUtil.abilityDamageMagic(c, t, dmg);
-            t.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,20,10,false,true));
-            t.sendActionBar(Component.text("🧻 Bandage! Stun 1s!",NamedTextColor.YELLOW));
+            DamageUtil.abilityDamageMagicEntity(c, tgt, dmg);
+            tgt.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,20,10,false,true));
+            if(tgt instanceof Player _tp)_tp.sendActionBar(Component.text("🧻 Bandage! Stun 1s!",NamedTextColor.YELLOW));
         }
         @Override public String getDynamicDescription(ChampionStats s){
             return String.format("Téléporte sur la cible. %.0f dégâts + stun 1s.",80+s.getFinalAP()*0.7);
@@ -73,9 +74,7 @@ public class Amumu extends BaseChampion {
                 @Override public void run(){
                     if(tick>=100){cancel();return;}
                     double dmg=s.getFinalMaxHP()*0.01+s.getFinalAP()*0.01;
-                    c.getWorld().getNearbyEntities(c.getLocation(),3,2,3).stream()
-                        .filter(e->e instanceof Player&&!e.equals(c))
-                        .forEach(e->DamageUtil.abilityDamageMagic(c, (Player)e, dmg));
+                    TargetingUtil.dealDamageAll(c, TargetingUtil.entitiesInRadius(c, c.getLocation(), 3), dmg, TargetingUtil.DmgType.MAGICAL);
                     tick+=20;
                 }
             }.runTaskTimer(LolPlugin.getInstance(),0L,20L);
@@ -91,9 +90,7 @@ public class Amumu extends BaseChampion {
             resourceCost = 35;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             double dmg=65+s.getFinalAP()*0.3;
-            c.getWorld().getNearbyEntities(c.getLocation(),3,2,3).stream()
-                .filter(e->e instanceof Player&&!e.equals(c))
-                .forEach(e->DamageUtil.abilityDamageMagic(c, (Player)e, dmg));
+            TargetingUtil.dealDamageAll(c, TargetingUtil.entitiesInRadius(c, c.getLocation(), 3), dmg, TargetingUtil.DmgType.MAGICAL);
             c.getWorld().spawnParticle(Particle.ANGRY_VILLAGER,c.getLocation(),8,1,1,1);
         }
         @Override public String getDynamicDescription(ChampionStats s){

@@ -6,6 +6,7 @@ import fr.lolmc.stats.ResourceSystem;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.stats.ChampionStats;
 import fr.lolmc.util.DamageUtil;
+import fr.lolmc.util.TargetingUtil;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.*;
@@ -37,7 +38,7 @@ public class Yasuo extends BaseChampion {
             new double[]{0.5},5,0,DamageType.PHYSICAL);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            if(t==null)return;
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
             double dmg=s.calcAutoAttackDamage(null);
             DamageUtil.damage(c, t, dmg, false);
         }
@@ -88,11 +89,11 @@ public class Yasuo extends BaseChampion {
             new double[]{0.5,0.5,0.5,0.5,0.5},5,0,DamageType.PHYSICAL);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            if(t==null)return;
-            Location dest=safeTeleport(c.getLocation(),t.getLocation());
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
+            Location dest=safeTeleport(c.getLocation(),tgt.getLocation());
             c.teleport(dest);
             double dmg=70+s.getFinalAD()*0.6;
-            DamageUtil.abilityDamage(c, t, dmg);
+            DamageUtil.abilityDamageEntity(c, tgt, dmg);
             c.getWorld().spawnParticle(Particle.SWEEP_ATTACK,dest,5);
         }
         @Override public String getDynamicDescription(ChampionStats s){
@@ -105,7 +106,7 @@ public class Yasuo extends BaseChampion {
             new double[]{200,180,160},5,4,DamageType.PHYSICAL);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            if(t==null)return;
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
             double dmg=200+s.getFinalAD()*1.5;
             c.getWorld().getNearbyEntities(c.getLocation(),4,3,4).stream()
                 .filter(e->e instanceof Player&&!e.equals(c))

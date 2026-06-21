@@ -6,6 +6,7 @@ import fr.lolmc.stats.ResourceSystem;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.stats.ChampionStats;
 import fr.lolmc.util.DamageUtil;
+import fr.lolmc.util.TargetingUtil;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.*;
@@ -35,7 +36,7 @@ public class Warwick extends BaseChampion {
             new double[]{0.5},5,0,DamageType.PHYSICAL);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            if(t==null)return;
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
             double dmg=s.calcAutoAttackDamage(null);
             DamageUtil.damage(c, t, dmg, false);
         }
@@ -49,9 +50,9 @@ public class Warwick extends BaseChampion {
             new double[]{6,5,4,3,2},20,0,DamageType.MAGICAL);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            if(t==null)return;
-            double[] pct={0.06,0.07,0.08,0.09,0.10};double dmg=t.getMaxHealth()*pct[getLevel()-1]*4+s.getFinalAD()*1.0;
-            DamageUtil.abilityDamageMagic(c, t, dmg);
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
+            double[] pct={0.06,0.07,0.08,0.09,0.10};double dmg=tgt.getMaxHealth()*pct[getLevel()-1]*4+s.getFinalAD()*1.0;
+            DamageUtil.abilityDamageMagicEntity(c, tgt, dmg);
             double heal=dmg*0.7;
             c.setHealth(Math.min(c.getMaxHealth(),c.getHealth()+heal));
             c.getWorld().spawnParticle(Particle.HEART,c.getLocation(),5,0.5,0.5,0.5);
@@ -93,14 +94,14 @@ public class Warwick extends BaseChampion {
             new double[]{110,85,60},25,0,DamageType.PHYSICAL);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            if(t==null)return;
-            Location dest=safeTeleport(c.getLocation(),t.getLocation());
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
+            Location dest=safeTeleport(c.getLocation(),tgt.getLocation());
             c.teleport(dest);
             double dmg=175+s.getFinalAD()*1.5;
-            DamageUtil.abilityDamage(c, t, dmg);
-            t.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,30,10,false,true));
-            t.setVelocity(new Vector(0,0.8,0));
-            t.sendActionBar(Component.text("🐺 SUPPRESSION!",NamedTextColor.DARK_RED));
+            DamageUtil.abilityDamageEntity(c, tgt, dmg);
+            tgt.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,30,10,false,true));
+            tgt.setVelocity(new Vector(0,0.8,0));
+            if(tgt instanceof Player _tp)_tp.sendActionBar(Component.text("🐺 SUPPRESSION!",NamedTextColor.DARK_RED));
         }
         @Override public String getDynamicDescription(ChampionStats s){
             return String.format("Bondit. %.0f dégâts + suppression 1.5s.",175+s.getFinalAD()*1.5);

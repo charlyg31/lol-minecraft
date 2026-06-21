@@ -6,6 +6,7 @@ import fr.lolmc.stats.ResourceSystem;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.stats.ChampionStats;
 import fr.lolmc.util.DamageUtil;
+import fr.lolmc.util.TargetingUtil;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.*;
@@ -38,7 +39,7 @@ public class Nasus extends BaseChampion {
             new double[]{0.5},5,0,DamageType.PHYSICAL);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            if(t==null)return;
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
             double dmg=s.calcAutoAttackDamage(null);
             DamageUtil.damage(c, t, dmg, false);
         }
@@ -52,11 +53,11 @@ public class Nasus extends BaseChampion {
             new double[]{8,7,6,5,4},5,0,DamageType.PHYSICAL);
             resourceCost = 20;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            if(t==null)return;
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
             int stacks=qStacks.getOrDefault(c.getUniqueId(),0);
             double dmg=s.getFinalAD()+stacks;
-            DamageUtil.abilityDamage(c, t, dmg);
-            if(t.getHealth()-dmg<=0) {qStacks.merge(c.getUniqueId(),6,Integer::sum);}
+            DamageUtil.abilityDamageEntity(c, tgt, dmg);
+            if(tgt.getHealth()-dmg<=0) {qStacks.merge(c.getUniqueId(),6,Integer::sum);}
         }
         @Override public String getDynamicDescription(ChampionStats s){
             int stacks=qStacks.getOrDefault(UUID.randomUUID(),0);
@@ -69,9 +70,9 @@ public class Nasus extends BaseChampion {
             new double[]{15,14,13,12,11},20,0,DamageType.MAGICAL);
             resourceCost = 80;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            if(t==null)return;
-            t.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,100,2,false,true));
-            t.sendActionBar(Component.text("💀 Flétrissure de Nasus -35%% vitesse!",NamedTextColor.DARK_PURPLE));
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
+            tgt.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,100,2,false,true));
+            if(tgt instanceof Player _tp)_tp.sendActionBar(Component.text("💀 Flétrissure de Nasus -35%% vitesse!",NamedTextColor.DARK_PURPLE));
         }
         @Override public String getDynamicDescription(ChampionStats s){return "Réduit vitesse déplacement et attaque de 35%% pendant 5s.";}
     }
@@ -81,16 +82,14 @@ public class Nasus extends BaseChampion {
             new double[]{12,11,10,9,8},20,3,DamageType.MAGICAL);
             resourceCost = 70;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            if(t==null)return;
-            Location loc=t.getLocation();
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
+            Location loc=tgt.getLocation();
             new BukkitRunnable(){
                 int tick=0;
                 @Override public void run(){
                     if(tick>=100){cancel();return;}
                     double dmg=(55+s.getFinalMaxHP()*0.05)/5.0;
-                    loc.getWorld().getNearbyEntities(loc,3,2,3).stream()
-                        .filter(e->e instanceof Player&&!e.equals(c))
-                        .forEach(e->DamageUtil.abilityDamageMagic(c, (Player)e, dmg));
+                    TargetingUtil.dealDamageAll(c, TargetingUtil.entitiesInRadius(c, loc, 3), dmg, TargetingUtil.DmgType.MAGICAL);
                     loc.getWorld().spawnParticle(Particle.WITCH,loc,5,1,1,1);
                     tick+=20;
                 }
@@ -114,9 +113,7 @@ public class Nasus extends BaseChampion {
                 @Override public void run(){
                     if(tick>=300){cancel();return;}
                     double dmg=3+s.getFinalMaxHP()*0.01;
-                    c.getWorld().getNearbyEntities(c.getLocation(),3,2,3).stream()
-                        .filter(e->e instanceof Player&&!e.equals(c))
-                        .forEach(e->DamageUtil.abilityDamageMagic(c, (Player)e, dmg));
+                    TargetingUtil.dealDamageAll(c, TargetingUtil.entitiesInRadius(c, c.getLocation(), 3), dmg, TargetingUtil.DmgType.MAGICAL);
                     tick+=20;
                 }
             }.runTaskTimer(LolPlugin.getInstance(),0L,20L);

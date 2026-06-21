@@ -6,6 +6,7 @@ import fr.lolmc.stats.ResourceSystem;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.stats.ChampionStats;
 import fr.lolmc.util.DamageUtil;
+import fr.lolmc.util.TargetingUtil;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.*;
@@ -35,7 +36,7 @@ public class MissFortune extends BaseChampion {
             new double[]{0.5},5,0,DamageType.PHYSICAL);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            if(t==null)return;
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
             double dmg=s.calcAutoAttackDamage(null);
             DamageUtil.damage(c, t, dmg, false);
         }
@@ -49,11 +50,11 @@ public class MissFortune extends BaseChampion {
             new double[]{7,6,5,4,3},25,0,DamageType.PHYSICAL);
             resourceCost = 43;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            if(t==null)return;
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
             double[] base={20,40,60,80,100};double d1=base[getLevel()-1]+s.getFinalAD()*1.0;
             double d2=(20+s.getFinalAD()*0.85)*1.35;
-            DamageUtil.abilityDamage(c, t, d1+d2);
-            c.getWorld().spawnParticle(Particle.CRIT,t.getLocation(),10,0.3,0.3,0.3);
+            DamageUtil.abilityDamageEntity(c, tgt, d1+d2);
+            c.getWorld().spawnParticle(Particle.CRIT,tgt.getLocation(),10,0.3,0.3,0.3);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double d=20+s.getFinalAD()*0.85;
@@ -78,15 +79,15 @@ public class MissFortune extends BaseChampion {
             new double[]{18,15,12,9,6},25,3,DamageType.PHYSICAL);
             resourceCost = 80;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            if(t==null)return;
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
             double dmg=60+s.getFinalAD()*0.8;
-            t.getWorld().getNearbyEntities(t.getLocation(),3,2,3).stream()
+            tgt.getWorld().getNearbyEntities(tgt.getLocation(),3,2,3).stream()
                 .filter(e->e instanceof Player)
                 .forEach(e->{
                     DamageUtil.abilityDamage(c, (Player)e, dmg);
                     ((Player)e).addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,40,1,false,true));
                 });
-            c.getWorld().spawnParticle(Particle.CRIT,t.getLocation(),20,1.5,1,1.5);
+            c.getWorld().spawnParticle(Particle.CRIT,tgt.getLocation(),20,1.5,1,1.5);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             return String.format("Zone 3 blocs: %.0f dégâts + ralentit 2s (60+80%%AD).",60+s.getFinalAD()*0.8);
@@ -104,9 +105,7 @@ public class MissFortune extends BaseChampion {
                 @Override public void run(){
                     if(tick>=60){cancel();return;}
                     double dmg=(110+s.getFinalAP()*0.2)/3.0;
-                    c.getWorld().getNearbyEntities(c.getLocation(),8,2,8).stream()
-                        .filter(e->e instanceof Player&&!e.equals(c))
-                        .forEach(e->DamageUtil.abilityDamage(c, (Player)e, dmg));
+                    TargetingUtil.dealDamageAll(c, TargetingUtil.entitiesInRadius(c, c.getLocation(), 8), dmg, TargetingUtil.DmgType.PHYSICAL);
                     c.getWorld().spawnParticle(Particle.CRIT,c.getLocation().add(
                         c.getLocation().getDirection().multiply(4)),5,3,0,3);
                     tick+=20;

@@ -6,6 +6,7 @@ import fr.lolmc.stats.ResourceSystem;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.stats.ChampionStats;
 import fr.lolmc.util.DamageUtil;
+import fr.lolmc.util.TargetingUtil;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.*;
@@ -35,7 +36,7 @@ public class LeeSin extends BaseChampion {
             new double[]{0.5},5,0,DamageType.PHYSICAL);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            if(t==null)return;
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
             double dmg=s.calcAutoAttackDamage(null);
             DamageUtil.damage(c, t, dmg, false);
         }
@@ -49,11 +50,11 @@ public class LeeSin extends BaseChampion {
             new double[]{11,10,9,8,7},15,0,DamageType.PHYSICAL);
             resourceCost = 50;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            if(t==null)return;
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
             double dmg=55+s.getFinalAD()*0.9;
-            DamageUtil.abilityDamage(c, t, dmg);
-            t.sendActionBar(Component.text("🦵 Frappe Sonique!",NamedTextColor.YELLOW));
-            c.getWorld().spawnParticle(Particle.SONIC_BOOM,t.getLocation(),1);
+            DamageUtil.abilityDamageEntity(c, tgt, dmg);
+            if(tgt instanceof Player _tp)_tp.sendActionBar(Component.text("🦵 Frappe Sonique!",NamedTextColor.YELLOW));
+            c.getWorld().spawnParticle(Particle.SONIC_BOOM,tgt.getLocation(),1);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             return String.format("%.0f dégâts physiques (55+90%%AD).",55+s.getFinalAD()*0.9);
@@ -66,13 +67,13 @@ public class LeeSin extends BaseChampion {
             resourceCost = 50;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             Player dest=t!=null?t:c;
-            dest.addPotionEffect(new PotionEffect(PotionEffectType.ABSORPTION,60,1,false,true));
-            dest.addPotionEffect(new PotionEffect(PotionEffectType.REGENERATION,60,1,false,true));
+            destgt.addPotionEffect(new PotionEffect(PotionEffectType.ABSORPTION,60,1,false,true));
+            destgt.addPotionEffect(new PotionEffect(PotionEffectType.REGENERATION,60,1,false,true));
             if(t!=null&&!t.equals(c)) {
-                Location safe=safeTeleport(c.getLocation(),t.getLocation());
+                Location safe=safeTeleport(c.getLocation(),tgt.getLocation());
                 c.teleport(safe);
             }
-            dest.sendActionBar(Component.text("🛡 Bouclier Protection!",NamedTextColor.GREEN));
+            desif(tgt instanceof Player _tp)_tp.sendActionBar(Component.text("🛡 Bouclier Protection!",NamedTextColor.GREEN));
         }
         @Override public String getDynamicDescription(ChampionStats s){return "Dash vers allié. Donne un bouclier + régén HP.";}
     }
@@ -101,14 +102,14 @@ public class LeeSin extends BaseChampion {
             new double[]{90,75,60},5,0,DamageType.PHYSICAL);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            if(t==null)return;
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
             double[] base={150,300,450};
             int r=Math.min(getLevel()-1,2);
             double dmg=base[r]+s.getFinalAD()*2.0;
-            DamageUtil.abilityDamage(c, t, dmg);
-            Vector kb=t.getLocation().toVector().subtract(c.getLocation().toVector()).normalize().multiply(2.5);
-            kb.setY(1.5); t.setVelocity(kb);
-            t.sendActionBar(Component.text("🐉 Dragon's Rage!",NamedTextColor.RED));
+            DamageUtil.abilityDamageEntity(c, tgt, dmg);
+            Vector kb=tgt.getLocation().toVector().subtract(c.getLocation().toVector()).normalize().multiply(2.5);
+            kb.setY(1.5); tgt.setVelocity(kb);
+            if(tgt instanceof Player _tp)_tp.sendActionBar(Component.text("🐉 Dragon's Rage!",NamedTextColor.RED));
         }
         @Override public String getDynamicDescription(ChampionStats s){
             return String.format("%.0f dégâts + knockback fort (175+200%%AD).",175+s.getFinalAD()*2);

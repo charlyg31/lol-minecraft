@@ -24,6 +24,39 @@ public class DamageUtil {
      * Inflige des dégâts déjà réduits par l'armure/MR.
      * @param amount dégâts post-résistance
      */
+    // ══════════════════════════════════════════════════════════════
+    // SURCHARGES UNIVERSELLES (acceptent sbires, monstres, joueurs)
+    // ══════════════════════════════════════════════════════════════
+
+    /** Dégâts sur n'importe quelle entité vivante (joueur, sbire, monstre). */
+    public static void damageEntity(Player attacker, org.bukkit.entity.LivingEntity victim,
+                                     double rawAmount, boolean isAbility, Type type) {
+        if (victim == null || victim.isDead()) return;
+        if (victim instanceof Player p) {
+            damage(attacker, p, rawAmount, isAbility, type);
+        } else {
+            // Sbire ou monstre : dégât direct sur les PV (PAS de victim.damage() -> évite StackOverflow)
+            double newHealth = Math.max(0, victim.getHealth() - rawAmount);
+            victim.setHealth(newHealth);
+            victim.getWorld().spawnParticle(org.bukkit.Particle.CRIT,
+                    victim.getLocation().add(0, 1, 0), 4, 0.3, 0.3, 0.3);
+            if (newHealth <= 0 && attacker != null) {
+                // Laisser MC gérer la mort (drop d'or géré par EntityDeathListener)
+                victim.setHealth(0);
+            }
+        }
+    }
+
+    public static void abilityDamageEntity(Player a, org.bukkit.entity.LivingEntity v, double amount) {
+        damageEntity(a, v, amount, true, Type.PHYSICAL);
+    }
+    public static void abilityDamageMagicEntity(Player a, org.bukkit.entity.LivingEntity v, double amount) {
+        damageEntity(a, v, amount, true, Type.MAGICAL);
+    }
+    public static void trueDamageEntity(Player a, org.bukkit.entity.LivingEntity v, double amount) {
+        damageEntity(a, v, amount, true, Type.TRUE);
+    }
+
     public static void damage(Player attacker, Player victim, double rawAmount, boolean isAbility, Type type) {
         ChampionManager cm = LolPlugin.getInstance().getChampionManager();
         if (cm == null || !cm.hasChampion(victim)) {

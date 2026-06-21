@@ -6,6 +6,7 @@ import fr.lolmc.stats.ResourceSystem;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.stats.ChampionStats;
 import fr.lolmc.util.DamageUtil;
+import fr.lolmc.util.TargetingUtil;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.*;
@@ -35,7 +36,7 @@ public class Janna extends BaseChampion {
             new double[]{0.5},5,0,DamageType.MAGICAL);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            if(t==null)return;
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
             double dmg=s.getFinalAP()*0.3;
             DamageUtil.damage(c, t, dmg, false, DamageUtil.Type.MAGICAL);
         }
@@ -49,11 +50,11 @@ public class Janna extends BaseChampion {
             new double[]{12,11,10,9,8},20,2,DamageType.MAGICAL);
             resourceCost = 60;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            if(t==null)return;
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
             double dmg=60+s.getFinalAP()*0.35;
-            DamageUtil.abilityDamageMagic(c, t, dmg);
-            t.setVelocity(new Vector(0,0.8,0));
-            t.sendActionBar(Component.text("🌪 Tornade!",NamedTextColor.WHITE));
+            DamageUtil.abilityDamageMagicEntity(c, tgt, dmg);
+            tgt.setVelocity(new Vector(0,0.8,0));
+            if(tgt instanceof Player _tp)_tp.sendActionBar(Component.text("🌪 Tornade!",NamedTextColor.WHITE));
         }
         @Override public String getDynamicDescription(ChampionStats s){
             return String.format("%.0f dégâts + knockup (60+35%%AP).",60+s.getFinalAP()*0.35);
@@ -65,11 +66,11 @@ public class Janna extends BaseChampion {
             new double[]{8,7,6,5,4},20,0,DamageType.MAGICAL);
             resourceCost = 40;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            if(t==null)return;
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
             double dmg=55+s.getFinalAP()*0.5;
-            DamageUtil.abilityDamageMagic(c, t, dmg);
-            t.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,60,2,false,true));
-            t.sendActionBar(Component.text("💨 Zéphyr -30%%!",NamedTextColor.AQUA));
+            DamageUtil.abilityDamageMagicEntity(c, tgt, dmg);
+            tgt.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,60,2,false,true));
+            if(tgt instanceof Player _tp)_tp.sendActionBar(Component.text("💨 Zéphyr -30%%!",NamedTextColor.AQUA));
         }
         @Override public String getDynamicDescription(ChampionStats s){
             return String.format("%.0f dégâts + ralentit 3s (55+50%%AP).",55+s.getFinalAP()*0.5);
@@ -87,8 +88,8 @@ public class Janna extends BaseChampion {
             double shield=shieldBase[getLevel()-1]+s.getFinalAP()*0.5;
             var cm=LolPlugin.getInstance().getChampionManager();
             if(cm.hasChampion(dest)) cm.getChampion(dest).getStats().addShield(shield);
-            dest.addPotionEffect(new PotionEffect(PotionEffectType.STRENGTH,100,0,false,true));
-            dest.sendActionBar(Component.text("🌀 Oeil de la Tempête! Bouclier "+(int)shield,NamedTextColor.AQUA));
+            destgt.addPotionEffect(new PotionEffect(PotionEffectType.STRENGTH,100,0,false,true));
+            desif(tgt instanceof Player _tp)_tp.sendActionBar(Component.text("🌀 Oeil de la Tempête! Bouclier "+(int)shield,NamedTextColor.AQUA));
         }
         @Override public String getDynamicDescription(ChampionStats s){return "Bouclier + force sur soi ou un allié pendant 5s.";}
     }

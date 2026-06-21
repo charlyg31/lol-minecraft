@@ -6,6 +6,7 @@ import fr.lolmc.stats.ResourceSystem;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.stats.ChampionStats;
 import fr.lolmc.util.DamageUtil;
+import fr.lolmc.util.TargetingUtil;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.*;
@@ -38,7 +39,7 @@ public class Zed extends BaseChampion {
             new double[]{0.5},5,0,DamageType.PHYSICAL);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            if(t==null)return;
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
             double dmg=s.calcAutoAttackDamage(null);
             DamageUtil.damage(c, t, dmg, false);
         }
@@ -52,10 +53,10 @@ public class Zed extends BaseChampion {
             new double[]{6,5.5,5,4.5,4},20,0,DamageType.PHYSICAL);
             resourceCost = 40;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            if(t==null)return;
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
             double[] base={80,120,160,200,240};double dmg=base[getLevel()-1]+s.getFinalAD()*1.1;
-            DamageUtil.abilityDamage(c, t, dmg);
-            c.getWorld().spawnParticle(Particle.CRIT,t.getLocation(),8,0.3,0.3,0.3);
+            DamageUtil.abilityDamageEntity(c, tgt, dmg);
+            c.getWorld().spawnParticle(Particle.CRIT,tgt.getLocation(),8,0.3,0.3,0.3);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             return String.format("%.0f dégâts physiques (70+90%%AD).",70+s.getFinalAD()*0.9);
@@ -111,15 +112,15 @@ public class Zed extends BaseChampion {
             new double[]{120,100,80},20,0,DamageType.TRUE);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            if(t==null)return;
-            t.sendActionBar(Component.text("💀 Mort en Sursis — 3s...",NamedTextColor.DARK_RED));
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
+            if(tgt instanceof Player _tp)_tp.sendActionBar(Component.text("💀 Mort en Sursis — 3s...",NamedTextColor.DARK_RED));
             new BukkitRunnable(){
                 @Override public void run(){
-                    if(!t.isOnline())return;
-                    double dmg=t.getMaxHealth()*0.2+s.getFinalAD()*0.75;
-                    t.getWorld().strikeLightningEffect(t.getLocation());
-                    DamageUtil.trueDamage(c, t, dmg);
-                    t.sendMessage(Component.text("☠ Mort en Sursis!",NamedTextColor.DARK_RED));
+                    if(!(!tgt.isDead()))return;
+                    double dmg=tgt.getMaxHealth()*0.2+s.getFinalAD()*0.75;
+                    tgt.getWorld().strikeLightningEffect(tgt.getLocation());
+                    DamageUtil.trueDamageEntity(c, tgt, dmg);
+                    if(tgt instanceof Player _tp)_tp.sendMessage(Component.text("☠ Mort en Sursis!",NamedTextColor.DARK_RED));
                 }
             }.runTaskLater(LolPlugin.getInstance(),60L);
         }
