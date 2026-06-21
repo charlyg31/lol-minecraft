@@ -127,16 +127,6 @@ mvn clean package
 
 Le `.jar` final est généré dans `target/lol-minecraft-1.0.0.jar` (avec toutes les dépendances incluses : drivers de base de données HikariCP, MySQL, SQLite).
 
-### Compilation sur Android (Termux)
-
-```bash
-pkg update && pkg upgrade -y
-pkg install git openjdk-21 maven -y
-git clone https://github.com/charlyg31/lol-minecraft.git
-cd lol-minecraft
-mvn clean package
-```
-
 > ⚠️ Le projet cible Java 25. Vérifie ta version avec `java -version` et adapte si besoin.
 
 ---
@@ -163,5 +153,3 @@ mvn clean package
 - Bases de données : **SQLite** / **MySQL** / **MongoDB** (HikariCP)
 
 ---
-
-*Plugin développé par charlyg31. Projet personnel, non affilié à Riot Games. League of Legends est une marque déposée de Riot Games, Inc.*
