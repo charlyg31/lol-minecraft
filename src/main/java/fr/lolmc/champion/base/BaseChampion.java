@@ -51,7 +51,9 @@ public abstract class BaseChampion {
 
     public void refreshSlot(Player player, int slot) {
         if (slot < 0 || slot > 4 || abilities[slot] == null) return;
-        player.getInventory().setItem(slot, abilities[slot].buildItemStack(stats));
+        // Passer par HotbarManager pour CONSERVER le marquage PDC de l'item
+        // (sinon getType() renvoie null après le 1er cast et les clics sont ignorés)
+        LolPlugin.getInstance().getHotbarManager().refreshAbilitySlot(player, this, slot);
     }
 
     // ─── Lancement de sort ───────────────────────────────────────
