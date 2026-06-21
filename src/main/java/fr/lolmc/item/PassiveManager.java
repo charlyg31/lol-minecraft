@@ -260,6 +260,12 @@ public class PassiveManager {
         hudManager.updateHUD(victim, vc);
     }
 
+    /** Passifs on-hit sur une entité non-joueur (sbire/monstre). Version simplifiée. */
+    public void onAutoAttackEntity(Player attacker, org.bukkit.entity.LivingEntity victim) {
+        // Les passifs on-hit complexes (BotRK, Kraken) ne s'appliquent qu'aux champions.
+        // Sur sbires/monstres, on ne déclenche rien de spécial pour l'instant.
+    }
+
     // ════════════════════════════════════════════════════════
     // ÉVÉNEMENT: DÉGÂTS DE SORT SUR UNE CIBLE
     // ════════════════════════════════════════════════════════
