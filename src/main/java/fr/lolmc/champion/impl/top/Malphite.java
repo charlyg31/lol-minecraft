@@ -69,12 +69,12 @@ public class Malphite extends BaseChampion {
             new double[]{12,11,10,9,8},5,3,DamageType.PHYSICAL);
             resourceCost = 25;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            c.getWorld().getNearbyEntities(c.getLocation(),3,2,3).stream()
-                .filter(e->e instanceof Player&&!e.equals(c))
-                .forEach(e->{
-                    ((Player)e).addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,60,1,false,true));
-                    ((Player)e).sendActionBar(Component.text("💥 Frappe Sismique!",NamedTextColor.GRAY));
-                });
+            for(var __t : TargetingUtil.enemiesAround(c, 3.0)){
+                if(__t instanceof Player __p){
+                    __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,60,1,false,true));
+                    __p.sendActionBar(Component.text("💥 Frappe Sismique!",NamedTextColor.GRAY));
+                }
+            }
         }
         @Override public String getDynamicDescription(ChampionStats s){return "Réduit la vitesse d'attaque des ennemis proches de 30%% pendant 3s.";}
     }
@@ -85,12 +85,11 @@ public class Malphite extends BaseChampion {
             resourceCost = 50;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             double dmg=60+s.getFinalAP()*0.3+s.getFinalArmor()*0.2;
-            c.getWorld().getNearbyEntities(c.getLocation(),4,2,4).stream()
-                .filter(e->e instanceof Player&&!e.equals(c))
-                .forEach(e->{
-                    DamageUtil.abilityDamageMagic(c, (Player)e, dmg);
-                    ((Player)e).addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,20,1,false,true));
-                });
+            for(var __t : TargetingUtil.enemiesAround(c, 4.0)){
+                TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);
+                if(__t instanceof Player __p)
+                    __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,20,1,false,true));
+            }
             c.getWorld().spawnParticle(Particle.BLOCK,c.getLocation(),25,2,0,2,Material.STONE.createBlockData());
         }
         @Override public String getDynamicDescription(ChampionStats s){
@@ -107,13 +106,12 @@ public class Malphite extends BaseChampion {
             Location dest=safeTeleport(c.getLocation(),tgt.getLocation());
             c.teleport(dest);
             double[] baseR={200,300,400};int rr=Math.min(getLevel()-1,2);double dmg=baseR[rr]+s.getFinalAP()*1.0;
-            c.getWorld().getNearbyEntities(c.getLocation(),4,2,4).stream()
-                .filter(e->e instanceof Player&&!e.equals(c))
-                .forEach(e->{
-                    DamageUtil.abilityDamageMagic(c, (Player)e, dmg);
-                    ((Player)e).setVelocity(new Vector(0,1.2,0));
-                    ((Player)e).sendActionBar(Component.text("🪨 KNOCKUP Malphite!",NamedTextColor.DARK_GRAY));
-                });
+            for(var __t : TargetingUtil.enemiesAround(c, 4.0)){
+                TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);
+                __t.setVelocity(new Vector(0,1.2,0));
+                if(__t instanceof Player __p)
+                    __p.sendActionBar(Component.text("🪨 KNOCKUP Malphite!",NamedTextColor.DARK_GRAY));
+            }
             c.getWorld().spawnParticle(Particle.EXPLOSION,c.getLocation(),5,1,0,1);
         }
         @Override public String getDynamicDescription(ChampionStats s){
