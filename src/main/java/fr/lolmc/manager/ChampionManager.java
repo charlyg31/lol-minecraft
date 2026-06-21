@@ -66,7 +66,9 @@ public class ChampionManager {
         if (instance == null) return;
 
         activeChampions.put(player.getUniqueId(), instance);
-        instance.applyInventory(player);
+        // Vider l'inventaire puis poser la hotbar complète (sorts + Flash + actifs + bouton page 2)
+        player.getInventory().clear();
+        LolPlugin.getInstance().getHotbarManager().initPlayer(player, instance);
         player.sendMessage("§a✓ Champion assigné : §e" + instance.getDisplayName());
     }
 

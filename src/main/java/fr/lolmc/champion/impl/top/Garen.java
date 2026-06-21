@@ -123,7 +123,7 @@ public class Garen extends BaseChampion {
             t.sendMessage(Component.text("☠ Exécution de Garen!",NamedTextColor.DARK_RED));
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            return String.format("%.0f dégâts vrais (x2.5 sur cible à 0%% HP).",(150+level*20));
+            double[] base={150,300,450};int r=Math.min(getLevel()-1,2);return String.format("%.0f dégâts vrais + 25%% PV manquants.",base[r]);
         }
     }
 }
