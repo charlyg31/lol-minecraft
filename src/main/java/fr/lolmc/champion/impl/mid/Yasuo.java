@@ -56,15 +56,14 @@ public class Yasuo extends BaseChampion {
             double[] base={20,45,70,95,120};double dmg=base[getLevel()-1]+s.getFinalAD()*1.0;
             // Tornade linéaire devant
             Location front=c.getLocation().add(c.getLocation().getDirection().multiply(3));
-            c.getWorld().getNearbyEntities(front,3,1,3).stream()
-                .filter(e->e instanceof Player&&!e.equals(c))
-                .forEach(e->{
-                    DamageUtil.abilityDamage(c, (Player)e, dmg);
-                    if(casts>=2) {
-                        ((Player)e).setVelocity(new Vector(0,1.2,0));
-                        ((Player)e).sendActionBar(Component.text("🌪 Knockup Yasuo!",NamedTextColor.YELLOW));
-                    }
-                });
+            for(var __t : TargetingUtil.entitiesInRadius(c, front, 3.0)){
+                TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.PHYSICAL);
+                if(casts>=2){
+                    __t.setVelocity(new Vector(0,1.2,0));
+                    if(__t instanceof Player __p)
+                        __p.sendActionBar(Component.text("🌪 Knockup Yasuo!",NamedTextColor.YELLOW));
+                }
+            }
             c.getWorld().spawnParticle(Particle.SWEEP_ATTACK,front,5,1,0.5,1);
             if(casts>=2) qCasts.put(c.getUniqueId(),0);
         }
@@ -108,13 +107,13 @@ public class Yasuo extends BaseChampion {
         @Override public void cast(Player c,ChampionStats s,Player t){
             org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
             double dmg=200+s.getFinalAD()*1.5;
-            c.getWorld().getNearbyEntities(c.getLocation(),4,3,4).stream()
-                .filter(e->e instanceof Player&&!e.equals(c))
-                .forEach(e->{
-                    DamageUtil.abilityDamage(c, (Player)e, dmg);
-                    ((Player)e).addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,20,10,false,true));
-                    ((Player)e).sendActionBar(Component.text("⚔ Dernier Souffle!",NamedTextColor.DARK_GRAY));
-                });
+            for(var __t : TargetingUtil.enemiesAround(c, 4.0)){
+                TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.PHYSICAL);
+                if(__t instanceof Player __p){
+                    __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,20,10,false,true));
+                    __p.sendActionBar(Component.text("⚔ Dernier Souffle!",NamedTextColor.DARK_GRAY));
+                }
+            }
             c.getWorld().spawnParticle(Particle.SWEEP_ATTACK,c.getLocation(),10,2,2,2);
         }
         @Override public String getDynamicDescription(ChampionStats s){
