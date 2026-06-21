@@ -39,9 +39,8 @@ public class Nasus extends BaseChampion {
             new double[]{0.5},5,0,DamageType.PHYSICAL);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
-            double dmg=s.calcAutoAttackDamage(null);
-            DamageUtil.damage(c, t, dmg, false);
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,2.5); if(tgt==null)return;
+            TargetingUtil.dealDamage(c, tgt, s.getFinalAD(), TargetingUtil.DmgType.PHYSICAL);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             return String.format("Inflige %.0f dégâts.", s.getFinalAD());
@@ -49,19 +48,29 @@ public class Nasus extends BaseChampion {
     }
 
     static class Q extends BaseAbility {
-        Q(){super("q_nasus","Frappe du Faucheur",Material.BONE,AbilitySlot.Q,
+        Q(){super("q_nasus","Frappe Siphon",Material.BONE,AbilitySlot.Q,
             new double[]{8,7,6,5,4},5,0,DamageType.PHYSICAL);
             resourceCost = 20;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,2.5); if(tgt==null){c.sendActionBar(Component.text("💀 Aucune cible",NamedTextColor.GRAY));return;}
+            // LoL : AD + bonus par rang (30/50/70/90/110) + stacks permanents
+            double[] bonus={30,50,70,90,110};
             int stacks=qStacks.getOrDefault(c.getUniqueId(),0);
-            double dmg=s.getFinalAD()+stacks;
-            DamageUtil.abilityDamageEntity(c, tgt, dmg);
-            if(tgt.getHealth()-dmg<=0) {qStacks.merge(c.getUniqueId(),6,Integer::sum);}
+            double dmg=s.getFinalAD()+bonus[getLevel()-1]+stacks;
+            boolean kills = tgt.getHealth()-dmg<=0;
+            TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.PHYSICAL);
+            // Stacks : +12 sur champion/gros monstre tué, +3 sinon
+            if(kills){
+                boolean big = (tgt instanceof Player) || fr.lolmc.game.JungleManager.isJungleMonster(tgt);
+                qStacks.merge(c.getUniqueId(), big?12:3, Integer::sum);
+                c.sendActionBar(Component.text("💀 Stacks Q: "+qStacks.get(c.getUniqueId()),NamedTextColor.GOLD));
+            }
+            c.getWorld().spawnParticle(Particle.SWEEP_ATTACK,tgt.getLocation().add(0,1,0),5);
+            c.getWorld().playSound(c.getLocation(), Sound.ENTITY_SKELETON_HURT, 1f, 0.6f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            int stacks=qStacks.getOrDefault(UUID.randomUUID(),0);
-            return String.format("AD + %d stacks Q = %.0f dégâts physiques. +6 stacks par kill.",stacks,s.getFinalAD()+stacks);
+            double[] bonus={30,50,70,90,110};
+            return String.format("AD + %.0f + stacks. +3/kill (+12 champion/gros). RESET attaque.",bonus[getLevel()-1]);
         }
     }
 
@@ -70,33 +79,53 @@ public class Nasus extends BaseChampion {
             new double[]{15,14,13,12,11},20,0,DamageType.MAGICAL);
             resourceCost = 80;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
-            tgt.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,100,2,false,true));
-            if(tgt instanceof Player _tp)_tp.sendActionBar(Component.text("💀 Flétrissure de Nasus -35%% vitesse!",NamedTextColor.DARK_PURPLE));
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.0); if(tgt==null){c.sendActionBar(Component.text("💀 Aucune cible",NamedTextColor.GRAY));return;}
+            // LoL : ralentit 35% montant jusqu'à 95% sur 5s (+ ralentit vitesse d'attaque)
+            // Approximation : lenteur progressive (amplifier croît) sur 5s
+            new BukkitRunnable(){
+                int sec=0;
+                @Override public void run(){
+                    if(sec>=5 || tgt.isDead()){cancel();return;}
+                    int amp=2+sec; // amplifier croît -> ralentissement de plus en plus fort
+                    tgt.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,25,Math.min(amp,6),false,true));
+                    tgt.getWorld().spawnParticle(Particle.WITCH,tgt.getLocation().add(0,1,0),8,0.4,0.8,0.4);
+                    sec++;
+                }
+            }.runTaskTimer(LolPlugin.getInstance(),0L,20L);
+            if(tgt instanceof Player _tp)_tp.sendActionBar(Component.text("💀 Flétri! Ralentissement croissant",NamedTextColor.DARK_PURPLE));
+            c.getWorld().playSound(c.getLocation(), Sound.ENTITY_WITHER_SHOOT, 0.8f, 1.5f);
         }
-        @Override public String getDynamicDescription(ChampionStats s){return "Réduit vitesse déplacement et attaque de 35%% pendant 5s.";}
+        @Override public String getDynamicDescription(ChampionStats s){return "Ralentit 35%% montant à 95%% sur 5s (déplacement + vitesse d'attaque).";}
     }
 
     static class E extends BaseAbility {
-        E(){super("e_nasus","Esprit du Vide",Material.PURPLE_WOOL,AbilitySlot.E,
+        E(){super("e_nasus","Feu Spirituel",Material.SOUL_LANTERN,AbilitySlot.E,
             new double[]{12,11,10,9,8},20,3,DamageType.MAGICAL);
             resourceCost = 70;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
-            Location loc=tgt.getLocation();
+            // LoL : zone au sol visée, dégâts magiques/s + réduction armure 30-50% sur 5s
+            Location loc=TargetingUtil.getAimedGroundLocation(c, 8.0);
+            double[] dotBase={55,95,135,175,215};
+            double perSec=(dotBase[getLevel()-1]+s.getFinalAP()*0.12);
             new BukkitRunnable(){
-                int tick=0;
+                int sec=0;
                 @Override public void run(){
-                    if(tick>=100){cancel();return;}
-                    double dmg=(55+s.getFinalMaxHP()*0.05)/5.0;
-                    TargetingUtil.dealDamageAll(c, TargetingUtil.entitiesInRadius(c, loc, 3), dmg, TargetingUtil.DmgType.MAGICAL);
-                    loc.getWorld().spawnParticle(Particle.WITCH,loc,5,1,1,1);
-                    tick+=20;
+                    if(sec>=5){cancel();return;}
+                    for(var __t : TargetingUtil.entitiesInRadius(c, loc, 3.5)){
+                        TargetingUtil.dealDamage(c, __t, perSec, TargetingUtil.DmgType.MAGICAL);
+                        // Réduction d'armure (approx via faiblesse)
+                        if(__t instanceof Player __p)
+                            __p.addPotionEffect(new PotionEffect(PotionEffectType.WEAKNESS,40,0,false,true));
+                    }
+                    loc.getWorld().spawnParticle(Particle.SOUL_FIRE_FLAME,loc,15,3,0.3,3,0.02);
+                    sec++;
                 }
             }.runTaskTimer(LolPlugin.getInstance(),0L,20L);
+            c.getWorld().playSound(loc, Sound.ENTITY_BLAZE_SHOOT, 1f, 0.8f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            return String.format("Zone 3 blocs: %.0f dégâts magiques/s pendant 5s.",55+s.getFinalMaxHP()*0.05);
+            double[] dotBase={55,95,135,175,215};
+            return String.format("Zone au sol: %.0f dégâts magiques/s pendant 5s + réduit l'armure.",dotBase[getLevel()-1]+s.getFinalAP()*0.12);
         }
     }
 
