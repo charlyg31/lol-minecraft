@@ -181,8 +181,7 @@ public class MinionManager {
     private void moveMinions() {
         var roadManager = LolPlugin.getInstance().getRoadManager();
         for (var world : LolPlugin.getInstance().getServer().getWorlds()) {
-            for (Entity e : world.getEntities()) {
-                if (!(e instanceof Zombie z)) continue;
+            for (Zombie z : world.getEntitiesByClass(Zombie.class)) {
                 if (!isMinion(z)) continue;
                 Team team = getMinionTeam(z);
                 if (team == null) continue;
