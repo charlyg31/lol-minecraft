@@ -80,15 +80,18 @@ public final class MobModel {
      */
     public List<UUID> spawnOn(LivingEntity base) {
         List<UUID> ids = new ArrayList<>();
+        List<BlockDisplay> displays = new ArrayList<>();
+        List<Transformation> baseTransforms = new ArrayList<>();
         for (Part p : parts) {
             try {
+                Quaternionf rot = new Quaternionf().rotateY((float) Math.toRadians(p.yawDeg));
+                // La translation place le COIN du bloc : on recentre en X/Z.
+                Vector3f tr = new Vector3f(p.ox - p.sx / 2f, p.oy, p.oz - p.sz / 2f);
+                Transformation baseT = new Transformation(
+                        tr, rot, new Vector3f(p.sx, p.sy, p.sz), new Quaternionf());
                 BlockDisplay d = base.getWorld().spawn(base.getLocation(), BlockDisplay.class, disp -> {
                     disp.setBlock(p.block.createBlockData());
-                    Quaternionf rot = new Quaternionf().rotateY((float) Math.toRadians(p.yawDeg));
-                    // La translation place le COIN du bloc : on recentre en X/Z.
-                    Vector3f tr = new Vector3f(p.ox - p.sx / 2f, p.oy, p.oz - p.sz / 2f);
-                    disp.setTransformation(new Transformation(
-                            tr, rot, new Vector3f(p.sx, p.sy, p.sz), new Quaternionf()));
+                    disp.setTransformation(baseT);
                     disp.setBrightness(new Display.Brightness(15, 15)); // toujours bien visible
                     disp.setPersistent(true);
                     disp.getPersistentDataContainer().set(
@@ -96,10 +99,14 @@ public final class MobModel {
                 });
                 base.addPassenger(d);
                 ids.add(d.getUniqueId());
+                displays.add(d);
+                baseTransforms.add(baseT);
             } catch (Exception e) {
                 LolPlugin.getInstance().getLogger().warning("MobModel part echec: " + e.getMessage());
             }
         }
+        // Enregistrer le modele pour l'animation (respiration / marche / attaque)
+        if (!displays.isEmpty()) MobAnimator.register(base, displays, baseTransforms);
         return ids;
     }
 }
