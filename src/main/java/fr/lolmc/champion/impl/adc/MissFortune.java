@@ -86,7 +86,7 @@ public class MissFortune extends BaseChampion {
             // LoL : zone au sol visée, dégâts magiques toutes les 0.25s sur 2s + ralentit 40-60%
             Location loc=TargetingUtil.getAimedGroundLocation(c, 8.0);
             double[] tickBase={15,20,25,30,35};
-            double perTick=tickBase[getLevel()-1]+s.getFinalAP()*0.1;
+            double perTick=tickBase[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("e_missfortune","ap",0.1);
             loc.getWorld().spawnParticle(Particle.ENCHANT,loc,20,3,0.2,3);
             new BukkitRunnable(){
                 int ticks=0;
@@ -105,7 +105,7 @@ public class MissFortune extends BaseChampion {
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] tickBase={15,20,25,30,35};
-            return String.format("Zone visée: %.0f dégâts/0.25s sur 2s + ralentit (zone de contrôle).",tickBase[getLevel()-1]+s.getFinalAP()*0.1);
+            return String.format("Zone visée: %.0f dégâts/0.25s sur 2s + ralentit (zone de contrôle).",tickBase[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("e_missfortune","ap",0.1));
         }
     }
 
@@ -116,7 +116,7 @@ public class MissFortune extends BaseChampion {
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : canalise 3s, ~8 vagues de balles en CÔNE devant. Chaque vague = 75% AD + 35% AP (peut critiquer)
             c.sendActionBar(Component.text("🔫 DÉLUGE DE BALLES! 3s",NamedTextColor.RED));
-            double perWave=s.getFinalAD()*0.75+s.getFinalAP()*0.35;
+            double perWave=s.getFinalAD()*fr.lolmc.util.Balance.ratio("r_missfortune","ad",0.75)+s.getFinalAP()*fr.lolmc.util.Balance.ratio("r_missfortune","ap",0.35);
             new BukkitRunnable(){
                 int waves=0;
                 @Override public void run(){
@@ -140,7 +140,7 @@ public class MissFortune extends BaseChampion {
             }.runTaskTimer(LolPlugin.getInstance(),0L,7L); // 8 vagues × 7 ticks ≈ 3s
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            double perWave=s.getFinalAD()*0.75+s.getFinalAP()*0.35;
+            double perWave=s.getFinalAD()*fr.lolmc.util.Balance.ratio("r_missfortune","ad",0.75)+s.getFinalAP()*fr.lolmc.util.Balance.ratio("r_missfortune","ap",0.35);
             return String.format("Canalise 3s: 8 vagues en cône, %.0f dégâts/vague (peut critiquer).",perWave);
         }
     }

@@ -57,7 +57,7 @@ public class Warwick extends BaseChampion {
             dest.setY(c.getLocation().getY());
             c.teleport(dest);
             double[] pct={0.06,0.07,0.08,0.09,0.10};
-            double dmg=s.getFinalAD()*1.0+tgt.getMaxHealth()*pct[getLevel()-1];
+            double dmg=s.getFinalAD()*fr.lolmc.util.Balance.ratio("q_warwick","ad",1.0)+tgt.getMaxHealth()*pct[getLevel()-1];
             TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.MAGICAL);
             // Soin 100% des dégâts
             var cm=LolPlugin.getInstance().getChampionManager();
@@ -120,7 +120,7 @@ public class Warwick extends BaseChampion {
             dest.setY(c.getLocation().getY());
             c.teleport(dest);
             double[] base=fr.lolmc.util.Balance.base("r_warwick",new double[]{175,300,425});int r=Math.min(getLevel()-1,2);
-            double dmg=base[r]+s.getFinalAD()*1.675;
+            double dmg=base[r]+s.getFinalAD()*fr.lolmc.util.Balance.ratio("r_warwick","ad",1.675);
             TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.MAGICAL);
             // Soin 100% des dégâts
             var cm=LolPlugin.getInstance().getChampionManager();
@@ -136,7 +136,7 @@ public class Warwick extends BaseChampion {
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] base=fr.lolmc.util.Balance.base("r_warwick",new double[]{175,300,425});int r=Math.min(getLevel()-1,2);
-            return String.format("Bond: supprime la cible 1.5s, %.0f dégâts (+167%%AD), soigne 100%%.",base[r]+s.getFinalAD()*1.675);
+            return String.format("Bond: supprime la cible 1.5s, %.0f dégâts (+167%%AD), soigne 100%%.",base[r]+s.getFinalAD()*fr.lolmc.util.Balance.ratio("r_warwick","ad",1.675));
         }
     }
 }

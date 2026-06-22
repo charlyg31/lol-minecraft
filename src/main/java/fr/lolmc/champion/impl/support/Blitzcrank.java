@@ -45,7 +45,7 @@ public class Blitzcrank extends BaseChampion {
             var hits=TargetingUtil.skillshot(c, 12.0, 1.0, false);
             if(hits.isEmpty()){c.sendActionBar(Component.text("🪝 Grappin manqué!",NamedTextColor.GRAY));return;}
             var tgt=hits.get(0);
-            double[] base=fr.lolmc.util.Balance.base("q_blitzcrank",new double[]{110,160,210,260,310});double dmg=base[getLevel()-1]+s.getFinalAP()*1.2;
+            double[] base=fr.lolmc.util.Balance.base("q_blitzcrank",new double[]{110,160,210,260,310});double dmg=base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("q_blitzcrank","ap",1.2);
             TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.MAGICAL);
             // Tire la cible vers Blitzcrank
             Vector pull=c.getLocation().toVector().subtract(tgt.getLocation().toVector()).normalize().multiply(2.0);
@@ -59,7 +59,7 @@ public class Blitzcrank extends BaseChampion {
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] base=fr.lolmc.util.Balance.base("q_blitzcrank",new double[]{110,160,210,260,310});
-            return String.format("Skillshot: %.0f dégâts (+120%%AP), attrape et tire la cible vers toi + stun.",base[getLevel()-1]+s.getFinalAP()*1.2);
+            return String.format("Skillshot: %.0f dégâts (+120%%AP), attrape et tire la cible vers toi + stun.",base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("q_blitzcrank","ap",1.2));
         }
     }
 
@@ -84,7 +84,7 @@ public class Blitzcrank extends BaseChampion {
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : prochaine attaque renforcée = knockup 1s + 200% AD
             org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,2.5); if(tgt==null){c.sendActionBar(Component.text("⚡ Poing de Force prêt (frappe un ennemi)",NamedTextColor.YELLOW));return;}
-            double dmg=s.getFinalAD()*2.0+s.getFinalAP()*0.25;
+            double dmg=s.getFinalAD()*fr.lolmc.util.Balance.ratio("e_blitzcrank","ad",2.0)+s.getFinalAP()*fr.lolmc.util.Balance.ratio("e_blitzcrank","ap",0.25);
             TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.PHYSICAL);
             tgt.setVelocity(new Vector(0,1.0,0)); // knockup
             if(tgt instanceof Player __p)__p.sendActionBar(Component.text("⚡ KNOCKUP! Poing de Force",NamedTextColor.YELLOW));
@@ -92,7 +92,7 @@ public class Blitzcrank extends BaseChampion {
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_PLAYER_ATTACK_CRIT, 1f, 0.7f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            return String.format("Prochaine attaque: %.0f dégâts (200%%AD) + knockup 1s.",s.getFinalAD()*2.0);
+            return String.format("Prochaine attaque: %.0f dégâts (200%%AD) + knockup 1s.",s.getFinalAD()*fr.lolmc.util.Balance.ratio("e_blitzcrank","ad",2.0));
         }
     }
 
@@ -102,7 +102,7 @@ public class Blitzcrank extends BaseChampion {
             resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : 275/400/525 + 100% AP, silence 0.5s + détruit les boucliers, autour
-            double[] base=fr.lolmc.util.Balance.base("r_blitzcrank",new double[]{275,400,525});int r=Math.min(getLevel()-1,2);double dmg=base[r]+s.getFinalAP()*1.0;
+            double[] base=fr.lolmc.util.Balance.base("r_blitzcrank",new double[]{275,400,525});int r=Math.min(getLevel()-1,2);double dmg=base[r]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("r_blitzcrank","ap",1.0);
             for(var __t : TargetingUtil.enemiesAround(c, 4.5)){
                 TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);
                 if(__t instanceof Player __p){
@@ -116,7 +116,7 @@ public class Blitzcrank extends BaseChampion {
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] base=fr.lolmc.util.Balance.base("r_blitzcrank",new double[]{275,400,525});int r=Math.min(getLevel()-1,2);
-            return String.format("%.0f dégâts foudre autour (+100%%AP) + silence 0.5s + détruit boucliers.",base[r]+s.getFinalAP()*1.0);
+            return String.format("%.0f dégâts foudre autour (+100%%AP) + silence 0.5s + détruit boucliers.",base[r]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("r_blitzcrank","ap",1.0));
         }
     }
 }

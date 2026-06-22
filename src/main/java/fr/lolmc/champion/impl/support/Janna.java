@@ -42,7 +42,7 @@ public class Janna extends BaseChampion {
             resourceCost = 60;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : skillshot tornade en ligne, 60/90/120/150/180 + 50% AP, knockup les ennemis traversés
-            double[] base=fr.lolmc.util.Balance.base("q_janna",new double[]{60,90,120,150,180});double dmg=base[getLevel()-1]+s.getFinalAP()*0.5;
+            double[] base=fr.lolmc.util.Balance.base("q_janna",new double[]{60,90,120,150,180});double dmg=base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("q_janna","ap",0.5);
             var hits=TargetingUtil.skillshot(c, 10.0, 1.2, true); // traverse
             if(hits.isEmpty()){c.sendActionBar(Component.text("🌪 Tornade lancée!",NamedTextColor.WHITE));return;}
             for(var __t : hits){
@@ -54,7 +54,7 @@ public class Janna extends BaseChampion {
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] base=fr.lolmc.util.Balance.base("q_janna",new double[]{60,90,120,150,180});
-            return String.format("Skillshot tornade: %.0f dégâts (+50%%AP) + knockup les ennemis.",base[getLevel()-1]+s.getFinalAP()*0.5);
+            return String.format("Skillshot tornade: %.0f dégâts (+50%%AP) + knockup les ennemis.",base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("q_janna","ap",0.5));
         }
     }
 
@@ -65,7 +65,7 @@ public class Janna extends BaseChampion {
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : envoie un élémentaire qui inflige des dégâts + ralentit. 60/105/150/195/240 + 60% AP
             org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,7.0); if(tgt==null){c.sendActionBar(Component.text("💨 Aucune cible",NamedTextColor.GRAY));return;}
-            double[] base=fr.lolmc.util.Balance.base("w_janna",new double[]{60,105,150,195,240});double dmg=base[getLevel()-1]+s.getFinalAP()*0.6;
+            double[] base=fr.lolmc.util.Balance.base("w_janna",new double[]{60,105,150,195,240});double dmg=base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("w_janna","ap",0.6);
             TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.MAGICAL);
             if(tgt instanceof Player __p)
                 __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,40,2,false,true));
@@ -76,7 +76,7 @@ public class Janna extends BaseChampion {
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] base=fr.lolmc.util.Balance.base("w_janna",new double[]{60,105,150,195,240});
-            return String.format("%.0f dégâts (+60%%AP) + ralentit. Janna gagne de la vitesse.",base[getLevel()-1]+s.getFinalAP()*0.6);
+            return String.format("%.0f dégâts (+60%%AP) + ralentit. Janna gagne de la vitesse.",base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("w_janna","ap",0.6));
         }
     }
 
@@ -88,7 +88,7 @@ public class Janna extends BaseChampion {
             // LoL : bouclier sur allié (ou soi) 75-175 + 50% AP + AD bonus 5s
             Player dest = (t!=null) ? t : c;
             double[] shieldBase={75,100,125,150,175};
-            double shield=shieldBase[getLevel()-1]+s.getFinalAP()*0.5;
+            double shield=shieldBase[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("e_janna","ap",0.5);
             var cm=LolPlugin.getInstance().getChampionManager();
             if(cm.hasChampion(dest)) cm.getChampion(dest).getStats().addShield(shield);
             dest.addPotionEffect(new PotionEffect(PotionEffectType.ABSORPTION,100,1,false,true));
@@ -99,7 +99,7 @@ public class Janna extends BaseChampion {
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] shieldBase={75,100,125,150,175};
-            return String.format("Bouclier %.0f (+50%%AP) + AD bonus sur soi ou un allié 5s.",shieldBase[getLevel()-1]+s.getFinalAP()*0.5);
+            return String.format("Bouclier %.0f (+50%%AP) + AD bonus sur soi ou un allié 5s.",shieldBase[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("e_janna","ap",0.5));
         }
     }
 
@@ -116,7 +116,7 @@ public class Janna extends BaseChampion {
             }
             // Soin sur 3s (canalisation)
             double[] healBase={100,150,200};int r=Math.min(getLevel()-1,2);
-            double healPerTick=(healBase[r]+s.getFinalAP()*0.6)/2.0; // par 0.5s
+            double healPerTick=(healBase[r]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("r_janna","ap",0.6))/2.0; // par 0.5s
             var cm=LolPlugin.getInstance().getChampionManager();
             new BukkitRunnable(){
                 int ticks=0;
@@ -137,7 +137,7 @@ public class Janna extends BaseChampion {
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] healBase={100,150,200};int r=Math.min(getLevel()-1,2);
-            return String.format("Repousse les ennemis + soigne les alliés %.0f/s sur 3s.",healBase[r]+s.getFinalAP()*0.6);
+            return String.format("Repousse les ennemis + soigne les alliés %.0f/s sur 3s.",healBase[r]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("r_janna","ap",0.6));
         }
     }
 }

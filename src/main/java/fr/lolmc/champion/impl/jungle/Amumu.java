@@ -49,7 +49,7 @@ public class Amumu extends BaseChampion {
             Location dest=tgt.getLocation().clone().subtract(tgt.getLocation().getDirection().multiply(1.5));
             dest.setY(c.getLocation().getY());
             c.teleport(dest);
-            double[] base=fr.lolmc.util.Balance.base("q_amumu",new double[]{80,130,180,230,280});double dmg=base[getLevel()-1]+s.getFinalAP()*0.85;
+            double[] base=fr.lolmc.util.Balance.base("q_amumu",new double[]{80,130,180,230,280});double dmg=base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("q_amumu","ap",0.85);
             TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.MAGICAL);
             if(tgt instanceof Player __p){
                 __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,20,10,false,true)); // stun 1s
@@ -59,7 +59,7 @@ public class Amumu extends BaseChampion {
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] base=fr.lolmc.util.Balance.base("q_amumu",new double[]{80,130,180,230,280});
-            return String.format("Skillshot: %.0f dégâts (+85%%AP), stun 1s + tire Amumu vers la cible.",base[getLevel()-1]+s.getFinalAP()*0.85);
+            return String.format("Skillshot: %.0f dégâts (+85%%AP), stun 1s + tire Amumu vers la cible.",base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("q_amumu","ap",0.85));
         }
     }
 
@@ -77,7 +77,7 @@ public class Amumu extends BaseChampion {
                 @Override public void run(){
                     if(ticks>=10){cancel();return;} // 10 ticks de 0.5s = 5s
                     for(var __t : TargetingUtil.entitiesInRadius(c, c.getLocation(), 3.5)){
-                        double dmg=__t.getMaxHealth()*pct+s.getFinalAP()*0.01;
+                        double dmg=__t.getMaxHealth()*pct+s.getFinalAP()*fr.lolmc.util.Balance.ratio("w_amumu","ap",0.01);
                         TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);
                     }
                     c.getWorld().spawnParticle(Particle.FALLING_WATER,c.getLocation().add(0,1,0),10,2,0.5,2);
@@ -97,14 +97,14 @@ public class Amumu extends BaseChampion {
             resourceCost = 35;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : dégâts magiques autour, 75/100/125/150/175 + 50% AP
-            double[] base=fr.lolmc.util.Balance.base("e_amumu",new double[]{75,100,125,150,175});double dmg=base[getLevel()-1]+s.getFinalAP()*0.5;
+            double[] base=fr.lolmc.util.Balance.base("e_amumu",new double[]{75,100,125,150,175});double dmg=base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("e_amumu","ap",0.5);
             TargetingUtil.dealDamageAll(c, TargetingUtil.entitiesInRadius(c, c.getLocation(), 3.0), dmg, TargetingUtil.DmgType.MAGICAL);
             c.getWorld().spawnParticle(Particle.ANGRY_VILLAGER,c.getLocation().add(0,1,0),12,1.5,0.5,1.5);
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_VILLAGER_NO, 1f, 0.7f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] base=fr.lolmc.util.Balance.base("e_amumu",new double[]{75,100,125,150,175});
-            return String.format("%.0f dégâts magiques autour (+50%%AP). CD réduit quand frappé.",base[getLevel()-1]+s.getFinalAP()*0.5);
+            return String.format("%.0f dégâts magiques autour (+50%%AP). CD réduit quand frappé.",base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("e_amumu","ap",0.5));
         }
     }
 
@@ -114,7 +114,7 @@ public class Amumu extends BaseChampion {
             resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : 200/300/400 + 80% AP, étourdit 1.5s tous les ennemis autour + knockdown
-            double[] base=fr.lolmc.util.Balance.base("r_amumu",new double[]{200,300,400});int rr=Math.min(getLevel()-1,2);double dmg=base[rr]+s.getFinalAP()*0.8;
+            double[] base=fr.lolmc.util.Balance.base("r_amumu",new double[]{200,300,400});int rr=Math.min(getLevel()-1,2);double dmg=base[rr]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("r_amumu","ap",0.8);
             for(var __t : TargetingUtil.enemiesAround(c, 5.0)){
                 TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);
                 __t.setVelocity(new Vector(0,0.4,0)); // knockdown
@@ -128,7 +128,7 @@ public class Amumu extends BaseChampion {
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] base=fr.lolmc.util.Balance.base("r_amumu",new double[]{200,300,400});int r=Math.min(getLevel()-1,2);
-            return String.format("%.0f dégâts (+80%%AP) + étourdit 1.5s tous les ennemis autour.",base[r]+s.getFinalAP()*0.8);
+            return String.format("%.0f dégâts (+80%%AP) + étourdit 1.5s tous les ennemis autour.",base[r]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("r_amumu","ap",0.8));
         }
     }
 }

@@ -42,14 +42,14 @@ public class Morgana extends BaseChampion {
             resourceCost = 50;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
-            double[] base=fr.lolmc.util.Balance.base("q_morgana",new double[]{80,135,190,245,300});double dmg=base[getLevel()-1]+s.getFinalAP()*0.9;
+            double[] base=fr.lolmc.util.Balance.base("q_morgana",new double[]{80,135,190,245,300});double dmg=base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("q_morgana","ap",0.9);
             DamageUtil.abilityDamageMagicEntity(c, tgt, dmg);
             tgt.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,40,10,false,true));
             if(tgt instanceof Player _tp)_tp.sendActionBar(Component.text("🕸 Root 2s — Morgana Q!",NamedTextColor.DARK_PURPLE));
             c.getWorld().spawnParticle(Particle.WITCH,tgt.getLocation(),10,0.5,0.5,0.5);
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            return String.format("%.0f dégâts + root 2s (80+90%%AP).",80+s.getFinalAP()*0.9);
+            return String.format("%.0f dégâts + root 2s (80+90%%AP).",80+s.getFinalAP()*fr.lolmc.util.Balance.ratio("q_morgana","ap",0.9));
         }
     }
 
@@ -64,7 +64,7 @@ public class Morgana extends BaseChampion {
                 int tick=0;
                 @Override public void run(){
                     if(tick>=100){cancel();return;}
-                    double dmg=(24+s.getFinalAP()*0.11);
+                    double dmg=(24+s.getFinalAP()*fr.lolmc.util.Balance.ratio("w_morgana","ap",0.11));
                     TargetingUtil.dealDamageAll(c,
                         TargetingUtil.entitiesInRadius(c, loc, 4.0), dmg, TargetingUtil.DmgType.MAGICAL);
                     loc.getWorld().spawnParticle(Particle.WITCH,loc,5,2,0,2);
@@ -73,7 +73,7 @@ public class Morgana extends BaseChampion {
             }.runTaskTimer(LolPlugin.getInstance(),0L,20L);
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            return String.format("Zone 4 blocs: %.0f dégâts magiques/s pendant 5s.",24+s.getFinalAP()*0.11);
+            return String.format("Zone 4 blocs: %.0f dégâts magiques/s pendant 5s.",24+s.getFinalAP()*fr.lolmc.util.Balance.ratio("w_morgana","ap",0.11));
         }
     }
 
@@ -85,7 +85,7 @@ public class Morgana extends BaseChampion {
             // Bouclier Noir : protège un allié (ou soi), absorbe les dégâts magiques + immunité CC tant qu'il tient
             Player dest = (t != null) ? t : c;
             double[] shieldBase = {80,130,180,230,280};
-            double shield = shieldBase[getLevel()-1] + s.getFinalAP()*0.4;
+            double shield = shieldBase[getLevel()-1] + s.getFinalAP()*fr.lolmc.util.Balance.ratio("e_morgana","ap",0.4);
             var cm = LolPlugin.getInstance().getChampionManager();
             if (cm.hasChampion(dest)) cm.getChampion(dest).getStats().addShield(shield);
             dest.addPotionEffect(new PotionEffect(PotionEffectType.ABSORPTION,100,1,false,true));
@@ -95,7 +95,7 @@ public class Morgana extends BaseChampion {
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] shieldBase = {80,130,180,230,280};
-            return String.format("Bouclier %.0f (+40%%AP) anti-dégâts magiques + immunité CC sur un allié.",shieldBase[getLevel()-1]+s.getFinalAP()*0.4);
+            return String.format("Bouclier %.0f (+40%%AP) anti-dégâts magiques + immunité CC sur un allié.",shieldBase[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("e_morgana","ap",0.4));
         }
     }
 
@@ -104,7 +104,7 @@ public class Morgana extends BaseChampion {
             new double[]{120,110,100},20,5,DamageType.MAGICAL);
             resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            double dmg=150+s.getFinalAP()*0.7;
+            double dmg=150+s.getFinalAP()*fr.lolmc.util.Balance.ratio("r_morgana","ap",0.7);
             for(var __t : TargetingUtil.enemiesAround(c, 5.0)){
                 TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);
                 if(__t instanceof Player __p){
@@ -115,7 +115,7 @@ public class Morgana extends BaseChampion {
             c.getWorld().spawnParticle(Particle.END_ROD,c.getLocation(),20,3,1,3);
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            return String.format("%.0f dégâts + stun 1.5s tous ennemis 5 blocs.",150+s.getFinalAP()*0.7);
+            return String.format("%.0f dégâts + stun 1.5s tous ennemis 5 blocs.",150+s.getFinalAP()*fr.lolmc.util.Balance.ratio("r_morgana","ap",0.7));
         }
     }
 }
