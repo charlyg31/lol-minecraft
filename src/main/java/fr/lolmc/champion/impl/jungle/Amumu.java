@@ -55,7 +55,7 @@ public class Amumu extends BaseChampion {
                 __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,20,10,false,true)); // stun 1s
                 __p.sendActionBar(Component.text("🧻 Lancer de Bandage! Stun 1s!",NamedTextColor.YELLOW));
             }
-            c.getWorld().playSound(c.getLocation(), Sound.ENTITY_LEASH_KNOT_PLACE, 1f, 0.8f);
+            c.getWorld().playSound(c.getLocation(), Sound.BLOCK_WOOL_PLACE, 1f, 0.8f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] base=fr.lolmc.util.Balance.base("q_amumu",new double[]{80,130,180,230,280});
