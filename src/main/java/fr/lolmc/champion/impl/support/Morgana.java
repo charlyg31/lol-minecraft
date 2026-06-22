@@ -90,12 +90,21 @@ public class Morgana extends BaseChampion {
             new double[]{23,21,19,17,15},0,0,DamageType.TRUE);
             resourceCost = 80;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            Player dest=t!=null?t:c;
-            destgt.addPotionEffect(new PotionEffect(PotionEffectType.ABSORPTION,100,2,false,true));
-            destgt.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE,80,1,false,true));
-            desif(tgt instanceof Player _tp)_tp.sendActionBar(Component.text("🛡 Bouclier Noir!",NamedTextColor.DARK_GRAY));
+            // Bouclier Noir : protège un allié (ou soi), absorbe les dégâts magiques + immunité CC tant qu'il tient
+            Player dest = (t != null) ? t : c;
+            double[] shieldBase = {80,130,180,230,280};
+            double shield = shieldBase[getLevel()-1] + s.getFinalAP()*0.4;
+            var cm = LolPlugin.getInstance().getChampionManager();
+            if (cm.hasChampion(dest)) cm.getChampion(dest).getStats().addShield(shield);
+            dest.addPotionEffect(new PotionEffect(PotionEffectType.ABSORPTION,100,1,false,true));
+            dest.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE,100,1,false,true));
+            dest.sendActionBar(Component.text("🛡 Bouclier Noir! ("+(int)shield+")",NamedTextColor.DARK_GRAY));
+            c.getWorld().playSound(c.getLocation(), Sound.BLOCK_BEACON_ACTIVATE, 0.8f, 0.6f);
         }
-        @Override public String getDynamicDescription(ChampionStats s){return "Bouclier anti-dégâts magiques + immunité CC sur allié.";}
+        @Override public String getDynamicDescription(ChampionStats s){
+            double[] shieldBase = {80,130,180,230,280};
+            return String.format("Bouclier %.0f (+40%%AP) anti-dégâts magiques + immunité CC sur un allié.",shieldBase[getLevel()-1]+s.getFinalAP()*0.4);
+        }
     }
 
     static class R extends BaseAbility {
