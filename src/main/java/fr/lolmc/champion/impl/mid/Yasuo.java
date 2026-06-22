@@ -33,6 +33,9 @@ public class Yasuo extends BaseChampion {
     }
 
     public static final Map<UUID,Integer> qCasts=new HashMap<>();
+    /** Reinitialise l'etat de ce joueur (fin de partie / deconnexion). */
+    public static void resetState(UUID id){ qCasts.remove(id); eStacks.remove(id); }
+    public static void resetAllState(){ qCasts.clear(); eStacks.clear(); }
 
     static class AA extends BasicAttackAbility {
         AA(){super("yasuo",Material.IRON_SWORD,2.5f,DamageType.PHYSICAL);}
