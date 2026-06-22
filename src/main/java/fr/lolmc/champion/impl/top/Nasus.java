@@ -34,6 +34,7 @@ public class Nasus extends BaseChampion {
 
     // Stacks Q globaux par UUID
     public static final Map<UUID,Integer> qStacks=new HashMap<>();
+    private static final int MAX_Q_STACKS = 500; // plafond anti-scaling infini
     /** Réinitialise les stacks de ce joueur (fin de partie / déconnexion). */
     public static void resetState(UUID id){ qStacks.remove(id); }
     public static void resetAllState(){ qStacks.clear(); }
@@ -54,10 +55,11 @@ public class Nasus extends BaseChampion {
             double dmg=s.getFinalAD()+bonus[getLevel()-1]+stacks;
             boolean kills = tgt.getHealth()-dmg<=0;
             TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.PHYSICAL);
-            // Stacks : +12 sur champion/gros monstre tué, +3 sinon
+            // Stacks : +12 sur champion/gros monstre tué, +3 sinon (plafonné pour éviter un scaling infini)
             if(kills){
                 boolean big = (tgt instanceof Player) || fr.lolmc.game.JungleManager.isJungleMonster(tgt);
                 qStacks.merge(c.getUniqueId(), big?12:3, Integer::sum);
+                if(qStacks.get(c.getUniqueId()) > MAX_Q_STACKS) qStacks.put(c.getUniqueId(), MAX_Q_STACKS);
                 c.sendActionBar(Component.text("💀 Stacks Q: "+qStacks.get(c.getUniqueId()),NamedTextColor.GOLD));
             }
             c.getWorld().spawnParticle(Particle.SWEEP_ATTACK,tgt.getLocation().add(0,1,0),5);
