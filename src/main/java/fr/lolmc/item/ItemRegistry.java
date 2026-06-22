@@ -14,6 +14,15 @@ public class ItemRegistry {
     private static final Map<String, LolItem> ITEMS = new LinkedHashMap<>();
 
     static {
+        registerComponents();
+        registerCoreItems();
+        registerConsumables();
+        registerMiscAndLegacy();
+        registerWards();
+        registerOfficialMissing();
+    }
+
+    private static void registerComponents() {
 
         // ════════════════════════════════════════════════════════════
         // COMPOSANTS DE BASE
@@ -75,6 +84,9 @@ public class ItemRegistry {
         reg(new LolItem("cappa_juice",    "Cappa Juice",       700,  Material.POTION,         UTILITY).passive("Actif","Soigne 40%%HP max sur 120s. 1 charge."));
         reg(new LolItem("winged_moonplate","Winged Moonplate", 800,  Material.PHANTOM_MEMBRANE,UTILITY).hp(150).ms(4));
 
+    }
+
+    private static void registerCoreItems() {
         // ════════════════════════════════════════════════════════════
         // ITEMS STARTER
         // ════════════════════════════════════════════════════════════
@@ -201,6 +213,9 @@ public class ItemRegistry {
         reg(new LolItem("essence_reaver","Essence Reaver",      2800, Material.DIAMOND_HOE,    DAMAGE).ad(60).crit(0.20).ah(15).passive("Spellblade","Après sort: AA +100%%AD + 3%% mana resto."));
         reg(new LolItem("sterak_gage2",  "Sterak's Gage",       3100, Material.IRON_CHESTPLATE,DAMAGE).ad(50).hp(400).passive("Lifeline","HP <30%%: bouclier 75%%AD bonus 4s."));
 
+    }
+
+    private static void registerConsumables() {
         // ════════════════════════════════════════════════════════════
         // CONSOMMABLES
         // ════════════════════════════════════════════════════════════
@@ -214,6 +229,9 @@ public class ItemRegistry {
         reg(new LolItem("stealth_ward",  "Stealth Ward (trinket)",0,  Material.TORCH,           UTILITY).passive("Actif","Place une ward invisible 150s (3 charges max)."));
         reg(new LolItem("farsight",      "Farsight Alteration", 0,    Material.COMPASS,         UTILITY).passive("Actif","Place ward révélatrice à longue portée."));
 
+    }
+
+    private static void registerMiscAndLegacy() {
         // ════════════════════════════════════════════════════════════
         // ITEMS FINAUX DIVERS (MANQUANTS)
         // ════════════════════════════════════════════════════════════
@@ -307,6 +325,9 @@ public class ItemRegistry {
         reg(new LolItem("spear_of_shojin2","Spear of Shojin",  3100, Material.STICK,           DAMAGE).ad(55).hp(300).ah(20).passive("Dragonforce","3 AA réduisent CD."));
 
 
+    }
+
+    private static void registerWards() {
         // ════════════════════════════════════════════════════════════
         // CONSOMMABLES & WARDS (prix officiels LoL)
         // ════════════════════════════════════════════════════════════
@@ -324,6 +345,9 @@ public class ItemRegistry {
         reg(new LolItem("cappa_juice2",        "Cappa Juice",              700, Material.HONEY_BOTTLE,      CONSUMABLE).passive("Actif","Soigne 40%% HP max sur 120s."));
 
 
+    }
+
+    private static void registerOfficialMissing() {
         // ════════════════════════════════════════════════════════════
         // ITEMS OFFICIELS MANQUANTS (57 items — patch 16.12)
         // ════════════════════════════════════════════════════════════
