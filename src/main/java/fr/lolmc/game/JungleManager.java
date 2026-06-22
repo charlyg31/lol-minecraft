@@ -1,5 +1,8 @@
 package fr.lolmc.game;
 import fr.lolmc.util.Compat;
+import fr.lolmc.util.MobAppearance;
+import org.bukkit.Bukkit;
+import org.bukkit.Material;
 
 import fr.lolmc.LolPlugin;
 import fr.lolmc.champion.base.BaseChampion;
@@ -42,6 +45,8 @@ public class JungleManager {
     private final Map<String, CampSpawn> camps = new HashMap<>();
     // Monstres vivants : entityUUID → MonsterType
     private final Map<UUID, MonsterType> liveMonsters = new HashMap<>();
+    // Décorations : monstreUUID → décoUUID (pour nettoyage à la mort/reset)
+    private final Map<UUID, UUID> monsterDeco = new HashMap<>();
     private boolean active = false;
 
     // ══════════════════════════════════════════════════════════════
@@ -227,6 +232,16 @@ public class JungleManager {
             // Stocker l'or individuel du mob
             mob.getPersistentDataContainer().set(KEY_GOLD, PersistentDataType.INTEGER, gold);
 
+            // ── APPARENCE CUSTOM : bloc thématique flottant + lueur sur les épiques ──
+            Material deco = decoFor(type);
+            if (deco != null) {
+                float yOff = isLarge ? 1.1f : 0.7f;
+                float scale = isLarge ? 0.6f : 0.4f;
+                var d = MobAppearance.addFloatingBlock(mob, deco, yOff, scale);
+                if (d != null) monsterDeco.put(mob.getUniqueId(), d.getUniqueId());
+            }
+            if (type.isEpic()) mob.setGlowing(true);
+
             camp.liveEntities.add(mob.getUniqueId());
             liveMonsters.put(mob.getUniqueId(), type);
         }
@@ -236,6 +251,13 @@ public class JungleManager {
     public void onMonsterDeath(UUID entityId, Player killer) {
         MonsterType type = liveMonsters.remove(entityId);
         if (type == null) return;
+
+        // Retirer la décoration flottante de ce monstre
+        UUID decoId = monsterDeco.remove(entityId);
+        if (decoId != null) {
+            Entity d = Bukkit.getEntity(decoId);
+            if (d != null) d.remove();
+        }
 
         // Retirer ce mob du camp ; respawn seulement quand TOUT le groupe est mort
         CampSpawn camp = null;
@@ -388,13 +410,38 @@ public class JungleManager {
         return t != null ? MonsterType.valueOf(t) : null;
     }
 
+    /**
+     * Bloc thématique flottant pour chaque monstre, inspiré des vrais camps LoL.
+     * Retourne null pour ne pas mettre de décoration.
+     */
+    private Material decoFor(MonsterType type) {
+        return switch (type) {
+            case GROMP        -> Material.SLIME_BLOCK;       // grenouille verte
+            case MURKWOLF     -> Material.BONE_BLOCK;         // loups
+            case RAPTOR       -> Material.HAY_BLOCK;          // oiseaux (nid)
+            case KRUG         -> Material.STONE;              // golems de pierre
+            case RED_BUFF     -> Material.MAGMA_BLOCK;        // Sanglepince (rouge/feu)
+            case BLUE_BUFF    -> Material.SEA_LANTERN;        // Sentinelle bleue (lumière bleue)
+            case SCUTTLE_CRAB -> Material.PRISMARINE;         // crabe aquatique
+            case DRAGON_INFERNAL -> Material.FIRE_CORAL_BLOCK;
+            case DRAGON_OCEAN    -> Material.TUBE_CORAL_BLOCK;
+            case DRAGON_MOUNTAIN -> Material.DEEPSLATE;
+            case DRAGON_CLOUD    -> Material.WHITE_WOOL;
+            case DRAGON_CHEMTECH -> Material.SLIME_BLOCK;
+            case DRAGON_ELDER    -> Material.AMETHYST_BLOCK;
+            case HERALD       -> Material.SCULK_CATALYST;     // Héraut
+            case BARON        -> Material.SCULK;              // Baron Nashor
+        };
+    }
+
     public void clearAllMonsters() {
         for (var world : LolPlugin.getInstance().getServer().getWorlds()) {
             for (Entity e : world.getEntities()) {
-                if (isJungleMonster(e)) e.remove();
+                if (isJungleMonster(e) || MobAppearance.isDecoration(e)) e.remove();
             }
         }
         liveMonsters.clear();
+        monsterDeco.clear();
         for (CampSpawn camp : camps.values()) { camp.liveEntities.clear(); camp.respawnAt = 0; }
     }
 
