@@ -42,7 +42,7 @@ public class Morgana extends BaseChampion {
             resourceCost = 50;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
-            double[] base={80,135,190,245,300};double dmg=base[getLevel()-1]+s.getFinalAP()*0.9;
+            double[] base=fr.lolmc.util.Balance.base("q_morgana",new double[]{80,135,190,245,300});double dmg=base[getLevel()-1]+s.getFinalAP()*0.9;
             DamageUtil.abilityDamageMagicEntity(c, tgt, dmg);
             tgt.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,40,10,false,true));
             if(tgt instanceof Player _tp)_tp.sendActionBar(Component.text("🕸 Root 2s — Morgana Q!",NamedTextColor.DARK_PURPLE));

@@ -44,7 +44,7 @@ public class MasterYi extends BaseChampion {
             org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
             Location dest=safeTeleport(c.getLocation(),tgt.getLocation());
             c.teleport(dest);
-            double[] base={25,60,95,130,165};double dmg=base[getLevel()-1]+s.getFinalAD()*1.0;
+            double[] base=fr.lolmc.util.Balance.base("q_masteryi",new double[]{25,60,95,130,165});double dmg=base[getLevel()-1]+s.getFinalAD()*1.0;
             DamageUtil.trueDamageEntity(c, tgt, dmg);
             c.getWorld().spawnParticle(Particle.CRIT,tgt.getLocation(),10,0.5,0.5,0.5);
         }

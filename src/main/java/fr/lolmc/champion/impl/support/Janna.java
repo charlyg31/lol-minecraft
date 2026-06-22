@@ -42,7 +42,7 @@ public class Janna extends BaseChampion {
             resourceCost = 60;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : skillshot tornade en ligne, 60/90/120/150/180 + 50% AP, knockup les ennemis traversés
-            double[] base={60,90,120,150,180};double dmg=base[getLevel()-1]+s.getFinalAP()*0.5;
+            double[] base=fr.lolmc.util.Balance.base("q_janna",new double[]{60,90,120,150,180});double dmg=base[getLevel()-1]+s.getFinalAP()*0.5;
             var hits=TargetingUtil.skillshot(c, 10.0, 1.2, true); // traverse
             if(hits.isEmpty()){c.sendActionBar(Component.text("🌪 Tornade lancée!",NamedTextColor.WHITE));return;}
             for(var __t : hits){
@@ -53,7 +53,7 @@ public class Janna extends BaseChampion {
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_PHANTOM_FLAP, 1f, 1.3f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            double[] base={60,90,120,150,180};
+            double[] base=fr.lolmc.util.Balance.base("q_janna",new double[]{60,90,120,150,180});
             return String.format("Skillshot tornade: %.0f dégâts (+50%%AP) + knockup les ennemis.",base[getLevel()-1]+s.getFinalAP()*0.5);
         }
     }
@@ -65,7 +65,7 @@ public class Janna extends BaseChampion {
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : envoie un élémentaire qui inflige des dégâts + ralentit. 60/105/150/195/240 + 60% AP
             org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,7.0); if(tgt==null){c.sendActionBar(Component.text("💨 Aucune cible",NamedTextColor.GRAY));return;}
-            double[] base={60,105,150,195,240};double dmg=base[getLevel()-1]+s.getFinalAP()*0.6;
+            double[] base=fr.lolmc.util.Balance.base("w_janna",new double[]{60,105,150,195,240});double dmg=base[getLevel()-1]+s.getFinalAP()*0.6;
             TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.MAGICAL);
             if(tgt instanceof Player __p)
                 __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,40,2,false,true));
@@ -75,7 +75,7 @@ public class Janna extends BaseChampion {
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_PHANTOM_AMBIENT, 1f, 1.4f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            double[] base={60,105,150,195,240};
+            double[] base=fr.lolmc.util.Balance.base("w_janna",new double[]{60,105,150,195,240});
             return String.format("%.0f dégâts (+60%%AP) + ralentit. Janna gagne de la vitesse.",base[getLevel()-1]+s.getFinalAP()*0.6);
         }
     }

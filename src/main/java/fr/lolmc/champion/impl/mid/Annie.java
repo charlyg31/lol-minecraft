@@ -44,14 +44,14 @@ public class Annie extends BaseChampion {
             // Brasier : cible l'ennemi visé (champion, sbire ou monstre)
             var target = TargetingUtil.getTargetedEnemy(c, 6.5);
             if(target==null){ c.sendActionBar(net.kyori.adventure.text.Component.text("Aucune cible",net.kyori.adventure.text.format.NamedTextColor.GRAY)); return; }
-            double[] base={80,130,180,230,280};
+            double[] base=fr.lolmc.util.Balance.base("q_annie",new double[]{80,130,180,230,280});
             double dmg=base[getLevel()-1]+s.getFinalAP()*0.85;
             TargetingUtil.dealDamage(c, target, dmg, TargetingUtil.DmgType.MAGICAL);
             target.getWorld().spawnParticle(Particle.FLAME,target.getLocation().add(0,1,0),20,0.5,0.5,0.5,0.1);
             target.getWorld().spawnParticle(Particle.SMALL_FLAME,target.getLocation().add(0,1,0),15,0.3,0.5,0.3,0.05);
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            double[] base={80,130,180,230,280};
+            double[] base=fr.lolmc.util.Balance.base("q_annie",new double[]{80,130,180,230,280});
             return String.format("%.0f dégâts magiques (%.0f+85%%AP).",base[getLevel()-1]+s.getFinalAP()*0.85,base[getLevel()-1]);
         }
     }
@@ -62,7 +62,7 @@ public class Annie extends BaseChampion {
             resourceCost = 70;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // Incinération : cône de feu devant Annie (touche tout)
-            double[] base={70,115,160,205,250};
+            double[] base=fr.lolmc.util.Balance.base("w_annie",new double[]{70,115,160,205,250});
             double dmg=base[getLevel()-1]+s.getFinalAP()*0.75;
             var targets = TargetingUtil.enemiesInCone(c, 6.0, 50);
             TargetingUtil.dealDamageAll(c, targets, dmg, TargetingUtil.DmgType.MAGICAL);
@@ -74,7 +74,7 @@ public class Annie extends BaseChampion {
             }
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            double[] base={70,115,160,205,250};
+            double[] base=fr.lolmc.util.Balance.base("w_annie",new double[]{70,115,160,205,250});
             return String.format("Cône de feu: %.0f dégâts (%.0f+75%%AP) dans 4 blocs.",base[getLevel()-1]+s.getFinalAP()*0.75,base[getLevel()-1]);
         }
     }
@@ -98,7 +98,7 @@ public class Annie extends BaseChampion {
             resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // Tibbers : zone d'explosion là où on vise (touche tout dans le rayon)
-            double[] base={175,300,425};
+            double[] base=fr.lolmc.util.Balance.base("r_annie",new double[]{175,300,425});
             int r=Math.min(getLevel()-1,2);
             double dmg=base[r]+s.getFinalAP()*0.75;
             var ground = TargetingUtil.getAimedGroundLocation(c, 7.0);
@@ -113,7 +113,7 @@ public class Annie extends BaseChampion {
             ground.getWorld().playSound(ground, org.bukkit.Sound.ENTITY_BLAZE_SHOOT, 1.5f, 0.6f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            double[] base={175,300,425};
+            double[] base=fr.lolmc.util.Balance.base("r_annie",new double[]{175,300,425});
             int r=Math.min(getLevel()-1,2);
             return String.format("%.0f dégâts AoE + brûlure (%.0f+75%%AP).",base[r]+s.getFinalAP()*0.75,base[r]);
         }

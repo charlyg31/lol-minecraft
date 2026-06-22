@@ -53,7 +53,7 @@ public class Jinx extends BaseChampion {
             resourceCost = 20;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : skillshot ligne. 10/80/150/220/290 + 160% AD au 1er touché + ralentit 30-60%
-            double[] base={10,80,150,220,290};double dmg=base[getLevel()-1]+s.getFinalAD()*1.6;
+            double[] base=fr.lolmc.util.Balance.base("w_jinx",new double[]{10,80,150,220,290});double dmg=base[getLevel()-1]+s.getFinalAD()*1.6;
             var hits=TargetingUtil.skillshot(c, 14.0, 0.8, false); // s'arrête au 1er
             if(hits.isEmpty()){c.sendActionBar(Component.text("⚡ Zap manqué!",NamedTextColor.GRAY));return;}
             var main=hits.get(0);
@@ -64,7 +64,7 @@ public class Jinx extends BaseChampion {
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_FIREWORK_ROCKET_BLAST, 1f, 1.4f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            double[] base={10,80,150,220,290};
+            double[] base=fr.lolmc.util.Balance.base("w_jinx",new double[]{10,80,150,220,290});
             return String.format("Skillshot: %.0f dégâts (+160%%AD) au 1er touché + ralentit.",base[getLevel()-1]+s.getFinalAD()*1.6);
         }
     }
@@ -76,7 +76,7 @@ public class Jinx extends BaseChampion {
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : lance 3 pièges sur zone visée. Enracinent les ennemis + dégâts magiques 70-270
             Location loc=TargetingUtil.getAimedGroundLocation(c, 9.0);
-            double[] base={70,120,170,220,270};double dmg=base[getLevel()-1]+s.getFinalAP()*1.0;
+            double[] base=fr.lolmc.util.Balance.base("e_jinx",new double[]{70,120,170,220,270});double dmg=base[getLevel()-1]+s.getFinalAP()*1.0;
             for(var __t : TargetingUtil.entitiesInRadius(c, loc, 4.0)){
                 TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);
                 // Root (enracinement) : lenteur extrême brève
@@ -91,7 +91,7 @@ public class Jinx extends BaseChampion {
             c.getWorld().playSound(loc, Sound.ENTITY_BLAZE_SHOOT, 1f, 1f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            double[] base={70,120,170,220,270};
+            double[] base=fr.lolmc.util.Balance.base("e_jinx",new double[]{70,120,170,220,270});
             return String.format("Pièges (zone visée): %.0f dégâts magiques + enracine.",base[getLevel()-1]+s.getFinalAP());
         }
     }
@@ -123,7 +123,7 @@ public class Jinx extends BaseChampion {
             if(main instanceof Player _tp)_tp.sendMessage(Component.text("🚀 SUPER MÉGA ROQUETTE DE LA MORT!",NamedTextColor.RED));
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            double[] base={250,400,550};int r=Math.min(getLevel()-1,2);
+            double[] base=fr.lolmc.util.Balance.base("r_jinx",new double[]{250,400,550});int r=Math.min(getLevel()-1,2);
             return String.format("Roquette globale: jusqu'à %.0f dégâts (+150%%AD) selon distance + %% PV manquants. Explose en zone.",base[r]+s.getFinalAD()*1.5);
         }
     }

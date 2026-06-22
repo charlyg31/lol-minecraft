@@ -42,7 +42,7 @@ public class Sivir extends BaseChampion {
             resourceCost = 70;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
-            double[] base={25,45,65,85,105};double dmg=base[getLevel()-1]+s.getFinalAD()*1.0;
+            double[] base=fr.lolmc.util.Balance.base("q_sivir",new double[]{25,45,65,85,105});double dmg=base[getLevel()-1]+s.getFinalAD()*1.0;
             DamageUtil.abilityDamageEntity(c, tgt, dmg);
             // Retour: dégâts réduits
             new BukkitRunnable(){@Override public void run(){

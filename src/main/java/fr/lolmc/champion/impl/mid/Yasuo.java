@@ -48,7 +48,7 @@ public class Yasuo extends BaseChampion {
         @Override public void cast(Player c,ChampionStats s,Player t){
             int casts=qCasts.merge(c.getUniqueId(),1,Integer::sum);
             // LoL : coup d'estoc en ligne. 20/45/70/95/120 + 100% AD (peut critiquer)
-            double[] base={20,45,70,95,120};double dmg=base[getLevel()-1]+s.getFinalAD()*1.0;
+            double[] base=fr.lolmc.util.Balance.base("q_yasuo",new double[]{20,45,70,95,120});double dmg=base[getLevel()-1]+s.getFinalAD()*1.0;
             boolean tornado = casts>=3; // 2 stacks accumulés -> 3e cast = tornade
             if(tornado){
                 // Tornade : skillshot plus long qui projette en l'air
@@ -68,7 +68,7 @@ public class Yasuo extends BaseChampion {
             }
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            double[] base={20,45,70,95,120};
+            double[] base=fr.lolmc.util.Balance.base("q_yasuo",new double[]{20,45,70,95,120});
             return String.format("%.0f dégâts en ligne (+100%%AD). 2 stacks = tornade qui projette.",base[getLevel()-1]+s.getFinalAD());
         }
     }
@@ -95,7 +95,7 @@ public class Yasuo extends BaseChampion {
             // LoL : dash à travers la cible, dégâts magiques + 25% par stack (max 4 = +100%)
             org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,5.0); if(tgt==null){c.sendActionBar(Component.text("🍃 Aucune cible",NamedTextColor.GRAY));return;}
             int stacks=Math.min(eStacks.getOrDefault(c.getUniqueId(),0),4);
-            double[] base={60,70,80,90,100};
+            double[] base=fr.lolmc.util.Balance.base("e_yasuo",new double[]{60,70,80,90,100});
             double dmg=(base[getLevel()-1]+s.getFinalAP()*0.6)*(1.0+0.25*stacks);
             // Dash à travers/derrière la cible
             var dest=tgt.getLocation().clone().add(tgt.getLocation().getDirection().multiply(1.5));
@@ -109,7 +109,7 @@ public class Yasuo extends BaseChampion {
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 1.4f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            double[] base={60,70,80,90,100};
+            double[] base=fr.lolmc.util.Balance.base("e_yasuo",new double[]{60,70,80,90,100});
             return String.format("Dash à travers la cible: %.0f dégâts magiques (+25%%/stack, max +100%%).",base[getLevel()-1]+s.getFinalAP()*0.6);
         }
     }
@@ -125,7 +125,7 @@ public class Yasuo extends BaseChampion {
             var dest=tgt.getLocation().clone().subtract(tgt.getLocation().getDirection().multiply(1.0));
             dest.setY(c.getLocation().getY());
             c.teleport(dest);
-            double[] base={200,350,500};
+            double[] base=fr.lolmc.util.Balance.base("r_yasuo",new double[]{200,350,500});
             int r=Math.min(getLevel()-1,2);
             double dmg=base[r]+s.getFinalAD()*1.5;
             for(var __t : TargetingUtil.enemiesAround(c, 4.0)){
@@ -138,7 +138,7 @@ public class Yasuo extends BaseChampion {
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_PLAYER_ATTACK_CRIT, 1.5f, 0.7f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            double[] base={200,350,500};int r=Math.min(getLevel()-1,2);
+            double[] base=fr.lolmc.util.Balance.base("r_yasuo",new double[]{200,350,500});int r=Math.min(getLevel()-1,2);
             return String.format("Dash sur la cible: %.0f dégâts (+150%%AD) + maintient en l'air.",base[r]+s.getFinalAD()*1.5);
         }
     }

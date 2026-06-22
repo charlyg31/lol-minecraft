@@ -42,7 +42,7 @@ public class Malphite extends BaseChampion {
             resourceCost = 70;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null){c.sendActionBar(Component.text("🪨 Aucune cible",NamedTextColor.GRAY));return;}
-            double[] base={70,120,170,220,270};
+            double[] base=fr.lolmc.util.Balance.base("q_malphite",new double[]{70,120,170,220,270});
             double dmg=base[getLevel()-1]+s.getFinalAP()*0.6;
             TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.MAGICAL);
             // LoL : ralentit la cible ET donne un boost de vitesse à Malphite

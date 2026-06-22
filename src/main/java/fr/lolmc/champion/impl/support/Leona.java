@@ -43,7 +43,7 @@ public class Leona extends BaseChampion {
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : prochaine attaque renforcée = stun 1s + dégâts magiques 20/45/70/95/120 + 30% AP
             org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,2.5); if(tgt==null){c.sendActionBar(Component.text("☀ Bouclier de l'Aube prêt (frappe un ennemi)",NamedTextColor.YELLOW));return;}
-            double[] base={20,45,70,95,120};double dmg=base[getLevel()-1]+s.getFinalAP()*0.3;
+            double[] base=fr.lolmc.util.Balance.base("q_leona",new double[]{20,45,70,95,120});double dmg=base[getLevel()-1]+s.getFinalAP()*0.3;
             TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.MAGICAL);
             if(tgt instanceof Player __p){
                 __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,20,10,false,true)); // stun 1s
@@ -53,7 +53,7 @@ public class Leona extends BaseChampion {
             c.getWorld().playSound(c.getLocation(), Sound.ITEM_SHIELD_BLOCK, 1f, 0.8f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            double[] base={20,45,70,95,120};
+            double[] base=fr.lolmc.util.Balance.base("q_leona",new double[]{20,45,70,95,120});
             return String.format("Prochaine attaque: %.0f dégâts (+30%%AP) + stun 1s.",base[getLevel()-1]+s.getFinalAP()*0.3);
         }
     }
@@ -68,7 +68,7 @@ public class Leona extends BaseChampion {
             c.addPotionEffect(new PotionEffect(PotionEffectType.ABSORPTION,60,0,false,true));
             c.sendActionBar(Component.text("🛡 Éclipse! Défenses + explosion dans 3s",NamedTextColor.GOLD));
             c.getWorld().playSound(c.getLocation(), Sound.BLOCK_BEACON_ACTIVATE, 0.8f, 0.8f);
-            double[] base={80,120,160,200,240};double dmg=base[getLevel()-1]+s.getFinalAP()*0.4;
+            double[] base=fr.lolmc.util.Balance.base("w_leona",new double[]{80,120,160,200,240});double dmg=base[getLevel()-1]+s.getFinalAP()*0.4;
             new BukkitRunnable(){
                 @Override public void run(){
                     boolean hit=false;
@@ -88,7 +88,7 @@ public class Leona extends BaseChampion {
             }.runTaskLater(LolPlugin.getInstance(),60L); // explosion après 3s
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            double[] base={80,120,160,200,240};
+            double[] base=fr.lolmc.util.Balance.base("w_leona",new double[]{80,120,160,200,240});
             return String.format("Armure/RM + réduction de dégâts 3s, puis explosion %.0f dégâts (+40%%AP).",base[getLevel()-1]+s.getFinalAP()*0.4);
         }
     }
@@ -99,7 +99,7 @@ public class Leona extends BaseChampion {
             resourceCost = 55;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : skillshot ligne 60-200 + 40% AP, dash sur le DERNIER ennemi touché + root 0.5s
-            double[] base={60,95,130,165,200};double dmg=base[getLevel()-1]+s.getFinalAP()*0.4;
+            double[] base=fr.lolmc.util.Balance.base("e_leona",new double[]{60,95,130,165,200});double dmg=base[getLevel()-1]+s.getFinalAP()*0.4;
             var hits=TargetingUtil.skillshot(c, 9.0, 1.0, true); // traverse, touche tous
             if(hits.isEmpty()){c.sendActionBar(Component.text("⚔ Lame manquée!",NamedTextColor.GRAY));return;}
             for(var __t : hits) TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);
@@ -116,7 +116,7 @@ public class Leona extends BaseChampion {
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 0.8f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            double[] base={60,95,130,165,200};
+            double[] base=fr.lolmc.util.Balance.base("e_leona",new double[]{60,95,130,165,200});
             return String.format("Skillshot: %.0f dégâts (+40%%AP), dash sur le dernier ennemi touché + root.",base[getLevel()-1]+s.getFinalAP()*0.4);
         }
     }
@@ -128,7 +128,7 @@ public class Leona extends BaseChampion {
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : zone au sol visée, 150/250/350 + 100% AP. Centre = STUN, extérieur = ralentit 80%
             Location loc=TargetingUtil.getAimedGroundLocation(c, 10.0);
-            double[] base={150,250,350};int r=Math.min(getLevel()-1,2);double dmg=base[r]+s.getFinalAP()*1.0;
+            double[] base=fr.lolmc.util.Balance.base("r_leona",new double[]{150,250,350});int r=Math.min(getLevel()-1,2);double dmg=base[r]+s.getFinalAP()*1.0;
             loc.getWorld().spawnParticle(Particle.END_ROD,loc,15,2,0.2,2);
             new BukkitRunnable(){
                 @Override public void run(){
@@ -152,7 +152,7 @@ public class Leona extends BaseChampion {
             }.runTaskLater(LolPlugin.getInstance(),13L); // délai 0.625s
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            double[] base={150,250,350};int r=Math.min(getLevel()-1,2);
+            double[] base=fr.lolmc.util.Balance.base("r_leona",new double[]{150,250,350});int r=Math.min(getLevel()-1,2);
             return String.format("Zone visée: %.0f dégâts (+100%%AP). Centre = stun, extérieur = ralentit 80%%.",base[r]+s.getFinalAP()*1.0);
         }
     }

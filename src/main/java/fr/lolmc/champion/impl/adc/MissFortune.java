@@ -43,7 +43,7 @@ public class MissFortune extends BaseChampion {
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : tir sur 1 cible qui ricoche sur celle derrière. 1ère: 20-100+100%AD. 2ème: 20-80+85%AD +crit
             org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.0); if(tgt==null){c.sendActionBar(Component.text("🔫 Aucune cible",NamedTextColor.GRAY));return;}
-            double[] base={20,40,60,80,100};double d1=base[getLevel()-1]+s.getFinalAD()*1.0;
+            double[] base=fr.lolmc.util.Balance.base("q_missfortune",new double[]{20,40,60,80,100});double d1=base[getLevel()-1]+s.getFinalAD()*1.0;
             TargetingUtil.dealDamage(c, tgt, d1, TargetingUtil.DmgType.PHYSICAL);
             // Ricochet : 2e cible la plus proche derrière la 1ère
             double[] base2={20,35,50,65,80};double d2=(base2[getLevel()-1]+s.getFinalAD()*0.85)*1.35;
@@ -61,7 +61,7 @@ public class MissFortune extends BaseChampion {
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_FIREWORK_ROCKET_BLAST, 1f, 1.5f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            double[] base={20,40,60,80,100};
+            double[] base=fr.lolmc.util.Balance.base("q_missfortune",new double[]{20,40,60,80,100});
             return String.format("1ère balle: %.0f (+100%%AD). Ricoche sur la 2ème cible (+35%%).",base[getLevel()-1]+s.getFinalAD());
         }
     }
