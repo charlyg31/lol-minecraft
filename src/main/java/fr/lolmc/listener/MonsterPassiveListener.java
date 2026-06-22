@@ -31,4 +31,12 @@ public class MonsterPassiveListener implements Listener {
             MonsterAbilities.applyRedBuffDebuff(attacker);
         }
     }
+
+    /** Quand un monstre de jungle FRAPPE : déclenche son animation d'attaque. */
+    @EventHandler
+    public void onMonsterAttack(EntityDamageByEntityEvent e) {
+        if (e.getDamager() instanceof LivingEntity dmg && JungleManager.isJungleMonster(dmg)) {
+            fr.lolmc.util.MobAnimator.triggerAttack(dmg.getUniqueId());
+        }
+    }
 }

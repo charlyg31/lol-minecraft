@@ -2,6 +2,7 @@ package fr.lolmc.game;
 import fr.lolmc.util.Compat;
 import fr.lolmc.util.MobAppearance;
 import fr.lolmc.util.MobModel;
+import fr.lolmc.util.MobAnimator;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 
@@ -266,6 +267,7 @@ public class JungleManager {
                 if (d != null) d.remove();
             }
         }
+        MobAnimator.unregister(entityId);
 
         // Retirer ce mob du camp ; respawn seulement quand TOUT le groupe est mort
         CampSpawn camp = null;
@@ -560,6 +562,7 @@ public class JungleManager {
         }
         liveMonsters.clear();
         monsterDeco.clear();
+        MobAnimator.clearAll();
         for (CampSpawn camp : camps.values()) { camp.liveEntities.clear(); camp.respawnAt = 0; }
     }
 
