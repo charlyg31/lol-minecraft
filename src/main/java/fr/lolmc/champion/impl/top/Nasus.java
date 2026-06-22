@@ -103,7 +103,7 @@ public class Nasus extends BaseChampion {
             // LoL : zone au sol visée, dégâts magiques/s + réduction armure 30-50% sur 5s
             Location loc=TargetingUtil.getAimedGroundLocation(c, 8.0);
             double[] dotBase={55,95,135,175,215};
-            double perSec=(dotBase[getLevel()-1]+s.getFinalAP()*0.12);
+            double perSec=(dotBase[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("e_nasus","ap",0.12));
             new BukkitRunnable(){
                 int sec=0;
                 @Override public void run(){
@@ -122,7 +122,7 @@ public class Nasus extends BaseChampion {
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] dotBase={55,95,135,175,215};
-            return String.format("Zone au sol: %.0f dégâts magiques/s pendant 5s + réduit l'armure.",dotBase[getLevel()-1]+s.getFinalAP()*0.12);
+            return String.format("Zone au sol: %.0f dégâts magiques/s pendant 5s + réduit l'armure.",dotBase[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("e_nasus","ap",0.12));
         }
     }
 

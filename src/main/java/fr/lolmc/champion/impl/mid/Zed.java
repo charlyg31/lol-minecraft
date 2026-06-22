@@ -106,7 +106,7 @@ public class Zed extends BaseChampion {
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : 70/92.5/115/137.5/160 + 70% AD bonus, ralentit 20-40% 1.5s
             double[] base=fr.lolmc.util.Balance.base("e_zed",new double[]{70,92.5,115,137.5,160});
-            double dmg=base[getLevel()-1]+s.getFinalAD()*0.7;
+            double dmg=base[getLevel()-1]+s.getFinalAD()*fr.lolmc.util.Balance.ratio("e_zed","ad",0.7);
             int rank=getLevel()-1;
             for(var __t : TargetingUtil.enemiesAround(c, 4.0)){
                 TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.PHYSICAL);
@@ -118,7 +118,7 @@ public class Zed extends BaseChampion {
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] base=fr.lolmc.util.Balance.base("e_zed",new double[]{70,92.5,115,137.5,160});
-            return String.format("%.0f dégâts AoE (+70%%AD) + ralentit 20-40%% 1.5s.",base[getLevel()-1]+s.getFinalAD()*0.7);
+            return String.format("%.0f dégâts AoE (+70%%AD) + ralentit 20-40%% 1.5s.",base[getLevel()-1]+s.getFinalAD()*fr.lolmc.util.Balance.ratio("e_zed","ad",0.7));
         }
     }
 

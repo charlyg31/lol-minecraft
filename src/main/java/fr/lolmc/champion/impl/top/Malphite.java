@@ -43,7 +43,7 @@ public class Malphite extends BaseChampion {
         @Override public void cast(Player c,ChampionStats s,Player t){
             org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null){c.sendActionBar(Component.text("🪨 Aucune cible",NamedTextColor.GRAY));return;}
             double[] base=fr.lolmc.util.Balance.base("q_malphite",new double[]{70,120,170,220,270});
-            double dmg=base[getLevel()-1]+s.getFinalAP()*0.6;
+            double dmg=base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("q_malphite","ap",0.6);
             TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.MAGICAL);
             // LoL : ralentit la cible ET donne un boost de vitesse à Malphite
             if(tgt instanceof Player __p) __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,60,1,false,true));
@@ -54,7 +54,7 @@ public class Malphite extends BaseChampion {
         }
         @Override public String getDynamicDescription(ChampionStats s){
             return String.format("%.0f dégâts magiques (70+60%%AP+10%%HP). Ralentit 2s.",
-                70+s.getFinalAP()*0.6+s.getFinalMaxHP()*0.1);
+                70+s.getFinalAP()*fr.lolmc.util.Balance.ratio("q_malphite","ap",0.6)+s.getFinalMaxHP()*0.1);
         }
     }
 
@@ -78,7 +78,7 @@ public class Malphite extends BaseChampion {
             new double[]{10,9,8,7,6},5,4,DamageType.MAGICAL);
             resourceCost = 50;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            double dmg=60+s.getFinalAP()*0.3+s.getFinalArmor()*0.2;
+            double dmg=60+s.getFinalAP()*fr.lolmc.util.Balance.ratio("e_malphite","ap",0.3)+s.getFinalArmor()*0.2;
             for(var __t : TargetingUtil.enemiesAround(c, 4.0)){
                 TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);
                 if(__t instanceof Player __p)
@@ -87,7 +87,7 @@ public class Malphite extends BaseChampion {
             c.getWorld().spawnParticle(Particle.BLOCK,c.getLocation(),25,2,0,2,Material.STONE.createBlockData());
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            return String.format("%.0f dégâts magiques AoE (60+30%%AP+20%%Armure).",60+s.getFinalAP()*0.3+s.getFinalArmor()*0.2);
+            return String.format("%.0f dégâts magiques AoE (60+30%%AP+20%%Armure).",60+s.getFinalAP()*fr.lolmc.util.Balance.ratio("e_malphite","ap",0.3)+s.getFinalArmor()*0.2);
         }
     }
 

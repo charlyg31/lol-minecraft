@@ -45,7 +45,7 @@ public class Garen extends BaseChampion {
             org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,2.5); if(tgt==null){c.sendActionBar(Component.text("⚔ Aucune cible à portée",NamedTextColor.GRAY));return;}
             // LoL : 30/55/80/105/130 + 50% AD bonus, silence 1.5s, boost vitesse
             double[] base=fr.lolmc.util.Balance.base("q_garen",new double[]{30,55,80,105,130});
-            double dmg=base[getLevel()-1]+s.getFinalAD()*0.5;
+            double dmg=base[getLevel()-1]+s.getFinalAD()*fr.lolmc.util.Balance.ratio("q_garen","ad",0.5);
             TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.PHYSICAL);
             // Silence 1.5s (approx via lenteur+faiblesse) + boost de vitesse pour Garen
             tgt.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,30,2,false,true));
@@ -56,7 +56,7 @@ public class Garen extends BaseChampion {
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] base=fr.lolmc.util.Balance.base("q_garen",new double[]{30,55,80,105,130});
-            return String.format("%.0f dégâts physiques (+50%%AD). Silence 1.5s + boost vitesse.",base[getLevel()-1]+s.getFinalAD()*0.5);
+            return String.format("%.0f dégâts physiques (+50%%AD). Silence 1.5s + boost vitesse.",base[getLevel()-1]+s.getFinalAD()*fr.lolmc.util.Balance.ratio("q_garen","ad",0.5));
         }
     }
 

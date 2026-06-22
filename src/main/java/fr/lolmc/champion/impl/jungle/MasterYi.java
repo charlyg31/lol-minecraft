@@ -74,7 +74,7 @@ public class MasterYi extends BaseChampion {
             c.sendActionBar(Component.text("⚔ Wuju actif 5s!",NamedTextColor.YELLOW));
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            return String.format("5s: +%.0f dégâts vrais par AA (10+10%%AD).",10+s.getFinalAD()*0.1);
+            return String.format("5s: +%.0f dégâts vrais par AA (10+10%%AD).",10+s.getFinalAD()*fr.lolmc.util.Balance.ratio("e_masteryi","ad",0.1));
         }
     }
 

@@ -135,7 +135,7 @@ public class Darius extends BaseChampion {
             org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,8.0); if(tgt==null){c.sendActionBar(Component.text("☠ Aucune cible visée",NamedTextColor.GRAY));return;}
             double[] base=fr.lolmc.util.Balance.base("r_darius",new double[]{100,200,300});
             int r=Math.min(getLevel()-1,2);
-            double dmg=base[r]+s.getFinalAD()*0.75;
+            double dmg=base[r]+s.getFinalAD()*fr.lolmc.util.Balance.ratio("r_darius","ad",0.75);
             // Bond vers la cible (téléportation proche)
             var dest=tgt.getLocation().clone().subtract(tgt.getLocation().getDirection().multiply(1.5));
             dest.setY(c.getLocation().getY());
@@ -148,7 +148,7 @@ public class Darius extends BaseChampion {
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] base=fr.lolmc.util.Balance.base("r_darius",new double[]{100,200,300});int r=Math.min(getLevel()-1,2);
-            return String.format("%.0f dégâts vrais (+75%%AD). Exécution, reset si kill.",base[r]+s.getFinalAD()*0.75);
+            return String.format("%.0f dégâts vrais (+75%%AD). Exécution, reset si kill.",base[r]+s.getFinalAD()*fr.lolmc.util.Balance.ratio("r_darius","ad",0.75));
         }
     }
 }

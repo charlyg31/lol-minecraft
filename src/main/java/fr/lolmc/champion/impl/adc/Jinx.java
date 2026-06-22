@@ -53,7 +53,7 @@ public class Jinx extends BaseChampion {
             resourceCost = 20;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : skillshot ligne. 10/80/150/220/290 + 160% AD au 1er touché + ralentit 30-60%
-            double[] base=fr.lolmc.util.Balance.base("w_jinx",new double[]{10,80,150,220,290});double dmg=base[getLevel()-1]+s.getFinalAD()*1.6;
+            double[] base=fr.lolmc.util.Balance.base("w_jinx",new double[]{10,80,150,220,290});double dmg=base[getLevel()-1]+s.getFinalAD()*fr.lolmc.util.Balance.ratio("w_jinx","ad",1.6);
             var hits=TargetingUtil.skillshot(c, 14.0, 0.8, false); // s'arrête au 1er
             if(hits.isEmpty()){c.sendActionBar(Component.text("⚡ Zap manqué!",NamedTextColor.GRAY));return;}
             var main=hits.get(0);
@@ -65,7 +65,7 @@ public class Jinx extends BaseChampion {
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] base=fr.lolmc.util.Balance.base("w_jinx",new double[]{10,80,150,220,290});
-            return String.format("Skillshot: %.0f dégâts (+160%%AD) au 1er touché + ralentit.",base[getLevel()-1]+s.getFinalAD()*1.6);
+            return String.format("Skillshot: %.0f dégâts (+160%%AD) au 1er touché + ralentit.",base[getLevel()-1]+s.getFinalAD()*fr.lolmc.util.Balance.ratio("w_jinx","ad",1.6));
         }
     }
 
@@ -76,7 +76,7 @@ public class Jinx extends BaseChampion {
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : lance 3 pièges sur zone visée. Enracinent les ennemis + dégâts magiques 70-270
             Location loc=TargetingUtil.getAimedGroundLocation(c, 9.0);
-            double[] base=fr.lolmc.util.Balance.base("e_jinx",new double[]{70,120,170,220,270});double dmg=base[getLevel()-1]+s.getFinalAP()*1.0;
+            double[] base=fr.lolmc.util.Balance.base("e_jinx",new double[]{70,120,170,220,270});double dmg=base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("e_jinx","ap",1.0);
             for(var __t : TargetingUtil.entitiesInRadius(c, loc, 4.0)){
                 TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);
                 // Root (enracinement) : lenteur extrême brève
@@ -110,7 +110,7 @@ public class Jinx extends BaseChampion {
             double distMult=Math.min(1.0, 0.1+dist*0.06); // monte avec la distance
             double[] baseMax={250,400,550};int rr=Math.min(getLevel()-1,2);
             double[] missPct={0.25,0.30,0.35};
-            double baseDmg=baseMax[rr]*distMult+s.getFinalAD()*1.5*distMult;
+            double baseDmg=baseMax[rr]*distMult+s.getFinalAD()*fr.lolmc.util.Balance.ratio("r_jinx","ad",1.5)*distMult;
             // Explosion en zone : chaque cible prend dégâts + bonus selon SES PV manquants
             for(var __t : TargetingUtil.entitiesInRadius(c, main.getLocation(), 5.0)){
                 double missingHP=__t.getMaxHealth()-__t.getHealth();
@@ -124,7 +124,7 @@ public class Jinx extends BaseChampion {
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] base=fr.lolmc.util.Balance.base("r_jinx",new double[]{250,400,550});int r=Math.min(getLevel()-1,2);
-            return String.format("Roquette globale: jusqu'à %.0f dégâts (+150%%AD) selon distance + %% PV manquants. Explose en zone.",base[r]+s.getFinalAD()*1.5);
+            return String.format("Roquette globale: jusqu'à %.0f dégâts (+150%%AD) selon distance + %% PV manquants. Explose en zone.",base[r]+s.getFinalAD()*fr.lolmc.util.Balance.ratio("r_jinx","ad",1.5));
         }
     }
 }
