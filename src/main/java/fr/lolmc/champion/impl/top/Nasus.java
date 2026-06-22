@@ -2,6 +2,7 @@ package fr.lolmc.champion.impl.top;
 
 import fr.lolmc.LolPlugin;
 import fr.lolmc.ability.base.BaseAbility;
+import fr.lolmc.ability.base.BasicAttackAbility;
 import fr.lolmc.stats.ResourceSystem;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.stats.ChampionStats;
@@ -34,17 +35,8 @@ public class Nasus extends BaseChampion {
     // Stacks Q globaux par UUID
     public static final Map<UUID,Integer> qStacks=new HashMap<>();
 
-    static class AA extends BaseAbility {
-        AA(){super("aa_nasus","Attaque de base",Material.BONE,AbilitySlot.AA,
-            new double[]{0.5},5,0,DamageType.PHYSICAL);
-            resourceCost = 0;}
-        @Override public void cast(Player c,ChampionStats s,Player t){
-            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,2.5); if(tgt==null)return;
-            TargetingUtil.dealDamage(c, tgt, s.getFinalAD(), TargetingUtil.DmgType.PHYSICAL);
-        }
-        @Override public String getDynamicDescription(ChampionStats s){
-            return String.format("Inflige %.0f dégâts.", s.getFinalAD());
-        }
+    static class AA extends BasicAttackAbility {
+        AA(){super("nasus",Material.BONE,2.5f,DamageType.PHYSICAL);}
     }
 
     static class Q extends BaseAbility {

@@ -2,6 +2,7 @@ package fr.lolmc.champion.impl.mid;
 
 import fr.lolmc.LolPlugin;
 import fr.lolmc.ability.base.BaseAbility;
+import fr.lolmc.ability.base.BasicAttackAbility;
 import fr.lolmc.stats.ResourceSystem;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.stats.ChampionStats;
@@ -34,23 +35,15 @@ public class Zed extends BaseChampion {
     // Ombre active par joueur
     private static final Map<UUID,Location> shadows=new HashMap<>();
 
-    static class AA extends BaseAbility {
-        AA(){super("aa_zed","Attaque de base",Material.IRON_SWORD,AbilitySlot.AA,
-            new double[]{0.5},5,0,DamageType.PHYSICAL);
-            resourceCost = 0;}
-        @Override public void cast(Player c,ChampionStats s,Player t){
-            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,2.5); if(tgt==null)return;
-            double dmg=s.getFinalAD();
-            TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.PHYSICAL);
+    static class AA extends BasicAttackAbility {
+        AA(){super("zed",Material.IRON_SWORD,2.5f,DamageType.PHYSICAL);}
+        @Override protected void onHit(Player c, ChampionStats s, org.bukkit.entity.LivingEntity tgt, double dmg){
             // Passif Mépris des Faibles : cible sous 50% PV = dégâts magiques bonus (8% PV max)
             if(tgt.getHealth() < tgt.getMaxHealth()*0.5){
                 double bonus=tgt.getMaxHealth()*0.08;
                 TargetingUtil.dealDamage(c, tgt, bonus, TargetingUtil.DmgType.MAGICAL);
                 tgt.getWorld().spawnParticle(Particle.SMOKE,tgt.getLocation().add(0,1,0),8,0.3,0.5,0.3);
             }
-        }
-        @Override public String getDynamicDescription(ChampionStats s){
-            return String.format("Inflige %.0f dégâts.", s.getFinalAD());
         }
     }
 
