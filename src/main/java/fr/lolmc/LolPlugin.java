@@ -108,6 +108,13 @@ public class LolPlugin extends JavaPlugin {
         fr.lolmc.util.Balance.load();
         fr.lolmc.util.DebugLogger.init();
 
+        initManagersAndListeners();
+        registerCommands();
+        getLogger().info("LoL MC activé — 20 champions + boutique chargés.");
+    }
+
+    /** Cree tous les managers (ordre de dependance preserve) et enregistre les ecouteurs lies. */
+    private void initManagersAndListeners() {
         championManager = new ChampionManager();
         flashManager = new FlashManager();
         hotbarManager = new HotbarManager();
@@ -168,6 +175,10 @@ public class LolPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(shopListener, this);
         getServer().getPluginManager().registerEvents(guiListener, this);
 
+    }
+
+    /** Branche les commandes (/champion, /shop, /lol, ...) et les derniers ecouteurs. */
+    private void registerCommands() {
         var cmd = getCommand("champion");
         if (cmd != null) {
             var champCmd = new ChampionCommand(championManager, championGUI);
@@ -212,7 +223,6 @@ public class LolPlugin extends JavaPlugin {
             new fr.lolmc.listener.StructureDamageListener(mapManager, championManager, teamManager), this);
         getServer().getPluginManager().registerEvents(
             new EntityDeathListener(championManager, rewardManager), this);
-        getLogger().info("LoL MC activé — 20 champions + boutique chargés.");
     }
 
     @Override
