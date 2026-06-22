@@ -75,6 +75,11 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
             case "team" -> handleTeamCmd(player, args);
             case "testgame" -> handleTestGame(player);
             case "debug" -> handleDebug(player, args);
+            case "reload" -> {
+                LolPlugin.getInstance().reloadConfig();
+                fr.lolmc.util.Balance.load();
+                player.sendMessage(Component.text("✔ Config et équilibrage (champions.yml) rechargés.", NamedTextColor.GREEN));
+            }
             case "select" -> {
                 // Lance une sélection avec tous les joueurs en ligne (test/manuel)
                 var ids = new java.util.ArrayList<java.util.UUID>();

@@ -87,7 +87,10 @@ public abstract class BaseAbility {
     public double getCurrentCooldown(ChampionStats stats) {
         // Si override dynamique (ex: AA dont le CD dépend de l'AS en jeu)
         if (dynamicCooldownOverride > 0) return dynamicCooldownOverride;
-        double base = baseCooldown[Math.min(level - 1, baseCooldown.length - 1)];
+        // Cooldown depuis champions.yml si défini, sinon valeur du code
+        double[] cdArr = fr.lolmc.util.Balance.cd(id);
+        if (cdArr == null) cdArr = baseCooldown;
+        double base = cdArr[Math.min(level - 1, cdArr.length - 1)];
         if (stats == null) return base;
         return base * stats.getCooldownMultiplier();
     }
@@ -210,7 +213,7 @@ public abstract class BaseAbility {
     }
 
     // ─── Ressource ───────────────────────────────────────────────
-    public double getResourceCost() { return resourceCost; }
+    public double getResourceCost() { return fr.lolmc.util.Balance.cost(id, resourceCost); }
     public void setResourceCost(double cost) { this.resourceCost = cost; }
 
     // ─── Getters ─────────────────────────────────────────────────

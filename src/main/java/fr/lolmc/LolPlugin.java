@@ -104,6 +104,8 @@ public class LolPlugin extends JavaPlugin {
     public void onEnable() {
         instance = this;
         saveDefaultConfig();
+        saveResource("champions.yml", false); // valeurs d'equilibrage (ne pas ecraser si deja present)
+        fr.lolmc.util.Balance.load();
         fr.lolmc.util.DebugLogger.init();
 
         championManager = new ChampionManager();
