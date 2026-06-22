@@ -42,7 +42,7 @@ public class Darius extends BaseChampion {
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : bord 14/24.5/35/45.5/56 + 35-49% AD (plein), centre (manche) = 35% des dégâts
-            double[] base={56,98,140,182,224}; // valeur au bord (x4 du tick pour gameplay MC)
+            double[] base=fr.lolmc.util.Balance.base("q_darius",new double[]{56,98,140,182,224}); // valeur au bord (x4 du tick pour gameplay MC)
             double[] adR={0.35,0.385,0.42,0.455,0.49};
             int rank=getLevel()-1;
             double edgeDmg=base[rank]+s.getFinalAD()*adR[rank];
@@ -70,7 +70,7 @@ public class Darius extends BaseChampion {
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 0.7f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            double[] base={56,98,140,182,224};double[] adR={0.35,0.385,0.42,0.455,0.49};int r=getLevel()-1;
+            double[] base=fr.lolmc.util.Balance.base("q_darius",new double[]{56,98,140,182,224});double[] adR={0.35,0.385,0.42,0.455,0.49};int r=getLevel()-1;
             return String.format("Bord: %.0f dégâts. Centre: 35%%. Soigne 15%%/champion touché.",base[r]+s.getFinalAD()*adR[r]);
         }
     }
@@ -133,7 +133,7 @@ public class Darius extends BaseChampion {
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : exécution, bond sur la cible, dégâts vrais 100/200/300 + 75% AD bonus
             org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,8.0); if(tgt==null){c.sendActionBar(Component.text("☠ Aucune cible visée",NamedTextColor.GRAY));return;}
-            double[] base={100,200,300};
+            double[] base=fr.lolmc.util.Balance.base("r_darius",new double[]{100,200,300});
             int r=Math.min(getLevel()-1,2);
             double dmg=base[r]+s.getFinalAD()*0.75;
             // Bond vers la cible (téléportation proche)
@@ -147,7 +147,7 @@ public class Darius extends BaseChampion {
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_PLAYER_ATTACK_CRIT, 1.5f, 0.5f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            double[] base={100,200,300};int r=Math.min(getLevel()-1,2);
+            double[] base=fr.lolmc.util.Balance.base("r_darius",new double[]{100,200,300});int r=Math.min(getLevel()-1,2);
             return String.format("%.0f dégâts vrais (+75%%AD). Exécution, reset si kill.",base[r]+s.getFinalAD()*0.75);
         }
     }

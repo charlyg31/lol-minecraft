@@ -45,7 +45,7 @@ public class Blitzcrank extends BaseChampion {
             var hits=TargetingUtil.skillshot(c, 12.0, 1.0, false);
             if(hits.isEmpty()){c.sendActionBar(Component.text("🪝 Grappin manqué!",NamedTextColor.GRAY));return;}
             var tgt=hits.get(0);
-            double[] base={110,160,210,260,310};double dmg=base[getLevel()-1]+s.getFinalAP()*1.2;
+            double[] base=fr.lolmc.util.Balance.base("q_blitzcrank",new double[]{110,160,210,260,310});double dmg=base[getLevel()-1]+s.getFinalAP()*1.2;
             TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.MAGICAL);
             // Tire la cible vers Blitzcrank
             Vector pull=c.getLocation().toVector().subtract(tgt.getLocation().toVector()).normalize().multiply(2.0);
@@ -58,7 +58,7 @@ public class Blitzcrank extends BaseChampion {
             c.getWorld().playSound(c.getLocation(), Sound.BLOCK_PISTON_EXTEND, 1f, 0.8f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            double[] base={110,160,210,260,310};
+            double[] base=fr.lolmc.util.Balance.base("q_blitzcrank",new double[]{110,160,210,260,310});
             return String.format("Skillshot: %.0f dégâts (+120%%AP), attrape et tire la cible vers toi + stun.",base[getLevel()-1]+s.getFinalAP()*1.2);
         }
     }
@@ -102,7 +102,7 @@ public class Blitzcrank extends BaseChampion {
             resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : 275/400/525 + 100% AP, silence 0.5s + détruit les boucliers, autour
-            double[] base={275,400,525};int r=Math.min(getLevel()-1,2);double dmg=base[r]+s.getFinalAP()*1.0;
+            double[] base=fr.lolmc.util.Balance.base("r_blitzcrank",new double[]{275,400,525});int r=Math.min(getLevel()-1,2);double dmg=base[r]+s.getFinalAP()*1.0;
             for(var __t : TargetingUtil.enemiesAround(c, 4.5)){
                 TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);
                 if(__t instanceof Player __p){
@@ -115,7 +115,7 @@ public class Blitzcrank extends BaseChampion {
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_LIGHTNING_BOLT_THUNDER, 1f, 1.2f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            double[] base={275,400,525};int r=Math.min(getLevel()-1,2);
+            double[] base=fr.lolmc.util.Balance.base("r_blitzcrank",new double[]{275,400,525});int r=Math.min(getLevel()-1,2);
             return String.format("%.0f dégâts foudre autour (+100%%AP) + silence 0.5s + détruit boucliers.",base[r]+s.getFinalAP()*1.0);
         }
     }

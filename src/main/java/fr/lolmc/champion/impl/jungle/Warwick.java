@@ -119,7 +119,7 @@ public class Warwick extends BaseChampion {
             var dest=tgt.getLocation().clone().subtract(tgt.getLocation().getDirection().multiply(0.5));
             dest.setY(c.getLocation().getY());
             c.teleport(dest);
-            double[] base={175,300,425};int r=Math.min(getLevel()-1,2);
+            double[] base=fr.lolmc.util.Balance.base("r_warwick",new double[]{175,300,425});int r=Math.min(getLevel()-1,2);
             double dmg=base[r]+s.getFinalAD()*1.675;
             TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.MAGICAL);
             // Soin 100% des dégâts
@@ -135,7 +135,7 @@ public class Warwick extends BaseChampion {
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_WOLF_GROWL, 1.5f, 0.5f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            double[] base={175,300,425};int r=Math.min(getLevel()-1,2);
+            double[] base=fr.lolmc.util.Balance.base("r_warwick",new double[]{175,300,425});int r=Math.min(getLevel()-1,2);
             return String.format("Bond: supprime la cible 1.5s, %.0f dégâts (+167%%AD), soigne 100%%.",base[r]+s.getFinalAD()*1.675);
         }
     }

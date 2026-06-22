@@ -44,7 +44,7 @@ public class Garen extends BaseChampion {
         @Override public void cast(Player c,ChampionStats s,Player t){
             org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,2.5); if(tgt==null){c.sendActionBar(Component.text("⚔ Aucune cible à portée",NamedTextColor.GRAY));return;}
             // LoL : 30/55/80/105/130 + 50% AD bonus, silence 1.5s, boost vitesse
-            double[] base={30,55,80,105,130};
+            double[] base=fr.lolmc.util.Balance.base("q_garen",new double[]{30,55,80,105,130});
             double dmg=base[getLevel()-1]+s.getFinalAD()*0.5;
             TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.PHYSICAL);
             // Silence 1.5s (approx via lenteur+faiblesse) + boost de vitesse pour Garen
@@ -55,7 +55,7 @@ public class Garen extends BaseChampion {
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_PLAYER_ATTACK_CRIT, 1f, 1f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            double[] base={30,55,80,105,130};
+            double[] base=fr.lolmc.util.Balance.base("q_garen",new double[]{30,55,80,105,130});
             return String.format("%.0f dégâts physiques (+50%%AD). Silence 1.5s + boost vitesse.",base[getLevel()-1]+s.getFinalAD()*0.5);
         }
     }
@@ -126,7 +126,7 @@ public class Garen extends BaseChampion {
         @Override public void cast(Player c,ChampionStats s,Player t){
             // Justice Démacienne : porté plus loin (sort à distance moyenne), cible visée
             org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,8.0); if(tgt==null){c.sendActionBar(Component.text("☠ Aucune cible visée",NamedTextColor.GRAY));return;}
-            double[] base={150,300,450};
+            double[] base=fr.lolmc.util.Balance.base("r_garen",new double[]{150,300,450});
             int r=Math.min(getLevel()-1,2);
             // Dégâts vrais : base + 25% PV manquants de la cible (formule LoL)
             var cm=LolPlugin.getInstance().getChampionManager();
@@ -139,7 +139,7 @@ public class Garen extends BaseChampion {
             if(tgt instanceof Player _tp)_tp.sendMessage(Component.text("☠ DEMACIA! Exécution de Garen!",NamedTextColor.DARK_RED));
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            double[] base={150,300,450};int r=Math.min(getLevel()-1,2);return String.format("%.0f dégâts vrais + 25%% PV manquants.",base[r]);
+            double[] base=fr.lolmc.util.Balance.base("r_garen",new double[]{150,300,450});int r=Math.min(getLevel()-1,2);return String.format("%.0f dégâts vrais + 25%% PV manquants.",base[r]);
         }
     }
 }

@@ -48,7 +48,7 @@ public class Veigar extends BaseChampion {
             resourceCost = 40;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : skillshot qui touche les 2 premiers ennemis. 80-240 + 65% AP. Kill = stacks AP permanents
-            double[] base={80,120,160,200,240};double dmg=base[getLevel()-1]+s.getFinalAP()*0.65;
+            double[] base=fr.lolmc.util.Balance.base("q_veigar",new double[]{80,120,160,200,240});double dmg=base[getLevel()-1]+s.getFinalAP()*0.65;
             var hits=TargetingUtil.skillshot(c, 9.0, 0.8, true);
             int touched=0;
             for(var __t : hits){
@@ -68,7 +68,7 @@ public class Veigar extends BaseChampion {
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_EVOKER_CAST_SPELL, 1f, 1.3f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            double[] base={80,120,160,200,240};
+            double[] base=fr.lolmc.util.Balance.base("q_veigar",new double[]{80,120,160,200,240});
             return String.format("Skillshot (2 cibles): %.0f dégâts (+65%%AP). Kill = AP permanent.",base[getLevel()-1]+s.getFinalAP()*0.65);
         }
     }
@@ -84,7 +84,7 @@ public class Veigar extends BaseChampion {
             loc.getWorld().playSound(loc, Sound.ENTITY_ENDER_DRAGON_GROWL, 0.6f, 1.5f);
             new BukkitRunnable(){
                 @Override public void run(){
-                    double[] base={80,130,180,230,280};double dmg=base[getLevel()-1]+s.getFinalAP()*1.0;
+                    double[] base=fr.lolmc.util.Balance.base("w_veigar",new double[]{80,130,180,230,280});double dmg=base[getLevel()-1]+s.getFinalAP()*1.0;
                     TargetingUtil.dealDamageAll(c,
                         TargetingUtil.entitiesInRadius(c, loc, 3.0), dmg, TargetingUtil.DmgType.MAGICAL);
                     loc.getWorld().spawnParticle(Particle.EXPLOSION,loc,8,1.5,0,1.5);
@@ -93,7 +93,7 @@ public class Veigar extends BaseChampion {
             }.runTaskLater(LolPlugin.getInstance(),24L);
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            double[] base={80,130,180,230,280};
+            double[] base=fr.lolmc.util.Balance.base("w_veigar",new double[]{80,130,180,230,280});
             return String.format("%.0f dégâts (+100%%AP) après 1.2s sur zone visée.",base[getLevel()-1]+s.getFinalAP());
         }
     }
@@ -126,7 +126,7 @@ public class Veigar extends BaseChampion {
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : ciblé. 200/350/500 + 80% AP, augmenté de 0-100% selon PV manquants
             org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,8.0); if(tgt==null){c.sendActionBar(Component.text("☠ Aucune cible visée",NamedTextColor.GRAY));return;}
-            double[] base={200,350,500};int rr=Math.min(getLevel()-1,2);
+            double[] base=fr.lolmc.util.Balance.base("r_veigar",new double[]{200,350,500});int rr=Math.min(getLevel()-1,2);
             double baseDmg=base[rr]+s.getFinalAP()*0.8;
             // Augmenté jusqu'à +100% selon PV manquants de la cible
             double missingPct=1.0-(tgt.getHealth()/tgt.getMaxHealth());
@@ -138,7 +138,7 @@ public class Veigar extends BaseChampion {
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_WITHER_SHOOT, 1.5f, 0.6f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            double[] base={200,350,500};int r=Math.min(getLevel()-1,2);
+            double[] base=fr.lolmc.util.Balance.base("r_veigar",new double[]{200,350,500});int r=Math.min(getLevel()-1,2);
             return String.format("%.0f dégâts (+80%%AP), jusqu'à ×2 selon PV manquants.",base[r]+s.getFinalAP()*0.8);
         }
     }
