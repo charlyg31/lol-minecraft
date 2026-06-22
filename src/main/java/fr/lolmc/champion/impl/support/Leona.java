@@ -36,9 +36,8 @@ public class Leona extends BaseChampion {
             new double[]{0.5},5,0,DamageType.PHYSICAL);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
-            double dmg=s.calcAutoAttackDamage(null);
-            DamageUtil.damage(c, t, dmg, false, DamageUtil.Type.MAGICAL);
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,2.0); if(tgt==null)return;
+            TargetingUtil.dealDamage(c, tgt, s.getFinalAD(), TargetingUtil.DmgType.PHYSICAL);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             return String.format("Inflige %.0f dégâts.", s.getFinalAD());
@@ -46,69 +45,123 @@ public class Leona extends BaseChampion {
     }
 
     static class Q extends BaseAbility {
-        Q(){super("q_leona","Lumière du Zénith",Material.GOLD_INGOT,AbilitySlot.Q,
-            new double[]{11,10,9,8,7},5,0,DamageType.MAGICAL);
+        Q(){super("q_leona","Bouclier de l'Aube",Material.GOLD_INGOT,AbilitySlot.Q,
+            new double[]{6,6,6,6,6},5,0,DamageType.MAGICAL);
             resourceCost = 45;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
-            double[] base={10,35,60,85,110};double dmg=base[getLevel()-1]+s.getFinalAP()*0.3;
-            DamageUtil.abilityDamageMagicEntity(c, tgt, dmg);
-            tgt.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,25,10,false,true));
-            if(tgt instanceof Player _tp)_tp.sendActionBar(Component.text("☀ Stun 1.25s — Leona Q!",NamedTextColor.YELLOW));
-            c.getWorld().spawnParticle(Particle.END_ROD,tgt.getLocation(),8,0.3,0.3,0.3);
+            // LoL : prochaine attaque renforcée = stun 1s + dégâts magiques 20/45/70/95/120 + 30% AP
+            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,2.5); if(tgt==null){c.sendActionBar(Component.text("☀ Bouclier de l'Aube prêt (frappe un ennemi)",NamedTextColor.YELLOW));return;}
+            double[] base={20,45,70,95,120};double dmg=base[getLevel()-1]+s.getFinalAP()*0.3;
+            TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.MAGICAL);
+            if(tgt instanceof Player __p){
+                __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,20,10,false,true)); // stun 1s
+                __p.sendActionBar(Component.text("☀ STUN 1s — Bouclier de l'Aube!",NamedTextColor.YELLOW));
+            }
+            c.getWorld().spawnParticle(Particle.END_ROD,tgt.getLocation().add(0,1,0),8,0.3,0.3,0.3);
+            c.getWorld().playSound(c.getLocation(), Sound.ITEM_SHIELD_BLOCK, 1f, 0.8f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            return String.format("%.0f dégâts + stun 1.25s.",40+s.getFinalAP()*0.4);
+            double[] base={20,45,70,95,120};
+            return String.format("Prochaine attaque: %.0f dégâts (+30%%AP) + stun 1s.",base[getLevel()-1]+s.getFinalAP()*0.3);
         }
     }
 
     static class W extends BaseAbility {
-        W(){super("w_leona","Éclat Solaire",Material.GOLDEN_CHESTPLATE,AbilitySlot.W,
-            new double[]{14,13,12,11,10},0,0,DamageType.TRUE);
-            resourceCost = 45;}
+        W(){super("w_leona","Éclipse",Material.GOLDEN_CHESTPLATE,AbilitySlot.W,
+            new double[]{14,13.5,13,12.5,12},0,3,DamageType.MAGICAL);
+            resourceCost = 60;}
         @Override public void cast(Player c,ChampionStats s,Player t){
+            // LoL : réduction de dégâts + armure/RM 3s, puis explosion de zone 80-240 + 40% AP
             c.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE,60,2,false,true));
-            c.sendActionBar(Component.text("🛡 Éclat Solaire 3s!",NamedTextColor.GOLD));
+            c.addPotionEffect(new PotionEffect(PotionEffectType.ABSORPTION,60,0,false,true));
+            c.sendActionBar(Component.text("🛡 Éclipse! Défenses + explosion dans 3s",NamedTextColor.GOLD));
+            c.getWorld().playSound(c.getLocation(), Sound.BLOCK_BEACON_ACTIVATE, 0.8f, 0.8f);
+            double[] base={80,120,160,200,240};double dmg=base[getLevel()-1]+s.getFinalAP()*0.4;
+            new BukkitRunnable(){
+                @Override public void run(){
+                    boolean hit=false;
+                    for(var __t : TargetingUtil.enemiesAround(c, 3.5)){
+                        TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);
+                        hit=true;
+                    }
+                    c.getWorld().spawnParticle(Particle.FLASH,c.getLocation().add(0,1,0),2);
+                    c.getWorld().spawnParticle(Particle.END_ROD,c.getLocation().add(0,1,0),25,2.5,1,2.5);
+                    // Si touché un ennemi, garde les bonus 3s de plus
+                    if(hit){
+                        c.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE,60,2,false,true));
+                        c.addPotionEffect(new PotionEffect(PotionEffectType.ABSORPTION,60,0,false,true));
+                    }
+                    c.getWorld().playSound(c.getLocation(), Sound.ENTITY_GENERIC_EXPLODE, 1f, 1.2f);
+                }
+            }.runTaskLater(LolPlugin.getInstance(),60L); // explosion après 3s
         }
-        @Override public String getDynamicDescription(ChampionStats s){return "+30 armure et MR pendant 3s. Bonus dégâts AA.";}
+        @Override public String getDynamicDescription(ChampionStats s){
+            double[] base={80,120,160,200,240};
+            return String.format("Armure/RM + réduction de dégâts 3s, puis explosion %.0f dégâts (+40%%AP).",base[getLevel()-1]+s.getFinalAP()*0.4);
+        }
     }
 
     static class E extends BaseAbility {
-        E(){super("e_leona","Zenith Blade",Material.BLAZE_ROD,AbilitySlot.E,
-            new double[]{13,12,11,10,9},20,0,DamageType.MAGICAL);
+        E(){super("e_leona","Lame du Zénith",Material.BLAZE_ROD,AbilitySlot.E,
+            new double[]{12,10.5,9,7.5,6},20,0,DamageType.MAGICAL);
             resourceCost = 55;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
-            Location dest=safeTeleport(c.getLocation(),tgt.getLocation());
+            // LoL : skillshot ligne 60-200 + 40% AP, dash sur le DERNIER ennemi touché + root 0.5s
+            double[] base={60,95,130,165,200};double dmg=base[getLevel()-1]+s.getFinalAP()*0.4;
+            var hits=TargetingUtil.skillshot(c, 9.0, 1.0, true); // traverse, touche tous
+            if(hits.isEmpty()){c.sendActionBar(Component.text("⚔ Lame manquée!",NamedTextColor.GRAY));return;}
+            for(var __t : hits) TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);
+            // Dash sur le dernier ennemi touché + root
+            var last=hits.get(hits.size()-1);
+            var dest=last.getLocation().clone().subtract(last.getLocation().getDirection().multiply(1.0));
+            dest.setY(c.getLocation().getY());
             c.teleport(dest);
-            double dmg=60+s.getFinalAP()*0.4;
-            DamageUtil.abilityDamageMagicEntity(c, tgt, dmg);
-            tgt.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,15,10,false,true));
-            c.getWorld().spawnParticle(Particle.END_ROD,dest,5,1,0,1);
+            if(last instanceof Player __p){
+                __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,10,10,false,true)); // root 0.5s
+                __p.sendActionBar(Component.text("⚔ Enraciné — Lame du Zénith!",NamedTextColor.YELLOW));
+            }
+            c.getWorld().spawnParticle(Particle.END_ROD,dest.add(0,1,0),5,1,0,1);
+            c.getWorld().playSound(c.getLocation(), Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 0.8f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            return String.format("Dash sur cible: %.0f dégâts + stun.",60+s.getFinalAP()*0.4);
+            double[] base={60,95,130,165,200};
+            return String.format("Skillshot: %.0f dégâts (+40%%AP), dash sur le dernier ennemi touché + root.",base[getLevel()-1]+s.getFinalAP()*0.4);
         }
     }
 
     static class R extends BaseAbility {
-        R(){super("r_leona","Éclipse Solaire",Material.SUNFLOWER,AbilitySlot.R,
-            new double[]{130,105,80},25,4,DamageType.MAGICAL);
+        R(){super("r_leona","Éruption Solaire",Material.SUNFLOWER,AbilitySlot.R,
+            new double[]{90,75,60},25,4,DamageType.MAGICAL);
             resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
-            double dmg=100+s.getFinalAP()*0.7;
-            for(var __t : TargetingUtil.entitiesInRadius(c, tgt.getLocation(), 4.0)){
-                TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);
-                if(__t instanceof Player __p){
-                    __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,30,10,false,true));
-                    __p.sendActionBar(Component.text("☀ ECLIPSE!",NamedTextColor.YELLOW));
+            // LoL : zone au sol visée, 150/250/350 + 100% AP. Centre = STUN, extérieur = ralentit 80%
+            Location loc=TargetingUtil.getAimedGroundLocation(c, 10.0);
+            double[] base={150,250,350};int r=Math.min(getLevel()-1,2);double dmg=base[r]+s.getFinalAP()*1.0;
+            loc.getWorld().spawnParticle(Particle.END_ROD,loc,15,2,0.2,2);
+            new BukkitRunnable(){
+                @Override public void run(){
+                    for(var __t : TargetingUtil.entitiesInRadius(c, loc, 4.0)){
+                        TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);
+                        double distCenter=__t.getLocation().distance(loc);
+                        if(__t instanceof Player __p){
+                            if(distCenter<=1.5){ // centre = stun
+                                __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,35,10,false,true));
+                                __p.sendActionBar(Component.text("☀ ÉRUPTION SOLAIRE! STUN",NamedTextColor.GOLD));
+                            } else { // extérieur = ralentit 80%
+                                __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,35,4,false,true));
+                                __p.sendActionBar(Component.text("☀ Éruption Solaire! Ralenti",NamedTextColor.GOLD));
+                            }
+                        }
+                    }
+                    loc.getWorld().spawnParticle(Particle.FLASH,loc,3);
+                    loc.getWorld().spawnParticle(Particle.END_ROD,loc,40,3,1,3);
+                    loc.getWorld().playSound(loc, Sound.ENTITY_GENERIC_EXPLODE, 1.5f, 1f);
                 }
-            }
-            tgt.getWorld().spawnParticle(Particle.END_ROD,tgt.getLocation(),30,2,1,2);
+            }.runTaskLater(LolPlugin.getInstance(),13L); // délai 0.625s
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            return String.format("%.0f dégâts AoE + stun 1.5s au centre.",100+s.getFinalAP()*0.7);
+            double[] base={150,250,350};int r=Math.min(getLevel()-1,2);
+            return String.format("Zone visée: %.0f dégâts (+100%%AP). Centre = stun, extérieur = ralentit 80%%.",base[r]+s.getFinalAP()*1.0);
         }
     }
 }
