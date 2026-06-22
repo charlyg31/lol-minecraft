@@ -1,6 +1,7 @@
 package fr.lolmc.game;
 import fr.lolmc.util.Compat;
 import fr.lolmc.util.MobAppearance;
+import fr.lolmc.util.MobModel;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 
@@ -45,8 +46,8 @@ public class JungleManager {
     private final Map<String, CampSpawn> camps = new HashMap<>();
     // Monstres vivants : entityUUID → MonsterType
     private final Map<UUID, MonsterType> liveMonsters = new HashMap<>();
-    // Décorations : monstreUUID → décoUUID (pour nettoyage à la mort/reset)
-    private final Map<UUID, UUID> monsterDeco = new HashMap<>();
+    // Décorations : monstreUUID → liste des UUID des parties du modèle (nettoyage)
+    private final Map<UUID, List<UUID>> monsterDeco = new HashMap<>();
     private boolean active = false;
 
     // ══════════════════════════════════════════════════════════════
@@ -232,15 +233,14 @@ public class JungleManager {
             // Stocker l'or individuel du mob
             mob.getPersistentDataContainer().set(KEY_GOLD, PersistentDataType.INTEGER, gold);
 
-            // ── APPARENCE CUSTOM : bloc thématique flottant + lueur sur les épiques ──
-            Material deco = decoFor(type);
-            if (deco != null) {
-                float yOff = isLarge ? 1.1f : 0.7f;
-                float scale = isLarge ? 0.6f : 0.4f;
-                var d = MobAppearance.addFloatingBlock(mob, deco, yOff, scale);
-                if (d != null) monsterDeco.put(mob.getUniqueId(), d.getUniqueId());
+            // ── APPARENCE CUSTOM : modèle composite + mob de base invisible ──
+            // Le mob vanilla devient invisible : on ne voit que le modèle (technique datapack).
+            MobAppearance.makeInvisible(mob);
+            MobAppearance.setSilent(mob, true);
+            MobModel model = modelFor(type, isLarge);
+            if (model != null) {
+                monsterDeco.put(mob.getUniqueId(), model.spawnOn(mob));
             }
-            if (type.isEpic()) mob.setGlowing(true);
 
             camp.liveEntities.add(mob.getUniqueId());
             liveMonsters.put(mob.getUniqueId(), type);
@@ -252,11 +252,13 @@ public class JungleManager {
         MonsterType type = liveMonsters.remove(entityId);
         if (type == null) return;
 
-        // Retirer la décoration flottante de ce monstre
-        UUID decoId = monsterDeco.remove(entityId);
-        if (decoId != null) {
-            Entity d = Bukkit.getEntity(decoId);
-            if (d != null) d.remove();
+        // Retirer toutes les parties du modèle custom de ce monstre
+        List<UUID> partIds = monsterDeco.remove(entityId);
+        if (partIds != null) {
+            for (UUID pid : partIds) {
+                Entity d = Bukkit.getEntity(pid);
+                if (d != null) d.remove();
+            }
         }
 
         // Retirer ce mob du camp ; respawn seulement quand TOUT le groupe est mort
@@ -411,27 +413,116 @@ public class JungleManager {
     }
 
     /**
-     * Bloc thématique flottant pour chaque monstre, inspiré des vrais camps LoL.
-     * Retourne null pour ne pas mettre de décoration.
+     * Construit le modèle composite (silhouette en blocs) de chaque monstre,
+     * inspiré des vrais monstres LoL. Repère : X gauche/droite, Y haut, Z avant.
+     * Dimensions à ajuster visuellement en jeu si besoin.
      */
-    private Material decoFor(MonsterType type) {
-        return switch (type) {
-            case GROMP        -> Material.SLIME_BLOCK;       // grenouille verte
-            case MURKWOLF     -> Material.BONE_BLOCK;         // loups
-            case RAPTOR       -> Material.HAY_BLOCK;          // oiseaux (nid)
-            case KRUG         -> Material.STONE;              // golems de pierre
-            case RED_BUFF     -> Material.MAGMA_BLOCK;        // Sanglepince (rouge/feu)
-            case BLUE_BUFF    -> Material.SEA_LANTERN;        // Sentinelle bleue (lumière bleue)
-            case SCUTTLE_CRAB -> Material.PRISMARINE;         // crabe aquatique
-            case DRAGON_INFERNAL -> Material.FIRE_CORAL_BLOCK;
-            case DRAGON_OCEAN    -> Material.TUBE_CORAL_BLOCK;
-            case DRAGON_MOUNTAIN -> Material.DEEPSLATE;
-            case DRAGON_CLOUD    -> Material.WHITE_WOOL;
-            case DRAGON_CHEMTECH -> Material.SLIME_BLOCK;
-            case DRAGON_ELDER    -> Material.AMETHYST_BLOCK;
-            case HERALD       -> Material.SCULK_CATALYST;     // Héraut
-            case BARON        -> Material.SCULK;              // Baron Nashor
+    private MobModel modelFor(MonsterType type, boolean large) {
+        MobModel m = switch (type) {
+
+            // 🐸 Gromp : gros crapaud vert à grosse bouche
+            case GROMP -> new MobModel()
+                    .box(Material.GREEN_CONCRETE,  0f, 0.0f,  0.0f, 1.3f, 0.9f, 1.2f)   // corps trapu
+                    .box(Material.LIME_CONCRETE,   0f, 0.85f, 0.1f, 1.0f, 0.5f, 0.9f)   // haut/tête
+                    .box(Material.BLACK_CONCRETE,  0f, 0.5f,  0.62f, 0.85f, 0.14f, 0.1f) // bouche
+                    .cube(Material.WHITE_CONCRETE, -0.35f, 1.05f, 0.55f, 0.28f)         // œil G
+                    .cube(Material.WHITE_CONCRETE,  0.35f, 1.05f, 0.55f, 0.28f)         // œil D
+                    .cube(Material.BLACK_CONCRETE, -0.35f, 1.10f, 0.66f, 0.14f)         // pupille G
+                    .cube(Material.BLACK_CONCRETE,  0.35f, 1.10f, 0.66f, 0.14f);        // pupille D
+
+            // 🐺 Loups : corps gris, yeux rouges
+            case MURKWOLF -> new MobModel()
+                    .box(Material.GRAY_CONCRETE,  0f, 0.2f,  0.0f, 0.5f, 0.5f, 1.0f)    // corps
+                    .box(Material.GRAY_CONCRETE,  0f, 0.5f,  0.45f, 0.4f, 0.4f, 0.4f)   // tête
+                    .box(Material.BLACK_CONCRETE, 0f, 0.45f, -0.5f, 0.15f, 0.3f, 0.4f)  // queue
+                    .cube(Material.RED_CONCRETE,  -0.12f, 0.6f, 0.62f, 0.1f)            // œil G
+                    .cube(Material.RED_CONCRETE,   0.12f, 0.6f, 0.62f, 0.1f);           // œil D
+
+            // 🦅 Raptors : petits oiseaux bruns avec bec
+            case RAPTOR -> new MobModel()
+                    .box(Material.BROWN_CONCRETE,    0f, 0.1f,  0.0f, 0.5f, 0.5f, 0.9f) // corps
+                    .box(Material.BROWN_TERRACOTTA,  0f, 0.45f, 0.35f, 0.35f, 0.4f, 0.35f) // tête
+                    .box(Material.ORANGE_CONCRETE,   0f, 0.4f,  0.6f, 0.15f, 0.12f, 0.25f) // bec
+                    .box(Material.BROWN_CONCRETE,    0f, 0.35f, -0.5f, 0.2f, 0.5f, 0.4f); // queue
+
+            // 🪨 Krugs : golems de pierre
+            case KRUG -> new MobModel()
+                    .box(Material.COBBLED_DEEPSLATE, 0f, 0.0f, 0.0f, 0.9f, 1.1f, 0.8f)  // torse
+                    .box(Material.STONE,             0f, 1.05f, 0.0f, 0.6f, 0.5f, 0.55f) // tête
+                    .box(Material.COBBLESTONE,    -0.6f, 0.3f, 0.0f, 0.35f, 0.8f, 0.35f) // bras G
+                    .box(Material.COBBLESTONE,     0.6f, 0.3f, 0.0f, 0.35f, 0.8f, 0.35f) // bras D
+                    .cube(Material.AMETHYST_BLOCK, 0f, 0.5f, 0.42f, 0.2f);              // rune
+
+            // 🔴 Sanglepince (Red Brambleback) : lézard rouge avec lave
+            case RED_BUFF -> new MobModel()
+                    .box(Material.RED_CONCRETE,   0f, 0.1f,  0.0f, 0.9f, 0.7f, 1.3f)    // corps
+                    .box(Material.RED_CONCRETE,   0f, 0.45f, 0.7f, 0.5f, 0.5f, 0.5f)    // tête
+                    .box(Material.MAGMA_BLOCK,    0f, 0.75f, 0.0f, 0.5f, 0.2f, 0.9f)    // crête de lave
+                    .box(Material.RED_CONCRETE,   0f, 0.3f, -0.8f, 0.4f, 0.4f, 0.6f)    // queue
+                    .cube(Material.ORANGE_CONCRETE, -0.18f, 0.6f, 0.92f, 0.12f)         // œil G
+                    .cube(Material.ORANGE_CONCRETE,  0.18f, 0.6f, 0.92f, 0.12f);        // œil D
+
+            // 🔵 Sentinelle bleue (Blue Sentinel) : golem de cristal bleu
+            case BLUE_BUFF -> new MobModel()
+                    .box(Material.LAPIS_BLOCK,    0f, 0.0f, 0.0f, 1.0f, 1.2f, 0.9f)     // torse
+                    .box(Material.LAPIS_BLOCK,    0f, 1.15f, 0.0f, 0.6f, 0.5f, 0.55f)   // tête
+                    .box(Material.BLUE_ICE,    -0.65f, 0.3f, 0.0f, 0.4f, 0.9f, 0.4f)    // bras G
+                    .box(Material.BLUE_ICE,     0.65f, 0.3f, 0.0f, 0.4f, 0.9f, 0.4f)    // bras D
+                    .cube(Material.SEA_LANTERN,   0f, 0.55f, 0.46f, 0.25f)              // cœur lumineux
+                    .cube(Material.DIAMOND_BLOCK, 0f, 1.5f, 0.0f, 0.3f);               // cristal
+
+            // 🦀 Crabe Pillargot : carapace turquoise + pinces
+            case SCUTTLE_CRAB -> new MobModel()
+                    .box(Material.PRISMARINE,        0f, 0.1f,  0.0f, 1.0f, 0.4f, 0.9f) // carapace
+                    .box(Material.DARK_PRISMARINE,   0f, 0.35f, 0.0f, 0.7f, 0.25f, 0.6f) // dôme
+                    .box(Material.PRISMARINE_BRICKS, 0f, 0.05f, 0.5f, 0.3f, 0.25f, 0.25f) // tête
+                    .box(Material.PRISMARINE,    -0.55f, 0.05f, 0.3f, 0.25f, 0.2f, 0.3f, 30f) // pince G
+                    .box(Material.PRISMARINE,     0.55f, 0.05f, 0.3f, 0.25f, 0.2f, 0.3f, -30f); // pince D
+
+            // 👁 Héraut de la Faille : corps violet avec gros œil
+            case HERALD -> new MobModel()
+                    .box(Material.PURPLE_CONCRETE,  0f, 0.1f, 0.0f, 0.9f, 1.1f, 0.9f)   // corps
+                    .box(Material.MAGENTA_CONCRETE, 0f, 1.0f, 0.0f, 0.6f, 0.5f, 0.6f)   // tête
+                    .cube(Material.WHITE_CONCRETE,  0f, 0.65f, 0.5f, 0.5f)              // gros œil
+                    .cube(Material.PURPLE_CONCRETE, 0f, 0.7f, 0.72f, 0.3f)             // iris
+                    .cube(Material.BLACK_CONCRETE,  0f, 0.7f, 0.85f, 0.16f)            // pupille
+                    .cube(Material.SCULK_CATALYST,  0f, 1.5f, 0.0f, 0.3f);             // sommet
+
+            // 🪱 Baron Nashor : énorme serpent du néant violet avec crocs et pics
+            case BARON -> new MobModel()
+                    .box(Material.PURPLE_CONCRETE,  0f, 0.3f, -0.2f, 1.0f, 1.0f, 1.6f)  // corps
+                    .box(Material.MAGENTA_CONCRETE, 0f, 0.7f, 0.9f, 0.9f, 0.9f, 0.7f)   // tête
+                    .box(Material.WHITE_CONCRETE,   0f, 0.58f, 1.25f, 0.7f, 0.12f, 0.15f) // crocs haut
+                    .box(Material.WHITE_CONCRETE,   0f, 0.38f, 1.25f, 0.7f, 0.12f, 0.15f) // crocs bas
+                    .cube(Material.MAGENTA_CONCRETE, -0.3f, 1.05f, 1.0f, 0.18f)         // œil G
+                    .cube(Material.MAGENTA_CONCRETE,  0.3f, 1.05f, 1.0f, 0.18f)         // œil D
+                    .box(Material.BLACK_CONCRETE,   0f, 1.3f, 0.2f, 0.12f, 0.5f, 0.12f)  // pic central
+                    .box(Material.BLACK_CONCRETE, -0.35f, 1.15f, -0.2f, 0.12f, 0.4f, 0.12f) // pic G
+                    .box(Material.BLACK_CONCRETE,  0.35f, 1.15f, -0.2f, 0.12f, 0.4f, 0.12f) // pic D
+                    .box(Material.PURPLE_CONCRETE,  0f, 0.2f, -1.3f, 0.5f, 0.5f, 0.8f); // queue
+
+            // 🐉 Dragons élémentaires : même structure, couleurs selon l'élément
+            case DRAGON_INFERNAL -> dragonModel(Material.RED_CONCRETE,   Material.MAGMA_BLOCK,    Material.RED_TERRACOTTA);
+            case DRAGON_OCEAN    -> dragonModel(Material.PRISMARINE,     Material.LAPIS_BLOCK,    Material.CYAN_TERRACOTTA);
+            case DRAGON_MOUNTAIN -> dragonModel(Material.DEEPSLATE,      Material.IRON_BLOCK,     Material.GRAY_TERRACOTTA);
+            case DRAGON_CLOUD    -> dragonModel(Material.WHITE_CONCRETE, Material.LIGHT_BLUE_CONCRETE, Material.WHITE_TERRACOTTA);
+            case DRAGON_CHEMTECH -> dragonModel(Material.LIME_CONCRETE,  Material.SLIME_BLOCK,    Material.GREEN_TERRACOTTA);
+            case DRAGON_ELDER    -> dragonModel(Material.CALCITE,        Material.AMETHYST_BLOCK, Material.PURPLE_TERRACOTTA);
         };
+        // Les petits monstres de groupe (loups/raptors/krugs secondaires) sont réduits
+        if (!large) m.scaleAll(0.6f);
+        return m;
+    }
+
+    /** Modèle générique de dragon (corps + tête + corne + queue + 2 ailes), couleurs paramétrables. */
+    private MobModel dragonModel(Material body, Material accent, Material wing) {
+        return new MobModel()
+                .box(body,   0f, 0.3f,  0.0f, 0.6f, 0.6f, 1.4f)        // corps
+                .box(body,   0f, 0.55f, 0.8f, 0.45f, 0.45f, 0.5f)      // tête
+                .box(accent, 0f, 0.9f,  0.85f, 0.15f, 0.3f, 0.15f)     // corne
+                .box(body,   0f, 0.3f, -0.9f, 0.3f, 0.3f, 0.7f)        // queue
+                .box(wing, -0.8f, 0.6f, 0.0f, 0.9f, 0.06f, 0.7f, 35f)  // aile G
+                .box(wing,  0.8f, 0.6f, 0.0f, 0.9f, 0.06f, 0.7f, -35f); // aile D
     }
 
     public void clearAllMonsters() {
