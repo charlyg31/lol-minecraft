@@ -62,6 +62,8 @@ public class GameManager {
 
     public void stopGame() {
         gameRunning = false;
+        // Réinitialise les états statiques des champions (anti-fuite + anti-stacks persistants)
+        fr.lolmc.util.ChampionStateReset.resetAll();
         if (timerBar != null) {
             for (Player p : Bukkit.getOnlinePlayers()) p.hideBossBar(timerBar);
         }

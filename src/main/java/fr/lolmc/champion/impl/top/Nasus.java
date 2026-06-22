@@ -34,6 +34,9 @@ public class Nasus extends BaseChampion {
 
     // Stacks Q globaux par UUID
     public static final Map<UUID,Integer> qStacks=new HashMap<>();
+    /** Réinitialise les stacks de ce joueur (fin de partie / déconnexion). */
+    public static void resetState(UUID id){ qStacks.remove(id); }
+    public static void resetAllState(){ qStacks.clear(); }
 
     static class AA extends BasicAttackAbility {
         AA(){super("nasus",Material.BONE,2.5f,DamageType.PHYSICAL);}

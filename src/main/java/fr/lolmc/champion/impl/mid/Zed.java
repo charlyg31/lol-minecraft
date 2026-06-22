@@ -34,6 +34,8 @@ public class Zed extends BaseChampion {
 
     // Ombre active par joueur
     private static final Map<UUID,Location> shadows=new HashMap<>();
+    public static void resetState(UUID id){ shadows.remove(id); }
+    public static void resetAllState(){ shadows.clear(); }
 
     static class AA extends BasicAttackAbility {
         AA(){super("zed",Material.IRON_SWORD,2.5f,DamageType.PHYSICAL);}

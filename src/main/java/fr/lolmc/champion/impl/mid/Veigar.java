@@ -33,6 +33,9 @@ public class Veigar extends BaseChampion {
     }
 
     public static final Map<UUID,Integer> apStacks=new HashMap<>();
+    /** Reinitialise les stacks AP de ce joueur (fin de partie / deconnexion). */
+    public static void resetState(UUID id){ apStacks.remove(id); }
+    public static void resetAllState(){ apStacks.clear(); }
 
     static class AA extends BasicAttackAbility {
         AA(){super("veigar",Material.PURPLE_DYE,5.5f,DamageType.MAGICAL);}

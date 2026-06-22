@@ -38,6 +38,8 @@ public class LeeSin extends BaseChampion {
 
     // Cible marquée par l'Onde Sonique (pour la Frappe Résonnante au recast)
     private static final Map<UUID,UUID> sonicTarget=new HashMap<>();
+    public static void resetState(UUID id){ sonicTarget.remove(id); }
+    public static void resetAllState(){ sonicTarget.clear(); }
 
     static class Q extends BaseAbility {
         Q(){super("q_leesin","Onde Sonique",Material.ECHO_SHARD,AbilitySlot.Q,
