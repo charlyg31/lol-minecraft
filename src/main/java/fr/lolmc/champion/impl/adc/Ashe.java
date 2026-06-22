@@ -2,6 +2,7 @@ package fr.lolmc.champion.impl.adc;
 
 import fr.lolmc.LolPlugin;
 import fr.lolmc.ability.base.BaseAbility;
+import fr.lolmc.ability.base.BasicAttackAbility;
 import fr.lolmc.stats.ResourceSystem;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.stats.ChampionStats;
@@ -31,19 +32,12 @@ public class Ashe extends BaseChampion {
         setAutoAttackRange(6.0);
     }
 
-    static class AA extends BaseAbility {
-        AA(){super("aa_ashe","Attaque de base",Material.ARROW,AbilitySlot.AA,
-            new double[]{0.5},5,0,DamageType.PHYSICAL);
-            resourceCost = 0;}
-        @Override public void cast(Player c,ChampionStats s,Player t){
-            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.0); if(tgt==null)return;
-            TargetingUtil.dealDamage(c, tgt, s.getFinalAD(), TargetingUtil.DmgType.PHYSICAL);
+    static class AA extends BasicAttackAbility {
+        AA(){super("ashe",Material.ARROW,6.0f,DamageType.PHYSICAL);}
+        @Override protected void onHit(Player c, ChampionStats s, org.bukkit.entity.LivingEntity tgt, double dmg){
             // Passif Tir de Givre : les attaques ralentissent la cible
             if(tgt instanceof Player __p)
                 __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,30,0,false,true));
-        }
-        @Override public String getDynamicDescription(ChampionStats s){
-            return String.format("Inflige %.0f dégâts.", s.getFinalAD());
         }
     }
 

@@ -2,6 +2,7 @@ package fr.lolmc.champion.impl.support;
 
 import fr.lolmc.LolPlugin;
 import fr.lolmc.ability.base.BaseAbility;
+import fr.lolmc.ability.base.BasicAttackAbility;
 import fr.lolmc.stats.ResourceSystem;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.stats.ChampionStats;
@@ -31,17 +32,8 @@ public class Morgana extends BaseChampion {
         setAutoAttackRange(5.5);
     }
 
-    static class AA extends BaseAbility {
-        AA(){super("aa_morgana","Attaque de base",Material.PURPLE_DYE,AbilitySlot.AA,
-            new double[]{0.5},5,0,DamageType.MAGICAL);
-            resourceCost = 0;}
-        @Override public void cast(Player c,ChampionStats s,Player t){
-            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,5.5); if(tgt==null)return;
-            TargetingUtil.dealDamage(c, tgt, s.getFinalAD(), TargetingUtil.DmgType.MAGICAL);
-        }
-        @Override public String getDynamicDescription(ChampionStats s){
-            return String.format("Inflige %.0f dégâts.", s.getFinalAP());
-        }
+    static class AA extends BasicAttackAbility {
+        AA(){super("morgana",Material.PURPLE_DYE,5.5f,DamageType.MAGICAL);}
     }
 
     static class Q extends BaseAbility {

@@ -2,6 +2,7 @@ package fr.lolmc.champion.impl.jungle;
 
 import fr.lolmc.LolPlugin;
 import fr.lolmc.ability.base.BaseAbility;
+import fr.lolmc.ability.base.BasicAttackAbility;
 import fr.lolmc.stats.ResourceSystem;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.stats.ChampionStats;
@@ -31,14 +32,9 @@ public class Warwick extends BaseChampion {
         initSystems(577, 9.0, ResourceSystem.ResourceType.NONE, 0, 0.0);
     }
 
-    static class AA extends BaseAbility {
-        AA(){super("aa_warwick","Attaque de base",Material.IRON_SWORD,AbilitySlot.AA,
-            new double[]{0.5},5,0,DamageType.PHYSICAL);
-            resourceCost = 0;}
-        @Override public void cast(Player c,ChampionStats s,Player t){
-            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,2.0); if(tgt==null)return;
-            double dmg=s.getFinalAD();
-            TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.PHYSICAL);
+    static class AA extends BasicAttackAbility {
+        AA(){super("warwick",Material.IRON_SWORD,2.0f,DamageType.PHYSICAL);}
+        @Override protected void onHit(Player c, ChampionStats s, org.bukkit.entity.LivingEntity tgt, double dmg){
             // Passif Faim Eternelle : soin sur AA (triplé sous 25% PV)
             double healBase=dmg*0.1;
             if(c.getHealth()<c.getMaxHealth()*0.25) healBase*=3;
@@ -46,9 +42,6 @@ public class Warwick extends BaseChampion {
                 var cm=LolPlugin.getInstance().getChampionManager();
                 if(cm.hasChampion(c)) cm.getChampion(c).getHPSystem().heal(healBase);
             }
-        }
-        @Override public String getDynamicDescription(ChampionStats s){
-            return String.format("Inflige %.0f dégâts + soin (Faim Éternelle, triplé sous 25%% PV).", s.getFinalAD());
         }
     }
 
