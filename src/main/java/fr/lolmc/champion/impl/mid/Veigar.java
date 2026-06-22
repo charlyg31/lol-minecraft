@@ -33,6 +33,7 @@ public class Veigar extends BaseChampion {
     }
 
     public static final Map<UUID,Integer> apStacks=new HashMap<>();
+    private static final int MAX_AP_STACKS = 150; // plafond anti-scaling infini
     /** Reinitialise les stacks AP de ce joueur (fin de partie / deconnexion). */
     public static void resetState(UUID id){ apStacks.remove(id); }
     public static void resetAllState(){ apStacks.clear(); }
@@ -54,8 +55,8 @@ public class Veigar extends BaseChampion {
                 if(touched>=2) break; // max 2 cibles
                 double hpBefore=__t.getHealth();
                 TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);
-                // Kill = +1 AP permanent (+2 si gros monstre/champion)
-                if(hpBefore-dmg<=0){
+                // Kill = +1 AP permanent (+2 si gros monstre/champion), plafonné
+                if(hpBefore-dmg<=0 && apStacks.getOrDefault(c.getUniqueId(),0) < MAX_AP_STACKS){
                     boolean big=(__t instanceof Player)||fr.lolmc.game.JungleManager.isJungleMonster(__t);
                     int gain=big?2:1;
                     s.addBonusAP(gain);
