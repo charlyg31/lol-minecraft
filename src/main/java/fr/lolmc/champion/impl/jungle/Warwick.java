@@ -91,7 +91,7 @@ public class Warwick extends BaseChampion {
             double[] redux={1,2,2,3,3}; // amplifier RESISTANCE approx 35-55%
             c.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE,50,(int)redux[getLevel()-1],false,true));
             c.sendActionBar(Component.text("🛡 Hurlement Primal! Réduction de dégâts",NamedTextColor.GOLD));
-            c.getWorld().playSound(c.getLocation(), Sound.ENTITY_WOLF_HOWL, 1f, 1f);
+            c.getWorld().playSound(c.getLocation(), Sound.ENTITY_WOLF_GROWL, 1f, 1f);
             // Après 1.5s : hurlement de peur
             new BukkitRunnable(){
                 @Override public void run(){
@@ -102,7 +102,7 @@ public class Warwick extends BaseChampion {
                         }
                     }
                     c.getWorld().spawnParticle(Particle.SONIC_BOOM,c.getLocation().add(0,1,0),2,2,0.5,2);
-                    c.getWorld().playSound(c.getLocation(), Sound.ENTITY_WOLF_HOWL, 1.5f, 0.6f);
+                    c.getWorld().playSound(c.getLocation(), Sound.ENTITY_WOLF_GROWL, 1.5f, 0.6f);
                 }
             }.runTaskLater(LolPlugin.getInstance(),30L);
         }
