@@ -34,6 +34,11 @@ public final class Compat {
         return attribute("attack_damage", "generic.attack_damage");
     }
 
+    /** Attribut "scale" (taille de l'entité ET de sa hitbox, depuis 1.20.5). */
+    public static Attribute scale() {
+        return attribute("scale", "generic.scale");
+    }
+
     /**
      * Résout un attribut par sa clé, en essayant plusieurs noms possibles
      * selon la version. Retourne null si introuvable (le code appelant

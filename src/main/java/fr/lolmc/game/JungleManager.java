@@ -241,6 +241,12 @@ public class JungleManager {
             if (model != null) {
                 monsterDeco.put(mob.getUniqueId(), model.spawnOn(mob));
             }
+            // Faire correspondre approximativement la hitbox a la taille du modele.
+            // (Minecraft : hitbox = boite unique. On ajuste la taille globale, pas la forme.)
+            float hbScale = hitboxScaleFor(type);
+            if (!isLarge) hbScale *= 0.6f; // petits monstres de groupe
+            var scaleAttr = mob.getAttribute(Compat.scale());
+            if (scaleAttr != null) scaleAttr.setBaseValue(hbScale);
 
             camp.liveEntities.add(mob.getUniqueId());
             liveMonsters.put(mob.getUniqueId(), type);
@@ -523,6 +529,27 @@ public class JungleManager {
                 .box(body,   0f, 0.3f, -0.9f, 0.3f, 0.3f, 0.7f)        // queue
                 .box(wing, -0.8f, 0.6f, 0.0f, 0.9f, 0.06f, 0.7f, 35f)  // aile G
                 .box(wing,  0.8f, 0.6f, 0.0f, 0.9f, 0.06f, 0.7f, -35f); // aile D
+    }
+
+    /**
+     * Taille de hitbox approximative par monstre (multiplie la hitbox naturelle
+     * de la base pour la rapprocher du modele). Valeurs a ajuster visuellement.
+     * Les epiques restent proches de 1.0 pour ne pas trop changer leur portee.
+     */
+    private float hitboxScaleFor(MonsterType type) {
+        return switch (type) {
+            case GROMP        -> 2.0f;   // slime petit -> grossir
+            case MURKWOLF     -> 1.0f;
+            case RAPTOR       -> 1.0f;
+            case KRUG         -> 2.5f;   // silverfish minuscule -> grossir
+            case RED_BUFF     -> 2.0f;   // magma cube petit
+            case BLUE_BUFF    -> 0.8f;   // iron golem deja grand -> reduire un peu
+            case SCUTTLE_CRAB -> 1.0f;
+            case DRAGON_INFERNAL, DRAGON_OCEAN, DRAGON_MOUNTAIN,
+                 DRAGON_CLOUD, DRAGON_CHEMTECH, DRAGON_ELDER -> 0.85f; // ravager -> modele plus fin
+            case HERALD       -> 0.85f;
+            case BARON        -> 0.9f;
+        };
     }
 
     public void clearAllMonsters() {
