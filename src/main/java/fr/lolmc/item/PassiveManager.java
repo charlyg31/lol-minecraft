@@ -438,8 +438,23 @@ public class PassiveManager {
         ItemState state = getState(player);
 
         switch (itemId) {
-            // ── Zhonya's Hourglass: invulnérabilité 2.5s (120s CD) ──
-            case "zhonyas_hourglass" -> {
+            case "zhonyas_hourglass" -> activateZhonyasHourglass(player, champ, state);
+            case "galeforce" -> activateGaleforce(player, champ, state);
+            case "shurelyas" -> activateShurelyas(player, champ, state);
+            case "redemption" -> activateRedemption(player, champ, state);
+            case "locket" -> activateLocket(player, champ, state);
+            case "mikaels" -> activateMikaels(player, champ, state);
+            case "rocketbelt", "hextec_rocketbelt2" -> activateRocketbelt(player, champ, state);
+            case "botrk" -> activateBotrk(player, champ, state);
+        }
+
+        hudManager.updateHUD(player, champ);
+    }
+
+    // ════════════════════════════════════════════════════════
+    // TÂCHES RÉPÉTÉES (auras, DoT, stacks passifs)
+    // ════════════════════════════════════════════════════════
+    private void activateZhonyasHourglass(Player player, BaseChampion champ, ItemState state) {
                 if (state.isOnCooldown(state.lastZhonyas, 120000L)) {
                     sendCDMessage(player, "Zhonya's", state.lastZhonyas, 120000L); return;
                 }
@@ -456,10 +471,8 @@ public class PassiveManager {
                         player.removePotionEffect(PotionEffectType.RESISTANCE);
                     }
                 }.runTaskLater(LolPlugin.getInstance(), 50L);
-            }
-
-            // ── Galeforce: dash + 3 projectiles ──
-            case "galeforce" -> {
+                }
+    private void activateGaleforce(Player player, BaseChampion champ, ItemState state) {
                 if (state.isOnCooldown(state.lastGaleforce, 90000L)) {
                     sendCDMessage(player, "Galeforce", state.lastGaleforce, 90000L); return;
                 }
@@ -483,10 +496,8 @@ public class PassiveManager {
                         }
                     });
                 player.sendActionBar(Component.text("⚡ Galeforce!", NamedTextColor.YELLOW));
-            }
-
-            // ── Shurelya's Battlesong: +60% vitesse alliés 4s ──
-            case "shurelyas" -> {
+                }
+    private void activateShurelyas(Player player, BaseChampion champ, ItemState state) {
                 if (state.isOnCooldown(state.lastShurelyas, 120000L)) {
                     sendCDMessage(player, "Shurelya's", state.lastShurelyas, 120000L); return;
                 }
@@ -496,10 +507,8 @@ public class PassiveManager {
                     .forEach(e -> ((Player)e).addPotionEffect(
                         new PotionEffect(PotionEffectType.SPEED, 80, 3, false, true)));
                 player.sendActionBar(Component.text("💨 Shurelya's! +60%% vitesse 4s alliés", NamedTextColor.AQUA));
-            }
-
-            // ── Redemption: soin de zone sur le sol ──
-            case "redemption" -> {
+                }
+    private void activateRedemption(Player player, BaseChampion champ, ItemState state) {
                 if (state.isOnCooldown(state.lastRedemption, 120000L)) {
                     sendCDMessage(player, "Redemption", state.lastRedemption, 120000L); return;
                 }
@@ -524,10 +533,8 @@ public class PassiveManager {
                             });
                     }
                 }.runTaskLater(LolPlugin.getInstance(), 50L);
-            }
-
-            // ── Locket of the Iron Solari: bouclier alliés ──
-            case "locket" -> {
+                }
+    private void activateLocket(Player player, BaseChampion champ, ItemState state) {
                 if (state.isOnCooldown(state.lastLocket, 90000L)) {
                     sendCDMessage(player, "Locket", state.lastLocket, 90000L); return;
                 }
@@ -544,10 +551,8 @@ public class PassiveManager {
                     });
                 player.sendActionBar(Component.text(
                     String.format("🛡 Locket! +%.0f bouclier alliés proches", shieldAmt), NamedTextColor.GOLD));
-            }
-
-            // ── Mikael's Blessing: cleanse + soin allié ──
-            case "mikaels" -> {
+                }
+    private void activateMikaels(Player player, BaseChampion champ, ItemState state) {
                 if (state.isOnCooldown(state.lastMikaels, 90000L)) {
                     sendCDMessage(player, "Mikael's", state.lastMikaels, 90000L); return;
                 }
@@ -564,10 +569,8 @@ public class PassiveManager {
                     hudManager.updateHUD(target2, championManager.getChampion(target2));
                     player.sendActionBar(Component.text("💧 Mikael's: cleanse + soin allié!", NamedTextColor.BLUE));
                 }
-            }
-
-            // ── Hextech Rocketbelt: dash + missiles ──
-            case "rocketbelt", "hextec_rocketbelt2" -> {
+                }
+    private void activateRocketbelt(Player player, BaseChampion champ, ItemState state) {
                 if (state.isOnCooldown(state.lastHextechRocket, 90000L)) {
                     sendCDMessage(player, "Rocketbelt", state.lastHextechRocket, 90000L); return;
                 }
@@ -585,10 +588,8 @@ public class PassiveManager {
                         }
                     });
                 player.sendActionBar(Component.text("🚀 Rocketbelt!", NamedTextColor.RED));
-            }
-
-            // ── BotRK actif: drain 10% HP actuels de la cible ──
-            case "botrk" -> {
+                }
+    private void activateBotrk(Player player, BaseChampion champ, ItemState state) {
                 if (state.isOnCooldown(state.lastBotrkActive, 60000L)) {
                     sendCDMessage(player, "BotRK", state.lastBotrkActive, 60000L); return;
                 }
@@ -607,15 +608,8 @@ public class PassiveManager {
                         }
                     });
                 player.sendActionBar(Component.text("🗡 BotRK actif! Drain + ralentit", NamedTextColor.RED));
-            }
-        }
+                }
 
-        hudManager.updateHUD(player, champ);
-    }
-
-    // ════════════════════════════════════════════════════════
-    // TÂCHES RÉPÉTÉES (auras, DoT, stacks passifs)
-    // ════════════════════════════════════════════════════════
     private void startTasks() {
         // ── Tâche principale 1s ──
         new BukkitRunnable() {
