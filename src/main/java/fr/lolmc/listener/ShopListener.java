@@ -116,83 +116,76 @@ public class ShopListener implements Listener {
             return;
         }
 
-        fr.lolmc.util.DebugLogger.log("Shop", player.getName() + " clic slot=" + slot
-            + " item=" + shopGUI.getClickedItemId(player, slot));
+        // ── Vue FICHE (arborescence) ──
+        if (shopGUI.isDetailView(player)) {
+            if (shopGUI.isBackSlot(slot)) { shopGUI.open(player); return; }
+            if (shopGUI.isBuySlot(slot)) {
+                String id = shopGUI.getDetailItemId(player);
+                LolItem it = (id != null) ? ItemRegistry.get(id) : null;
+                if (it != null && purchase(player, it)) {
+                    shopGUI.openDetail(player, it.getId()); // rafraîchir (or / dispo)
+                }
+                return;
+            }
+            String navId = shopGUI.getDetailNavId(player, slot);
+            if (navId != null) { shopGUI.openDetail(player, navId); return; }
+            return;
+        }
 
-        // Clic sur un onglet ?
+        // ── Vue PARCOURS ──
         LolItem.ItemCategory cat = shopGUI.getClickedCategory(slot);
-        if (cat != null) {
-            shopGUI.open(player, cat);
-            return;
-        }
+        if (cat != null) { shopGUI.open(player, cat); return; }
 
-        // Clic sur un item à acheter ?
         String itemId = shopGUI.getClickedItemId(player, slot);
-        if (itemId == null) {
-            fr.lolmc.util.DebugLogger.log("Shop", "  itemId=null (slot pas un item)");
-            return;
-        }
+        if (itemId != null) { shopGUI.openDetail(player, itemId); } // ouvre la fiche/recette
+    }
 
-        LolItem item = ItemRegistry.get(itemId);
-        if (item == null) {
-            fr.lolmc.util.DebugLogger.log("Shop", "  ItemRegistry.get('" + itemId + "')=NULL !");
-            player.sendMessage(Component.text("❌ Item introuvable: " + itemId, NamedTextColor.RED));
-            return;
-        }
+    /** Achète un item (vérifie or + place). Retourne true si l'achat a réussi. */
+    private boolean purchase(Player player, LolItem item) {
+        if (item == null) return false;
 
-        // Vérifier l'or
         int gold = goldManager.getGold(player.getUniqueId());
-        fr.lolmc.util.DebugLogger.log("Shop", "  item=" + item.getDisplayName()
-            + " cout=" + item.getGoldCost() + " or_joueur=" + gold);
         if (gold < item.getGoldCost()) {
             player.sendMessage(Component.text(
                 String.format("❌ Or insuffisant! Tu as %d or, il en faut %d.", gold, item.getGoldCost()),
                 NamedTextColor.RED));
             player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 1f, 1f);
-            return;
+            return false;
         }
 
-        // Vérifier l'espace
         PlayerInventoryManager inv = getOrCreate(player);
-        if (inv.isFull()) {
+        if (item.getCategory() != ItemCategory.CONSUMABLE && inv.isFull()) {
             player.sendMessage(Component.text("❌ Inventaire plein (6/6 items)!", NamedTextColor.RED));
-            return;
+            return false;
         }
 
-        // Acheter
         BaseChampion champ = championManager.getChampion(player);
-        boolean spent = goldManager.spendGold(player.getUniqueId(), item.getGoldCost());
-        fr.lolmc.util.DebugLogger.log("Shop", "  spendGold=" + spent + " champ=" + (champ != null));
-        if (spent) {
-            // Consommables: utilisation immédiate
-            ConsumableManager cm = LolPlugin.getInstance().getConsumableManager();
-            if (item.getCategory() == ItemCategory.CONSUMABLE && cm != null) {
-                // Stocker le consommable dans la page 2 de la hotbar (utilisable plus tard)
-                var hb = LolPlugin.getInstance().getHotbarManager();
-                hb.addConsumable(player, item.getId());
-                hb.renderPage(player, champ);
-                player.sendActionBar(Component.text(
-                    "🧪 " + item.getDisplayName() + " ajouté (page 2)", NamedTextColor.GREEN));
-            } else {
-                try {
-                    inv.equipItem(player, champ, item);
-                    var hb = LolPlugin.getInstance().getHotbarManager();
-                    hb.addItem(player, item.getId());
-                    hb.renderPage(player, champ);
-                    hudManager.updateHUD(player, champ);
-                    fr.lolmc.util.DebugLogger.log("Shop", "  ACHAT REUSSI: " + item.getDisplayName());
-                } catch (Exception ex) {
-                    fr.lolmc.util.DebugLogger.log("Shop", "  EXCEPTION equipItem: " + ex);
-                    player.sendMessage(Component.text("❌ Erreur achat: " + ex.getMessage(), NamedTextColor.RED));
-                }
-            }
-            // Rafraîchir l'affichage de l'or dans la boutique
+        if (!goldManager.spendGold(player.getUniqueId(), item.getGoldCost())) return false;
+
+        ConsumableManager cm = LolPlugin.getInstance().getConsumableManager();
+        if (item.getCategory() == ItemCategory.CONSUMABLE && cm != null) {
+            var hb = LolPlugin.getInstance().getHotbarManager();
+            hb.addConsumable(player, item.getId());
+            hb.renderPage(player, champ);
             player.sendActionBar(Component.text(
-                String.format("💰 Or: %d | %s acheté!", 
-                    goldManager.getGold(player.getUniqueId()),
-                    item.getDisplayName()),
-                NamedTextColor.GOLD));
+                "🧪 " + item.getDisplayName() + " ajouté (page 2)", NamedTextColor.GREEN));
+        } else {
+            try {
+                inv.equipItem(player, champ, item);
+                var hb = LolPlugin.getInstance().getHotbarManager();
+                hb.addItem(player, item.getId());
+                hb.renderPage(player, champ);
+                hudManager.updateHUD(player, champ);
+            } catch (Exception ex) {
+                player.sendMessage(Component.text("❌ Erreur achat: " + ex.getMessage(), NamedTextColor.RED));
+                return false;
+            }
         }
+        player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1f, 1.3f);
+        player.sendActionBar(Component.text(
+            String.format("💰 Or: %d | %s acheté!", goldManager.getGold(player.getUniqueId()),
+                item.getDisplayName()), NamedTextColor.GOLD));
+        return true;
     }
 
     private void trySellItem(Player player, int mcSlot) {
