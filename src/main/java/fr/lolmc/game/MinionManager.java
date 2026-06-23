@@ -136,7 +136,7 @@ public class MinionManager {
     }
 
     private void spawnMinion(Team team, String lane, Location loc, MinionType type) {
-        Zombie minion = loc.getWorld().spawn(loc, Zombie.class, z -> {
+        Zombie minion = loc.getWorld().spawn(loc, Husk.class, z -> {
             z.setBaby(false);
             z.setShouldBurnInDay(false);
             z.setCustomNameVisible(false);

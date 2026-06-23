@@ -127,9 +127,6 @@ public class SchematicManager {
             return;
         }
         clipboard.setOrigin(furnace);
-        try {
-            clipboard.setBlock(furnace, BlockTypes.AIR.getDefaultState());
-        } catch (Exception ignored) {}
     }
 
     /**
@@ -151,7 +148,7 @@ public class SchematicManager {
                 BukkitAdapter.adapt(location.getWorld()))) {
             ClipboardHolder holder = new ClipboardHolder(clipboard);
             if (angleDegrees != 0) {
-                holder.setTransform(new AffineTransform().rotateY(angleDegrees));
+                holder.setTransform(new AffineTransform().translate(-0.5, 0, -0.5).rotateY(angleDegrees).translate(0.5, 0, 0.5));
             }
             Operation operation = holder
                     .createPaste(editSession)
@@ -159,6 +156,7 @@ public class SchematicManager {
                     .ignoreAirBlocks(false)
                     .build();
             Operations.complete(operation);
+            editSession.setBlock(BlockVector3.at(location.getBlockX(), location.getBlockY(), location.getBlockZ()), BlockTypes.AIR.getDefaultState());
         } catch (Exception e) {
             LolPlugin.getInstance().getLogger().warning("Erreur collage schématique " + name + ": " + e.getMessage());
         }

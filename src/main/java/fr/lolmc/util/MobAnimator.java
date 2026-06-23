@@ -100,6 +100,7 @@ public final class MobAnimator {
     }
 
     private static void animate(Anim a) {
+        a.mob.setRotation(a.mob.getLocation().getYaw(), a.mob.getLocation().getPitch());
         Location loc = a.mob.getLocation();
         boolean moving = a.lastLoc != null
                 && a.lastLoc.getWorld().equals(loc.getWorld())
