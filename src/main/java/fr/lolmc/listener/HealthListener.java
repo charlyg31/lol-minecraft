@@ -93,6 +93,41 @@ public class HealthListener implements Listener {
         p.setFoodLevel(20);
         p.setSaturation(20f);
         p.setExhaustion(0f);
+
+        // Reconnexion : un tick plus tard (joueur pleinement chargé pour le téléport)
+        new org.bukkit.scheduler.BukkitRunnable() {
+            @Override public void run() {
+                if (!p.isOnline()) return;
+                var plugin = LolPlugin.getInstance();
+                var gm = plugin.getGameManager();
+                var cm = plugin.getChampionManager();
+                var tm = plugin.getTeamManager();
+                java.util.UUID id = p.getUniqueId();
+
+                boolean canRejoin = gm.isRunning() && gm.isParticipant(id) && cm.hasChampion(p);
+                if (canRejoin) {
+                    // Restaurer le joueur dans SA partie (son champion/équipe/objets ont été gardés)
+                    var team = gm.getParticipantTeam(id);
+                    if (team != null && !tm.hasTeam(p)) tm.setTeam(p, team);
+                    var champ = cm.getChampion(p);
+                    try { plugin.getHotbarManager().renderPage(p, champ); } catch (Exception ignored) {}
+                    var spawn = (team != null) ? plugin.getMapManager().getSpawn(team, 1) : null;
+                    if (spawn != null) p.teleport(spawn);
+                    p.sendMessage(net.kyori.adventure.text.Component.text(
+                            "🔄 Reconnecté à ta partie en cours.", net.kyori.adventure.text.format.NamedTextColor.GREEN));
+                } else {
+                    // Pas de partie en cours pour ce joueur → ne pas le laisser sur la map
+                    if (cm.hasChampion(p)) cm.removeChampion(p);
+                    tm.removePlayer(id);
+                    var world = plugin.getServer().getWorlds().get(0);
+                    p.teleport(world.getSpawnLocation());
+                    if (gm.isRunning()) {
+                        p.sendMessage(net.kyori.adventure.text.Component.text(
+                                "Une partie est en cours mais tu n'en fais pas partie.", net.kyori.adventure.text.format.NamedTextColor.YELLOW));
+                    }
+                }
+            }
+        }.runTaskLater(LolPlugin.getInstance(), 1L);
     }
 
     // ── Respawn → réinitialiser HP et ressource ───────────────────

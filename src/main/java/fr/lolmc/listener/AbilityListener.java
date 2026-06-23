@@ -396,12 +396,26 @@ public class AbilityListener implements Listener {
     @EventHandler
     public void onQuit(PlayerQuitEvent e) {
         Player p = e.getPlayer();
-        cleanupPlayer(p);
+        // Si le joueur est en pleine partie : on GARDE son état (champion, équipe, objets)
+        // pour qu'il puisse revenir. On ne fait qu'un nettoyage léger des caches transitoires.
+        var gm = LolPlugin.getInstance().getGameManager();
+        if (gm.isRunning() && gm.isParticipant(p.getUniqueId())) {
+            lightCleanup(p);
+        } else {
+            cleanupPlayer(p);
+        }
     }
 
     @EventHandler
     public void onKick(PlayerKickEvent e) {
         cleanupPlayer(e.getPlayer());
+    }
+
+    /** Nettoyage léger (déconnexion en cours de partie) : garde champion/équipe/objets. */
+    private void lightCleanup(Player p) {
+        LolPlugin.getInstance().getFlashManager().cleanup(p.getUniqueId());
+        LolPlugin.getInstance().getWardManager().cleanup(p.getUniqueId());
+        LolPlugin.getInstance().getBushManager().cleanup(p.getUniqueId());
     }
 
     private void cleanupPlayer(Player p) {
