@@ -49,6 +49,8 @@ public class JungleManager {
     private final Map<UUID, MonsterType> liveMonsters = new HashMap<>();
     // Décorations : monstreUUID → liste des UUID des parties du modèle (nettoyage)
     private final Map<UUID, List<UUID>> monsterDeco = new HashMap<>();
+    // Dragons tués par équipe (pour l'âme du Dragon au 4e)
+    private final Map<fr.lolmc.team.TeamManager.Team, Integer> dragonsKilled = new HashMap<>();
     private boolean active = false;
 
     // ══════════════════════════════════════════════════════════════
@@ -287,9 +289,27 @@ public class JungleManager {
             LolPlugin.getInstance().getRewardManager()
                     .onJungleMonsterKill(killer, gold, type.xp);
 
-            // Buff : seulement quand le porteur de buff meurt (gros mob = dernier du camp pour les buffs)
+            // Buffs d'objectifs : les épiques buffent TOUTE l'équipe (Dragon/Baron),
+            // les camps rouge/bleu restent des buffs personnels.
             if (!type.buff.equals("none")) {
-                applyBuff(killer, type.buff);
+                if (type.isEpic()) {
+                    applyTeamBuff(killer, type.buff);
+                    if (type.isDragon()) {
+                        var dtm = LolPlugin.getInstance().getTeamManager();
+                        var dteam = dtm.getTeam(killer);
+                        if (dteam != null) {
+                            int n = dragonsKilled.merge(dteam, 1, Integer::sum);
+                            if (n >= 4) {
+                                applyTeamBuff(killer, "dragon_soul");
+                                LolPlugin.getInstance().getServer().broadcast(Component.text(
+                                        "🐉 L'équipe de " + killer.getName() + " a obtenu l'ÂME DU DRAGON!",
+                                        NamedTextColor.LIGHT_PURPLE));
+                            }
+                        }
+                    }
+                } else {
+                    applyBuff(killer, type.buff);
+                }
             }
 
             // Annonce pour les épiques (uniquement quand le camp est vidé)
@@ -319,6 +339,17 @@ public class JungleManager {
     // ══════════════════════════════════════════════════════════════
     // BUFFS (Rouge / Bleu / Baron)
     // ══════════════════════════════════════════════════════════════
+
+    /** Applique un buff à TOUTE l'équipe du tueur (objectifs : Dragon, Baron, âme...). */
+    private void applyTeamBuff(Player killer, String buff) {
+        var tm = LolPlugin.getInstance().getTeamManager();
+        var team = tm.getTeam(killer);
+        if (team == null) { applyBuff(killer, buff); return; }
+        for (UUID id : tm.getTeamMembers(team)) {
+            Player m = LolPlugin.getInstance().getServer().getPlayer(id);
+            if (m != null && m.isOnline()) applyBuff(m, buff);
+        }
+    }
 
     private void applyBuff(Player player, String buff) {
         if (buff == null || buff.equals("none")) return;
@@ -385,6 +416,15 @@ public class JungleManager {
                     champ.getStats().addBonusAD(-24);
                     champ.getStats().addBonusAP(-40);
                 }, 180);
+            }
+            case "dragon_soul" -> {
+                // Âme du Dragon : bénédiction PERMANENTE d'équipe
+                champ.getStats().addBonusAD(20);
+                champ.getStats().addBonusAP(30);
+                champ.getStats().multiplyHP(1.08);
+                player.sendActionBar(Component.text(
+                        "🐉 ÂME DU DRAGON! Bénédiction permanente (+20 AD, +30 AP, +8% PV)",
+                        NamedTextColor.LIGHT_PURPLE));
             }
         }
         var hud = LolPlugin.getInstance().getHUDManager();
@@ -562,6 +602,7 @@ public class JungleManager {
         }
         liveMonsters.clear();
         monsterDeco.clear();
+        dragonsKilled.clear();
         MobAnimator.clearAll();
         for (CampSpawn camp : camps.values()) { camp.liveEntities.clear(); camp.respawnAt = 0; }
     }
