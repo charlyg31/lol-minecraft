@@ -572,12 +572,29 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
         Location clicked = e.getClickedBlock().getLocation();
 
         if (setup.kind().equals("structure")) {
-            mapManager.setStructure(setup.type(), setup.team(), setup.lane(), setup.index(), clicked);
+            // Orientation : si le bloc cliqué est directionnel (four, etc.), on lit sa face.
+            int angle = 0;
+            String facingMsg = "orientation par défaut (Sud)";
+            var bd = e.getClickedBlock().getBlockData();
+            if (bd instanceof org.bukkit.block.data.Directional dir) {
+                angle = switch (dir.getFacing()) {
+                    case SOUTH -> 0;
+                    case WEST  -> 90;
+                    case NORTH -> 180;
+                    case EAST  -> 270;
+                    default    -> 0;
+                };
+                facingMsg = "orientée vers " + dir.getFacing() + " (" + angle + "°)";
+                // Retirer le four marqueur : la schématique sera collée à sa place
+                e.getClickedBlock().setType(org.bukkit.Material.AIR);
+            }
+            mapManager.setStructure(setup.type(), setup.team(), setup.lane(), setup.index(), clicked, angle);
             // Appliquer le niveau de tourelle si défini
             var tier = pendingTier.remove(player.getUniqueId());
             if (tier != null) {
                 mapManager.setStructureTier(setup.type(), setup.team(), setup.lane(), setup.index(), tier);
             }
+            player.sendMessage(Component.text("   ↳ " + facingMsg, NamedTextColor.GRAY));
             // Marqueur visuel temporaire (bloc de verre coloré)
             showMarker(clicked.clone().add(0, 1, 0), setup.team());
             player.sendMessage(Component.text(String.format(

@@ -10,6 +10,7 @@ import com.sk89q.worldedit.extent.clipboard.io.ClipboardReader;
 import com.sk89q.worldedit.function.operation.Operation;
 import com.sk89q.worldedit.function.operation.Operations;
 import com.sk89q.worldedit.math.BlockVector3;
+import com.sk89q.worldedit.math.transform.AffineTransform;
 import com.sk89q.worldedit.session.ClipboardHolder;
 import fr.lolmc.LolPlugin;
 import org.bukkit.Location;
@@ -109,12 +110,24 @@ public class SchematicManager {
      * Colle une schématique à un emplacement (centrée sur le point d'origine du clipboard).
      */
     public void pasteSchematic(String name, Location location) {
+        pasteSchematic(name, location, 0);
+    }
+
+    /**
+     * Colle une schématique avec une rotation (0/90/180/270°).
+     * WorldEdit fait tourner correctement les blocs orientés (escaliers, troncs...).
+     */
+    public void pasteSchematic(String name, Location location, int angleDegrees) {
         Clipboard clipboard = loadSchematic(name);
         if (clipboard == null) return;
 
         try (EditSession editSession = WorldEdit.getInstance().newEditSession(
                 BukkitAdapter.adapt(location.getWorld()))) {
-            Operation operation = new ClipboardHolder(clipboard)
+            ClipboardHolder holder = new ClipboardHolder(clipboard);
+            if (angleDegrees != 0) {
+                holder.setTransform(new AffineTransform().rotateY(angleDegrees));
+            }
+            Operation operation = holder
                     .createPaste(editSession)
                     .to(BlockVector3.at(location.getBlockX(), location.getBlockY(), location.getBlockZ()))
                     .ignoreAirBlocks(false)

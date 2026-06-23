@@ -42,6 +42,7 @@ public class GameStructure {
     private final int index;          // 1, 2, 3...
     private final Location center;    // case centrale où coller la schématique
     private TurretTier tier = TurretTier.OUTER; // niveau (tourelles uniquement)
+    private int angle = 0; // rotation de la schématique en degrés (0/90/180/270)
 
     private double maxHP;
     private double currentHP;
@@ -114,6 +115,8 @@ public class GameStructure {
     public String getLane()         { return lane; }
     public int getIndex()           { return index; }
     public Location getCenter()     { return center; }
+    public int getAngle()           { return angle; }
+    public void setAngle(int a)     { this.angle = a; }
     public double getMaxHP()        { return maxHP; }
     public double getCurrentHP()    { return currentHP; }
     public boolean isDestroyed()    { return destroyed; }
