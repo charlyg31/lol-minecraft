@@ -55,7 +55,7 @@ public class MapManager {
      * @param index  1, 2, 3...
      * @param center case centrale cliquée
      */
-    public void setStructure(Type type, Team team, String lane, int index, Location center) {
+    public void setStructure(Type type, Team team, String lane, int index, Location center, int angle) {
         String key = structureKey(type, team, lane, index);
         config.set("structures." + key + ".world", center.getWorld().getName());
         config.set("structures." + key + ".x", center.getBlockX());
@@ -65,6 +65,7 @@ public class MapManager {
         config.set("structures." + key + ".team", team.name());
         config.set("structures." + key + ".lane", lane);
         config.set("structures." + key + ".index", index);
+        config.set("structures." + key + ".angle", angle);
         save();
     }
 
@@ -139,6 +140,8 @@ public class MapManager {
             };
 
             GameStructure structure = new GameStructure(type, team, lane, index, center, maxHP, phases);
+            int angle = config.getInt(path + "angle", 0);
+            structure.setAngle(angle);
             // Appliquer le niveau de tourelle si défini
             String tierName = config.getString(path + "tier");
             if (tierName != null && type == Type.TURRET) {
@@ -148,10 +151,10 @@ public class MapManager {
             }
             structures.add(structure);
 
-            // Coller la schématique de base (100%)
+            // Coller la schématique de base (100%) avec son orientation
             String schem = structure.getCurrentSchematic();
             if (schem != null) {
-                schematics.pasteSchematic(schem, center);
+                schematics.pasteSchematic(schem, center, angle);
             }
         }
 
@@ -165,7 +168,7 @@ public class MapManager {
     public void updateStructurePhase(GameStructure structure) {
         String schem = structure.getCurrentSchematic();
         if (schem != null) {
-            schematics.pasteSchematic(schem, structure.getCenter());
+            schematics.pasteSchematic(schem, structure.getCenter(), structure.getAngle());
         }
     }
 
