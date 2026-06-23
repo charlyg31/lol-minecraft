@@ -1,5 +1,9 @@
 package fr.lolmc.game;
 import fr.lolmc.util.Compat;
+import fr.lolmc.util.MobAppearance;
+import fr.lolmc.util.MobModel;
+import fr.lolmc.util.MobAnimator;
+import org.bukkit.Material;
 
 import fr.lolmc.LolPlugin;
 import fr.lolmc.team.TeamManager.Team;
@@ -41,6 +45,11 @@ public class MinionManager {
     private boolean spawning = false;
     // Inhibiteurs détruits → super-sbires sur cette lane (clé: "BLUE_top")
     private final java.util.Set<String> superMinionLanes = new java.util.HashSet<>();
+    // Modèles custom : sbireUUID → liste des parties (pour nettoyage)
+    private final Map<UUID, List<UUID>> minionDeco = new HashMap<>();
+
+    /** Types de sbires (apparence façon LoL). */
+    private enum MinionType { MELEE, CASTER, SUPER }
 
     public MinionManager(MapManager mapManager) {
         this.mapManager = mapManager;
@@ -106,9 +115,11 @@ public class MinionManager {
 
             for (int i = 0; i < MINIONS_PER_WAVE; i++) {
                 final int delay = i * 8; // décaler chaque sbire de 0.4s
+                // LoL : 3 sbires de mêlée puis 3 sbires à distance (mages)
+                final MinionType type = (i < MINIONS_PER_WAVE / 2) ? MinionType.MELEE : MinionType.CASTER;
                 new BukkitRunnable() {
                     @Override public void run() {
-                        if (spawning) spawnMinion(team, lane, spawnPoint);
+                        if (spawning) spawnMinion(team, lane, spawnPoint, type);
                     }
                 }.runTaskLater(LolPlugin.getInstance(), delay);
             }
@@ -124,7 +135,7 @@ public class MinionManager {
         }
     }
 
-    private void spawnMinion(Team team, String lane, Location loc) {
+    private void spawnMinion(Team team, String lane, Location loc, MinionType type) {
         Zombie minion = loc.getWorld().spawn(loc, Zombie.class, z -> {
             z.setBaby(false);
             z.setShouldBurnInDay(false);
@@ -138,15 +149,20 @@ public class MinionManager {
             z.getPersistentDataContainer().set(KEY_MINION, PersistentDataType.BYTE, (byte) 1);
             z.getPersistentDataContainer().set(KEY_TEAM, PersistentDataType.STRING, team.name());
             z.getPersistentDataContainer().set(KEY_LANE, PersistentDataType.STRING, lane);
-            // Couleur visuelle via nom
             z.customName(Component.text(team == Team.BLUE ? "🔵 Sbire" : "🔴 Sbire",
                     team == Team.BLUE ? NamedTextColor.BLUE : NamedTextColor.RED));
-            // Équiper selon l'équipe (visuel)
-            if (z.getEquipment() != null) {
-                z.getEquipment().setHelmet(new org.bukkit.inventory.ItemStack(
-                        team == Team.BLUE ? org.bukkit.Material.BLUE_WOOL : org.bukkit.Material.RED_WOOL));
-            }
         });
+        applyMinionModel(minion, type, team, type == MinionType.CASTER ? 0.7f : 0.8f);
+    }
+
+    /** Rend le sbire invisible et lui pose un modèle custom anime (façon jungle). */
+    private void applyMinionModel(LivingEntity minion, MinionType type, Team team, float hitboxScale) {
+        MobAppearance.makeInvisible(minion);
+        MobAppearance.setSilent(minion, true);
+        List<UUID> parts = minionModel(type, team).spawnOn(minion);
+        if (!parts.isEmpty()) minionDeco.put(minion.getUniqueId(), parts);
+        var sc = minion.getAttribute(Compat.scale());
+        if (sc != null) sc.setBaseValue(hitboxScale);
     }
 
 
@@ -165,12 +181,8 @@ public class MinionManager {
                     (team == Team.BLUE ? "🔵 " : "🔴 ") + "Super-Sbire",
                     team == Team.BLUE ? net.kyori.adventure.text.format.NamedTextColor.BLUE
                             : net.kyori.adventure.text.format.NamedTextColor.RED));
-            if (h.getEquipment() != null) {
-                h.getEquipment().setHelmet(new org.bukkit.inventory.ItemStack(org.bukkit.Material.DIAMOND_HELMET));
-                h.getEquipment().setChestplate(new org.bukkit.inventory.ItemStack(
-                        team == Team.BLUE ? org.bukkit.Material.DIAMOND_CHESTPLATE : org.bukkit.Material.NETHERITE_CHESTPLATE));
-            }
         });
+        applyMinionModel(superMinion, MinionType.SUPER, team, 1.0f);
     }
 
     // ── Déplacement ───────────────────────────────────────────────
@@ -288,6 +300,7 @@ public class MinionManager {
         Long last = lastTurretHit.get(minion.getUniqueId());
         if (last == null || (now - last) >= TURRET_HIT_COOLDOWN) {
             lastTurretHit.put(minion.getUniqueId(), now);
+            MobAnimator.triggerAttack(minion.getUniqueId());
             // Animation : le sbire "frappe" + particule
             minion.swingMainHand();
             target.getWorld().spawnParticle(org.bukkit.Particle.CRIT,
@@ -369,7 +382,64 @@ public class MinionManager {
         return lane != null ? lane : "mid";
     }
 
+    /** Modèle composite custom d'un sbire, aux couleurs de l'équipe (façon LoL). */
+    private MobModel minionModel(MinionType type, Team team) {
+        Material body = (team == Team.BLUE) ? Material.BLUE_CONCRETE : Material.RED_CONCRETE;
+        Material trim = (team == Team.BLUE) ? Material.LIGHT_BLUE_CONCRETE : Material.ORANGE_CONCRETE;
+        return switch (type) {
+            // ⚔ Sbire de mêlée : petit corps + épée
+            case MELEE -> new MobModel()
+                    .box(body, 0f, 0.0f, 0.0f, 0.45f, 0.55f, 0.4f)      // corps
+                    .box(body, 0f, 0.55f, 0.0f, 0.4f, 0.4f, 0.4f)       // tête
+                    .cube(Material.WHITE_CONCRETE, -0.1f, 0.7f, 0.22f, 0.1f) // œil G
+                    .cube(Material.WHITE_CONCRETE,  0.1f, 0.7f, 0.22f, 0.1f) // œil D
+                    .box(Material.IRON_BLOCK, 0.32f, 0.3f, 0.0f, 0.1f, 0.55f, 0.1f); // épée
+
+            // 🪄 Sbire mage : plus petit + bâton lumineux
+            case CASTER -> new MobModel()
+                    .box(body, 0f, 0.0f, 0.0f, 0.4f, 0.5f, 0.38f)       // corps
+                    .box(body, 0f, 0.5f, 0.0f, 0.36f, 0.36f, 0.36f)     // tête
+                    .cube(Material.WHITE_CONCRETE, -0.09f, 0.63f, 0.2f, 0.09f)
+                    .cube(Material.WHITE_CONCRETE,  0.09f, 0.63f, 0.2f, 0.09f)
+                    .box(Material.OAK_FENCE, 0.3f, 0.2f, 0.0f, 0.07f, 0.6f, 0.07f) // bâton
+                    .cube(Material.SEA_LANTERN, 0.3f, 0.78f, 0.0f, 0.16f); // orbe lumineux
+
+            // 🛡 Super-sbire : plus gros + armure + grande épée
+            case SUPER -> new MobModel()
+                    .box(body, 0f, 0.0f, 0.0f, 0.6f, 0.8f, 0.55f)       // corps
+                    .box(trim, 0f, 0.55f, 0.0f, 0.62f, 0.18f, 0.57f)    // ceinture/armure
+                    .box(body, 0f, 0.85f, 0.0f, 0.5f, 0.45f, 0.5f)      // tête
+                    .cube(Material.WHITE_CONCRETE, -0.13f, 1.0f, 0.28f, 0.12f)
+                    .cube(Material.WHITE_CONCRETE,  0.13f, 1.0f, 0.28f, 0.12f)
+                    .box(Material.IRON_BLOCK, -0.42f, 0.55f, 0.0f, 0.18f, 0.3f, 0.5f) // épaule G
+                    .box(Material.IRON_BLOCK,  0.42f, 0.55f, 0.0f, 0.18f, 0.3f, 0.5f) // épaule D
+                    .box(Material.IRON_BLOCK,  0.5f, 0.35f, 0.0f, 0.13f, 0.85f, 0.13f); // grande épée
+        };
+    }
+
+    /** Appelé à la mort d'un sbire : retire son modèle et son animation. */
+    public void onMinionDeath(UUID minionId) {
+        List<UUID> parts = minionDeco.remove(minionId);
+        if (parts != null) {
+            for (UUID pid : parts) {
+                Entity d = org.bukkit.Bukkit.getEntity(pid);
+                if (d != null) d.remove();
+            }
+        }
+        MobAnimator.unregister(minionId);
+    }
+
     public void clearAllMinions() {
+        // Retirer les parties de modèle de chaque sbire + désenregistrer l'animation
+        for (List<UUID> parts : minionDeco.values()) {
+            for (UUID pid : parts) {
+                Entity d = org.bukkit.Bukkit.getEntity(pid);
+                if (d != null) d.remove();
+            }
+        }
+        for (UUID id : minionDeco.keySet()) MobAnimator.unregister(id);
+        minionDeco.clear();
+        // Retirer les sbires eux-mêmes
         for (var world : LolPlugin.getInstance().getServer().getWorlds()) {
             for (Entity e : world.getEntities()) {
                 if (e instanceof LivingEntity le && isMinion(le)) {
