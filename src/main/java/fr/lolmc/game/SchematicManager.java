@@ -157,6 +157,7 @@ public class SchematicManager {
                     .build();
             Operations.complete(operation);
             editSession.setBlock(BlockVector3.at(location.getBlockX(), location.getBlockY(), location.getBlockZ()), BlockTypes.AIR.getDefaultState());
+            editSession.setBlock(BlockVector3.at(location.getBlockX(), location.getBlockY(), location.getBlockZ()), BlockTypes.AIR.getDefaultState());
         } catch (Exception e) {
             LolPlugin.getInstance().getLogger().warning("Erreur collage schématique " + name + ": " + e.getMessage());
         }
