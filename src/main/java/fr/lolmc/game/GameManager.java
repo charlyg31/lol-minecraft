@@ -31,6 +31,9 @@ public class GameManager {
     private final Map<UUID, Long> respawnAt = new HashMap<>();
     // BossBar individuelle de respawn
     private final Map<UUID, BossBar> respawnBars = new HashMap<>();
+    // Participants de la partie en cours (pour la reconnexion)
+    private final java.util.Set<UUID> participants = new java.util.HashSet<>();
+    private final Map<UUID, fr.lolmc.team.TeamManager.Team> participantTeam = new HashMap<>();
 
     // Or passif LoL : 20.4 or / 10s, démarre à 1:50, distribué toutes les 0.5s
     // 20.4 / 20 ticks-de-0.5s = 1.02 or par demi-seconde
@@ -53,6 +56,7 @@ public class GameManager {
     public void startGame() {
         gameRunning = true;
         gameStartTime = System.currentTimeMillis();
+        captureParticipants();
         timerBar = BossBar.bossBar(Component.text("Partie — 00:00"),
                 1.0f, BossBar.Color.WHITE, BossBar.Overlay.PROGRESS);
         for (Player p : Bukkit.getOnlinePlayers()) {
@@ -72,7 +76,27 @@ public class GameManager {
             for (Player p : Bukkit.getOnlinePlayers()) p.hideBossBar(bar);
         }
         respawnBars.clear();
+        participants.clear();
+        participantTeam.clear();
     }
+
+    /** Capture les joueurs présents (avec champion) comme participants de la partie. */
+    private void captureParticipants() {
+        participants.clear();
+        participantTeam.clear();
+        var cm = LolPlugin.getInstance().getChampionManager();
+        var tm = LolPlugin.getInstance().getTeamManager();
+        for (Player p : Bukkit.getOnlinePlayers()) {
+            if (cm.hasChampion(p)) {
+                participants.add(p.getUniqueId());
+                if (tm.hasTeam(p)) participantTeam.put(p.getUniqueId(), tm.getTeam(p));
+            }
+        }
+    }
+
+    /** Ce joueur fait-il partie de la partie en cours ? (pour la reconnexion) */
+    public boolean isParticipant(UUID id) { return participants.contains(id); }
+    public fr.lolmc.team.TeamManager.Team getParticipantTeam(UUID id) { return participantTeam.get(id); }
 
     public boolean isRunning() { return gameRunning; }
 
