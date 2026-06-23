@@ -51,10 +51,8 @@ public class Amumu extends BaseChampion {
             c.teleport(dest);
             double[] base=fr.lolmc.util.Balance.base("q_amumu",new double[]{80,130,180,230,280});double dmg=base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("q_amumu","ap",0.85);
             TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.MAGICAL);
-            if(tgt instanceof Player __p){
-                __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,20,10,false,true)); // stun 1s
-                __p.sendActionBar(Component.text("🧻 Lancer de Bandage! Stun 1s!",NamedTextColor.YELLOW));
-            }
+            fr.lolmc.LolPlugin.getInstance().getCCManager().stun(tgt, 20); // vrai stun 1s
+            if(tgt instanceof Player __p) __p.sendActionBar(Component.text("🧻 Lancer de Bandage! Stun 1s!",NamedTextColor.YELLOW));
             c.getWorld().playSound(c.getLocation(), Sound.BLOCK_WOOL_PLACE, 1f, 0.8f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
@@ -118,10 +116,8 @@ public class Amumu extends BaseChampion {
             for(var __t : TargetingUtil.enemiesAround(c, 5.0)){
                 TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);
                 __t.setVelocity(new Vector(0,0.4,0)); // knockdown
-                if(__t instanceof Player __p){
-                    __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,30,10,false,true)); // stun 1.5s
-                    __p.sendActionBar(Component.text("⛓ MALÉDICTION DE LA MOMIE! Stun 1.5s",NamedTextColor.DARK_PURPLE));
-                }
+                fr.lolmc.LolPlugin.getInstance().getCCManager().stun(__t, 30); // vrai stun 1.5s
+                if(__t instanceof Player __p) __p.sendActionBar(Component.text("⛓ MALÉDICTION DE LA MOMIE! Stun 1.5s",NamedTextColor.DARK_PURPLE));
             }
             c.getWorld().spawnParticle(Particle.END_ROD,c.getLocation().add(0,1,0),30,3,1,3);
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_WITHER_SPAWN, 1f, 1.5f);

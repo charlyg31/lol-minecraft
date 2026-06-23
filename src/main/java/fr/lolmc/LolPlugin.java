@@ -63,6 +63,7 @@ public class LolPlugin extends JavaPlugin {
     private HUDManager hudManager;
     private ShopGUI shopGUI;
     private GoldManager goldManager;
+    private fr.lolmc.game.CCManager ccManager;
     private ShopListener shopListener;
     private PassiveManager passiveManager;
     private ConsumableManager consumableManager;
@@ -160,6 +161,7 @@ public class LolPlugin extends JavaPlugin {
         hudManager = new HUDManager(championManager);
         shopGUI = new ShopGUI();
         goldManager = new GoldManager();
+        ccManager = new fr.lolmc.game.CCManager();
         shopListener = new ShopListener(shopGUI, championManager, goldManager, hudManager);
         passiveManager = new PassiveManager(championManager, hudManager, shopListener);
         consumableManager = new ConsumableManager(championManager, hudManager);
@@ -240,6 +242,7 @@ public class LolPlugin extends JavaPlugin {
     public HUDManager getHUDManager()           { return hudManager; }
     public ShopGUI getShopGUI()                 { return shopGUI; }
     public GoldManager getGoldManager()         { return goldManager; }
+    public fr.lolmc.game.CCManager getCCManager()   { return ccManager; }
     public ShopListener getShopListener()       { return shopListener; }
     public PassiveManager getPassiveManager()   { return passiveManager; }
     public ConsumableManager getConsumableManager() { return consumableManager; }
