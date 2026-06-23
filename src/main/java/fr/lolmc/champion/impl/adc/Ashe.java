@@ -103,8 +103,9 @@ public class Ashe extends BaseChampion {
             double dist=c.getLocation().distance(main.getLocation());
             int stunTicks=(int)Math.min(70, 20+dist*2.5);
             TargetingUtil.dealDamage(c, main, dmg, TargetingUtil.DmgType.MAGICAL);
+            // Vrai stun (immobilise + empêche d'agir, réduit par la ténacité)
+            fr.lolmc.LolPlugin.getInstance().getCCManager().stun(main, stunTicks);
             if(main instanceof Player __p){
-                __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,stunTicks,10,false,true)); // stun approx
                 __p.sendActionBar(Component.text("❄ ÉTOURDI par la Flèche de Cristal!",NamedTextColor.AQUA));
             }
             // Zone autour de la cible principale : 50% dégâts + ralentissement

@@ -76,6 +76,19 @@ public abstract class BaseChampion {
             + " unlocked=" + (slot==0 || levelSystem.isAbilityUnlocked(slot))
             + " onCooldown=" + ability.isOnCooldown(caster));
 
+        // Blocage par contrôle de foule : stun bloque tout, silence bloque les sorts (pas l'AA)
+        var cc = LolPlugin.getInstance().getCCManager();
+        if (cc != null) {
+            boolean blocked = (slot == 0) ? cc.isStunned(caster.getUniqueId())
+                                          : !cc.canCastAbility(caster.getUniqueId());
+            if (blocked) {
+                caster.sendActionBar(Component.text(
+                    cc.isStunned(caster.getUniqueId()) ? "💫 Étourdi — action impossible!" : "🔇 Réduit au silence!",
+                    NamedTextColor.YELLOW));
+                return;
+            }
+        }
+
         // Le sort doit être débloqué (AA slot 0 toujours OK)
         if (slot >= 1 && !levelSystem.isAbilityUnlocked(slot)) {
             caster.sendActionBar(Component.text(
