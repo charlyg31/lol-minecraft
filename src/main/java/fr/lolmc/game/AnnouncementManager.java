@@ -111,16 +111,28 @@ public class AnnouncementManager {
         if (team == null) return;
 
         Location loc = sender.getLocation();
-        Component msg = Component.text(type.label + " ", type.color)
-                .append(Component.text("(" + (int) loc.getX() + ", " + (int) loc.getZ() + ") par "
-                        + sender.getName(), NamedTextColor.GRAY));
+        String phrase = switch (type) {
+            case DANGER     -> "de danger";
+            case ON_MY_WAY  -> "pour dire qu'il arrive";
+            case MISSING    -> "de champion manquant";
+            case ASSIST     -> "à l'aide";
+            case ENEMY      -> "d'ennemi repéré";
+        };
+        // Son différent selon le type (pour les reconnaître à l'oreille)
+        float pitch = switch (type) {
+            case DANGER -> 0.7f; case ASSIST -> 0.9f; case MISSING -> 1.3f;
+            case ON_MY_WAY -> 1.6f; case ENEMY -> 1.0f;
+        };
+        Component msg = Component.text("📢 Le joueur ", NamedTextColor.AQUA)
+                .append(Component.text(sender.getName(), type.color))
+                .append(Component.text(" a fait un ping " + phrase, NamedTextColor.AQUA))
+                .append(Component.text("  (" + (int) loc.getX() + ", " + (int) loc.getZ() + ")", NamedTextColor.GRAY));
 
         for (UUID memberId : tm.getTeamMembers(team)) {
             Player member = Bukkit.getPlayer(memberId);
             if (member == null || !member.isOnline()) continue;
             member.sendMessage(msg);
-            member.playSound(member.getLocation(),
-                    org.bukkit.Sound.BLOCK_NOTE_BLOCK_BELL, 1f, 1.5f);
+            member.playSound(member.getLocation(), org.bukkit.Sound.BLOCK_NOTE_BLOCK_BELL, 1f, pitch);
         }
     }
 
