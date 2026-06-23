@@ -2,7 +2,6 @@ package fr.lolmc.shop;
 
 import fr.lolmc.item.ItemRegistry;
 import fr.lolmc.item.LolItem;
-import fr.lolmc.item.consumable.ConsumableManager;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
@@ -16,87 +15,190 @@ import org.bukkit.inventory.meta.ItemMeta;
 import java.util.*;
 
 /**
- * GUI de la boutique LoL.
- * 6 rangées de 9 = 54 slots
- *
- * Disposition:
- *   Rangée 0 (slots 0-8) : onglets catégories + bouton vendre
- *   Rangées 1-5 (slots 9-53) : items de la catégorie sélectionnée
+ * Boutique LoL — deux vues :
+ *   • PARCOURS : onglets de catégories + grille d'items (clic = ouvre la fiche).
+ *   • FICHE (arborescence) : l'item, ses composants (recette), ce qu'il construit,
+ *     et un bouton Acheter. On peut cliquer un composant pour naviguer dans l'arbre.
  */
 public class ShopGUI {
 
-    public static final String TITLE_PREFIX = "🏪 Boutique — ";
+    public static final String BROWSE_PREFIX = "🏪 Boutique — ";
+    public static final String DETAIL_PREFIX = "🧬 Recette — ";
 
-    // Catégorie par défaut affichée à l'ouverture
     private static final LolItem.ItemCategory DEFAULT_CAT = LolItem.ItemCategory.DAMAGE;
 
-    // Slots des onglets
-    private static final int[] TAB_SLOTS   = {0, 1, 2, 3, 4, 5, 8};
-    private static final int   SELL_SLOT   = 8;
-    private static final int   BACK_SLOT   = 7;
-    private static final int   INFO_SLOT   = 6;
+    // ── PARCOURS ──
+    private static final int[] TAB_SLOTS   = {0, 1, 2, 3, 4, 5, 6};
     private static final int   ITEMS_START = 9;
+    private static final int   GOLD_SLOT_B = 8;
 
-    // Mapping slot → item ID (pour chaque joueur)
-    private final Map<UUID, Map<Integer, String>> slotToItemId = new HashMap<>();
-    // Catégorie actuelle par joueur
+    // ── FICHE ──
+    private static final int   D_ITEM   = 4;   // l'item affiché
+    private static final int   D_BACK   = 0;   // retour
+    private static final int   D_GOLD   = 8;   // or
+    private static final int   D_BUY    = 49;  // acheter
+    private static final int[] D_COMPONENTS = {20, 21, 22, 23, 24}; // recette (jusqu'à 5)
+    private static final int[] D_BUILDS    = {37, 38, 39, 40, 41, 42, 43}; // construit en (jusqu'à 7)
+
+    // État par joueur
+    private final Map<UUID, Map<Integer, String>> slotToItemId = new HashMap<>(); // parcours
     private final Map<UUID, LolItem.ItemCategory> currentCategory = new HashMap<>();
+    private final Map<UUID, String> detailItem = new HashMap<>();                  // fiche ouverte
+    private final Map<UUID, Map<Integer, String>> detailNav = new HashMap<>();     // slots navigables de la fiche
 
-    // ── Ouvrir la boutique ────────────────────────────────────────
+    // ══════════════════════════════════════════════════════════════
+    // VUE PARCOURS
+    // ══════════════════════════════════════════════════════════════
 
-    public void open(Player player) {
-        open(player, DEFAULT_CAT);
-    }
+    public void open(Player player) { open(player, getCurrentCategory(player)); }
 
     public void open(Player player, LolItem.ItemCategory cat) {
+        detailItem.remove(player.getUniqueId());
         currentCategory.put(player.getUniqueId(), cat);
-        String title = TITLE_PREFIX + getCategoryLabel(cat);
         Inventory inv = Bukkit.createInventory(null, 54,
-            Component.text(title, NamedTextColor.GOLD));
+                Component.text(BROWSE_PREFIX + getCategoryLabel(cat), NamedTextColor.GOLD));
 
-        // Remplir les onglets
-        buildTabs(inv, cat);
+        // Onglets
+        LolItem.ItemCategory[] cats = LolItem.ItemCategory.values();
+        for (int i = 0; i < Math.min(cats.length, TAB_SLOTS.length); i++) {
+            inv.setItem(TAB_SLOTS[i], tabButton(cats[i], cats[i] == cat));
+        }
+        inv.setItem(GOLD_SLOT_B, goldDisplay(player));
 
-        // Remplir les items
+        // Items de la catégorie
         Map<Integer, String> mapping = new HashMap<>();
-        List<LolItem> items = ItemRegistry.byCategory(cat);
         int slot = ITEMS_START;
-        for (LolItem item : items) {
+        for (LolItem item : ItemRegistry.byCategory(cat)) {
             if (slot >= 54) break;
-            inv.setItem(slot, item.buildItemStack());
+            inv.setItem(slot, decorateBrowse(item.buildItemStack(), item));
             mapping.put(slot, item.getId());
             slot++;
         }
         slotToItemId.put(player.getUniqueId(), mapping);
 
-        // Remplir les cases vides
         ItemStack filler = filler();
-        for (int i = ITEMS_START; i < 54; i++) {
-            if (inv.getItem(i) == null) inv.setItem(i, filler);
-        }
-
-        // Bouton info
-        inv.setItem(INFO_SLOT, infoButton(player));
-        // Bouton vendre
-        inv.setItem(SELL_SLOT, sellButton());
+        for (int i = 0; i < 54; i++) if (inv.getItem(i) == null) inv.setItem(i, filler);
 
         player.openInventory(inv);
     }
 
-    // ── Onglets ───────────────────────────────────────────────────
+    /** Ajoute un indice "clic = fiche" à l'item de la grille. */
+    private ItemStack decorateBrowse(ItemStack stack, LolItem item) {
+        ItemMeta m = stack.getItemMeta();
+        if (m == null) return stack;
+        List<Component> lore = m.lore() != null ? new ArrayList<>(m.lore()) : new ArrayList<>();
+        lore.add(Component.empty());
+        if (!item.getBuildsFrom().isEmpty()) {
+            lore.add(Component.text("🧬 " + item.getBuildsFrom().size() + " composants",
+                    NamedTextColor.AQUA).decoration(TextDecoration.ITALIC, false));
+        }
+        lore.add(Component.text("▶ Clic : voir la recette / acheter", NamedTextColor.YELLOW)
+                .decoration(TextDecoration.ITALIC, false));
+        m.lore(lore);
+        stack.setItemMeta(m);
+        return stack;
+    }
 
-    private void buildTabs(Inventory inv, LolItem.ItemCategory current) {
-        LolItem.ItemCategory[] cats = LolItem.ItemCategory.values();
-        int[] tabSlots = {0, 1, 2, 3, 4, 5};
-        for (int i = 0; i < Math.min(cats.length, tabSlots.length); i++) {
-            inv.setItem(tabSlots[i], tabButton(cats[i], cats[i] == current));
+    // ══════════════════════════════════════════════════════════════
+    // VUE FICHE (arborescence)
+    // ══════════════════════════════════════════════════════════════
+
+    public void openDetail(Player player, String itemId) {
+        LolItem item = ItemRegistry.get(itemId);
+        if (item == null) { open(player); return; }
+        detailItem.put(player.getUniqueId(), itemId);
+        Inventory inv = Bukkit.createInventory(null, 54,
+                Component.text(DETAIL_PREFIX + item.getDisplayName(), NamedTextColor.LIGHT_PURPLE));
+
+        ItemStack filler = filler();
+        for (int i = 0; i < 54; i++) inv.setItem(i, filler);
+
+        // L'item au centre haut
+        inv.setItem(D_ITEM, item.buildItemStack());
+        inv.setItem(D_BACK, navButton(Material.ARROW, "◀ Retour", NamedTextColor.YELLOW));
+        inv.setItem(D_GOLD, goldDisplay(player));
+
+        Map<Integer, String> nav = new HashMap<>();
+
+        // Composants (recette)
+        inv.setItem(18, label("⬇ Construit à partir de :", NamedTextColor.AQUA));
+        List<String> comps = item.getBuildsFrom();
+        if (comps.isEmpty()) {
+            inv.setItem(D_COMPONENTS[2], label("Composant de base (pas de recette)", NamedTextColor.GRAY));
+        } else {
+            placeRow(inv, comps, D_COMPONENTS, nav);
+        }
+
+        // Ce que l'item construit
+        inv.setItem(27, label("⬆ Composant de :", NamedTextColor.GOLD));
+        List<String> into = new ArrayList<>();
+        for (LolItem b : ItemRegistry.buildsInto(itemId)) into.add(b.getId());
+        if (into.isEmpty()) {
+            inv.setItem(D_BUILDS[3], label("Item final (ne construit rien)", NamedTextColor.GRAY));
+        } else {
+            placeRow(inv, into, D_BUILDS, nav);
+        }
+
+        // Bouton acheter
+        inv.setItem(D_BUY, buyButton(player, item));
+
+        detailNav.put(player.getUniqueId(), nav);
+        player.openInventory(inv);
+    }
+
+    /** Place une liste d'items dans une rangée de slots et les enregistre comme navigables. */
+    private void placeRow(Inventory inv, List<String> ids, int[] slots, Map<Integer, String> nav) {
+        for (int i = 0; i < ids.size() && i < slots.length; i++) {
+            LolItem it = ItemRegistry.get(ids.get(i));
+            if (it == null) continue;
+            ItemStack stack = it.buildItemStack();
+            ItemMeta m = stack.getItemMeta();
+            if (m != null) {
+                List<Component> lore = m.lore() != null ? new ArrayList<>(m.lore()) : new ArrayList<>();
+                lore.add(Component.empty());
+                lore.add(Component.text("▶ Clic : voir cet item", NamedTextColor.YELLOW)
+                        .decoration(TextDecoration.ITALIC, false));
+                m.lore(lore);
+                stack.setItemMeta(m);
+            }
+            inv.setItem(slots[i], stack);
+            nav.put(slots[i], it.getId());
         }
     }
+
+    private ItemStack buyButton(Player player, LolItem item) {
+        int gold = LolPluginGold(player);
+        boolean afford = gold >= item.getGoldCost();
+        ItemStack b = new ItemStack(afford ? Material.EMERALD_BLOCK : Material.REDSTONE_BLOCK);
+        ItemMeta m = b.getItemMeta();
+        if (m == null) return b;
+        m.displayName(Component.text((afford ? "✔ Acheter — " : "✘ ") + item.getGoldCost() + " or",
+                afford ? NamedTextColor.GREEN : NamedTextColor.RED)
+                .decoration(TextDecoration.ITALIC, false));
+        List<Component> lore = new ArrayList<>();
+        lore.add(Component.text(item.getDisplayName(), NamedTextColor.WHITE)
+                .decoration(TextDecoration.ITALIC, false));
+        lore.add(Component.text("Ton or : " + gold, NamedTextColor.GOLD)
+                .decoration(TextDecoration.ITALIC, false));
+        if (!afford) lore.add(Component.text("Il te manque " + (item.getGoldCost() - gold) + " or",
+                NamedTextColor.RED).decoration(TextDecoration.ITALIC, false));
+        m.lore(lore);
+        b.setItemMeta(m);
+        return b;
+    }
+
+    private int LolPluginGold(Player player) {
+        return fr.lolmc.LolPlugin.getInstance().getGoldManager().getGold(player.getUniqueId());
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // BOUTONS / HELPERS VISUELS
+    // ══════════════════════════════════════════════════════════════
 
     private ItemStack tabButton(LolItem.ItemCategory cat, boolean selected) {
         Material mat = switch (cat) {
             case DAMAGE       -> Material.NETHERITE_SWORD;
-            case MAGE         -> Material.BLAZE_POWDER;
+            case MAGE         -> Material.BLAZE_ROD;
             case TANK         -> Material.IRON_CHESTPLATE;
             case ATTACK_SPEED -> Material.BOW;
             case SUPPORT      -> Material.GOLDEN_APPLE;
@@ -106,49 +208,45 @@ public class ShopGUI {
         ItemStack item = new ItemStack(mat);
         ItemMeta meta = item.getItemMeta();
         if (meta == null) return item;
-        NamedTextColor color = selected ? NamedTextColor.GOLD : NamedTextColor.GRAY;
-        meta.displayName(Component.text(
-                (selected ? "▶ " : "") + getCategoryLabel(cat),
-                color).decoration(TextDecoration.ITALIC, false)
+        meta.displayName(Component.text((selected ? "▶ " : "") + getCategoryLabel(cat),
+                        selected ? NamedTextColor.GOLD : NamedTextColor.GRAY)
+                .decoration(TextDecoration.ITALIC, false)
                 .decoration(TextDecoration.BOLD, selected));
         item.setItemMeta(meta);
         return item;
     }
 
-    private ItemStack infoButton(Player player) {
-        ItemStack item = new ItemStack(Material.BOOK);
-        ItemMeta meta = item.getItemMeta();
-        if (meta == null) return item;
-        meta.displayName(Component.text("ℹ Mon inventaire", NamedTextColor.AQUA)
+    private ItemStack goldDisplay(Player player) {
+        int gold = LolPluginGold(player);
+        ItemStack item = new ItemStack(Material.GOLD_INGOT);
+        ItemMeta m = item.getItemMeta();
+        if (m == null) return item;
+        m.displayName(Component.text("💰 Ton or : " + gold, NamedTextColor.GOLD)
                 .decoration(TextDecoration.ITALIC, false));
-        meta.lore(List.of(
-            Component.text("Clique sur un item pour l'acheter.", NamedTextColor.GRAY)
-                .decoration(TextDecoration.ITALIC, false),
-            Component.text("Clique sur le slot [Vendre] pour vendre.", NamedTextColor.GRAY)
-                .decoration(TextDecoration.ITALIC, false)
-        ));
-        item.setItemMeta(meta);
+        item.setItemMeta(m);
         return item;
     }
 
-    private ItemStack sellButton() {
-        ItemStack item = new ItemStack(Material.GOLD_INGOT);
-        ItemMeta meta = item.getItemMeta();
-        if (meta == null) return item;
-        meta.displayName(Component.text("💰 Vendre un item (70%)", NamedTextColor.GOLD)
-                .decoration(TextDecoration.ITALIC, false));
-        meta.lore(List.of(
-            Component.text("Ferme la boutique, puis clique", NamedTextColor.GRAY)
-                .decoration(TextDecoration.ITALIC, false),
-            Component.text("droit sur l'item à vendre.", NamedTextColor.GRAY)
-                .decoration(TextDecoration.ITALIC, false)
-        ));
-        item.setItemMeta(meta);
+    private ItemStack navButton(Material mat, String name, NamedTextColor color) {
+        ItemStack item = new ItemStack(mat);
+        ItemMeta m = item.getItemMeta();
+        if (m == null) return item;
+        m.displayName(Component.text(name, color).decoration(TextDecoration.ITALIC, false));
+        item.setItemMeta(m);
+        return item;
+    }
+
+    private ItemStack label(String text, NamedTextColor color) {
+        ItemStack item = new ItemStack(Material.PAPER);
+        ItemMeta m = item.getItemMeta();
+        if (m == null) return item;
+        m.displayName(Component.text(text, color).decoration(TextDecoration.ITALIC, false));
+        item.setItemMeta(m);
         return item;
     }
 
     private ItemStack filler() {
-        ItemStack f = new ItemStack(Material.BLACK_STAINED_GLASS_PANE);
+        ItemStack f = new ItemStack(Material.GRAY_STAINED_GLASS_PANE);
         ItemMeta m = f.getItemMeta();
         if (m != null) {
             m.displayName(Component.text(" ").decoration(TextDecoration.ITALIC, false));
@@ -157,29 +255,42 @@ public class ShopGUI {
         return f;
     }
 
-    // ── Gestion des clics ─────────────────────────────────────────
+    // ══════════════════════════════════════════════════════════════
+    // ROUTAGE DES CLICS (lu par ShopListener)
+    // ══════════════════════════════════════════════════════════════
 
-    /**
-     * Retourne l'item ID cliqué, ou null si c'est un onglet/filler.
-     */
+    public boolean isDetailView(Player player) {
+        return detailItem.containsKey(player.getUniqueId());
+    }
+
+    /** Item dont la fiche est ouverte (pour l'achat). */
+    public String getDetailItemId(Player player) {
+        return detailItem.get(player.getUniqueId());
+    }
+
+    public boolean isBackSlot(int slot)  { return slot == D_BACK; }
+    public boolean isBuySlot(int slot)   { return slot == D_BUY; }
+
+    /** Slot navigable de la fiche (composant / construit en) → item ID, ou null. */
+    public String getDetailNavId(Player player, int slot) {
+        Map<Integer, String> nav = detailNav.get(player.getUniqueId());
+        return nav != null ? nav.get(slot) : null;
+    }
+
+    /** (Parcours) item cliqué dans la grille → ID, ou null. */
     public String getClickedItemId(Player player, int slot) {
         Map<Integer, String> mapping = slotToItemId.get(player.getUniqueId());
         return mapping != null ? mapping.get(slot) : null;
     }
 
-    /**
-     * Retourne la catégorie de l'onglet cliqué, ou null.
-     */
+    /** (Parcours) onglet cliqué → catégorie, ou null. */
     public LolItem.ItemCategory getClickedCategory(int slot) {
         LolItem.ItemCategory[] cats = LolItem.ItemCategory.values();
-        int[] tabSlots = {0, 1, 2, 3, 4, 5};
-        for (int i = 0; i < tabSlots.length; i++) {
-            if (tabSlots[i] == slot && i < cats.length) return cats[i];
+        for (int i = 0; i < TAB_SLOTS.length; i++) {
+            if (TAB_SLOTS[i] == slot && i < cats.length) return cats[i];
         }
         return null;
     }
-
-    public boolean isSellSlot(int slot) { return slot == SELL_SLOT; }
 
     public LolItem.ItemCategory getCurrentCategory(Player player) {
         return currentCategory.getOrDefault(player.getUniqueId(), DEFAULT_CAT);
@@ -188,14 +299,14 @@ public class ShopGUI {
     public void cleanup(Player player) {
         slotToItemId.remove(player.getUniqueId());
         currentCategory.remove(player.getUniqueId());
+        detailItem.remove(player.getUniqueId());
+        detailNav.remove(player.getUniqueId());
     }
-
-    // ── Helpers ───────────────────────────────────────────────────
 
     public static boolean isShopInventory(Component title) {
         String plain = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
                 .plainText().serialize(title);
-        return plain.startsWith("🏪 Boutique");
+        return plain.startsWith("🏪 Boutique") || plain.startsWith("🧬 Recette");
     }
 
     private String getCategoryLabel(LolItem.ItemCategory cat) {
