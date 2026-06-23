@@ -218,10 +218,18 @@ public class SummonerSpellManager {
             caster.sendActionBar(Component.text("⚔ Aucun monstre à châtier", NamedTextColor.GRAY));
             return false;
         }
-        // Châtiment inflige 600 dégâts vrais aux monstres (valeur LoL)
-        target.damage(600);
+        // Châtiment = dégâts bruts ; sécurise l'objectif (crédit/or au lanceur)
+        double smiteDamage = 600;
+        double cur = target.getHealth();
+        if (smiteDamage >= cur) {
+            // EXÉCUTION : on garantit la mort attribuée au lanceur (vol de Dragon/Baron)
+            target.damage(cur + 100, caster);
+            caster.sendActionBar(Component.text("⚔ Châtiment — EXÉCUTÉ!", NamedTextColor.GOLD));
+        } else {
+            target.damage(smiteDamage, caster);
+            caster.sendActionBar(Component.text("⚔ Châtiment! (" + (int) smiteDamage + ")", NamedTextColor.GOLD));
+        }
         target.getWorld().spawnParticle(Particle.CRIT, target.getLocation().add(0,1,0), 20, 0.4, 0.4, 0.4);
-        caster.sendActionBar(Component.text("⚔ Châtiment!", NamedTextColor.GOLD));
         return true;
     }
 
