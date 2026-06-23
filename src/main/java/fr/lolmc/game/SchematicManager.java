@@ -12,6 +12,7 @@ import com.sk89q.worldedit.function.operation.Operations;
 import com.sk89q.worldedit.math.BlockVector3;
 import com.sk89q.worldedit.math.transform.AffineTransform;
 import com.sk89q.worldedit.session.ClipboardHolder;
+import com.sk89q.worldedit.world.block.BlockTypes;
 import fr.lolmc.LolPlugin;
 import org.bukkit.Location;
 
@@ -98,12 +99,37 @@ public class SchematicManager {
 
         try (ClipboardReader reader = format.getReader(new FileInputStream(file))) {
             Clipboard clipboard = reader.read();
+            anchorOnFurnace(clipboard); // four = origine + pivot, puis retiré
             cache.put(name, clipboard);
             return clipboard;
         } catch (Exception e) {
             LolPlugin.getInstance().getLogger().warning("Erreur lecture schématique " + name + ": " + e.getMessage());
             return null;
         }
+    }
+
+    /**
+     * Cherche le four le plus bas de la schématique, le définit comme point
+     * d'origine (= ancrage et pivot de rotation), puis le remplace par de l'air
+     * (le four est un simple marqueur, il n'apparaît pas dans la structure finie).
+     * Si aucun four : on garde l'origine d'origine de WorldEdit (repli).
+     */
+    private void anchorOnFurnace(Clipboard clipboard) {
+        BlockVector3 furnace = null;
+        for (BlockVector3 pos : clipboard.getRegion()) {
+            if (clipboard.getBlock(pos).getBlockType() == BlockTypes.FURNACE) {
+                if (furnace == null || pos.getY() < furnace.getY()) furnace = pos;
+            }
+        }
+        if (furnace == null) {
+            LolPlugin.getInstance().getLogger().warning(
+                    "Schématique sans four marqueur : origine WorldEdit par défaut utilisée.");
+            return;
+        }
+        clipboard.setOrigin(furnace);
+        try {
+            clipboard.setBlock(furnace, BlockTypes.AIR.getDefaultState());
+        } catch (Exception ignored) {}
     }
 
     /**
