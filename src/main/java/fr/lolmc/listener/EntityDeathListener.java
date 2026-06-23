@@ -41,6 +41,7 @@ public class EntityDeathListener implements Listener {
         if (MinionManager.isMinion(dead)) {
             e.getDrops().clear();
             e.setDroppedExp(0);
+            LolPlugin.getInstance().getMinionManager().onMinionDeath(dead.getUniqueId());
             if (killer != null && championManager.hasChampion(killer)) {
                 // Or/XP selon le type de sbire (mêlée par défaut)
                 rewardManager.onMinionKill(killer,

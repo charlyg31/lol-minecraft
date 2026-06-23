@@ -32,10 +32,11 @@ public class MonsterPassiveListener implements Listener {
         }
     }
 
-    /** Quand un monstre de jungle FRAPPE : déclenche son animation d'attaque. */
+    /** Quand un monstre de jungle ou un sbire FRAPPE : déclenche son animation d'attaque. */
     @EventHandler
     public void onMonsterAttack(EntityDamageByEntityEvent e) {
-        if (e.getDamager() instanceof LivingEntity dmg && JungleManager.isJungleMonster(dmg)) {
+        if (e.getDamager() instanceof LivingEntity dmg
+                && (JungleManager.isJungleMonster(dmg) || fr.lolmc.game.MinionManager.isMinion(dmg))) {
             fr.lolmc.util.MobAnimator.triggerAttack(dmg.getUniqueId());
         }
     }
