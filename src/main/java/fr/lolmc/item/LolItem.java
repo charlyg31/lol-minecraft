@@ -26,6 +26,9 @@ public class LolItem {
     private final Material icon;
     private final ItemCategory category;
 
+    // ── Recette (arborescence) : IDs des composants qui construisent cet item ──
+    private final java.util.List<String> buildsFrom = new java.util.ArrayList<>();
+
     // ── Catégories ──
     public enum ItemCategory {
         DAMAGE,       // AD / Crit / Lethality
@@ -300,6 +303,13 @@ public class LolItem {
     public LolItem active(String name, String desc) {
         this.passiveName = name; this.passiveDescription = desc; this.hasActive = true; return this;
     }
+
+    /** Définit la recette : les IDs des composants qui construisent cet item. */
+    public LolItem recipe(String... componentIds) {
+        for (String c : componentIds) buildsFrom.add(c);
+        return this;
+    }
+    public java.util.List<String> getBuildsFrom() { return buildsFrom; }
     public boolean hasActive() { return hasActive; }
 
     // ── Getters ───────────────────────────────────────────────────

@@ -20,6 +20,7 @@ public class ItemRegistry {
         registerMiscAndLegacy();
         registerWards();
         registerOfficialMissing();
+        registerRecipes();
     }
 
     private static void registerComponents() {
@@ -425,5 +426,96 @@ public class ItemRegistry {
     public static boolean exists(String id)             { return ITEMS.containsKey(id); }
     public static List<LolItem> byCategory(LolItem.ItemCategory cat) {
         return ITEMS.values().stream().filter(i -> i.getCategory() == cat).toList();
+    }
+
+    /** Items dont la recette contient ce composant (= ce que ce composant construit). */
+    public static List<LolItem> buildsInto(String componentId) {
+        List<LolItem> out = new ArrayList<>();
+        for (LolItem it : ITEMS.values()) {
+            if (it.getBuildsFrom().contains(componentId)) out.add(it);
+        }
+        return out;
+    }
+
+    private static void rec(String id, String... comps) {
+        LolItem it = ITEMS.get(id);
+        if (it != null) it.recipe(comps);
+    }
+
+    /** Recettes (arborescence) des items emblématiques, façon LoL. */
+    private static void registerRecipes() {
+        // ── Épiques (Tier 2) ──
+        rec("phage", "long_sword", "ruby_crystal");
+        rec("kindlegem", "ruby_crystal");
+        rec("hexdrinker", "long_sword", "null_magic_orb");
+        rec("lost_chapter", "amplifying_tome", "sapphire_crystal", "faerie_charm");
+        rec("serrated_dirk", "long_sword", "long_sword");
+        rec("sheen", "sapphire_crystal");
+        rec("seekers_armguard", "cloth_armor", "amplifying_tome");
+        rec("glacial_buckler", "sapphire_crystal", "cloth_armor");
+        rec("the_brutalizer", "long_sword", "long_sword", "pickaxe");
+        rec("noonquiver", "bf_sword", "dagger", "dagger");
+
+        // ── Dégâts (AD / crit) ──
+        rec("infinity_edge", "bf_sword", "pickaxe", "cloak_agility");
+        rec("bloodthirster", "bf_sword", "vampiric_scepter", "cloak_agility");
+        rec("the_collector", "serrated_dirk", "pickaxe", "cloak_agility");
+        rec("youmuus_ghostblade", "serrated_dirk", "caulfields");
+        rec("deaths_dance", "serrated_dirk", "caulfields", "chain_vest");
+        rec("black_cleaver", "serrated_dirk", "phage", "kindlegem");
+        rec("lord_dominiks", "bf_sword", "pickaxe", "cloak_agility");
+        rec("mortal_reminder", "bf_sword", "vampiric_scepter", "cloak_agility");
+        rec("guardian_angel", "bf_sword", "chain_vest", "stopwatch");
+        rec("maw", "hexdrinker", "caulfields");
+
+        // ── Attaque rapide / on-hit ──
+        rec("kraken_slayer", "noonquiver", "cloak_agility", "rectrix");
+        rec("phantom_dancer", "zeal", "dagger", "cloak_agility");
+        rec("runaans_hurricane", "zeal", "dagger", "recurve_bow");
+        rec("rapid_firecannon", "zeal", "kircheis_shard", "dagger");
+        rec("statikk_shiv", "zeal", "kircheis_shard", "dagger");
+        rec("wits_end", "recurve_bow", "null_magic_orb", "dagger");
+        rec("nashors_tooth", "recurve_bow", "fiendish_codex", "blasting_wand");
+        rec("rageblade", "recurve_bow", "pickaxe", "amplifying_tome");
+        rec("trinity_force", "sheen", "phage", "hearthbound_axe");
+        rec("divine_sunderer", "sheen", "phage", "kindlegem");
+        rec("iceborn_gauntlet", "sheen", "warden_mail", "glacial_buckler");
+        rec("lich_bane", "sheen", "aether_wisp", "blasting_wand");
+
+        // ── Mage (AP) ──
+        rec("rabadons_deathcap", "needlessly_large_rod", "needlessly_large_rod", "amplifying_tome");
+        rec("zhonyas_hourglass", "needlessly_large_rod", "seekers_armguard", "stopwatch");
+        rec("void_staff", "blasting_wand", "blighting_jewel", "amplifying_tome");
+        rec("morellonomicon", "oblivion_orb", "blasting_wand", "amplifying_tome");
+        rec("liandry_anguish", "haunting_guise", "blasting_wand", "amplifying_tome");
+        rec("liandry_torment", "haunting_guise", "blasting_wand", "amplifying_tome");
+        rec("ludens_companion", "lost_chapter", "blasting_wand", "amplifying_tome");
+        rec("ludens_echo", "lost_chapter", "blasting_wand", "amplifying_tome");
+        rec("rod_of_ages", "catalyst", "blasting_wand", "sapphire_crystal");
+        rec("rylais_crystal_scepter", "needlessly_large_rod", "giants_belt", "amplifying_tome");
+        rec("archangels_staff", "tear_of_goddess", "lost_chapter", "blasting_wand");
+        rec("banshees_veil", "blasting_wand", "negatron_cloak", "amplifying_tome");
+        rec("shadowflame", "blasting_wand", "blighting_jewel", "amplifying_tome");
+        rec("hextech_gunblade", "hextech_alternator", "vampiric_scepter", "amplifying_tome");
+
+        // ── Tank (HP / Armure / RM) ──
+        rec("thornmail", "bramble_vest", "chain_vest", "ruby_crystal");
+        rec("sunfire_aegis", "bamis_cinder", "chain_vest", "ruby_crystal");
+        rec("sunfire_cape", "bamis_cinder", "chain_vest", "ruby_crystal");
+        rec("randuins_omen", "warden_mail", "giants_belt", "ruby_crystal");
+        rec("frozen_heart", "warden_mail", "glacial_buckler");
+        rec("spirit_visage", "kindlegem", "spectre_cowl");
+        rec("abyssal_mask", "catalyst", "negatron_cloak");
+        rec("warmogs_armor", "giants_belt", "crystalline_bracer", "rejuv_bead");
+        rec("dead_mans_plate", "warden_mail", "winged_moonplate");
+        rec("frozen_mallet", "phage", "giants_belt", "ruby_crystal");
+        rec("force_of_nature", "negatron_cloak", "negatron_cloak", "winged_moonplate");
+        rec("steraks_gage", "phage", "giants_belt");
+        rec("titanic_hydra", "tiamat", "ruby_crystal", "giants_belt");
+
+        // ── Combat / bruisers ──
+        rec("ravenous_hydra", "tiamat", "vampiric_scepter", "long_sword");
+        rec("stridebreaker", "tiamat", "hearthbound_axe", "kindlegem");
+        rec("sterak_gage2", "phage", "giants_belt");
     }
 }
