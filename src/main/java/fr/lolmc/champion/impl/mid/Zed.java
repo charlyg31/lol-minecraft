@@ -32,15 +32,16 @@ public class Zed extends BaseChampion {
         initSystems(582, 7.0, ResourceSystem.ResourceType.ENERGY, 200, 50.0);
     }
 
-    // Ombre active par joueur
-    private static final Map<UUID,Location> shadows=new HashMap<>();
+    // Gestion de l'ombre et des cooldowns manuels
+    private static final Map<UUID,Location> shadows = new HashMap<>();
+    private static final Map<UUID, Long> wCooldowns = new HashMap<>();
+
     public static void resetState(UUID id){ shadows.remove(id); }
     public static void resetAllState(){ shadows.clear(); }
 
     static class AA extends BasicAttackAbility {
         AA(){super("zed",Material.IRON_SWORD,2.5f,DamageType.PHYSICAL);}
         @Override protected void onHit(Player c, ChampionStats s, org.bukkit.entity.LivingEntity tgt, double dmg){
-            // Passif Mépris des Faibles : cible sous 50% PV = dégâts magiques bonus (8% PV max)
             if(tgt.getHealth() < tgt.getMaxHealth()*0.5){
                 double bonus=tgt.getMaxHealth()*0.08;
                 TargetingUtil.dealDamage(c, tgt, bonus, TargetingUtil.DmgType.MAGICAL);
@@ -54,13 +55,12 @@ public class Zed extends BaseChampion {
             new double[]{6,5.5,5,4.5,4},20,0,DamageType.PHYSICAL);
             resourceCost = 40;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            // LoL : skillshot ligne droite. 1er ennemi: 80-240 +100% AD bonus. Suivants: 48-144 +60% AD
             double[] baseFirst={80,120,160,200,240};
             double[] baseNext={48,72,96,120,144};
             int rank=getLevel()-1;
             double dmgFirst=baseFirst[rank]+s.getFinalAD()*1.0;
             double dmgNext=baseNext[rank]+s.getFinalAD()*0.6;
-            var hits=TargetingUtil.skillshot(c, 12.0, 1.0, true); // traverse tous
+            var hits=TargetingUtil.skillshot(c, 12.0, 1.0, true);
             boolean first=true;
             for(var __t : hits){
                 TargetingUtil.dealDamage(c, __t, first?dmgFirst:dmgNext, TargetingUtil.DmgType.PHYSICAL);
@@ -75,28 +75,55 @@ public class Zed extends BaseChampion {
     }
 
     static class W extends BaseAbility {
-        W(){super("w_zed","Ombre Vivante",Material.GRAY_DYE,AbilitySlot.W,
-            new double[]{20,18,16,14,12},0,0,DamageType.TRUE);
-            resourceCost = 40;}
+        W(){
+            super("w_zed","Ombre Vivante",Material.GRAY_DYE,AbilitySlot.W,
+                new double[]{0,0,0,0,0},0,0,DamageType.TRUE);
+            resourceCost = 40;
+        }
         @Override public void cast(Player c,ChampionStats s,Player t){
-            if(shadows.containsKey(c.getUniqueId())) {
-                // Double cast: téléportation sur l'ombre
-                Location shadow=shadows.get(c.getUniqueId());
-                c.teleport(safeTeleport(c.getLocation(),shadow));
-                shadows.remove(c.getUniqueId());
-                c.sendActionBar(Component.text("👤 Retour à l'ombre!",NamedTextColor.DARK_GRAY));
+            UUID uuid = c.getUniqueId();
+            int rank = Math.min(getLevel() - 1, 4);
+            double[] realCooldowns = {20, 18, 16, 14, 12};
+            long now = System.currentTimeMillis();
+
+            if (wCooldowns.containsKey(uuid) && wCooldowns.get(uuid) > now && !shadows.containsKey(uuid)) {
+                long remaining = (wCooldowns.get(uuid) - now) / 1000;
+                c.sendActionBar(Component.text("⏳ Ombre Vivante en récupération (" + remaining + "s)", NamedTextColor.RED));
+                return;
+            }
+
+            if(shadows.containsKey(uuid)) {
+                Location shadowLoc = shadows.get(uuid);
+                if (shadowLoc != null) {
+                    c.teleport(shadowLoc);
+                    shadows.remove(uuid);
+                    c.sendActionBar(Component.text("👤 Échange avec l'ombre !", NamedTextColor.DARK_GRAY));
+                    wCooldowns.put(uuid, now + (long)(realCooldowns[rank] * 1000));
+                }
             } else {
-                // Premier cast: crée une ombre devant
-                Location shadowLoc=c.getLocation().clone().add(c.getLocation().getDirection().multiply(8));
-                Location safe=safeTeleport(c.getLocation(),shadowLoc);
-                shadows.put(c.getUniqueId(),safe);
-                c.getWorld().spawnParticle(Particle.SMOKE,safe,20,1,1,1);
-                c.sendActionBar(Component.text("👤 Ombre créée! Re-cast pour aller dessus.",NamedTextColor.DARK_GRAY));
-                // Supprimer l'ombre après 4s si pas re-cast
-                new BukkitRunnable(){@Override public void run(){shadows.remove(c.getUniqueId());}}.runTaskLater(LolPlugin.getInstance(),80L);
+                Vector dir = c.getLocation().getDirection().setY(0).normalize();
+                Location shadowLoc = c.getLocation().clone().add(dir.multiply(8));
+                shadowLoc.setY(c.getWorld().getHighestBlockYAt(shadowLoc) + 1);
+                shadowLoc.setYaw(c.getLocation().getYaw());
+                shadowLoc.setPitch(c.getLocation().getPitch());
+
+                shadows.put(uuid, shadowLoc);
+                c.getWorld().spawnParticle(Particle.SMOKE, shadowLoc, 20, 0.5, 1, 0.5);
+                c.sendActionBar(Component.text("👤 Ombre créée ! Re-cast pour échanger de place.", NamedTextColor.DARK_GRAY));
+
+                new BukkitRunnable(){
+                    @Override public void run(){
+                        if (shadows.containsKey(uuid)) {
+                            shadows.remove(uuid);
+                            wCooldowns.put(uuid, System.currentTimeMillis() + (long)(realCooldowns[rank] * 1000));
+                        }
+                    }
+                }.runTaskLater(LolPlugin.getInstance(), 80L);
             }
         }
-        @Override public String getDynamicDescription(ChampionStats s){return "Projette une ombre. Re-cast pour échanger de position avec elle.";}
+        @Override public String getDynamicDescription(ChampionStats s){
+            return "Projette une ombre au sol. Re-cast pour échanger de position avec elle.";
+        }
     }
 
     static class E extends BaseAbility {
@@ -104,17 +131,31 @@ public class Zed extends BaseChampion {
             new double[]{4,3,2,1,0.5},5,4,DamageType.PHYSICAL);
             resourceCost = 50;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            // LoL : 70/92.5/115/137.5/160 + 70% AD bonus, ralentit 20-40% 1.5s
             double[] base=fr.lolmc.util.Balance.base("e_zed",new double[]{70,92.5,115,137.5,160});
             double dmg=base[getLevel()-1]+s.getFinalAD()*fr.lolmc.util.Balance.ratio("e_zed","ad",0.7);
             int rank=getLevel()-1;
             for(var __t : TargetingUtil.enemiesAround(c, 4.0)){
                 TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.PHYSICAL);
                 if(__t instanceof Player __p)
-                    __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,30,rank,false,true)); // 20%->40%
+                    __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,30,rank,false,true));
             }
             c.getWorld().spawnParticle(Particle.SWEEP_ATTACK,c.getLocation().add(0,1,0),6,2,0.5,2);
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 0.9f);
+
+            if (shadows.containsKey(c.getUniqueId())) {
+                Location shadowLoc = shadows.get(c.getUniqueId());
+                if (shadowLoc != null) {
+                    for (Entity entity : shadowLoc.getWorld().getNearbyEntities(shadowLoc, 4.0, 4.0, 4.0)) {
+                        if (entity instanceof org.bukkit.entity.LivingEntity tgtEnnemi && !entity.equals(c)) {
+                            TargetingUtil.dealDamage(c, tgtEnnemi, dmg, TargetingUtil.DmgType.PHYSICAL);
+                            if (tgtEnnemi instanceof Player __p) 
+                                __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 30, rank, false, true));
+                        }
+                    }
+                    shadowLoc.getWorld().spawnParticle(Particle.SWEEP_ATTACK, shadowLoc.clone().add(0,1,0), 6, 2, 0.5, 2);
+                    shadowLoc.getWorld().playSound(shadowLoc, Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 0.9f);
+                }
+            }
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] base=fr.lolmc.util.Balance.base("e_zed",new double[]{70,92.5,115,137.5,160});
@@ -128,11 +169,9 @@ public class Zed extends BaseChampion {
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,8.0); if(tgt==null){c.sendActionBar(Component.text("💀 Aucune cible visée",NamedTextColor.GRAY));return;}
-            // Dash derrière la cible (intouchable approx)
             var dest=tgt.getLocation().clone().add(tgt.getLocation().getDirection().multiply(1.5));
             dest.setY(c.getLocation().getY());
             c.teleport(dest);
-            // Marque : on note les PV de la cible au début pour calculer les dégâts subis
             final double startHP=tgt.getHealth();
             if(tgt instanceof Player _tp)_tp.sendActionBar(Component.text("💀 MARQUE DE MORT — 3s...",NamedTextColor.DARK_RED));
             tgt.getWorld().spawnParticle(Particle.SMOKE,tgt.getLocation().add(0,1,0),20,0.5,1,0.5);
@@ -142,7 +181,6 @@ public class Zed extends BaseChampion {
             new BukkitRunnable(){
                 @Override public void run(){
                     if(tgt.isDead())return;
-                    // Dégâts subis pendant la marque = startHP - HP actuel (approx des dégâts infligés)
                     double subis=Math.max(0, startHP - tgt.getHealth());
                     double dmg=ad*0.65 + subis*ampPct[rank];
                     tgt.getWorld().strikeLightningEffect(tgt.getLocation());
@@ -150,7 +188,7 @@ public class Zed extends BaseChampion {
                     TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.TRUE);
                     if(tgt instanceof Player _tp)_tp.sendMessage(Component.text("☠ DÉTONATION! Marque de Mort",NamedTextColor.DARK_RED));
                 }
-            }.runTaskLater(LolPlugin.getInstance(),60L); // 3s
+            }.runTaskLater(LolPlugin.getInstance(),60L);
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 1f, 0.7f);
         }
         @Override public String getDynamicDescription(ChampionStats s){

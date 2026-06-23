@@ -86,7 +86,7 @@ public final class MobModel {
             try {
                 Quaternionf rot = new Quaternionf().rotateY((float) Math.toRadians(p.yawDeg));
                 // La translation place le COIN du bloc : on recentre en X/Z.
-                Vector3f tr = new Vector3f(p.ox - p.sx / 2f, p.oy, p.oz - p.sz / 2f);
+                Vector3f tr = new Vector3f(p.ox - p.sx / 2f, p.oy - 1.6f, p.oz - p.sz / 2f);
                 Transformation baseT = new Transformation(
                         tr, rot, new Vector3f(p.sx, p.sy, p.sz), new Quaternionf());
                 BlockDisplay d = base.getWorld().spawn(base.getLocation(), BlockDisplay.class, disp -> {
