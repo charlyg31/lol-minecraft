@@ -11,7 +11,7 @@ import fr.lolmc.matchmaking.PartyManager;
 import fr.lolmc.matchmaking.MatchmakingManager;
 import fr.lolmc.listener.PartyCommand;
 import fr.lolmc.listener.LolCommand;
-import fr.lolmc.game.SchematicManager;
+import fr.lolmc.manager.SchematicManager; // CORRECTION : Importation du bon dossier
 import fr.lolmc.game.MapManager;
 import fr.lolmc.game.TurretManager;
 import fr.lolmc.game.MinionManager;
@@ -37,7 +37,6 @@ import fr.lolmc.game.MatchScoreboard;
 import fr.lolmc.stats.persistence.DatabaseManager;
 import fr.lolmc.stats.persistence.RankedManager;
 import fr.lolmc.stats.persistence.ApiServer;
-import fr.lolmc.listener.AbilityListener;
 import fr.lolmc.listener.EntityDeathListener;
 import fr.lolmc.item.consumable.ConsumableManager;
 import fr.lolmc.listener.ShopCommand;
@@ -105,7 +104,7 @@ public class LolPlugin extends JavaPlugin {
     public void onEnable() {
         instance = this;
         saveDefaultConfig();
-        saveResource("champions.yml", false); // valeurs d'equilibrage (ne pas ecraser si deja present)
+        saveResource("champions.yml", false);
         fr.lolmc.util.Balance.load();
         fr.lolmc.util.DebugLogger.init();
 
@@ -123,7 +122,10 @@ public class LolPlugin extends JavaPlugin {
         wardManager = new WardManager(teamManager);
         partyManager = new PartyManager();
         matchmakingManager = new MatchmakingManager(partyManager, teamManager);
-        schematicManager = new SchematicManager();
+
+        // CORRECTION : Passage de "this" (l'instance du plugin) au constructeur
+        schematicManager = new SchematicManager(this);
+
         mapManager = new MapManager(schematicManager);
         minionManager = new MinionManager(mapManager);
         turretManager = new TurretManager(mapManager, championManager, teamManager);
@@ -165,8 +167,8 @@ public class LolPlugin extends JavaPlugin {
         shopListener = new ShopListener(shopGUI, championManager, goldManager, hudManager);
         passiveManager = new PassiveManager(championManager, hudManager, shopListener);
         consumableManager = new ConsumableManager(championManager, hudManager);
-        // Charger le registre d'items
-        ItemRegistry.all(); // force le static init
+
+        ItemRegistry.all();
         headManager     = new HeadManager(this);
         championGUI     = new ChampionGUI(championManager, headManager);
         guiListener     = new GUIListener(championGUI, championManager, headManager, hudManager);
@@ -176,7 +178,6 @@ public class LolPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new HealthListener(championManager, hudManager), this);
         getServer().getPluginManager().registerEvents(shopListener, this);
         getServer().getPluginManager().registerEvents(guiListener, this);
-
     }
 
     /** Branche les commandes (/champion, /shop, /lol, ...) et les derniers ecouteurs. */
@@ -222,9 +223,9 @@ public class LolPlugin extends JavaPlugin {
             getCommand("ping").setTabCompleter(playerCmds);
         }
         getServer().getPluginManager().registerEvents(
-            new fr.lolmc.listener.StructureDamageListener(mapManager, championManager, teamManager), this);
+                new fr.lolmc.listener.StructureDamageListener(mapManager, championManager, teamManager), this);
         getServer().getPluginManager().registerEvents(
-            new EntityDeathListener(championManager, rewardManager), this);
+                new EntityDeathListener(championManager, rewardManager), this);
     }
 
     @Override

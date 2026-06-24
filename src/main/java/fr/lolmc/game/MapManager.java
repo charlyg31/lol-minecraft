@@ -1,5 +1,6 @@
 package fr.lolmc.game;
 
+import fr.lolmc.manager.SchematicManager;
 import fr.lolmc.LolPlugin;
 import fr.lolmc.game.GameStructure.Type;
 import fr.lolmc.team.TeamManager.Team;
@@ -47,14 +48,6 @@ public class MapManager {
     // PLACEMENT (commandes /lol set)
     // ══════════════════════════════════════════════════════════════
 
-    /**
-     * Enregistre la position d'une structure.
-     * @param type   TURRET, NEXUS ou NEXUS_BASE
-     * @param team   équipe propriétaire
-     * @param lane   "top", "mid", "bot" (ou "base" pour le nexus principal)
-     * @param index  1, 2, 3...
-     * @param center case centrale cliquée
-     */
     public void setStructure(Type type, Team team, String lane, int index, Location center, int angle) {
         String key = structureKey(type, team, lane, index);
         config.set("structures." + key + ".world", center.getWorld().getName());
@@ -69,9 +62,6 @@ public class MapManager {
         save();
     }
 
-    /**
-     * Enregistre la position de spawn/respawn d'un joueur.
-     */
     public void setSpawn(Team team, int position, Location loc) {
         String key = team.name().toLowerCase() + "_" + position;
         spawns.put(key, loc.clone());
@@ -84,9 +74,7 @@ public class MapManager {
         save();
     }
 
-    /** Définit le niveau (tier) d'une tourelle, persisté. */
-    public void setStructureTier(Type type, Team team, String lane, int index,
-                                 GameStructure.TurretTier tier) {
+    public void setStructureTier(Type type, Team team, String lane, int index, GameStructure.TurretTier tier) {
         String key = structureKey(type, team, lane, index);
         config.set("structures." + key + ".tier", tier.name());
         save();
@@ -128,9 +116,38 @@ public class MapManager {
             String lane = config.getString(path + "lane");
             int index = config.getInt(path + "index");
 
-            // Nom de base de la schématique (ex: TurretBlue, NexusRed, NexusBaseBlue)
             String baseName = schematicBaseName(type, team);
-            var phases = schematics.findPhases(baseName);
+
+            // CORRECTION : Instanciation et extraction dynamique des objets GameStructure.Phase
+            List<GameStructure.Phase> phases = new ArrayList<>();
+            File folder = new File(LolPlugin.getInstance().getDataFolder(), "schematics");
+
+            if (folder.exists() && folder.isDirectory()) {
+                File[] files = folder.listFiles((dir, name) -> name.startsWith(baseName) && name.endsWith(".json"));
+                if (files != null) {
+                    for (File f : files) {
+                        String schemName = f.getName().substring(0, f.getName().length() - 5); // Retire ".json"
+                        String suffix = schemName.substring(baseName.length()); // Récupère ce qui suit (ex: "75", "50" ou "")
+
+                        int threshold = 100; // Par défaut, si aucun chiffre (ex: TurretBlue.json), c'est 100%
+                        if (!suffix.isEmpty()) {
+                            try {
+                                threshold = Integer.parseInt(suffix);
+                            } catch (NumberFormatException ignored) {}
+                        }
+
+                        phases.add(new GameStructure.Phase(threshold, schemName));
+                    }
+                }
+            }
+
+            // Si le dossier est vide, on ajoute au moins la phase par défaut à 100%
+            if (phases.isEmpty()) {
+                phases.add(new GameStructure.Phase(100, baseName));
+            } else {
+                // Tri décroissant obligatoire exigé par GameStructure : [100, 75, 50, 25]
+                phases.sort((p1, p2) -> Integer.compare(p2.threshold(), p1.threshold()));
+            }
 
             double maxHP = switch (type) {
                 case TURRET -> TURRET_HP;
@@ -142,7 +159,7 @@ public class MapManager {
             GameStructure structure = new GameStructure(type, team, lane, index, center, maxHP, phases);
             int angle = config.getInt(path + "angle", 0);
             structure.setAngle(angle);
-            // Appliquer le niveau de tourelle si défini
+
             String tierName = config.getString(path + "tier");
             if (tierName != null && type == Type.TURRET) {
                 try {
@@ -151,15 +168,13 @@ public class MapManager {
             }
             structures.add(structure);
 
-            // Coller la schématique de base (100%) avec son orientation
             String schem = structure.getCurrentSchematic();
             if (schem != null) {
-                schematics.pasteSchematic(schem, center, angle);
+                schematics.pasteSchematicAboveAnchor(schem, center, 200);
             }
         }
 
-        LolPlugin.getInstance().getLogger().info(
-                "Reset: " + structures.size() + " structures rechargées.");
+        LolPlugin.getInstance().getLogger().info("Reset: " + structures.size() + " structures rechargées.");
     }
 
     /**
@@ -168,29 +183,21 @@ public class MapManager {
     public void updateStructurePhase(GameStructure structure) {
         String schem = structure.getCurrentSchematic();
         if (schem != null) {
-            schematics.pasteSchematic(schem, structure.getCenter(), structure.getAngle());
+            schematics.pasteSchematicAboveAnchor(schem, structure.getCenter(), 200);
         }
     }
 
     // ══════════════════════════════════════════════════════════════
-    // RÈGLE DE PROTECTION DU NEXUS
+    // RÈGLE DE PROTECTION DU NEXUS & HELPERS
     // ══════════════════════════════════════════════════════════════
 
-    /**
-     * Vérifie si le Nexus principal d'une équipe peut être attaqué.
-     * Comme dans LoL : il faut qu'au moins 1 petit nexus ET les 2 tourelles
-     * de base de cette équipe soient détruits.
-     */
     public boolean canAttackBaseNexus(Team team) {
-        // Au moins 1 nexus de lane détruit ?
         boolean aNexusDown = structures.stream()
                 .filter(s -> s.getTeam() == team && s.getType() == Type.NEXUS)
                 .anyMatch(GameStructure::isDestroyed);
 
-        // Les 2 tourelles de base détruites ? (les tourelles lane="base")
         List<GameStructure> baseTurrets = structures.stream()
-                .filter(s -> s.getTeam() == team && s.getType() == Type.TURRET
-                        && "base".equals(s.getLane()))
+                .filter(s -> s.getTeam() == team && s.getType() == Type.TURRET && "base".equals(s.getLane()))
                 .toList();
         boolean allBaseTurretsDown = !baseTurrets.isEmpty()
                 && baseTurrets.stream().allMatch(GameStructure::isDestroyed);
@@ -198,19 +205,12 @@ public class MapManager {
         return aNexusDown && allBaseTurretsDown;
     }
 
-    /**
-     * Retourne le Nexus de base d'une équipe (s'il existe).
-     */
     public GameStructure getBaseNexus(Team team) {
         return structures.stream()
                 .filter(s -> s.getTeam() == team && s.getType() == Type.NEXUS_BASE)
                 .findFirst().orElse(null);
     }
 
-    /**
-     * Trouve la structure dont le centre est dans un rayon donné d'une position.
-     * Utilisé pour détecter quelle structure est attaquée.
-     */
     public GameStructure getStructureAt(Location loc, double radius) {
         for (GameStructure s : structures) {
             if (s.isDestroyed()) continue;
@@ -220,12 +220,7 @@ public class MapManager {
         return null;
     }
 
-    // ══════════════════════════════════════════════════════════════
-    // PERSISTANCE
-    // ══════════════════════════════════════════════════════════════
-
     private void load() {
-        // Charger les spawns
         var section = config.getConfigurationSection("spawns");
         if (section != null) {
             for (String key : section.getKeys(false)) {
@@ -248,18 +243,10 @@ public class MapManager {
         catch (Exception e) { LolPlugin.getInstance().getLogger().warning("Erreur sauvegarde map.yml: " + e.getMessage()); }
     }
 
-    // ══════════════════════════════════════════════════════════════
-    // HELPERS
-    // ══════════════════════════════════════════════════════════════
-
     private String structureKey(Type type, Team team, String lane, int index) {
         return type.name().toLowerCase() + "_" + team.name().toLowerCase() + "_" + lane + "_" + index;
     }
 
-    /**
-     * Nom de base de la schématique selon le type et l'équipe.
-     * TURRET+BLUE → "TurretBlue", NEXUS+RED → "NexusRed", NEXUS_BASE+BLUE → "NexusBaseBlue"
-     */
     private String schematicBaseName(Type type, Team team) {
         String teamName = (team == Team.BLUE) ? "Blue" : "Red";
         return switch (type) {

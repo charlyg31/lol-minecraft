@@ -28,6 +28,7 @@ import java.util.*;
  *   /lol set basenexus                           → puis clic (nexus principal)
  *   /lol position <blue|red> <1-5>               → puis clic au sol (spawn)
  *   /lol lane <top|mid|bot>                       → clics successifs = waypoints, /lol lane done
+ *   /lol schem <pos1|pos2|save>                  → définition et sauvegarde de schématique d'ancre
  *   /lol start                                    → lance la partie (reset structures)
  *   /lol stop                                     → arrête la partie
  */
@@ -42,6 +43,9 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
     // Waypoints en cours de définition (mode lane)
     private final Map<UUID, List<Location>> laneSetup = new HashMap<>();
     private final Map<UUID, String> laneSetupName = new HashMap<>();
+
+    // AJOUT : Sélections locales des coins de schématiques par joueur
+    private final Map<UUID, Location[]> schematicSelections = new HashMap<>();
 
     private record PendingSetup(String kind, Type type, Team team, String lane, int index, int position) {}
 
@@ -64,6 +68,7 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
             case "set" -> handleSet(player, args);
             case "position" -> handlePosition(player, args);
             case "lane" -> handleLane(player, args);
+            case "schem" -> handleSchem(player, args); // AJOUT : Liaison vers le gestionnaire de schématiques
             case "road" -> handleRoad(player, args);
             case "jungle" -> handleJungle(player, args);
             case "shopnpc" -> handleShopNpc(player, args);
@@ -81,7 +86,6 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
                 player.sendMessage(Component.text("✔ Config et équilibrage (champions.yml) rechargés.", NamedTextColor.GREEN));
             }
             case "select" -> {
-                // Lance une sélection avec tous les joueurs en ligne (test/manuel)
                 var ids = new java.util.ArrayList<java.util.UUID>();
                 for (var pl : LolPlugin.getInstance().getServer().getOnlinePlayers()) {
                     ids.add(pl.getUniqueId());
@@ -95,7 +99,6 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
                 LolPlugin.getInstance().getMinionManager().startWaves();
                 LolPlugin.getInstance().getJungleManager().startJungle();
                 LolPlugin.getInstance().getGameManager().startGame();
-                // Si aucun mode défini, démarrer en amical par défaut
                 LolPlugin.getInstance().getMatchScoreboard().startMatch(
                         LolPlugin.getInstance().getMatchScoreboard().isRanked());
                 player.sendMessage(Component.text("✔ Partie lancée (structures, sbires, jungle, timer)!", NamedTextColor.GREEN));
@@ -111,15 +114,70 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
         return true;
     }
 
+    // ── /lol schem ────────────────────────────────────────────────
+
+    private void handleSchem(Player player, String[] args) {
+        if (args.length < 2) {
+            player.sendMessage("§cUsage: /lol schem <pos1|pos2|save> ...");
+            return;
+        }
+
+        String subCommand = args[1].toLowerCase();
+        UUID uuid = player.getUniqueId();
+
+        if (subCommand.equals("pos1")) {
+            Location loc = player.getLocation().getBlock().getLocation();
+            Location[] sel = schematicSelections.computeIfAbsent(uuid, k -> new Location[2]);
+            sel[0] = loc;
+            player.sendMessage(Component.text("✔ Position 1 définie à tes pieds : " + loc.getBlockX() + ", " + loc.getBlockY() + ", " + loc.getBlockZ(), NamedTextColor.GREEN));
+            return;
+        }
+
+        if (subCommand.equals("pos2")) {
+            Location loc = player.getLocation().getBlock().getLocation();
+            Location[] sel = schematicSelections.computeIfAbsent(uuid, k -> new Location[2]);
+            sel[1] = loc;
+            player.sendMessage(Component.text("✔ Position 2 définie à tes pieds : " + loc.getBlockX() + ", " + loc.getBlockY() + ", " + loc.getBlockZ(), NamedTextColor.GREEN));
+            return;
+        }
+
+        if (subCommand.equals("save")) {
+            if (args.length < 3) {
+                player.sendMessage("§cUsage: /lol schem save <nom_de_la_schematic>");
+                return;
+            }
+
+            Location[] sel = schematicSelections.get(uuid);
+            if (sel == null || sel[0] == null || sel[1] == null) {
+                player.sendMessage(Component.text("❌ Erreur : Tu dois d'abord définir pos1 et pos2 !", NamedTextColor.RED));
+                return;
+            }
+
+            if (!sel[0].getWorld().equals(sel[1].getWorld())) {
+                player.sendMessage(Component.text("❌ Erreur : Les deux coins doivent être dans le même monde !", NamedTextColor.RED));
+                return;
+            }
+
+            String name = args[2];
+            player.sendMessage(Component.text("⏳ Analyse de la zone et recherche du FOUR d'ancrage pour '" + name + "'...", NamedTextColor.YELLOW));
+
+            // Appel direct à ton gestionnaire de schématiques
+            mapManager.getSchematics().saveSchematicWithAnchor(name, sel[0], sel[1]);
+
+            player.sendMessage(Component.text("✔ Sauvegarde de la schématique exécutée !", NamedTextColor.GREEN));
+            return;
+        }
+
+        player.sendMessage("§cAction inconnue. Utilise /lol schem <pos1|pos2|save>");
+    }
+
     // ── /lol set ──────────────────────────────────────────────────
 
     private void handleSet(Player player, String[] args) {
-        // /lol set turret top 1  |  /lol set nexus mid 1  |  /lol set basenexus
         if (args.length < 2) { player.sendMessage("§cUsage: /lol set <turret|nexus|basenexus> ..."); return; }
         String what = args[1].toLowerCase();
 
         if (what.equals("basenexus")) {
-            // Nexus principal — on demande l'équipe
             if (args.length < 3) { player.sendMessage("§cUsage: /lol set basenexus <blue|red>"); return; }
             Team team = parseTeam(args[2]);
             if (team == null) { player.sendMessage("§cÉquipe: blue ou red"); return; }
@@ -129,7 +187,6 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
             return;
         }
 
-        // turret / nexus : /lol set turret <blue|red> <top|mid|bot|base> <index>
         if (args.length < 5) {
             player.sendMessage("§cUsage: /lol set " + what + " <blue|red> <top|mid|bot|base> <index>");
             return;
@@ -146,7 +203,6 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
         try { index = Integer.parseInt(args[4]); }
         catch (NumberFormatException e) { player.sendMessage("§cIndex invalide."); return; }
 
-        // Niveau de tourelle optionnel (5e argument) : outer/inner/inhibitor/nexus
         fr.lolmc.game.GameStructure.TurretTier tier = fr.lolmc.game.GameStructure.TurretTier.OUTER;
         if (type == Type.TURRET && args.length >= 6) {
             try {
@@ -156,7 +212,6 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
                 return;
             }
         }
-        // Stocker le tier dans le PendingSetup (réutilise le champ position pour l'ordinal)
         pendingTier.put(player.getUniqueId(), tier);
         pending.put(player.getUniqueId(), new PendingSetup("structure", type, team, lane, index, 0));
         player.sendMessage(Component.text(String.format(
@@ -167,7 +222,6 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
     // ── /lol position ─────────────────────────────────────────────
 
     private void handlePosition(Player player, String[] args) {
-        // /lol position blue 1
         if (args.length < 3) { player.sendMessage("§cUsage: /lol position <blue|red> <1-5>"); return; }
         Team team = parseTeam(args[1]);
         if (team == null) { player.sendMessage("§cÉquipe: blue ou red"); return; }
@@ -202,32 +256,22 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
         laneSetupName.put(player.getUniqueId(), lane);
         player.sendMessage(Component.text(String.format(
                 "👉 Clique successivement sur le chemin de la lane %s (du spawn BLEU vers ROUGE). "
-                + "Tape /lol lane done pour finir.", lane), NamedTextColor.AQUA));
+                        + "Tape /lol lane done pour finir.", lane), NamedTextColor.AQUA));
     }
 
+    // ── /lol debug ────────────────────────────────────────────────
 
-
-
-
-    // ══════════════════════════════════════════════════════════════
-    // COMMANDES DE TEST ADMIN (mode solo)
-    // ══════════════════════════════════════════════════════════════
-
-
-    /** /lol debug [on|off|clear|state] : gère le log de débug et affiche l'état. */
     private void handleDebug(Player player, String[] args) {
         var plugin = LolPlugin.getInstance();
         var cm = plugin.getChampionManager();
 
-        // Sous-commandes de gestion du fichier de log
         if (args.length >= 2) {
             String sub = args[1].toLowerCase();
             switch (sub) {
                 case "on" -> {
                     fr.lolmc.util.DebugLogger.setEnabled(true);
                     fr.lolmc.listener.AbilityListener.DEBUG = true;
-                    player.sendMessage(Component.text("✔ Débug ACTIVÉ. Log: " 
-                        + fr.lolmc.util.DebugLogger.getPath(), NamedTextColor.GREEN));
+                    player.sendMessage(Component.text("✔ Débug ACTIVÉ. Log: " + fr.lolmc.util.DebugLogger.getPath(), NamedTextColor.GREEN));
                     return;
                 }
                 case "off" -> {
@@ -242,97 +286,69 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
                     return;
                 }
                 case "state" -> {
-                    player.sendMessage(Component.text("Débug: "
-                        + (fr.lolmc.util.DebugLogger.isEnabled() ? "ACTIF" : "inactif")
-                        + " | Fichier: " + fr.lolmc.util.DebugLogger.getPath(), NamedTextColor.AQUA));
+                    player.sendMessage(Component.text("Débug: " + (fr.lolmc.util.DebugLogger.isEnabled() ? "ACTIF" : "inactif") + " | Fichier: " + fr.lolmc.util.DebugLogger.getPath(), NamedTextColor.AQUA));
                     return;
                 }
                 default -> {
-                    player.sendMessage(Component.text(
-                        "Usage: /lol debug [on|off|clear|state] — sans argument: rapport d'état du joueur",
-                        NamedTextColor.GRAY));
+                    player.sendMessage(Component.text("Usage: /lol debug [on|off|clear|state] — sans argument: rapport d'état du joueur", NamedTextColor.GRAY));
                     return;
                 }
             }
         }
 
-        // Sans argument : rapport d'état complet du joueur
         player.sendMessage(Component.text("══════ DEBUG ══════", NamedTextColor.YELLOW));
-
-        // Champion
         boolean hasChamp = cm.hasChampion(player);
-        player.sendMessage(Component.text("Champion: " + (hasChamp ? "OUI" : "NON"),
-                hasChamp ? NamedTextColor.GREEN : NamedTextColor.RED));
+        player.sendMessage(Component.text("Champion: " + (hasChamp ? "OUI" : "NON"), hasChamp ? NamedTextColor.GREEN : NamedTextColor.RED));
         if (hasChamp) {
             var champ = cm.getChampion(player);
             player.sendMessage(Component.text("  Nom: " + champ.getDisplayName(), NamedTextColor.GRAY));
             var ls = champ.getLevelSystem();
             player.sendMessage(Component.text("  Niveau: " + ls.getLevel(), NamedTextColor.GRAY));
-            // Rangs des sorts
-            String ranks = "  Sorts Q/W/E/R: "
-                + ls.getAbilityRank(1) + "/" + ls.getAbilityRank(2) + "/"
-                + ls.getAbilityRank(3) + "/" + ls.getAbilityRank(4);
+            String ranks = "  Sorts Q/W/E/R: " + ls.getAbilityRank(1) + "/" + ls.getAbilityRank(2) + "/" + ls.getAbilityRank(3) + "/" + ls.getAbilityRank(4);
             player.sendMessage(Component.text(ranks, NamedTextColor.GRAY));
-            // Sorts débloqués ?
             for (int s = 1; s <= 4; s++) {
                 var ab = champ.getAbility(s);
                 String slotName = switch(s) { case 1->"Q"; case 2->"W"; case 3->"E"; default->"R"; };
                 boolean unlocked = ls.isAbilityUnlocked(s);
-                player.sendMessage(Component.text("    " + slotName + " (" + (ab!=null?ab.getName():"null") + "): "
-                    + (unlocked ? "débloqué" : "VERROUILLÉ"),
-                    unlocked ? NamedTextColor.GREEN : NamedTextColor.RED));
+                player.sendMessage(Component.text("    " + slotName + " (" + (ab!=null?ab.getName():"null") + "): " + (unlocked ? "débloqué" : "VERROUILLÉ"), unlocked ? NamedTextColor.GREEN : NamedTextColor.RED));
             }
-            // Stats clés
             var st = champ.getStats();
-            player.sendMessage(Component.text(String.format("  PV: %.0f/%.0f | AD: %.0f | AP: %.0f",
-                champ.getHPSystem().getCurrentHP(), champ.getHPSystem().getMaxHP(),
-                st.getFinalAD(), st.getFinalAP()), NamedTextColor.GRAY));
+            player.sendMessage(Component.text(String.format("  PV: %.0f/%.0f | AD: %.0f | AP: %.0f", champ.getHPSystem().getCurrentHP(), champ.getHPSystem().getMaxHP(), st.getFinalAD(), st.getFinalAP()), NamedTextColor.GRAY));
         }
 
-        // Or
         int gold = plugin.getGoldManager().getGold(player.getUniqueId());
         player.sendMessage(Component.text("Or: " + gold, NamedTextColor.GOLD));
 
-        // Équipe
         var team = plugin.getTeamManager().getTeam(player);
-        player.sendMessage(Component.text("Équipe: " + (team != null ? team.name() : "AUCUNE"),
-                team != null ? NamedTextColor.AQUA : NamedTextColor.RED));
+        player.sendMessage(Component.text("Équipe: " + (team != null ? team.name() : "AUCUNE"), team != null ? NamedTextColor.AQUA : NamedTextColor.RED));
 
-        // Hotbar page
         int page = plugin.getHotbarManager().getPage(player);
         player.sendMessage(Component.text("Page hotbar: " + page, NamedTextColor.GRAY));
 
-        // Slot tenu + type d'item
         int heldSlot = player.getInventory().getHeldItemSlot();
         var held = player.getInventory().getItem(heldSlot);
         String type = fr.lolmc.item.HotbarManager.getType(held);
         String id = fr.lolmc.item.HotbarManager.getId(held);
-        player.sendMessage(Component.text("Slot tenu: " + heldSlot
-            + " | type=" + type + " | id=" + id, NamedTextColor.GRAY));
+        player.sendMessage(Component.text("Slot tenu: " + heldSlot + " | type=" + type + " | id=" + id, NamedTextColor.GRAY));
 
-        // Partie en cours ?
         boolean running = plugin.getGameManager().isRunning();
         player.sendMessage(Component.text("Partie active: " + running, NamedTextColor.GRAY));
 
-        // Spawn défini ?
         if (team != null) {
             var spawn = plugin.getMapManager().getSpawn(team, 1);
-            player.sendMessage(Component.text("Spawn équipe défini: " + (spawn != null),
-                spawn != null ? NamedTextColor.GREEN : NamedTextColor.RED));
+            player.sendMessage(Component.text("Spawn équipe défini: " + (spawn != null), spawn != null ? NamedTextColor.GREEN : NamedTextColor.RED));
         }
         player.sendMessage(Component.text("═══════════════════", NamedTextColor.YELLOW));
     }
 
-    /** /lol solo <champion> : met l'admin en jeu, équipe BLEUE, avec un champion, et lance tout. */
+    // ── /lol solo ─────────────────────────────────────────────────
+
     private void handleSolo(Player player, String[] args) {
         String champId = args.length >= 2 ? args[1].toLowerCase() : "garen";
         var plugin = LolPlugin.getInstance();
 
-        // 1. Équipe bleue
         plugin.getTeamManager().setTeam(player, fr.lolmc.team.TeamManager.Team.BLUE);
-        // 2. Champion
         plugin.getChampionManager().assignChampion(player, champId);
-        // 3. Niveau 18 + tous les sorts débloqués au max (mode test : tout est jouable)
         var soloChamp = plugin.getChampionManager().getChampion(player);
         if (soloChamp != null) {
             soloChamp.getLevelSystem().setLevel(18);
@@ -340,26 +356,20 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
             soloChamp.getLevelSystem().maxOutAbilities();
             plugin.getHotbarManager().renderPage(player, soloChamp);
         }
-        // 4. Page de runes par défaut
         plugin.getRuneManager().applyRuneStats(player);
-        // 5. Or de départ généreux pour tester la boutique
         plugin.getGoldManager().addGold(player.getUniqueId(), 20000);
-        // 4. Lancer la partie complète
         mapManager.resetAllStructures();
         plugin.getMinionManager().startWaves();
         plugin.getJungleManager().startJungle();
         plugin.getGameManager().startGame();
         plugin.getMatchScoreboard().startMatch(false);
-        // 5. Téléporter au spawn bleu si défini
         var spawn = plugin.getMapManager().getSpawn(fr.lolmc.team.TeamManager.Team.BLUE, 1);
         if (spawn != null) player.teleport(spawn);
 
         player.sendMessage(Component.text("🧪 MODE SOLO lancé!", NamedTextColor.GREEN));
         player.sendMessage(Component.text("Équipe BLEUE • Champion: " + champId, NamedTextColor.AQUA));
-        player.sendMessage(Component.text("Commandes utiles: /lol give <champ>, /lol level <n>, /lol gold <n>, /lol team <blue/red>, /lol stop", NamedTextColor.GRAY));
     }
 
-    /** /lol give <champion> : change le champion de l'admin instantanément. */
     private void handleGive(Player player, String[] args) {
         if (args.length < 2) { player.sendMessage("§cUsage: /lol give <champion>"); return; }
         String champId = args[1].toLowerCase();
@@ -368,35 +378,31 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
         player.sendMessage(Component.text("✔ Champion: " + champId, NamedTextColor.GREEN));
     }
 
-    /** /lol level <n> : met le champion de l'admin au niveau voulu (1-18). */
     private void handleLevel(Player player, String[] args) {
         if (args.length < 2) { player.sendMessage("§cUsage: /lol level <1-18>"); return; }
         var cm = LolPlugin.getInstance().getChampionManager();
-        if (!cm.hasChampion(player)) { player.sendMessage("§cTu n'as pas de champion (utilise /lol solo)."); return; }
+        if (!cm.hasChampion(player)) { player.sendMessage("§cTu n'as pas de champion."); return; }
         int lvl;
         try { lvl = Integer.parseInt(args[1]); }
         catch (NumberFormatException e) { player.sendMessage("§cNiveau invalide."); return; }
         lvl = Math.max(1, Math.min(18, lvl));
         var champ = cm.getChampion(player);
         champ.getLevelSystem().setLevel(lvl);
-        champ.getLevelSystem().maxOutAbilities();   // débloque les sorts pour le test
+        champ.getLevelSystem().maxOutAbilities();
         champ.getStats().setChampionLevel(lvl);
-        // Re-poser la hotbar pour refléter les sorts débloqués
         LolPlugin.getInstance().getHotbarManager().renderPage(player, champ);
         player.sendMessage(Component.text("✔ Niveau " + lvl + " — sorts débloqués", NamedTextColor.GREEN));
     }
 
-    /** /lol gold <n> : donne de l'or à l'admin. */
     private void handleGold(Player player, String[] args) {
         if (args.length < 2) { player.sendMessage("§cUsage: /lol gold <montant>"); return; }
         int amount;
         try { amount = Integer.parseInt(args[1]); }
         catch (NumberFormatException e) { player.sendMessage("§cMontant invalide."); return; }
         LolPlugin.getInstance().getGoldManager().addGold(player.getUniqueId(), amount);
-        player.sendMessage(Component.text("✔ +" + amount + " or", NamedTextColor.GREEN));
+        player.sendMessage(Component.text("✔ +" + amount + " or", NamedTextColor.GOLD));
     }
 
-    /** /lol team <blue/red> : change l'admin d'équipe (pour tester les deux côtés). */
     private void handleTeamCmd(Player player, String[] args) {
         if (args.length < 2) { player.sendMessage("§cUsage: /lol team <blue/red>"); return; }
         var team = parseTeam(args[1]);
@@ -407,7 +413,6 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
         player.sendMessage(Component.text("✔ Équipe: " + team.name(), NamedTextColor.GREEN));
     }
 
-    /** /lol testgame : lance la map (structures+sbires+jungle) sans toucher au joueur. */
     private void handleTestGame(Player player) {
         var plugin = LolPlugin.getInstance();
         mapManager.resetAllStructures();
@@ -418,41 +423,24 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
         player.sendMessage(Component.text("🧪 Map lancée (structures, sbires, jungle, timer).", NamedTextColor.GREEN));
     }
 
-    // ── /lol shopnpc ──────────────────────────────────────────────
-
     private void handleShopNpc(Player player, String[] args) {
-        // /lol shopnpc <blue|red>
         if (args.length < 2) { player.sendMessage("§cUsage: /lol shopnpc <blue|red>"); return; }
         Team team = parseTeam(args[1]);
         if (team == null) { player.sendMessage("§cÉquipe: blue ou red"); return; }
         LolPlugin.getInstance().getShopNpcManager().spawnShopNpc(player.getLocation(), team);
-        player.sendMessage(Component.text("✔ PNJ boutique " + team.name() + " créé à ta position.",
-                NamedTextColor.GREEN));
+        player.sendMessage(Component.text("✔ PNJ boutique " + team.name() + " créé à ta position.", NamedTextColor.GREEN));
     }
 
-    // ── /lol mode ─────────────────────────────────────────────────
-
     private void handleMode(Player player, String[] args) {
-        // /lol mode <ranked|normal>
         if (args.length < 2) { player.sendMessage("§cUsage: /lol mode <ranked|normal>"); return; }
         boolean ranked = args[1].equalsIgnoreCase("ranked") || args[1].equalsIgnoreCase("classe");
         LolPlugin.getInstance().getMatchScoreboard().startMatch(ranked);
-        player.sendMessage(Component.text("✔ Mode de partie : "
-                + (ranked ? "CLASSÉ (compte dans l'Elo)" : "AMICAL (hors classement)"),
-                NamedTextColor.GREEN));
+        player.sendMessage(Component.text("✔ Mode de partie : " + (ranked ? "CLASSÉ" : "AMICAL"), NamedTextColor.GREEN));
     }
 
-    // ── /lol jungle ───────────────────────────────────────────────
-
     private void handleJungle(Player player, String[] args) {
-        // /lol jungle <type> [blue|red]
-        // Types neutres: gromp, murkwolf, raptor, krug, red_buff, blue_buff
-        // Épiques (pas d'équipe): dragon, baron, herald
         if (args.length < 2) {
             player.sendMessage("§cUsage: /lol jungle <type> [blue|red]");
-            player.sendMessage("§7Camps: gromp, murkwolf, raptor, krug, red_buff, blue_buff");
-            player.sendMessage("§7Neutres: scuttle_crab, herald, baron");
-            player.sendMessage("§7Dragons: dragon_infernal, dragon_ocean, dragon_mountain, dragon_cloud, dragon_chemtech, dragon_elder");
             return;
         }
         fr.lolmc.game.JungleManager.MonsterType type;
@@ -463,9 +451,7 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
             return;
         }
 
-        // Les épiques sont neutres, les autres ont besoin d'une équipe
         boolean isEpic = type.isEpic() || type == fr.lolmc.game.JungleManager.MonsterType.SCUTTLE_CRAB;
-
         Team team = null;
         if (!isEpic) {
             if (args.length < 3) {
@@ -477,64 +463,44 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
         }
 
         pending.put(player.getUniqueId(), new PendingSetup("jungle", null, team, args[1].toUpperCase(), 0, 0));
-        player.sendMessage(Component.text(String.format(
-                "👉 Clique au sol pour placer %s%s.",
-                type.displayName, team != null ? " (" + team.name() + ")" : " (neutre)"),
-                NamedTextColor.AQUA));
+        player.sendMessage(Component.text(String.format("👉 Clique au sol pour placer %s%s.", type.displayName, team != null ? " (" + team.name() + ")" : " (neutre)"), NamedTextColor.AQUA));
     }
 
-    // ── /lol road ─────────────────────────────────────────────────
-
     private void handleRoad(Player player, String[] args) {
-        // /lol road end  → terminer
         if (args.length >= 2 && args[1].equalsIgnoreCase("end")) {
             if (!roadManager.isPainting(player.getUniqueId())) {
                 player.sendMessage(Component.text("❌ Aucune route en cours de tracé.", NamedTextColor.RED));
                 return;
             }
             int count = roadManager.finishPainting(player.getUniqueId());
-            // Retirer l'outil de peinture
             player.getInventory().remove(Material.GOLDEN_HOE);
-            player.sendMessage(Component.text(String.format(
-                    "✔ Route enregistrée (%d points de passage). Les blocs sont restaurés.", count),
-                    NamedTextColor.GREEN));
+            player.sendMessage(Component.text(String.format("✔ Route enregistrée (%d points).", count), NamedTextColor.GREEN));
             return;
         }
 
-        // /lol road <lane> <blue|red>
         if (args.length < 3) {
             player.sendMessage("§cUsage: /lol road <top|mid|bot> <blue|red> | /lol road end");
             return;
         }
         String lane = args[1].toLowerCase();
         String teamHint = args[2].toLowerCase();
-        if (!teamHint.equals("blue") && !teamHint.equals("red")
-                && !teamHint.equals("bleu") && !teamHint.equals("rouge")) {
+        if (!teamHint.equals("blue") && !teamHint.equals("red") && !teamHint.equals("bleu") && !teamHint.equals("rouge")) {
             player.sendMessage("§cÉquipe: blue ou red");
             return;
         }
 
         roadManager.startPainting(player.getUniqueId(), lane, teamHint);
-        // Donner l'outil de peinture
         var tool = new org.bukkit.inventory.ItemStack(Material.GOLDEN_HOE);
         var meta = tool.getItemMeta();
         if (meta != null) {
-            meta.displayName(Component.text("🖌 Pinceau de route — " + lane,
-                    NamedTextColor.GREEN).decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
-            meta.lore(java.util.List.of(
-                Component.text("Clique sur les blocs pour tracer le chemin.", NamedTextColor.GRAY)
-                    .decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false),
-                Component.text("/lol road end pour terminer.", NamedTextColor.GRAY)
-                    .decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false)));
+            meta.displayName(Component.text("🖌 Pinceau de route — " + lane, NamedTextColor.GREEN));
             tool.setItemMeta(meta);
         }
         player.getInventory().addItem(tool);
-        player.sendMessage(Component.text(String.format(
-                "🖌 Trace la route de la lane %s (sens %s). Clique les blocs, puis /lol road end.",
-                lane, teamHint), NamedTextColor.AQUA));
+        player.sendMessage(Component.text(String.format("🖌 Trace la route de la lane %s. Clique les blocs, puis /lol road end.", lane), NamedTextColor.AQUA));
     }
 
-    // ── Clic au sol ───────────────────────────────────────────────
+    // ── Événement de Clic ─────────────────────────────────────────
 
     @EventHandler
     public void onClick(PlayerInteractEvent e) {
@@ -542,9 +508,7 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
         if (e.getAction() != Action.LEFT_CLICK_BLOCK && e.getAction() != Action.RIGHT_CLICK_BLOCK) return;
         if (e.getClickedBlock() == null) return;
 
-        // Mode peinture de route (pinceau)
         if (roadManager.isPainting(player.getUniqueId())) {
-            // Seulement si le joueur tient le pinceau
             if (player.getInventory().getItemInMainHand().getType() == Material.GOLDEN_HOE) {
                 e.setCancelled(true);
                 if (roadManager.paintBlock(player.getUniqueId(), e.getClickedBlock())) {
@@ -554,17 +518,14 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
             }
         }
 
-        // Mode lane : ajouter un waypoint
         if (laneSetup.containsKey(player.getUniqueId())) {
             e.setCancelled(true);
             Location wp = e.getClickedBlock().getLocation().add(0.5, 1, 0.5);
             laneSetup.get(player.getUniqueId()).add(wp);
-            int count = laneSetup.get(player.getUniqueId()).size();
-            player.sendActionBar(Component.text("📍 Waypoint #" + count + " ajouté.", NamedTextColor.YELLOW));
+            player.sendActionBar(Component.text("📍 Waypoint #" + laneSetup.get(player.getUniqueId()).size() + " ajouté.", NamedTextColor.YELLOW));
             return;
         }
 
-        // Mode structure/spawn
         PendingSetup setup = pending.get(player.getUniqueId());
         if (setup == null) return;
         e.setCancelled(true);
@@ -572,7 +533,6 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
         Location clicked = e.getClickedBlock().getLocation();
 
         if (setup.kind().equals("structure")) {
-            // Orientation : si le bloc cliqué est directionnel (four, etc.), on lit sa face.
             int angle = 0;
             String facingMsg = "orientation par défaut (Sud)";
             var bd = e.getClickedBlock().getBlockData();
@@ -585,36 +545,26 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
                     default    -> 0;
                 };
                 facingMsg = "orientée vers " + dir.getFacing() + " (" + angle + "°)";
-                // Retirer le four marqueur : la schématique sera collée à sa place
                 e.getClickedBlock().setType(org.bukkit.Material.AIR);
             }
             mapManager.setStructure(setup.type(), setup.team(), setup.lane(), setup.index(), clicked, angle);
-            // Appliquer le niveau de tourelle si défini
             var tier = pendingTier.remove(player.getUniqueId());
             if (tier != null) {
                 mapManager.setStructureTier(setup.type(), setup.team(), setup.lane(), setup.index(), tier);
             }
             player.sendMessage(Component.text("   ↳ " + facingMsg, NamedTextColor.GRAY));
-            // Marqueur visuel temporaire (bloc de verre coloré)
             showMarker(clicked.clone().add(0, 1, 0), setup.team());
-            player.sendMessage(Component.text(String.format(
-                    "✔ %s %s %s #%d placé en %d,%d,%d.",
-                    setup.type().name().toLowerCase(), setup.team().name(), setup.lane(), setup.index(),
-                    clicked.getBlockX(), clicked.getBlockY(), clicked.getBlockZ()), NamedTextColor.GREEN));
+            player.sendMessage(Component.text(String.format("✔ %s %s %s #%d placé.", setup.type().name().toLowerCase(), setup.team().name(), setup.lane(), setup.index()), NamedTextColor.GREEN));
         } else if (setup.kind().equals("jungle")) {
             var type = fr.lolmc.game.JungleManager.MonsterType.valueOf(setup.lane());
-            Location campLoc = clicked.clone().add(0.5, 1, 0.5);
-            LolPlugin.getInstance().getJungleManager().setCamp(type, setup.team(), campLoc);
-            player.sendMessage(Component.text(String.format(
-                    "✔ %s placé en %d,%d,%d.", type.displayName,
-                    clicked.getBlockX(), clicked.getBlockY(), clicked.getBlockZ()), NamedTextColor.GREEN));
+            LolPlugin.getInstance().getJungleManager().setCamp(type, setup.team(), clicked.clone().add(0.5, 1, 0.5));
+            player.sendMessage(Component.text(String.format("✔ %s placé.", type.displayName), NamedTextColor.GREEN));
         } else if (setup.kind().equals("spawn")) {
             Location spawnLoc = clicked.clone().add(0.5, 1, 0.5);
             spawnLoc.setYaw(player.getLocation().getYaw());
             spawnLoc.setPitch(0);
             mapManager.setSpawn(setup.team(), setup.position(), spawnLoc);
-            player.sendMessage(Component.text(String.format(
-                    "✔ Spawn %s #%d défini.", setup.team().name(), setup.position()), NamedTextColor.GREEN));
+            player.sendMessage(Component.text(String.format("✔ Spawn %s #%d défini.", setup.team().name(), setup.position()), NamedTextColor.GREEN));
         }
 
         pending.remove(player.getUniqueId());
@@ -624,15 +574,10 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
         Material mat = (team == Team.BLUE) ? Material.BLUE_STAINED_GLASS : Material.RED_STAINED_GLASS;
         Material original = loc.getBlock().getType();
         loc.getBlock().setType(mat);
-        // Retirer le marqueur après 10s
         new org.bukkit.scheduler.BukkitRunnable() {
-            @Override public void run() {
-                if (loc.getBlock().getType() == mat) loc.getBlock().setType(original);
-            }
+            @Override public void run() { if (loc.getBlock().getType() == mat) loc.getBlock().setType(original); }
         }.runTaskLater(LolPlugin.getInstance(), 200L);
     }
-
-    // ── Helpers ───────────────────────────────────────────────────
 
     private Team parseTeam(String s) {
         return switch (s.toLowerCase()) {
@@ -649,22 +594,22 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
         p.sendMessage(Component.text("/lol set basenexus <blue|red>", NamedTextColor.AQUA));
         p.sendMessage(Component.text("/lol position <blue|red> <1-5>", NamedTextColor.AQUA));
         p.sendMessage(Component.text("/lol lane <top|mid|bot> ... /lol lane done", NamedTextColor.AQUA));
+        p.sendMessage(Component.text("/lol schem <pos1|pos2|save>", NamedTextColor.YELLOW)); // AJOUT : Aide textuelle
         p.sendMessage(Component.text("/lol start | /lol stop", NamedTextColor.AQUA));
     }
 
     @Override
     public List<String> onTabComplete(CommandSender sender, Command cmd, String alias, String[] args) {
-        if (args.length == 1) return List.of("set", "position", "lane", "road", "jungle", "shopnpc", "mode", "select", "solo", "give", "level", "gold", "team", "testgame", "debug", "start", "stop");
+        if (args.length == 1) return List.of("set", "position", "lane", "schem", "road", "jungle", "shopnpc", "mode", "select", "solo", "give", "level", "gold", "team", "testgame", "debug", "reload", "start", "stop"); // MODIFICATION : Injecté "schem"
         if (args.length == 2) {
             return switch (args[0].toLowerCase()) {
                 case "set" -> List.of("turret", "inhibitor", "nexus", "basenexus");
+                case "schem" -> List.of("pos1", "pos2", "save"); // AJOUT : Auto-complétion de l'action de schématique
                 case "shopnpc" -> List.of("blue", "red");
                 case "mode" -> List.of("ranked", "normal");
                 case "position", "lane" -> List.of("blue", "red");
                 case "road" -> List.of("top", "mid", "bot", "end");
-                case "jungle" -> List.of("gromp", "murkwolf", "raptor", "krug", "red_buff", "blue_buff",
-                        "scuttle_crab", "dragon_infernal", "dragon_ocean", "dragon_mountain",
-                        "dragon_cloud", "dragon_chemtech", "dragon_elder", "herald", "baron");
+                case "jungle" -> List.of("gromp", "murkwolf", "raptor", "krug", "red_buff", "blue_buff", "scuttle_crab", "dragon_infernal", "dragon_ocean", "dragon_mountain", "dragon_cloud", "dragon_chemtech", "dragon_elder", "herald", "baron");
                 default -> List.of();
             };
         }
