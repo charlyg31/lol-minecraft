@@ -71,6 +71,19 @@ public class PlayerInventoryManager {
     }
 
     /**
+     * Retire un item du slot sans rembourser l'or (utilisé pour les upgrades :
+     * le joueur paie seulement la différence prix_final - prix_composant).
+     */
+    public void removeItemNoRefund(BaseChampion champ, int slotIndex) {
+        if (slotIndex < 0 || slotIndex >= 6 || equippedItems[slotIndex] == null) return;
+        LolItem item = equippedItems[slotIndex];
+        item.removeStats(champ.getStats(), champ.getHPSystem(), champ.getResourceSystem());
+        var hp = champ.getHPSystem();
+        if (hp.getCurrentHP() > hp.getMaxHP()) hp.setCurrentHP(hp.getMaxHP());
+        equippedItems[slotIndex] = null;
+    }
+
+    /**
      * Recharge tous les items dans l'inventaire (ex: après respawn).
      */
     public void refreshAll(Player player) {
