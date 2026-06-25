@@ -307,4 +307,19 @@ public class SummonerSpellManager {
     public void cleanup(UUID uuid) {
         cooldowns.entrySet().removeIf(e -> e.getKey().startsWith(uuid.toString()));
     }
+
+
+    /**
+     * Définit les sorts d'invocateur d'un joueur (appelé par BridgeManager).
+     */
+    public void setSpells(org.bukkit.entity.Player player, String spell1, String spell2) {
+        try {
+            Spell s1 = Spell.valueOf(spell1.toUpperCase());
+            Spell s2 = Spell.valueOf(spell2.toUpperCase());
+            assignSpells(player, s1, s2);
+        } catch (IllegalArgumentException e) {
+            LolPlugin.getInstance().getLogger().warning(
+                "[Bridge] Sorts invalides: " + spell1 + ", " + spell2);
+        }
+    }
 }

@@ -168,4 +168,20 @@ public class PartyManager {
             }
         }
     }
+
+
+    /**
+     * Ajoute un membre à la party du leader (utilisé par BridgeManager
+     * pour reconstituer les groupes formés dans le lobby).
+     */
+    public void addToParty(Player leader, Player member) {
+        Party party = getOrCreateParty(leader);
+        if (!party.members.contains(member.getUniqueId())) {
+            party.members.add(member.getUniqueId());
+            playerToParty.put(member.getUniqueId(), leader.getUniqueId());
+            member.sendMessage(net.kyori.adventure.text.Component.text(
+                "✔ Groupe de lobby restauré avec " + leader.getName(),
+                net.kyori.adventure.text.format.NamedTextColor.GREEN));
+        }
+    }
 }

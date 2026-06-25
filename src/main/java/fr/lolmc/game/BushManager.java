@@ -1,6 +1,8 @@
 package fr.lolmc.game;
 
 import fr.lolmc.LolPlugin;
+import fr.lolmc.util.WorldContext;
+
 import fr.lolmc.team.TeamManager;
 import fr.lolmc.team.TeamManager.Team;
 import org.bukkit.Location;
@@ -84,7 +86,7 @@ public class BushManager implements Listener {
         long now = System.currentTimeMillis();
 
         // 1. Mettre à jour le bush de chaque joueur
-        for (Player p : LolPlugin.getInstance().getServer().getOnlinePlayers()) {
+        for (Player p : WorldContext.getGamePlayers()) {
             if (!champMgr.hasChampion(p)) {
                 playerBush.remove(p.getUniqueId());
                 continue;
@@ -102,7 +104,7 @@ public class BushManager implements Listener {
 
         // 2. Recalculer la visibilité — uniquement pour les paires proches
         //    et seulement si la cible est dans un bush (sinon toujours visible).
-        var players = new ArrayList<>(LolPlugin.getInstance().getServer().getOnlinePlayers());
+        var players = new ArrayList<>(WorldContext.getGamePlayers());
         for (Player target : players) {
             if (!champMgr.hasChampion(target)) continue;
             boolean targetInBush = playerBush.containsKey(target.getUniqueId());
@@ -314,7 +316,7 @@ public class BushManager implements Listener {
         // S'assurer que ce joueur est de nouveau visible pour tous
         Player p = LolPlugin.getInstance().getServer().getPlayer(uuid);
         if (p != null) {
-            for (Player other : LolPlugin.getInstance().getServer().getOnlinePlayers()) {
+            for (Player other : WorldContext.getGamePlayers()) {
                 if (!other.equals(p)) {
                     other.showPlayer(LolPlugin.getInstance(), p);
                     p.showPlayer(LolPlugin.getInstance(), other);

@@ -1,6 +1,8 @@
 package fr.lolmc.item;
 
 import fr.lolmc.LolPlugin;
+import fr.lolmc.util.WorldContext;
+
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.listener.ShopListener;
 import fr.lolmc.manager.ChampionManager;
@@ -685,7 +687,7 @@ public class PassiveManager {
         // ── Tâche principale 1s ──
         new BukkitRunnable() {
             @Override public void run() {
-                for (Player p : Bukkit.getOnlinePlayers()) {
+                for (Player p : WorldContext.getGamePlayers()) {
                     if (!championManager.hasChampion(p)) continue;
                     BaseChampion champ = championManager.getChampion(p);
                     ItemState state = getState(p);
@@ -697,7 +699,7 @@ public class PassiveManager {
         // ── Sunfire / Bami's Cinder: dégâts AoE 2 ticks ──
         new BukkitRunnable() {
             @Override public void run() {
-                for (Player p : Bukkit.getOnlinePlayers()) {
+                for (Player p : WorldContext.getGamePlayers()) {
                     if (!championManager.hasChampion(p)) continue;
                     if (!hasAnyItem(p,"sunfire_aegis","sunfire_cape","bamis_cinder","turbo_chemtank")) continue;
                     BaseChampion ac = championManager.getChampion(p);
@@ -720,7 +722,7 @@ public class PassiveManager {
         // ── Dead Man's Plate: stacks mouvement hors combat ──
         new BukkitRunnable() {
             @Override public void run() {
-                for (Player p : Bukkit.getOnlinePlayers()) {
+                for (Player p : WorldContext.getGamePlayers()) {
                     if (!championManager.hasChampion(p)) continue;
                     if (!hasAnyItem(p,"dead_mans_plate")) continue;
                     ItemState state = getState(p);
@@ -740,7 +742,7 @@ public class PassiveManager {
         // ── Manamune: recalculer AD bonus ──
         new BukkitRunnable() {
             @Override public void run() {
-                for (Player p : Bukkit.getOnlinePlayers()) {
+                for (Player p : WorldContext.getGamePlayers()) {
                     if (!championManager.hasChampion(p)) continue;
                     if (!hasAnyItem(p,"manamune","muramana")) continue;
                     BaseChampion champ = championManager.getChampion(p);
@@ -761,7 +763,7 @@ public class PassiveManager {
         // ── Abyssal Mask: aura -15% MR ennemis proches ──
         new BukkitRunnable() {
             @Override public void run() {
-                for (Player p : Bukkit.getOnlinePlayers()) {
+                for (Player p : WorldContext.getGamePlayers()) {
                     if (!championManager.hasChampion(p)) continue;
                     if (!hasAnyItem(p,"abyssal_mask")) continue;
                     p.getWorld().getNearbyEntities(p.getLocation(), 5, 2, 5).stream()

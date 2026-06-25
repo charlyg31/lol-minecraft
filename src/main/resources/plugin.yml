@@ -178,3 +178,5 @@ permissions:
   lolmc.champion.sivir: {description: Jouer Sivir, default: true}
   lolmc.champion.jinx: {description: Jouer Jinx, default: true}
   lolmc.champion.missfortune: {description: Jouer Miss Fortune, default: true}
+
+bungeecord: true

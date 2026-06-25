@@ -209,6 +209,13 @@ public class MatchmakingManager {
 
     private void startMatch(List<UUID> blue, List<UUID> red) {
         announce(blue, red);
+        // Notifier le bridge (lobby cross-serveur)
+        var bridge = LolPlugin.getInstance().getBridgeManager();
+        if (bridge != null && bridge.isEnabled()) {
+            java.util.List<java.util.UUID> allPlayers = new java.util.ArrayList<>(blue);
+            allPlayers.addAll(red);
+            bridge.notifyGameStart(allPlayers);
+        }
         // Le système de partie (téléportation, spawn) sera branché ici plus tard.
     }
 

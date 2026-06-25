@@ -1,0 +1,30 @@
+# LolMC Lobby — Configuration
+# ════════════════════════════
+
+# Serveur de jeu BungeeCord où envoyer les joueurs
+game-server: "lolmc-01"
+
+# Nombre de joueurs pour former une partie
+players-per-game: 10
+
+# Taille maximale d'un groupe
+max-party-size: 5
+
+# Messages personnalisables
+messages:
+  queue-joined: "&aTu rejoins la file! &7(%s/%s joueurs)"
+  queue-left: "&cTu as quitté la file."
+  game-found: "&6Partie trouvée! Connexion en cours..."
+  party-invite: "&e%s t'invite dans son groupe. &7/party accept"
+
+# Stockage des données joueurs (même DB que le serveur de jeu)
+database:
+  type: sqlite
+  path: "lolmc_lobby.db"
+  # Ou pointer vers la même MySQL que le serveur de jeu:
+  # type: mysql
+  # host: localhost
+  # port: 3306
+  # database: lolmc
+  # user: root
+  # password: ""

@@ -101,6 +101,7 @@ public class LolPlugin extends JavaPlugin {
     private RankedManager rankedManager;
     private ApiServer apiServer;
     private AbilityListener abilityListener;
+    private fr.lolmc.bridge.BridgeManager bridgeManager;
 
     @Override
     public void onEnable() {
@@ -116,6 +117,9 @@ public class LolPlugin extends JavaPlugin {
         // AJOUT : Démarrage de la tâche de chargement forcé des chunks (toutes les 20 ticks = 1 seconde)
         this.chunkLoaderManager = new ChunkLoaderManager();
         this.chunkLoaderManager.runTaskTimer(this, 0L, 20L);
+
+        // Bridge cross-serveur (BungeeCord)
+        this.bridgeManager = new fr.lolmc.bridge.BridgeManager(this);
 
         getLogger().info("LoL MC activé — 20 champions + boutique chargés.");
     }
@@ -243,6 +247,7 @@ public class LolPlugin extends JavaPlugin {
         }
         if (apiServer != null) apiServer.stop();
         if (databaseManager != null) databaseManager.close();
+        if (bridgeManager != null) bridgeManager.disable();
         fr.lolmc.util.DebugLogger.close();
         getLogger().info("LoL MC désactivé.");
     }
@@ -293,4 +298,6 @@ public class LolPlugin extends JavaPlugin {
     public RankedManager getRankedManager()     { return rankedManager; }
 
     public AbilityListener getAbilityListener() { return abilityListener; }
+
+    public fr.lolmc.bridge.BridgeManager getBridgeManager() { return bridgeManager; }
 }
