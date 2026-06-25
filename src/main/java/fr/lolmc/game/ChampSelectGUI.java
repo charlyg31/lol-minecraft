@@ -6,6 +6,7 @@ import fr.lolmc.rune.RuneRegistry.Path;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer; // AJOUT : Import pour convertir l'ancien format coloré
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -26,16 +27,18 @@ import java.util.List;
  */
 public class ChampSelectGUI implements Listener {
 
-    private static final String CHAMP_TITLE = "§5Choisis ton Champion";
-    private static final String RUNE_TITLE = "§5Choisis tes Runes";
+    private static final Component CHAMP_TITLE = Component.text("Choisis ton Champion", NamedTextColor.DARK_PURPLE)
+            .decoration(TextDecoration.ITALIC, false);
+    private static final Component RUNE_TITLE = Component.text("Choisis tes Runes", NamedTextColor.DARK_PURPLE)
+            .decoration(TextDecoration.ITALIC, false);
 
     // Les 20 champions disponibles (id → matériau d'icône)
     private static final String[] CHAMPIONS = {
-        "garen", "darius", "malphite", "nasus",            // top
-        "warwick", "amumu", "masteryi", "leesin",          // jungle
-        "annie", "veigar", "zed", "yasuo",                 // mid
-        "morgana", "leona", "blitzcrank", "janna",         // support
-        "ashe", "sivir", "jinx", "missfortune"             // adc
+            "garen", "darius", "malphite", "nasus",            // top
+            "warwick", "amumu", "masteryi", "leesin",          // jungle
+            "annie", "veigar", "zed", "yasuo",                 // mid
+            "morgana", "leona", "blitzcrank", "janna",         // support
+            "ashe", "sivir", "jinx", "missfortune"             // adc
     };
 
     // ── Menu Champion ─────────────────────────────────────────────
@@ -46,15 +49,14 @@ public class ChampSelectGUI implements Listener {
             inv.setItem(i, championIcon(CHAMPIONS[i]));
         }
         // Bouton runes + bouton lock
-        inv.setItem(25, button(Material.ENCHANTED_BOOK, "§dRunes",
+        inv.setItem(25, button(Material.ENCHANTED_BOOK, Component.text("Runes", NamedTextColor.LIGHT_PURPLE),
                 "Clique pour configurer tes runes"));
-        inv.setItem(26, button(Material.LIME_DYE, "§a🔒 Verrouiller",
+        inv.setItem(26, button(Material.LIME_DYE, Component.text("🔒 Verrouiller", NamedTextColor.GREEN),
                 "Confirme tes choix"));
         player.openInventory(inv);
     }
 
     private ItemStack championIcon(String champId) {
-        // Icône : tête de joueur ou matériau thématique
         ItemStack item = new ItemStack(championMaterial(champId));
         var meta = item.getItemMeta();
         if (meta != null) {
@@ -68,7 +70,6 @@ public class ChampSelectGUI implements Listener {
     }
 
     private Material championMaterial(String champId) {
-        // Matériau thématique par champion (visuel)
         return switch (champId) {
             case "garen" -> Material.IRON_SWORD;
             case "darius" -> Material.IRON_AXE;
@@ -98,12 +99,10 @@ public class ChampSelectGUI implements Listener {
 
     public void openRuneMenu(Player player) {
         Inventory inv = Bukkit.createInventory(null, 54, RUNE_TITLE);
-        // Une ligne par voie, avec les keystones
         int row = 0;
         for (Path path : Path.values()) {
             List<RuneRegistry.Rune> keystones = RuneRegistry.getKeystones(path);
             int col = 0;
-            // Icône de la voie
             inv.setItem(row * 9, pathIcon(path));
             for (var ks : keystones) {
                 inv.setItem(row * 9 + 1 + col, runeIcon(ks.name(), ks.description()));
@@ -122,7 +121,10 @@ public class ChampSelectGUI implements Listener {
             case RESOLVE -> Material.EMERALD;
             case INSPIRATION -> Material.PRISMARINE_CRYSTALS;
         };
-        return button(mat, path.color + path.displayName, "Voie de runes");
+
+        // CORRECTION : On reprend path.color d'origine et on le convertit proprement en Component moderne
+        Component display = LegacyComponentSerializer.legacySection().deserialize(path.color + path.displayName);
+        return button(mat, display, "Voie de runes");
     }
 
     private ItemStack runeIcon(String name, String desc) {
@@ -142,9 +144,9 @@ public class ChampSelectGUI implements Listener {
 
     @EventHandler
     public void onClick(InventoryClickEvent e) {
-        String title = e.getView().getTitle();
+        Component title = e.getView().title();
         if (!title.equals(CHAMP_TITLE) && !title.equals(RUNE_TITLE)) return;
-        e.setCancelled(true); // empêcher de prendre les items
+        e.setCancelled(true);
 
         if (!(e.getWhoClicked() instanceof Player player)) return;
         ItemStack clicked = e.getCurrentItem();
@@ -159,16 +161,13 @@ public class ChampSelectGUI implements Listener {
                 player.closeInventory();
             } else if (slot == 25) {
                 player.closeInventory();
-                LolPlugin.getInstance().getRuneGUI().open(player); // éditeur de runes complet
+                LolPlugin.getInstance().getRuneGUI().open(player);
             } else if (slot == 26) {
-                csm.lock(player); // bouton verrouiller
+                csm.lock(player);
                 player.closeInventory();
             }
         } else if (title.equals(RUNE_TITLE)) {
-            // Clic sur une keystone : on construit une page simple autour
             if (clicked.getType() == Material.ENCHANTED_BOOK) {
-                // Pour simplifier : la keystone cliquée devient la keystone primaire
-                // (le détail complet des 3+2 runes pourrait être un menu plus poussé)
                 player.sendActionBar(Component.text(
                         "Keystone sélectionnée. Page de base appliquée.", NamedTextColor.GREEN));
                 csm.chooseRunes(player, fr.lolmc.rune.RunePage.defaultPage());
@@ -179,11 +178,11 @@ public class ChampSelectGUI implements Listener {
 
     // ── Helpers ───────────────────────────────────────────────────
 
-    private ItemStack button(Material mat, String name, String lore) {
+    private ItemStack button(Material mat, Component modernName, String lore) {
         ItemStack item = new ItemStack(mat);
         var meta = item.getItemMeta();
         if (meta != null) {
-            meta.displayName(Component.text(name).decoration(TextDecoration.ITALIC, false));
+            meta.displayName(modernName.decoration(TextDecoration.ITALIC, false));
             meta.lore(List.of(Component.text(lore, NamedTextColor.GRAY)
                     .decoration(TextDecoration.ITALIC, false)));
             item.setItemMeta(meta);

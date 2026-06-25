@@ -11,6 +11,7 @@ import fr.lolmc.util.TargetingUtil;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.*;
+import org.bukkit.attribute.Attribute;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffect;
@@ -22,7 +23,7 @@ import java.util.*;
 public class Annie extends BaseChampion {
     public Annie() {
         super("annie", "Annie", ChampionRole.MID,
-            new ChampionStats(560,50,0,23,30,0.610,0,335,6.25,5.5));
+                new ChampionStats(560,50,0,23,30,0.610,0,335,6.25,5.5));
         getStats().setGrowthStats(96.0,2.6,4.0,1.30,0.01360,0.55);
     }
     @Override protected void registerAbilities() {
@@ -53,7 +54,7 @@ public class Annie extends BaseChampion {
 
     static class Q extends BaseAbility {
         Q(){super("q_annie","Brasier",Material.BLAZE_POWDER,AbilitySlot.Q,
-            new double[]{4,3.5,3,2.5,2},20,0,DamageType.MAGICAL);
+                new double[]{4,3.5,3,2.5,2},20,0,DamageType.MAGICAL);
             resourceCost = 60;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             var target = TargetingUtil.getTargetedEnemy(c, 6.5);
@@ -72,7 +73,7 @@ public class Annie extends BaseChampion {
 
     static class W extends BaseAbility {
         W(){super("w_annie","Incinération",Material.CAMPFIRE,AbilitySlot.W,
-            new double[]{8,7,6,5,4},6,4,DamageType.MAGICAL);
+                new double[]{8,7,6,5,4},6,4,DamageType.MAGICAL);
             resourceCost = 70;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             double[] base=fr.lolmc.util.Balance.base("w_annie",new double[]{70,115,160,205,250});
@@ -93,7 +94,7 @@ public class Annie extends BaseChampion {
 
     static class E extends BaseAbility {
         E(){super("e_annie","Molten Shield",Material.ORANGE_STAINED_GLASS,AbilitySlot.E,
-            new double[]{10,9,8,7,6},0,0,DamageType.MAGICAL);
+                new double[]{10,9,8,7,6},0,0,DamageType.MAGICAL);
             resourceCost = 40;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             Player dest=t!=null?t:c;
@@ -106,9 +107,8 @@ public class Annie extends BaseChampion {
 
     static class R extends BaseAbility {
         R(){
-            // Cooldown de l'infrastructure à 0 pour autoriser les re-casts de ciblage
             super("r_annie","Invocation de Tibbers",Material.NETHERITE_BLOCK,AbilitySlot.R,
-                new double[]{0,0,0},20,3,DamageType.MAGICAL);
+                    new double[]{0,0,0},20,3,DamageType.MAGICAL);
             resourceCost = 100;
         }
 
@@ -138,7 +138,7 @@ public class Annie extends BaseChampion {
                 }
             }
 
-            // 2. VÉRIFICATION DU COOLDOWN MANUEL (Premier cast uniquement)
+            // 2. VÉRIFICATION DU COOLDOWN MANUEL
             if (rCooldowns.containsKey(uuid) && rCooldowns.get(uuid) > now) {
                 long remaining = (rCooldowns.get(uuid) - now) / 1000;
                 c.sendActionBar(Component.text("⏳ Ultime en récupération (" + remaining + "s)", NamedTextColor.RED));
@@ -163,21 +163,20 @@ public class Annie extends BaseChampion {
 
             // Spawner de Tibbers (IronGolem modifié)
             org.bukkit.entity.IronGolem tibbers = ground.getWorld().spawn(ground, org.bukkit.entity.IronGolem.class, golem -> {
-                golem.setCustomName("§cTibbers de " + c.getName());
+                // CORRECTION : Remplacement de setCustomName(String) par customName(Component)
+                golem.customName(Component.text("Tibbers de " + c.getName(), NamedTextColor.RED));
                 golem.setCustomNameVisible(true);
-                
-                // Boost de statistiques (Vitesse de LoL + Dégâts scalés AP)
-                var speedAttr = golem.getAttribute(org.bukkit.attribute.Attribute.MOVEMENT_SPEED);
+
+                var speedAttr = golem.getAttribute(fr.lolmc.util.Compat.movementSpeed());
                 if (speedAttr != null) speedAttr.setBaseValue(0.35);
-                
-                var dmgAttr = golem.getAttribute(org.bukkit.attribute.Attribute.ATTACK_DAMAGE);
+
+                var dmgAttr = golem.getAttribute(fr.lolmc.util.Compat.attackDamage());
                 if (dmgAttr != null) dmgAttr.setBaseValue(20.0 + (s.getFinalAP() * 0.15));
             });
 
             activeTibbers.put(uuid, tibbers);
-            thisAbility.resourceCost = 0; // Les re-casts pour ordonner d'attaquer deviennent gratuits !
+            thisAbility.resourceCost = 0;
 
-            // Agression automatique instantanée sur le plus proche si existant
             for (Entity entity : tibbers.getNearbyEntities(10.0, 10.0, 10.0)) {
                 if (entity instanceof org.bukkit.entity.LivingEntity le && !entity.equals(c) && !entity.equals(tibbers)) {
                     tibbers.setTarget(le);
@@ -192,17 +191,15 @@ public class Annie extends BaseChampion {
                     if (!tibbers.isValid() || elapsed >= 45 || !c.isOnline()) {
                         if (tibbers.isValid()) tibbers.remove();
                         activeTibbers.remove(uuid);
-                        thisAbility.resourceCost = 100; // Restauration du coût en mana
+                        thisAbility.resourceCost = 100;
                         rCooldowns.put(uuid, System.currentTimeMillis() + (long)(realCooldowns[r] * 1000));
                         if (c.isOnline()) c.sendActionBar(Component.text("🐻 Tibbers s'est dissipé.", NamedTextColor.GRAY));
                         cancel();
                         return;
                     }
 
-                    // Particules de l'aura brûlante
                     tibbers.getWorld().spawnParticle(Particle.FLAME, tibbers.getLocation().add(0, 1, 0), 8, 0.4, 0.5, 0.4, 0.02);
-                    
-                    // Dégâts magiques continus autour de Tibbers
+
                     double auraDmg = 20 + (s.getFinalAP() * 0.12);
                     for (Entity entity : tibbers.getNearbyEntities(3.5, 3.5, 3.5)) {
                         if (entity instanceof org.bukkit.entity.LivingEntity target && !entity.equals(c) && !entity.equals(tibbers)) {
@@ -218,7 +215,7 @@ public class Annie extends BaseChampion {
         @Override public String getDynamicDescription(ChampionStats s){
             double[] base=fr.lolmc.util.Balance.base("r_annie",new double[]{175,300,425});
             int r=Math.min(getLevel()-1,2);
-            return String.format("%.0f dégâts AoE + Invoque Tibbers (45s). Re-cast R pour ordonner d'attaquer.",base[r]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("r_annie","ap",0.75));
+            return String.format("%.0f dégâts AoE + Invoque Tibbers (45s). Re-cast R pour ordonner d'attaquer.",base[r]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("r_annie", "ap", 0.75));
         }
     }
 }

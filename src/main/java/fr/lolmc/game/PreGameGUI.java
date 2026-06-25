@@ -24,31 +24,39 @@ import java.util.List;
  */
 public class PreGameGUI implements Listener {
 
-    private static final String TITLE = "§6Préparation de partie";
+    // CORRECTION : Le titre passe en Component moderne (GOLD remplace §6)[cite: 10]
+    private static final Component TITLE = Component.text("Préparation de partie", NamedTextColor.GOLD)
+            .decoration(TextDecoration.ITALIC, false);
 
     public void open(Player player) {
+        // Appelle la méthode Bukkit native acceptant un Component[cite: 10]
         Inventory inv = Bukkit.createInventory(null, 27, TITLE);
 
-        // Les 5 rôles (slots 1-5)
+        // Les 5 rôles (slots 1-5)[cite: 10]
         Role[] roles = Role.values();
         var selected = LolPlugin.getInstance().getRoleQueueManager().getPreferredRoles(player.getUniqueId());
         for (int i = 0; i < roles.length; i++) {
             inv.setItem(1 + i, roleIcon(roles[i], selected.contains(roles[i])));
         }
 
-        // Bouton runes (slot 11)
-        inv.setItem(11, button(Material.ENCHANTED_BOOK, "§dConfigurer mes Runes",
+        // Bouton runes (slot 11) - Passage en Component (LIGHT_PURPLE remplace §d)[cite: 10]
+        inv.setItem(11, button(Material.ENCHANTED_BOOK, Component.text("Configurer mes Runes", NamedTextColor.LIGHT_PURPLE),
                 "Ouvre l'éditeur de pages de runes"));
 
-        // Bouton sorts (slot 13)
-        inv.setItem(13, button(Material.BLAZE_POWDER, "§eSorts d'invocateur",
+        // Bouton sorts (slot 13) - Passage en Component (YELLOW remplace §e)[cite: 10]
+        inv.setItem(13, button(Material.BLAZE_POWDER, Component.text("Sorts d'invocateur", NamedTextColor.YELLOW),
                 "Configure tes 2 sorts d'invocateur"));
 
-        // Bouton rejoindre la file (slot 15)
+        // Bouton rejoindre la file (slot 15)[cite: 10]
         int roleCount = selected.size();
+        boolean canJoin = roleCount >= 2;
+        Component buttonName = canJoin
+                ? Component.text("Rejoindre la file", NamedTextColor.GREEN)
+                : Component.text("Choisis 2 rôles d'abord", NamedTextColor.GRAY);
+
         inv.setItem(15, button(
-                roleCount >= 2 ? Material.LIME_DYE : Material.GRAY_DYE,
-                roleCount >= 2 ? "§aRejoindre la file" : "§7Choisis 2 rôles d'abord",
+                canJoin ? Material.LIME_DYE : Material.GRAY_DYE,
+                buttonName,
                 "Rôles choisis : " + roleCount + "/2 minimum"));
 
         player.openInventory(inv);
@@ -66,10 +74,10 @@ public class PreGameGUI implements Listener {
         var meta = item.getItemMeta();
         if (meta != null) {
             meta.displayName(Component.text((selected ? "✔ " : "") + role.displayName,
-                    selected ? NamedTextColor.GREEN : NamedTextColor.WHITE)
+                            selected ? NamedTextColor.GREEN : NamedTextColor.WHITE)
                     .decoration(TextDecoration.ITALIC, false));
             meta.lore(List.of(Component.text(
-                    selected ? "Clique pour retirer" : "Clique pour ajouter", NamedTextColor.GRAY)
+                            selected ? "Clique pour retirer" : "Clique pour ajouter", NamedTextColor.GRAY)
                     .decoration(TextDecoration.ITALIC, false)));
             if (selected) {
                 meta.addEnchant(fr.lolmc.util.Compat.glowEnchant(), 1, true);
@@ -82,33 +90,34 @@ public class PreGameGUI implements Listener {
 
     @EventHandler
     public void onClick(InventoryClickEvent e) {
-        if (!TITLE.equals(e.getView().getTitle())) return;
+        // CORRECTION : Comparaison via e.getView().title() qui retourne un Component[cite: 10]
+        if (!TITLE.equals(e.getView().title())) return;
         e.setCancelled(true);
         if (!(e.getWhoClicked() instanceof Player player)) return;
         int slot = e.getSlot();
         var rqm = LolPlugin.getInstance().getRoleQueueManager();
 
-        // Rôles (slots 1-5)
+        // Rôles (slots 1-5)[cite: 10]
         if (slot >= 1 && slot <= 5) {
             Role role = Role.values()[slot - 1];
             rqm.toggleRole(player, role);
             open(player); // rafraîchir
             return;
         }
-        // Bouton runes
+        // Bouton runes[cite: 10]
         if (slot == 11) {
             player.closeInventory();
             LolPlugin.getInstance().getRuneGUI().open(player);
             return;
         }
-        // Bouton sorts
+        // Bouton sorts[cite: 10]
         if (slot == 13) {
             player.closeInventory();
             player.sendMessage(Component.text("Utilise /spell <sort1> <sort2> (ex: /spell flash ignite)",
                     NamedTextColor.AQUA));
             return;
         }
-        // Bouton rejoindre la file
+        // Bouton rejoindre la file[cite: 10]
         if (slot == 15) {
             player.closeInventory();
             rqm.joinQueue(player);
@@ -116,11 +125,12 @@ public class PreGameGUI implements Listener {
         }
     }
 
-    private ItemStack button(Material mat, String name, String lore) {
+    // CORRECTION : Signature adaptée pour consommer directement un Component[cite: 10]
+    private ItemStack button(Material mat, Component modernName, String lore) {
         ItemStack item = new ItemStack(mat);
         var meta = item.getItemMeta();
         if (meta != null) {
-            meta.displayName(Component.text(name).decoration(TextDecoration.ITALIC, false));
+            meta.displayName(modernName.decoration(TextDecoration.ITALIC, false));
             meta.lore(List.of(Component.text(lore, NamedTextColor.GRAY)
                     .decoration(TextDecoration.ITALIC, false)));
             item.setItemMeta(meta);

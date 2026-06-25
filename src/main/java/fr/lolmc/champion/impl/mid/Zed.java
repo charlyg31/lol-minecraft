@@ -6,13 +6,13 @@ import fr.lolmc.ability.base.BasicAttackAbility;
 import fr.lolmc.stats.ResourceSystem;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.stats.ChampionStats;
+import fr.lolmc.util.DamageUtil;
 import fr.lolmc.util.TargetingUtil;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.*;
-import org.bukkit.entity.ArmorStand;
+import org.bukkit.attribute.Attribute; // AJOUT : Import de l'attribut
 import org.bukkit.entity.Entity;
-import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
@@ -33,29 +33,22 @@ public class Zed extends BaseChampion {
         initSystems(582, 7.0, ResourceSystem.ResourceType.ENERGY, 200, 50.0);
     }
 
-    // Gestion de l'état global des ombres de Zed
-    private static final Map<UUID, Location> shadows = new HashMap<>();
-    private static final Map<UUID, ArmorStand> shadowEntities = new HashMap<>();
+    // Gestion de l'ombre et des cooldowns manuels
+    private static final Map<UUID,Location> shadows = new HashMap<>();
     private static final Map<UUID, Long> wCooldowns = new HashMap<>();
 
-    public static void resetState(UUID id){
-        shadows.remove(id);
-        ArmorStand stand = shadowEntities.remove(id);
-        if (stand != null && stand.isValid()) stand.remove();
-    }
-    public static void resetAllState(){
-        shadows.clear();
-        for (ArmorStand stand : shadowEntities.values()) {
-            if (stand != null && stand.isValid()) stand.remove();
-        }
-        shadowEntities.clear();
-    }
+    public static void resetState(UUID id){ shadows.remove(id); }
+    public static void resetAllState(){ shadows.clear(); }
 
     static class AA extends BasicAttackAbility {
         AA(){super("zed",Material.IRON_SWORD,2.5f,DamageType.PHYSICAL);}
         @Override protected void onHit(Player c, ChampionStats s, org.bukkit.entity.LivingEntity tgt, double dmg){
-            if(tgt.getHealth() < tgt.getMaxHealth()*0.5){
-                double bonus=tgt.getMaxHealth()*0.08;
+            // CORRECTION : Utilisation de l'attribut GENERIC_MAX_HEALTH au lieu de getMaxHealth() déprécié
+            var maxHealthAttr = tgt.getAttribute(fr.lolmc.util.Compat.maxHealth());
+            double maxHealth = maxHealthAttr != null ? maxHealthAttr.getValue() : 20.0;
+
+            if(tgt.getHealth() < maxHealth * 0.5){
+                double bonus = maxHealth * 0.08;
                 TargetingUtil.dealDamage(c, tgt, bonus, TargetingUtil.DmgType.MAGICAL);
                 tgt.getWorld().spawnParticle(Particle.SMOKE,tgt.getLocation().add(0,1,0),8,0.3,0.5,0.3);
             }
@@ -72,8 +65,6 @@ public class Zed extends BaseChampion {
             int rank=getLevel()-1;
             double dmgFirst=baseFirst[rank]+s.getFinalAD()*1.0;
             double dmgNext=baseNext[rank]+s.getFinalAD()*0.6;
-
-            // 1. Shuriken du joueur
             var hits=TargetingUtil.skillshot(c, 12.0, 1.0, true);
             boolean first=true;
             for(var __t : hits){
@@ -81,135 +72,55 @@ public class Zed extends BaseChampion {
                 first=false;
             }
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_ARROW_SHOOT, 1f, 1.3f);
-
-            // 2. Shuriken de l'Ombre
-            UUID uuid = c.getUniqueId();
-            if (shadows.containsKey(uuid)) {
-                Location shadowLoc = shadows.get(uuid);
-                if (shadowLoc != null) {
-                    Vector dir = c.getLocation().getDirection().setY(0).normalize();
-                    shadowLoc.getWorld().playSound(shadowLoc, Sound.ENTITY_ARROW_SHOOT, 1f, 1.3f);
-
-                    List<LivingEntity> shadowHits = new ArrayList<>();
-                    for (double d = 1.0; d <= 12.0; d += 0.5) {
-                        Location checkLoc = shadowLoc.clone().add(dir.clone().multiply(d)).add(0, 1, 0);
-                        checkLoc.getWorld().spawnParticle(Particle.CRIT, checkLoc, 1, 0, 0, 0, 0);
-
-                        for (Entity entity : checkLoc.getWorld().getNearbyEntities(checkLoc, 1.0, 1.0, 1.0)) {
-                            if (entity instanceof LivingEntity tgtEnnemi && !entity.equals(c) && !(entity instanceof ArmorStand)) {
-                                if (!shadowHits.contains(tgtEnnemi)) {
-                                    shadowHits.add(tgtEnnemi);
-                                    double dmg = (shadowHits.size() == 1) ? dmgFirst : dmgNext;
-                                    TargetingUtil.dealDamage(c, tgtEnnemi, dmg, TargetingUtil.DmgType.PHYSICAL);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] baseFirst={80,120,160,200,240};
-            return String.format("Skillshot: %.0f dégâts au 1er ennemi (+100%%AD), réduit aux suivants. Répliqué par l'ombre.",baseFirst[getLevel()-1]+s.getFinalAD());
+            return String.format("Skillshot: %.0f dégâts au 1er ennemi (+100%%AD), réduit aux suivants.",baseFirst[getLevel()-1]+s.getFinalAD());
         }
     }
 
     static class W extends BaseAbility {
-        private double energyCost = 40; // Variable locale étanche
-        private long lastClickTime = 0; // Sécurité anti-double clic Spigot
-
         W(){
             super("w_zed","Ombre Vivante",Material.GRAY_DYE,AbilitySlot.W,
                     new double[]{0,0,0,0,0},0,0,DamageType.TRUE);
+            resourceCost = 40;
         }
-
-        // --- FORÇAGE DU FRAMEWORK COMPORTEMENTAL ---
-        @Override
-        public double getResourceCost() {
-            return this.energyCost;
-        }
-
-        @Override
-        public boolean isOnCooldown(Player player) {
-            if (shadows.containsKey(player.getUniqueId())) return false; // Permet le recast immédiat
-            return wCooldowns.containsKey(player.getUniqueId()) && wCooldowns.get(player.getUniqueId()) > System.currentTimeMillis();
-        }
-
-        @Override
-        public double getRemainingCooldown(Player player) {
-            if (shadows.containsKey(player.getUniqueId())) return 0;
-            UUID uuid = player.getUniqueId();
-            if (!wCooldowns.containsKey(uuid)) return 0;
-            long rem = wCooldowns.get(uuid) - System.currentTimeMillis();
-            return rem > 0 ? rem / 1000.0 : 0;
-        }
-
         @Override public void cast(Player c,ChampionStats s,Player t){
             UUID uuid = c.getUniqueId();
-            long now = System.currentTimeMillis();
-
-            // Filtrage anti double-envoi simultané (Main Droite / Main Gauche)
-            if (now - lastClickTime < 200) return;
-            lastClickTime = now;
-
             int rank = Math.min(getLevel() - 1, 4);
             double[] realCooldowns = {20, 18, 16, 14, 12};
+            long now = System.currentTimeMillis();
+
+            if (wCooldowns.containsKey(uuid) && wCooldowns.get(uuid) > now && !shadows.containsKey(uuid)) {
+                long remaining = (wCooldowns.get(uuid) - now) / 1000;
+                c.sendActionBar(Component.text("⏳ Ombre Vivante en récupération (" + remaining + "s)", NamedTextColor.RED));
+                return;
+            }
 
             if(shadows.containsKey(uuid)) {
-                // ─── RE-CAST : TELEPORTATION ───
                 Location shadowLoc = shadows.get(uuid);
                 if (shadowLoc != null) {
-                    ArmorStand stand = shadowEntities.remove(uuid);
-                    if (stand != null && stand.isValid()) stand.remove();
-
-                    c.teleport(shadowLoc.add(0, 0.1, 0));
+                    c.teleport(shadowLoc);
                     shadows.remove(uuid);
-
                     c.sendActionBar(Component.text("👤 Échange avec l'ombre !", NamedTextColor.DARK_GRAY));
                     wCooldowns.put(uuid, now + (long)(realCooldowns[rank] * 1000));
-
-                    this.energyCost = 40; // Restaure le coût
                 }
             } else {
-                // ─── PREMIER CAST : INVOCATION ───
                 Vector dir = c.getLocation().getDirection().setY(0).normalize();
-                Location shadowLoc = c.getLocation().clone().add(dir.multiply(7));
-                shadowLoc.setY(c.getLocation().getY());
+                Location shadowLoc = c.getLocation().clone().add(dir.multiply(8));
+                shadowLoc.setY(c.getWorld().getHighestBlockYAt(shadowLoc) + 1);
                 shadowLoc.setYaw(c.getLocation().getYaw());
                 shadowLoc.setPitch(c.getLocation().getPitch());
 
                 shadows.put(uuid, shadowLoc);
-                this.energyCost = 0; // Le second clic devient gratuit au niveau du framework
-
-                ArmorStand stand = shadowLoc.getWorld().spawn(shadowLoc, ArmorStand.class, entity -> {
-                    entity.setVisible(false);
-                    entity.setGravity(false);
-                    entity.setBasePlate(false);
-                    entity.setArms(true);
-                    entity.getEquipment().setHelmet(new org.bukkit.inventory.ItemStack(Material.WITHER_SKELETON_SKULL));
-
-                    org.bukkit.inventory.ItemStack chest = new org.bukkit.inventory.ItemStack(Material.LEATHER_CHESTPLATE);
-                    var meta = (org.bukkit.inventory.meta.LeatherArmorMeta) chest.getItemMeta();
-                    if (meta != null) {
-                        meta.setColor(Color.BLACK);
-                        chest.setItemMeta(meta);
-                    }
-                    entity.getEquipment().setChestplate(chest);
-                });
-                shadowEntities.put(uuid, stand);
-
-                c.getWorld().spawnParticle(Particle.SMOKE, shadowLoc.clone().add(0, 1, 0), 20, 0.5, 1, 0.5);
+                c.getWorld().spawnParticle(Particle.SMOKE, shadowLoc, 20, 0.5, 1, 0.5);
                 c.sendActionBar(Component.text("👤 Ombre créée ! Re-cast pour échanger de place.", NamedTextColor.DARK_GRAY));
 
                 new BukkitRunnable(){
                     @Override public void run(){
                         if (shadows.containsKey(uuid)) {
                             shadows.remove(uuid);
-                            ArmorStand st = shadowEntities.remove(uuid);
-                            if (st != null && st.isValid()) st.remove();
-
                             wCooldowns.put(uuid, System.currentTimeMillis() + (long)(realCooldowns[rank] * 1000));
-                            W.this.energyCost = 40;
                         }
                     }
                 }.runTaskLater(LolPlugin.getInstance(), 80L);
@@ -228,8 +139,6 @@ public class Zed extends BaseChampion {
             double[] base=fr.lolmc.util.Balance.base("e_zed",new double[]{70,92.5,115,137.5,160});
             double dmg=base[getLevel()-1]+s.getFinalAD()*fr.lolmc.util.Balance.ratio("e_zed","ad",0.7);
             int rank=getLevel()-1;
-
-            // 1. Dégâts autour du corps de Zed
             for(var __t : TargetingUtil.enemiesAround(c, 4.0)){
                 TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.PHYSICAL);
                 if(__t instanceof Player __p)
@@ -238,26 +147,24 @@ public class Zed extends BaseChampion {
             c.getWorld().spawnParticle(Particle.SWEEP_ATTACK,c.getLocation().add(0,1,0),6,2,0.5,2);
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 0.9f);
 
-            // 2. Dégâts autour de l'Ombre de Zed
             if (shadows.containsKey(c.getUniqueId())) {
                 Location shadowLoc = shadows.get(c.getUniqueId());
                 if (shadowLoc != null) {
-                    shadowLoc.getWorld().spawnParticle(Particle.SWEEP_ATTACK, shadowLoc.clone().add(0,1,0), 6, 2, 0.5, 2);
-                    shadowLoc.getWorld().playSound(shadowLoc, Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 0.9f);
-
                     for (Entity entity : shadowLoc.getWorld().getNearbyEntities(shadowLoc, 4.0, 4.0, 4.0)) {
-                        if (entity instanceof LivingEntity tgtEnnemi && !entity.equals(c) && !(entity instanceof ArmorStand)) {
+                        if (entity instanceof org.bukkit.entity.LivingEntity tgtEnnemi && !entity.equals(c)) {
                             TargetingUtil.dealDamage(c, tgtEnnemi, dmg, TargetingUtil.DmgType.PHYSICAL);
                             if (tgtEnnemi instanceof Player __p)
                                 __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 30, rank, false, true));
                         }
                     }
+                    shadowLoc.getWorld().spawnParticle(Particle.SWEEP_ATTACK, shadowLoc.clone().add(0,1,0), 6, 2, 0.5, 2);
+                    shadowLoc.getWorld().playSound(shadowLoc, Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 0.9f);
                 }
             }
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] base=fr.lolmc.util.Balance.base("e_zed",new double[]{70,92.5,115,137.5,160});
-            return String.format("%.0f dégâts AoE (+70%%AD) + ralentit 20-40%% 1.5s. Répliqué par l'ombre.",base[getLevel()-1]+s.getFinalAD()*fr.lolmc.util.Balance.ratio("e_zed","ad",0.7));
+            return String.format("%.0f dégâts AoE (+70%%AD) + ralentit 20-40%% 1.5s.",base[getLevel()-1]+s.getFinalAD()*fr.lolmc.util.Balance.ratio("e_zed","ad",0.7));
         }
     }
 

@@ -11,6 +11,7 @@ import fr.lolmc.util.TargetingUtil;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.*;
+import org.bukkit.attribute.Attribute; // AJOUT : Import de l'attribut
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffect;
@@ -22,7 +23,7 @@ import java.util.*;
 public class Veigar extends BaseChampion {
     public Veigar() {
         super("veigar", "Veigar", ChampionRole.MID,
-            new ChampionStats(550,52,0,18,30,0.625,0,340,5.5,6.0));
+                new ChampionStats(550,52,0,18,30,0.625,0,340,5.5,6.0));
         getStats().setGrowthStats(108.0,2.6,4.0,1.30,0.02240,0.60);
     }
     @Override protected void registerAbilities() {
@@ -33,8 +34,7 @@ public class Veigar extends BaseChampion {
     }
 
     public static final Map<UUID,Integer> apStacks=new HashMap<>();
-    private static final int MAX_AP_STACKS = 150; // plafond anti-scaling infini
-    /** Reinitialise les stacks AP de ce joueur (fin de partie / deconnexion). */
+    private static final int MAX_AP_STACKS = 150;
     public static void resetState(UUID id){ apStacks.remove(id); }
     public static void resetAllState(){ apStacks.clear(); }
 
@@ -44,18 +44,16 @@ public class Veigar extends BaseChampion {
 
     static class Q extends BaseAbility {
         Q(){super("q_veigar","Frappe Baleful",Material.AMETHYST_SHARD,AbilitySlot.Q,
-            new double[]{7,6.5,6,5.5,5},20,0,DamageType.MAGICAL);
+                new double[]{7,6.5,6,5.5,5},20,0,DamageType.MAGICAL);
             resourceCost = 40;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            // LoL : skillshot qui touche les 2 premiers ennemis. 80-240 + 65% AP. Kill = stacks AP permanents
             double[] base=fr.lolmc.util.Balance.base("q_veigar",new double[]{80,120,160,200,240});double dmg=base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("q_veigar","ap",0.65);
             var hits=TargetingUtil.skillshot(c, 9.0, 0.8, true);
             int touched=0;
             for(var __t : hits){
-                if(touched>=2) break; // max 2 cibles
+                if(touched>=2) break;
                 double hpBefore=__t.getHealth();
                 TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);
-                // Kill = +1 AP permanent (+2 si gros monstre/champion), plafonné
                 if(hpBefore-dmg<=0 && apStacks.getOrDefault(c.getUniqueId(),0) < MAX_AP_STACKS){
                     boolean big=(__t instanceof Player)||fr.lolmc.game.JungleManager.isJungleMonster(__t);
                     int gain=big?2:1;
@@ -75,10 +73,9 @@ public class Veigar extends BaseChampion {
 
     static class W extends BaseAbility {
         W(){super("w_veigar","Matière Noire",Material.OBSIDIAN,AbilitySlot.W,
-            new double[]{10,9,8,7,6},20,3,DamageType.MAGICAL);
+                new double[]{10,9,8,7,6},20,3,DamageType.MAGICAL);
             resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            // LoL : tombe du ciel sur la zone visée après ~1.2s. 80-280 + 100% AP
             Location loc=TargetingUtil.getAimedGroundLocation(c, 9.0);
             loc.getWorld().spawnParticle(Particle.ENCHANT,loc,30,2,2,2);
             loc.getWorld().playSound(loc, Sound.ENTITY_ENDER_DRAGON_GROWL, 0.6f, 1.5f);
@@ -86,7 +83,7 @@ public class Veigar extends BaseChampion {
                 @Override public void run(){
                     double[] base=fr.lolmc.util.Balance.base("w_veigar",new double[]{80,130,180,230,280});double dmg=base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("w_veigar","ap",1.0);
                     TargetingUtil.dealDamageAll(c,
-                        TargetingUtil.entitiesInRadius(c, loc, 3.0), dmg, TargetingUtil.DmgType.MAGICAL);
+                            TargetingUtil.entitiesInRadius(c, loc, 3.0), dmg, TargetingUtil.DmgType.MAGICAL);
                     loc.getWorld().spawnParticle(Particle.EXPLOSION,loc,8,1.5,0,1.5);
                     loc.getWorld().playSound(loc, Sound.ENTITY_GENERIC_EXPLODE, 1f, 0.8f);
                 }
@@ -100,7 +97,7 @@ public class Veigar extends BaseChampion {
 
     static class E extends BaseAbility {
         E(){super("e_veigar","Cage Événementielle",Material.DARK_OAK_FENCE,AbilitySlot.E,
-            new double[]{18,16,14,12,10},20,4,DamageType.TRUE);
+                new double[]{18,16,14,12,10},20,4,DamageType.TRUE);
             resourceCost = 80;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
@@ -121,15 +118,19 @@ public class Veigar extends BaseChampion {
 
     static class R extends BaseAbility {
         R(){super("r_veigar","Explosion Primordiale",Material.NETHER_STAR,AbilitySlot.R,
-            new double[]{120,100,80},20,0,DamageType.MAGICAL);
+                new double[]{120,100,80},20,0,DamageType.MAGICAL);
             resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            // LoL : ciblé. 200/350/500 + 80% AP, augmenté de 0-100% selon PV manquants
             org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,8.0); if(tgt==null){c.sendActionBar(Component.text("☠ Aucune cible visée",NamedTextColor.GRAY));return;}
             double[] base=fr.lolmc.util.Balance.base("r_veigar",new double[]{200,350,500});int rr=Math.min(getLevel()-1,2);
             double baseDmg=base[rr]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("r_veigar","ap",0.8);
+
+            // CORRECTION : Utilisation de l'attribut GENERIC_MAX_HEALTH au lieu de getMaxHealth() déprécié
+            var maxHealthAttr = tgt.getAttribute(fr.lolmc.util.Compat.maxHealth());
+            double maxHealth = maxHealthAttr != null ? maxHealthAttr.getValue() : 20.0;
+
             // Augmenté jusqu'à +100% selon PV manquants de la cible
-            double missingPct=1.0-(tgt.getHealth()/tgt.getMaxHealth());
+            double missingPct=1.0-(tgt.getHealth()/maxHealth);
             double dmg=baseDmg*(1.0+missingPct);
             tgt.getWorld().strikeLightningEffect(tgt.getLocation());
             tgt.getWorld().spawnParticle(Particle.FLASH,tgt.getLocation().add(0,1,0),3);
