@@ -33,7 +33,7 @@ public class Veigar extends BaseChampion {
         setAutoAttackRange(5.5);
     }
 
-    public static final Map<UUID,Integer> apStacks=new HashMap<>();
+    public static final Map<UUID,Integer> apStacks=new java.util.concurrent.ConcurrentHashMap<>();
     private static final int MAX_AP_STACKS = 150;
     public static void resetState(UUID id){ apStacks.remove(id); }
     public static void resetAllState(){ apStacks.clear(); }

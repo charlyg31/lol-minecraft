@@ -108,7 +108,9 @@ public class SummonerSpellManager {
         var cm = LolPlugin.getInstance().getChampionManager();
         if (!cm.hasChampion(target)) return false;
 
-        int casterLevel = cm.getChampion(caster).getLevelSystem().getLevel();
+        int casterLevel = cm.hasChampion(caster)
+                ? cm.getChampion(caster).getLevelSystem().getLevel()
+                : 1;
         // Dégâts LoL : 70 + 20 par niveau (70 au niv 1 → 410 au niv 18), sur 5s
         double totalDamage = 50 + 20 * casterLevel;
         double perTick = totalDamage / 5.0;

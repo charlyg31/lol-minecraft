@@ -34,11 +34,11 @@ public class Zed extends BaseChampion {
     }
 
     // Gestion de l'ombre et des cooldowns manuels
-    private static final Map<UUID,Location> shadows = new HashMap<>();
-    private static final Map<UUID, Long> wCooldowns = new HashMap<>();
+    private static final Map<UUID,Location> shadows = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final Map<UUID, Long> wCooldowns = new java.util.concurrent.ConcurrentHashMap<>();
 
-    public static void resetState(UUID id){ shadows.remove(id); }
-    public static void resetAllState(){ shadows.clear(); }
+    public static void resetState(UUID id){ shadows.remove(id); wCooldowns.remove(id); }
+    public static void resetAllState(){ shadows.clear(); wCooldowns.clear(); }
 
     static class AA extends BasicAttackAbility {
         AA(){super("zed",Material.IRON_SWORD,2.5f,DamageType.PHYSICAL);}

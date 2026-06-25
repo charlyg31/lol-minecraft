@@ -78,6 +78,7 @@ public class GameManager {
         respawnBars.clear();
         participants.clear();
         participantTeam.clear();
+        goldAccumulator.clear();
     }
 
     /** Capture les joueurs présents (avec champion) comme participants de la partie. */

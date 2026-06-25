@@ -98,7 +98,7 @@ public class AbilityListener implements Listener {
 
     // Anti-rebond : évite le double déclenchement clic gauche (animation + attaque entité)
     // Active les messages de diagnostic en jeu (à désactiver en prod)
-    public static boolean DEBUG = true;
+    public static boolean DEBUG = false;
     private final java.util.Map<java.util.UUID, Long> lastCastTime = new java.util.HashMap<>();
     private boolean canCast(Player p) {
         long now = System.currentTimeMillis();

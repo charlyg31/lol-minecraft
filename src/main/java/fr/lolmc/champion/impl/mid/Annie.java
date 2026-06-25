@@ -34,8 +34,8 @@ public class Annie extends BaseChampion {
     }
 
     // Suivi de Tibbers et cooldowns manuels
-    private static final Map<UUID, org.bukkit.entity.IronGolem> activeTibbers = new HashMap<>();
-    private static final Map<UUID, Long> rCooldowns = new HashMap<>();
+    private static final Map<UUID, org.bukkit.entity.IronGolem> activeTibbers = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final Map<UUID, Long> rCooldowns = new java.util.concurrent.ConcurrentHashMap<>();
 
     public static void resetState(UUID id) {
         if (activeTibbers.containsKey(id)) {

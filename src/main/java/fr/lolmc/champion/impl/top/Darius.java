@@ -145,6 +145,27 @@ public class Darius extends BaseChampion {
             TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.TRUE);
             if(tgt instanceof Player _tp)_tp.sendMessage(Component.text("☠ GUILLOTINE NOXIENNE!",NamedTextColor.DARK_RED));
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_PLAYER_ATTACK_CRIT, 1.5f, 0.5f);
+            // Reset du CD si la cible meurt dans le tick suivant (mécanique Juggernaut LoL)
+            final org.bukkit.entity.LivingEntity finalTgt = tgt;
+            final BaseAbility thisAbility = this;
+            new org.bukkit.scheduler.BukkitRunnable() {
+                @Override public void run() {
+                    boolean killed = finalTgt.isDead() || finalTgt.getHealth() <= 0;
+                    if (!killed && finalTgt instanceof Player pTgt) {
+                        var cm = LolPlugin.getInstance().getChampionManager();
+                        if (cm.hasChampion(pTgt)) killed = cm.getChampion(pTgt).getHPSystem().isDead();
+                    }
+                    if (killed) {
+                        // Réinitialiser le cooldown : dynamicCooldown à 0 le temps d'un tick puis -1
+                        thisAbility.setDynamicCooldown(0.001);
+                        thisAbility.triggerCooldown(c);
+                        new org.bukkit.scheduler.BukkitRunnable() {
+                            @Override public void run() { thisAbility.setDynamicCooldown(-1); }
+                        }.runTaskLater(LolPlugin.getInstance(), 1L);
+                        c.sendActionBar(Component.text("☠ JUGGERNAUT — Guillotine reset!", NamedTextColor.DARK_RED));
+                    }
+                }
+            }.runTaskLater(LolPlugin.getInstance(), 1L);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] base=fr.lolmc.util.Balance.base("r_darius",new double[]{100,200,300});int r=Math.min(getLevel()-1,2);
