@@ -58,9 +58,8 @@ public class GameManager {
     private final Map<UUID, Double> goldAccumulator = new HashMap<>();
 
     public GameManager() {
-        startTimerTask();
-        startPassiveGoldTask();
-        startRespawnTask();
+        // NE PAS démarrer les tâches ici.
+        // Appelé par startGame() → startSystems().
     }
 
     // ══════════════════════════════════════════════════════════════

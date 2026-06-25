@@ -76,7 +76,7 @@ public class ShopListener implements Listener {
             // Annuler TOUT clic (y compris shift-clic, double-clic, nombre)
             event.setCancelled(true);
             // Seuls les clics dans le menu haut (slots 0-53) déclenchent un achat
-            int raw = event.getRawSlot();
+            int raw = event.getSlot();
             if (raw >= 0 && raw < event.getView().getTopInventory().getSize()) {
                 handleShopClick(player, raw);
             }
@@ -85,8 +85,11 @@ public class ShopListener implements Listener {
 
         // ── INVENTAIRE JOUEUR — protéger slots sorts (0-4) et items (5,6,7,8,18,19) ──
         if (!championManager.hasChampion(player)) return;
+        // Guard : ne traiter que les clics dans l'inventaire du joueur (pas conteneur ouvert)
+        if (event.getClickedInventory() == null) return;
+        if (!event.getClickedInventory().equals(player.getInventory())) return;
 
-        int slot = event.getRawSlot();
+        int slot = event.getSlot();
         boolean isSortSlot = slot >= 0 && slot <= 4;
         boolean isItemSlot = isLolItemSlot(slot);
 
