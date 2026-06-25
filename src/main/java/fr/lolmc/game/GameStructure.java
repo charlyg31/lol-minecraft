@@ -119,6 +119,7 @@ public class GameStructure {
     public void setAngle(int a)     { this.angle = a; }
     public double getMaxHP()        { return maxHP; }
     public double getCurrentHP()    { return currentHP; }
+    public void respawn() { this.currentHP = this.maxHP; this.destroyed = false; this.currentPhaseIndex = 0; }
     public boolean isDestroyed()    { return destroyed; }
     public double getHealthPercent(){ return (currentHP / maxHP) * 100.0; }
     public List<Phase> getPhases()  { return phases; }

@@ -72,9 +72,16 @@ public class StructureDamageListener implements Listener {
             }
         }
 
-        // Infliger les dégâts (basés sur l'AD du champion)
+        // Infliger les degats (bases sur l'AD du champion)
         BaseChampion champ = championManager.getChampion(player);
         double damage = champ.getStats().getFinalAD();
+        // Turret Plating : -40% degats si plaques actives
+        var tm = LolPlugin.getInstance().getTurretManager();
+        String structKey = structure.getType().name() + "_" + structure.getTeam() + "_" + structure.getLane();
+        if (structure.getType() == fr.lolmc.game.GameStructure.Type.TURRET && tm.hasPlating(structKey)) {
+            damage *= 0.60;
+            tm.tickPlating(structKey, player);
+        }
 
         boolean phaseChanged = structure.takeDamage(damage);
         player.playSound(player.getLocation(), Sound.BLOCK_ANVIL_HIT, 0.5f, 1.2f);

@@ -34,6 +34,24 @@ public class Blitzcrank extends BaseChampion {
 
     static class AA extends BasicAttackAbility {
         AA(){super("blitzcrank",Material.IRON_INGOT,2.0f,DamageType.PHYSICAL);}
+
+    // Passif Statique Mana : quand Blitzcrank tombe sous 20% HP, génère un bouclier = 50% de sa mana actuelle (CD 60s)
+    private static final java.util.Map<java.util.UUID, Long> staticShieldCD = new java.util.concurrent.ConcurrentHashMap<>();
+    public static void tickStaticShield(org.bukkit.entity.Player p, fr.lolmc.champion.base.BaseChampion champ) {
+        var hp = champ.getHPSystem(); var res = champ.getResourceSystem();
+        if (hp.getHPRatio() < 0.20 && champ.getStats().getShield() <= 0) {
+            Long last = staticShieldCD.get(p.getUniqueId());
+            if (last == null || System.currentTimeMillis() - last > 60_000L) {
+                double shield = res.getCurrent() * 0.50;
+                if (shield > 0) {
+                    champ.getStats().addShield(shield);
+                    staticShieldCD.put(p.getUniqueId(), System.currentTimeMillis());
+                    p.sendActionBar(net.kyori.adventure.text.Component.text(
+                        "⚡ Bouclier Statique! +" + (int)shield, net.kyori.adventure.text.format.NamedTextColor.YELLOW));
+                }
+            }
+        }
+    }
     }
 
     static class Q extends BaseAbility {

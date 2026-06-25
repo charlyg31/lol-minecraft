@@ -32,8 +32,23 @@ public class Sivir extends BaseChampion {
         setAutoAttackRange(5.5);
     }
 
+    private static final java.util.Map<java.util.UUID, Boolean> ricochetActive = new java.util.concurrent.ConcurrentHashMap<>();
+    public static void setRicochet(java.util.UUID id, boolean v) { ricochetActive.put(id, v); }
+
     static class AA extends BasicAttackAbility {
-        AA(){super("sivir",Material.STONE_SWORD,6.0f,DamageType.PHYSICAL);}
+        AA(){super("sivir",Material.CROSSBOW,5.5f,DamageType.PHYSICAL);}
+        @Override protected void onHit(Player c, ChampionStats s, org.bukkit.entity.LivingEntity tgt, double dmg) {
+            if (!ricochetActive.getOrDefault(c.getUniqueId(), false)) return;
+            // Ricochet W : AA rebondit sur jusqu'à 6 cibles proches (60% dégâts)
+            int bounces = 0;
+            for (var e : fr.lolmc.util.TargetingUtil.enemiesAround(c, 5.0)) {
+                if (e.equals(tgt) || bounces >= 6) continue;
+                fr.lolmc.util.TargetingUtil.dealDamage(c, e, dmg * 0.60, fr.lolmc.util.TargetingUtil.DmgType.PHYSICAL);
+                e.getWorld().spawnParticle(org.bukkit.Particle.CRIT, e.getLocation().add(0,1,0), 3, 0.2,0.2,0.2);
+                bounces++;
+            }
+        }
+    }
     }
 
     static class Q extends BaseAbility {
@@ -63,10 +78,12 @@ public class Sivir extends BaseChampion {
             new double[]{10,9,8,7,6},0,0,DamageType.PHYSICAL);
             resourceCost = 22;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            c.addPotionEffect(new PotionEffect(PotionEffectType.STRENGTH,100,0,false,true));
-            c.addPotionEffect(new PotionEffect(PotionEffectType.HASTE,100,1,false,true));
-            c.sendActionBar(Component.text("🔄 Ricochets 6s!",NamedTextColor.YELLOW));
-        }
+            // W Ricochet : active le rebond des AA pendant 6s
+            setRicochet(c.getUniqueId(), true);
+            c.addPotionEffect(new PotionEffect(PotionEffectType.HASTE,120,1,false,true));
+            c.sendActionBar(Component.text("🎯 Ricochet actif 6s!",NamedTextColor.YELLOW));
+            new BukkitRunnable(){@Override public void run(){ setRicochet(c.getUniqueId(), false); }}.runTaskLater(LolPlugin.getInstance(),120L);
+                }
         @Override public String getDynamicDescription(ChampionStats s){return "6s: AA rebondissent sur 7 cibles proches.";}
     }
 

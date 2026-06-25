@@ -32,8 +32,28 @@ public class Malphite extends BaseChampion {
         initSystems(574, 8.5, ResourceSystem.ResourceType.MANA, 480, 11.0);
     }
 
+    // Passif Granite Shield : bouclier 10% HP max, se recharge 10s hors combat
+    private static final java.util.Map<java.util.UUID, Long> shieldCooldown = new java.util.concurrent.ConcurrentHashMap<>();
+    public static void onDamageTaken(java.util.UUID id) { shieldCooldown.put(id, System.currentTimeMillis()); }
+    public static void tickGraniteShield(org.bukkit.entity.Player p, fr.lolmc.champion.base.BaseChampion champ) {
+        Long last = shieldCooldown.get(p.getUniqueId());
+        if (last == null || (System.currentTimeMillis() - last) >= 10_000L) {
+            double shield = champ.getStats().getFinalMaxHP() * 0.10;
+            if (champ.getStats().getShield() < shield) {
+                champ.getStats().clearShields(); champ.getStats().addShield(shield);
+            }
+        }
+    }
+
     static class AA extends BasicAttackAbility {
         AA(){super("malphite",Material.STONE_SWORD,2.5f,DamageType.PHYSICAL);}
+        @Override protected void onHit(Player c, ChampionStats s, org.bukkit.entity.LivingEntity tgt, double dmg){
+            // Éclat de Roche : chaque AA envoie des éclats (10% AP) sur les ennemis proches
+            double splash = s.getFinalAP() * 0.10;
+            if (splash > 0)
+                for (var e : TargetingUtil.enemiesAround(c, 2.5))
+                    if (!e.equals(tgt)) TargetingUtil.dealDamage(c, e, splash, TargetingUtil.DmgType.MAGICAL);
+        }
     }
 
     static class Q extends BaseAbility {

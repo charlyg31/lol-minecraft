@@ -40,16 +40,18 @@ public class MinionManager {
     private static final long FIRST_WAVE_DELAY = 1300L;  // 1ère vague à 1:05 (fidèle LoL)
     private static final int MINIONS_PER_WAVE = 6;
     private static final double MINION_HP = 477;
+    private static final double CANNON_HP = 1257;
     private static final double MINION_SPEED = 0.25;
 
     private boolean spawning = false;
+    private int waveCount = 0; // pour le sbire canon (toutes les 3 vagues)
     // Inhibiteurs détruits → super-sbires sur cette lane (clé: "BLUE_top")
     private final java.util.Set<String> superMinionLanes = new java.util.HashSet<>();
     // Modèles custom : sbireUUID → liste des parties (pour nettoyage)
     private final Map<UUID, List<UUID>> minionDeco = new HashMap<>();
 
     /** Types de sbires (apparence façon LoL). */
-    private enum MinionType { MELEE, CASTER, SUPER }
+    private enum MinionType { MELEE, CASTER, CANNON, SUPER }
 
     public MinionManager(MapManager mapManager) {
         this.mapManager = mapManager;
@@ -116,13 +118,20 @@ public class MinionManager {
             for (int i = 0; i < MINIONS_PER_WAVE; i++) {
                 final int delay = i * 8; // décaler chaque sbire de 0.4s
                 // LoL : 3 sbires de mêlée puis 3 sbires à distance (mages)
-                final MinionType type = (i < MINIONS_PER_WAVE / 2) ? MinionType.MELEE : MinionType.CASTER;
+                // 3e vague = un sbire canon à la place du 1er caster
+                    final MinionType type;
+                    if (waveCount % 3 == 2 && i == MINIONS_PER_WAVE / 2) {
+                        type = MinionType.CANNON;
+                    } else {
+                        type = (i < MINIONS_PER_WAVE / 2) ? MinionType.MELEE : MinionType.CASTER;
+                    }
                 new BukkitRunnable() {
                     @Override public void run() {
                         if (spawning) spawnMinion(team, lane, spawnPoint, type);
                     }
                 }.runTaskLater(LolPlugin.getInstance(), delay);
             }
+            waveCount++; // incrémenter le compteur de vagues
             // Super-sbire si l'inhibiteur ennemi est détruit sur cette lane
             if (hasSuperMinions(team, lane)) {
                 final Location sp = spawnPoint;
@@ -152,7 +161,12 @@ public class MinionManager {
             z.customName(Component.text(team == Team.BLUE ? "🔵 Sbire" : "🔴 Sbire",
                     team == Team.BLUE ? NamedTextColor.BLUE : NamedTextColor.RED));
         });
-        applyMinionModel(minion, type, team, type == MinionType.CASTER ? 0.7f : 0.8f);
+        applyMinionModel(minion, type, team, type == MinionType.CASTER ? 0.7f : (type == MinionType.CANNON ? 1.0f : 0.8f));
+            // HP du cannon plus élevé
+            if (type == MinionType.CANNON) {
+                var hpAttr = minion.getAttribute(fr.lolmc.util.Compat.maxHealth());
+                if (hpAttr != null) { hpAttr.setBaseValue(CANNON_HP); minion.setHealth(CANNON_HP); }
+            }
     }
 
     /** Rend le sbire invisible et lui pose un modèle custom anime (façon jungle). */
@@ -389,7 +403,11 @@ public class MinionManager {
         Material trim = (team == Team.BLUE) ? Material.LIGHT_BLUE_CONCRETE : Material.ORANGE_CONCRETE;
         return switch (type) {
             // ⚔ Sbire de mêlée : petit corps + épée
-            case MELEE -> new MobModel()
+            case CANNON -> new MobModel()
+                    .head(org.bukkit.Material.IRON_BLOCK, 0.0f, 0.3f, 0.3f, Color.fromRGB(180,180,200))
+                    .body(org.bukkit.Material.IRON_BLOCK, 0.0f, 0.4f, 0.4f, Color.fromRGB(150,150,180))
+                    .setScale(1.1f);
+                case MELEE -> new MobModel()
                     .box(body, 0f, 0.0f, 0.0f, 0.45f, 0.55f, 0.4f)      // corps
                     .box(body, 0f, 0.55f, 0.0f, 0.4f, 0.4f, 0.4f)       // tête
                     .cube(Material.WHITE_CONCRETE, -0.1f, 0.7f, 0.22f, 0.1f) // œil G
@@ -448,5 +466,20 @@ public class MinionManager {
                 }
             }
         }
+    }
+
+    /** Désactive les super-sbires sur une lane (inhibiteur repoussé). */
+    public void onInhibitorRespawned(String key) {
+        // key format: "BLUE_top" ou "RED_mid"
+        superMinionLanes.remove(key);
+    }
+
+
+    /** Retourne le type de sbire ("melee", "caster", "cannon", "super") ou null si inconnu. */
+    public static String getMinionTypeTag(org.bukkit.entity.LivingEntity e) {
+        if (!isMinion(e)) return null;
+        var pdc = e.getPersistentDataContainer();
+        return pdc.has(KEY_LANE, org.bukkit.persistence.PersistentDataType.STRING)
+            ? pdc.get(KEY_LANE, org.bukkit.persistence.PersistentDataType.STRING) : "melee";
     }
 }

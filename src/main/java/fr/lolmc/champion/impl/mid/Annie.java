@@ -36,6 +36,13 @@ public class Annie extends BaseChampion {
     // Suivi de Tibbers et cooldowns manuels
     private static final Map<UUID, org.bukkit.entity.IronGolem> activeTibbers = new java.util.concurrent.ConcurrentHashMap<>();
     private static final Map<UUID, Long> rCooldowns = new java.util.concurrent.ConcurrentHashMap<>();
+    // Passif Pyromanie : tous les 4 sorts lancés, le suivant étourdit
+    private static final Map<UUID, Integer> pyroStacks = new java.util.concurrent.ConcurrentHashMap<>();
+    public static void onSpellCast(UUID id) {
+        int stacks = pyroStacks.merge(id, 1, Integer::sum);
+        if (stacks >= 4) pyroStacks.put(id, 0); // reset au 4e (qui aura le stun)
+    }
+    public static boolean hasPyromancyStun(UUID id) { return pyroStacks.getOrDefault(id, 0) == 0 && pyroStacks.containsKey(id); }
 
     public static void resetState(UUID id) {
         if (activeTibbers.containsKey(id)) {
@@ -43,9 +50,17 @@ public class Annie extends BaseChampion {
             if (golem != null && golem.isValid()) golem.remove();
         }
     }
+    public static void resetState(UUID id) {
+        if (activeTibbers.containsKey(id)) {
+            var golem = activeTibbers.remove(id);
+            if (golem != null && golem.isValid()) golem.remove();
+        }
+        pyroStacks.remove(id);
+    }
     public static void resetAllState() {
         activeTibbers.values().forEach(g -> { if (g != null) g.remove(); });
         activeTibbers.clear();
+        pyroStacks.clear();
     }
 
     static class AA extends BasicAttackAbility {

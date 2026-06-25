@@ -47,6 +47,21 @@ public class AnnouncementManager {
                     Sound.sound(net.kyori.adventure.key.Key.key("entity.wither.spawn"), Sound.Source.MASTER, 1f, 1f));
         }
 
+        // ── Killing Spree (serie sans mourir) ──
+        int spree = spreeStreak.merge(killer.getUniqueId(), 1, Integer::sum);
+        String spreeMsg = switch (spree) {
+            case 3  -> "\u2694 KILLING SPREE!";
+            case 4  -> "\u2694\u2694 RAMPAGE!";
+            case 5  -> "\u2694\u2694\u2694 UNSTOPPABLE!";
+            case 6  -> "\u2694\u2694\u2694\u2694 DOMINATING!";
+            case 7  -> "\u2694\u2694\u2694\u2694\u2694 GODLIKE!";
+            default -> spree >= 8 ? "\uD83D\uDC51 LEGENDARY! (" + spree + " kills)" : null;
+        };
+        if (spreeMsg != null) {
+            broadcastTitle("\u00A74\u00A7l" + spreeMsg, "\u00A77" + killer.getName(),
+                org.bukkit.Sound.sound(net.kyori.adventure.key.Key.key("entity.player.levelup"),
+                    org.bukkit.Sound.Source.MASTER, 1f, 1.2f));
+        }
         // ── Kills multiples ──
         Long last = lastKillTime.get(killer.getUniqueId());
         int streak = (last != null && (now - last) < MULTI_KILL_WINDOW)
@@ -71,6 +86,7 @@ public class AnnouncementManager {
 
     /** Réinitialise la série d'un joueur à sa mort. */
     public void onPlayerDeath(Player victim) {
+        spreeStreak.put(victim.getUniqueId(), 0); // reset killing spree
         killStreak.remove(victim.getUniqueId());
         lastKillTime.remove(victim.getUniqueId());
     }
@@ -142,5 +158,16 @@ public class AnnouncementManager {
             return net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
                     .legacySection().deserialize(legacy);
         }
+    }
+
+
+    /** Annonce la prise d'un objectif epique avec titre a tout le serveur. */
+    public void announceObjective(String displayName, String killerName, net.kyori.adventure.text.format.NamedTextColor color) {
+        broadcastTitle(displayName, "Par " + killerName, org.bukkit.Sound.sound(net.kyori.adventure.key.Key.key("entity.ender_dragon.growl"), org.bukkit.Sound.Source.MASTER, 1f, 0.8f));
+    }
+
+    public void announceInhibitorDestroyed(String lane, String team) {
+        broadcastTitle("\uD83C\uDFDB Inhibiteur detruit!", lane + " (" + team + ") — respawn 5min",
+            org.bukkit.Sound.sound(net.kyori.adventure.key.Key.key("entity.wither.spawn"), org.bukkit.Sound.Source.MASTER, 1f, 1f));
     }
 }

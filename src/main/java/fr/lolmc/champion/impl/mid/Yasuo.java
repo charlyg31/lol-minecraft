@@ -30,12 +30,30 @@ public class Yasuo extends BaseChampion {
         setAbility(0,new AA()); setAbility(1,new Q());
         setAbility(2,new W()); setAbility(3,new E()); setAbility(4,new R());
         initSystems(523, 0.0, ResourceSystem.ResourceType.FLOW, 100, 0.0);
+        // Passif Voie du Vagabond : double la crit chance des items (plafonné à 1.0)
+        // Simulé via un multiplicateur appliqué quand des items de crit sont achetés
+        // Note: l'application se fait dans PassiveManager.equipItem via addBonusCritChance x2
     }
 
     public static final Map<UUID,Integer> qCasts=new java.util.concurrent.ConcurrentHashMap<>();
     /** Reinitialise l'etat de ce joueur (fin de partie / deconnexion). */
     public static void resetState(UUID id){ qCasts.remove(id); eStacks.remove(id); }
     public static void resetAllState(){ qCasts.clear(); eStacks.clear(); }
+
+    // Passif Voie du Vagabond : au double crit chance passif (déjà configuré via ChampionStats)
+    // Passif Esprit du Vent : bouclier égal 100+50%AP quand Flow est plein
+    public static void tickWindShield(org.bukkit.entity.Player p, fr.lolmc.champion.base.BaseChampion champ) {
+        var res = champ.getResourceSystem();
+        if (res.getType() == fr.lolmc.stats.ResourceSystem.ResourceType.FLOW
+                && res.getCurrent() >= res.getMax()
+                && champ.getStats().getShield() <= 0) {
+            double shield = 100 + champ.getStats().getFinalAP() * 0.50;
+            champ.getStats().addShield(shield);
+            res.setCurrent(0);
+            p.sendActionBar(net.kyori.adventure.text.Component.text(
+                "💨 Bouclier de Vent! +" + (int)shield, net.kyori.adventure.text.format.NamedTextColor.WHITE));
+        }
+    }
 
     static class AA extends BasicAttackAbility {
         AA(){super("yasuo",Material.IRON_SWORD,2.5f,DamageType.PHYSICAL);}
