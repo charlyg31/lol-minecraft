@@ -49,7 +49,7 @@ public class FogOfWarManager {
         if (team == null) return false;
         // Chercher un sbire allié à portée de la cible ennemie
         for (var entity : target.getNearbyEntities(8, 4, 8)) {
-            if (fr.lolmc.game.MinionManager.isMinion(entity)) {
+            if (entity instanceof org.bukkit.entity.LivingEntity le && fr.lolmc.game.MinionManager.isMinion(le)) {
                 var minionTeam = fr.lolmc.game.MinionManager.getMinionTeam(
                     (org.bukkit.entity.LivingEntity) entity);
                 if (minionTeam == team) return true;

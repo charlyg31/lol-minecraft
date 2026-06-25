@@ -424,9 +424,9 @@ public class MinionManager {
         return switch (type) {
             // ⚔ Sbire de mêlée : petit corps + épée
             case CANNON -> new MobModel()
-                    .head(org.bukkit.Material.IRON_BLOCK, 0.0f, 0.3f, 0.3f, Color.fromRGB(180,180,200))
-                    .body(org.bukkit.Material.IRON_BLOCK, 0.0f, 0.4f, 0.4f, Color.fromRGB(150,150,180))
-                    .setScale(1.1f);
+                    
+                    
+                    ;
                 case MELEE -> new MobModel()
                     .box(body, 0f, 0.0f, 0.0f, 0.45f, 0.55f, 0.4f)      // corps
                     .box(body, 0f, 0.55f, 0.0f, 0.4f, 0.4f, 0.4f)       // tête
@@ -517,7 +517,7 @@ public class MinionManager {
             case "super"  -> MinionType.SUPER;
             default       -> MinionType.MELEE;
         };
-        if (type == MinionType.SUPER) { spawnSuperMinion(loc, team); return; }
+        if (type == MinionType.SUPER) { spawnSuperMinion(team, "mid", loc); return; }
         var e = type == MinionType.CASTER
             ? loc.getWorld().spawn(loc, org.bukkit.entity.WitherSkeleton.class)
             : loc.getWorld().spawn(loc, org.bukkit.entity.Zombie.class);

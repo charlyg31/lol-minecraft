@@ -179,7 +179,6 @@ public class RuneManager {
                 }.runTaskTimer(LolPlugin.getInstance(), 20L, 20L);
             }
         }
-        RunePage page = getPage(victim.getUniqueId());
         var cm = LolPlugin.getInstance().getChampionManager();
         if (!cm.hasChampion(victim)) return;
         var champ = cm.getChampion(victim);
@@ -355,11 +354,11 @@ public class RuneManager {
                 // +13% AS par stack (total +78% AS à 6 stacks)
                 var cm = LolPlugin.getInstance().getChampionManager();
                 if (cm.hasChampion(attacker)) {
-                    cm.getChampion(attacker).getStats().addBonusAttackSpeed(0.13);
+                    cm.getChampion(attacker).getStats().addBonusAttackSpeed(13);
                     new org.bukkit.scheduler.BukkitRunnable() {
                         @Override public void run() {
                             if (cm.hasChampion(attacker))
-                                cm.getChampion(attacker).getStats().addBonusAttackSpeed(-0.13);
+                                cm.getChampion(attacker).getStats().addBonusAttackSpeed(-13);
                         }
                     }.runTaskLater(LolPlugin.getInstance(), 120L); // 6s
                 }
@@ -420,7 +419,7 @@ public class RuneManager {
             case "glacial_augment" -> {
                 // AA ralentit 30% + crée des zones gelées
                 if (!isAbility) {
-                    LolPlugin.getInstance().getCCManager().slow(victim, 0.30, 40);
+                    LolPlugin.getInstance().getCCManager().slow(victim, 30, 40);
                     victim.getWorld().spawnParticle(org.bukkit.Particle.SNOWFLAKE,
                         victim.getLocation().add(0,1,0), 8, 0.5, 0.5, 0.5);
                     attacker.sendActionBar(Component.text("❄ Augment Glacial!", NamedTextColor.AQUA));
@@ -496,7 +495,7 @@ public class RuneManager {
         if (!minorsStr.isEmpty()) {
             String[] parts = minorsStr.split(",");
             for (int i = 0; i < Math.min(parts.length, 6); i++) {
-                if (i < page.minors.length) page.minors[i] = parts[i].trim();
+//                 if (i < page.minors.length) page.minors[i] = parts[i].trim();
             }
         }
         playerPages.put(player.getUniqueId(), page);
@@ -505,7 +504,5 @@ public class RuneManager {
             "✔ Runes appliquées depuis le lobby!", net.kyori.adventure.text.format.NamedTextColor.GREEN));
     }
 
-    public RunePage getPage(java.util.UUID uuid) {
-        return playerPages.getOrDefault(uuid, RunePage.defaultPage());
-    }
+
 }

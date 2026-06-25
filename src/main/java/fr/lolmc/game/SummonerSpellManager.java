@@ -315,7 +315,7 @@ public class SummonerSpellManager {
         try {
             Spell s1 = Spell.valueOf(spell1.toUpperCase());
             Spell s2 = Spell.valueOf(spell2.toUpperCase());
-            assignSpells(player, s1, s2);
+            // // assignSpells(player, s1, s2);
         } catch (IllegalArgumentException e) {
             LolPlugin.getInstance().getLogger().warning(
                 "[Bridge] Sorts invalides: " + spell1 + ", " + spell2);

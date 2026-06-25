@@ -37,6 +37,7 @@ import java.util.*;
  * et des récompenses (or + XP). Positions configurées par commande et par équipe.
  */
 public class JungleManager {
+    private static final java.util.Map<Object, String> dragonSoulType = new java.util.HashMap<>();
 
     public static NamespacedKey KEY_MONSTER; // type du monstre
     public static NamespacedKey KEY_BUFF;    // buff accordé (red/blue/none)
@@ -645,7 +646,7 @@ public class JungleManager {
     public void spawnTestMonster(org.bukkit.Location loc, String monsterTypeName) {
         try {
             MonsterType type = MonsterType.valueOf(monsterTypeName.toUpperCase());
-            var entity = loc.getWorld().spawn(loc, type.entityType.getEntityClass());
+            var entity = loc.getWorld().spawn(loc, org.bukkit.entity.Zombie.class);
             if (entity instanceof org.bukkit.entity.LivingEntity le) {
                 var pdc = le.getPersistentDataContainer();
                 pdc.set(KEY_MONSTER, org.bukkit.persistence.PersistentDataType.STRING, type.name());

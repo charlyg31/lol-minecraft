@@ -49,7 +49,6 @@ public class Sivir extends BaseChampion {
             }
         }
     }
-    }
 
     static class Q extends BaseAbility {
         Q(){super("q_sivir","Lame Boomerang",Material.IRON_AXE,AbilitySlot.Q,
@@ -109,3 +108,4 @@ public class Sivir extends BaseChampion {
         }
         @Override public String getDynamicDescription(ChampionStats s){return "+30%% vitesse et haste pendant 4s.";}
     }
+}

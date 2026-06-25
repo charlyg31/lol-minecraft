@@ -225,7 +225,7 @@ public class BridgeManager implements PluginMessageListener {
         boolean first = true;
         for (var st : stats) {
             if (!first) sb.append(",");
-            sb.append("{\"uuid\":\"").append(st.uuid()).append("\"}");
+            sb.append("{\"uuid\":\"").append(st.uuid).append("\"}");
             first = false;
         }
         sb.append("]}");
