@@ -107,6 +107,9 @@ public class HotbarManager {
     private void renderPage1(Player player, BaseChampion champ) {
         PlayerInventory inv = player.getInventory();
 
+        // Effacer toute la hotbar avant de redessiner (evite les residus de page 2)
+        for (int i = 0; i <= 8; i++) inv.setItem(i, emptySlot());
+
         // Slots 0-4 : sorts (AA, Q, W, E, R)
         for (int i = 0; i < 5; i++) {
             var ability = champ.getAbility(i);
@@ -137,6 +140,9 @@ public class HotbarManager {
 
     private void renderPage2(Player player, BaseChampion champ) {
         PlayerInventory inv = player.getInventory();
+
+        // Effacer toute la hotbar avant de redessiner (evite les residus de page 1)
+        for (int i = 0; i <= 8; i++) inv.setItem(i, emptySlot());
 
         // Items actifs au-delà des 2 premiers + consommables
         List<String> activeItems = getActiveItems(player);
