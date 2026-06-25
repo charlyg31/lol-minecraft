@@ -188,19 +188,63 @@ public class SummonerSpellManager {
     // ── Téléportation : retour à la base (simplifié) ──
 
     private boolean castTeleport(Player caster) {
-        var team = LolPlugin.getInstance().getTeamManager().getTeam(caster);
-        if (team == null) return false;
-        caster.sendActionBar(Component.text("⏳ Téléportation... (4s)", NamedTextColor.AQUA));
-        new org.bukkit.scheduler.BukkitRunnable() {
-            @Override public void run() {
-                Location base = LolPlugin.getInstance().getMapManager().getSpawn(team, 1);
-                if (base != null && caster.isOnline()) {
-                    caster.teleport(base);
-                    caster.playSound(base, Sound.ENTITY_ENDERMAN_TELEPORT, 1f, 1f);
+        // LoL : TP vers une tourelle alliee, un sbire allié ou la base
+        // On cherche la cible la plus proche dans la direction du regard
+        var cm = LolPlugin.getInstance().getChampionManager();
+        var tm = LolPlugin.getInstance().getTeamManager();
+        var team = tm.getTeam(caster);
+
+        // 1. Chercher une tourelle alliee proche du curseur (via MapManager)
+        var mapMgr = LolPlugin.getInstance().getMapManager();
+        if (mapMgr != null && team != null) {
+            var structures = mapMgr.getStructuresForTeam(team);
+            if (structures != null && !structures.isEmpty()) {
+                // Trouver la structure la plus proche du regard (dans 500 blocs)
+                var eye = caster.getEyeLocation();
+                var dir = eye.getDirection().normalize();
+                fr.lolmc.game.GameStructure best = null; double bestDot = 0.8;
+                for (var s : structures) {
+                    if (s.isDestroyed()) continue;
+                    var toS = s.getCenter().toVector().subtract(eye.toVector());
+                    double dist = toS.length();
+                    if (dist > 500 || dist < 1) continue;
+                    double dot = toS.normalize().dot(dir);
+                    if (dot > bestDot) { bestDot = dot; best = s; }
+                }
+                if (best != null) {
+                    final var target = best;
+                    caster.sendActionBar(net.kyori.adventure.text.Component.text(
+                        "\uD83C\uDF00 Teleportation vers " + target.getType().name() + " dans 4s...",
+                        net.kyori.adventure.text.format.NamedTextColor.AQUA));
+                    new org.bukkit.scheduler.BukkitRunnable() {
+                        @Override public void run() {
+                            if (caster.isOnline()) {
+                                caster.teleport(target.getCenter());
+                                caster.playSound(target.getCenter(), org.bukkit.Sound.ENTITY_ENDERMAN_TELEPORT, 1f, 1f);
+                            }
+                        }
+                    }.runTaskLater(LolPlugin.getInstance(), 80L); // 4s
+                    return true;
                 }
             }
-        }.runTaskLater(LolPlugin.getInstance(), 80L); // 4s de canalisation
-        return true;
+        }
+
+        // 2. Fallback : TP vers la base de l'equipe
+        var base = mapMgr != null && team != null ? mapMgr.getSpawn(team, 0) : null;
+        if (base != null && caster.isOnline()) {
+            caster.sendActionBar(net.kyori.adventure.text.Component.text(
+                "\uD83C\uDF00 Retour a la base dans 4s...", net.kyori.adventure.text.format.NamedTextColor.AQUA));
+            new org.bukkit.scheduler.BukkitRunnable() {
+                @Override public void run() {
+                    if (caster.isOnline()) {
+                        caster.teleport(base);
+                        caster.playSound(base, org.bukkit.Sound.ENTITY_ENDERMAN_TELEPORT, 1f, 1f);
+                    }
+                }
+            }.runTaskLater(LolPlugin.getInstance(), 80L);
+            return true;
+        }
+        return false;
     }
 
     // ── Châtiment : dégâts bruts à un monstre proche (LoL: 600 vrais) ──

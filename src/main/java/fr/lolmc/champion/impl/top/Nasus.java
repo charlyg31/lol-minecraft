@@ -41,6 +41,12 @@ public class Nasus extends BaseChampion {
 
     static class AA extends BasicAttackAbility {
         AA(){super("nasus",Material.BONE,2.5f,DamageType.PHYSICAL);}
+        @Override protected void onHit(Player c, ChampionStats s, org.bukkit.entity.LivingEntity tgt, double dmg){
+            // Passif Vol d'Ame : 12% vol de vie sur toutes les attaques
+            double heal = dmg * 0.12;
+            var cm = LolPlugin.getInstance().getChampionManager();
+            if (cm.hasChampion(c)) cm.getChampion(c).getHPSystem().heal(heal);
+        }
     }
 
     static class Q extends BaseAbility {

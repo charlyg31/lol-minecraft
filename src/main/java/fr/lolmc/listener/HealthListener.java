@@ -77,6 +77,9 @@ public class HealthListener implements Listener {
             HPSystem hp = champ.getHPSystem();
             double finalDmg = dmg * 5;
             hp.takeDamage(finalDmg);
+            // Notifier les passifs de dégâts reçus
+            if ("malphite".equals(champ.getId()))
+                fr.lolmc.champion.impl.top.Malphite.onDamageTaken(p.getUniqueId());
             // Vérifier passifs défensifs (Sterak's, Guardian Angel)
             PassiveManager pm = LolPlugin.getInstance().getPassiveManager();
             if (pm != null) LolPlugin.getInstance().getBushManager().revealOnDamage(p);

@@ -43,9 +43,12 @@ public class EntityDeathListener implements Listener {
             e.setDroppedExp(0);
             LolPlugin.getInstance().getMinionManager().onMinionDeath(dead.getUniqueId());
             if (killer != null && championManager.hasChampion(killer)) {
-                // Or/XP selon le type de sbire (mêlée par défaut)
-                rewardManager.onMinionKill(killer,
-                        RewardManager.GOLD_MINION_MELEE, RewardManager.XP_MINION);
+                // Or/XP selon le type de sbire
+                String minionType = fr.lolmc.game.MinionManager.getMinionTypeTag(dead);
+                int gold = "caster".equals(minionType) ? RewardManager.GOLD_MINION_CASTER
+                         : "cannon".equals(minionType) ? RewardManager.GOLD_MINION_CANNON
+                         : RewardManager.GOLD_MINION_MELEE;
+                rewardManager.onMinionKill(killer, gold, RewardManager.XP_MINION);
             }
             return;
         }

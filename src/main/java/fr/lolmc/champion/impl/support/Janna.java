@@ -34,6 +34,16 @@ public class Janna extends BaseChampion {
 
     static class AA extends BasicAttackAbility {
         AA(){super("janna",Material.FEATHER,5.5f,DamageType.MAGICAL);}
+
+    // Passif Grâce de la Tempête : vitesse de deplacement bonus = 8% AS
+    public static void tickJannaPassive(org.bukkit.entity.Player p, fr.lolmc.champion.base.BaseChampion champ) {
+        double asBonus = champ.getStats().getFinalAttackSpeed() * 0.08;
+        // Appliqué chaque tick de regen via HUDManager
+        champ.getStats().addBonusMoveSpeed(asBonus);
+        new org.bukkit.scheduler.BukkitRunnable(){
+            @Override public void run(){ champ.getStats().addBonusMoveSpeed(-asBonus); }
+        }.runTaskLater(fr.lolmc.LolPlugin.getInstance(), 100L);
+    }
     }
 
     static class Q extends BaseAbility {

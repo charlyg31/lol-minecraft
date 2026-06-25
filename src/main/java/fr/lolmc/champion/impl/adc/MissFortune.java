@@ -25,6 +25,9 @@ public class MissFortune extends BaseChampion {
             new ChampionStats(640,52,0,28,30,0.656,0,325,5.5,3.8));
         getStats().setGrowthStats(103.0,3.0,4.5,1.30,0.03010,0.65);
     }
+    public static void resetState(java.util.UUID id) { lastTarget.remove(id); }
+    public static void resetAllState() { lastTarget.clear(); }
+
     @Override protected void registerAbilities() {
         setAbility(0,new AA()); setAbility(1,new Q());
         setAbility(2,new W()); setAbility(3,new E()); setAbility(4,new R());
@@ -32,8 +35,22 @@ public class MissFortune extends BaseChampion {
         setAutoAttackRange(5.5);
     }
 
+    // Passif Love Tap : première AA sur une nouvelle cible inflige 50-110% AD bonus physiques
+    private static final java.util.Map<java.util.UUID, java.util.UUID> lastTarget = new java.util.concurrent.ConcurrentHashMap<>();
+
     static class AA extends BasicAttackAbility {
-        AA(){super("missfortune",Material.BOW,5.5f,DamageType.PHYSICAL);}
+        AA(){super("missfortune",Material.CROSSBOW,5.5f,DamageType.PHYSICAL);}
+        @Override protected void onHit(Player c, ChampionStats s, org.bukkit.entity.LivingEntity tgt, double dmg) {
+            java.util.UUID prev = lastTarget.get(c.getUniqueId());
+            if (prev == null || !prev.equals(tgt.getUniqueId())) {
+                // Nouvelle cible : Love Tap (70% AD bonus physique)
+                double bonusDmg = s.getFinalAD() * 0.70;
+                fr.lolmc.util.TargetingUtil.dealDamage(c, tgt, bonusDmg, fr.lolmc.util.TargetingUtil.DmgType.PHYSICAL);
+                c.getWorld().spawnParticle(org.bukkit.Particle.HEART, tgt.getLocation().add(0,1.5,0), 3, 0.3, 0.3, 0.3);
+                lastTarget.put(c.getUniqueId(), tgt.getUniqueId());
+            }
+        }
+    }
     }
 
     static class Q extends BaseAbility {

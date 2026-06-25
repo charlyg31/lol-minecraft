@@ -37,6 +37,12 @@ public class TurretManager {
     private final double detectionHeight;  // hauteur de la zone de détection (blocs)
     private final double beamHeight;       // hauteur d'où part l'animation du tir (blocs)
     private final double baseDamage;       // dégâts de base d'un tir
+    // Turret Plating : 5 plaques par tourelle, actives jusqu'à 14min
+    private final java.util.Map<String, Integer> platingLeft = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final int MAX_PLATING = 5;
+    private static final long PLATING_END_MS = 14 * 60 * 1000L;
+    private long gameStartMs = 0;
+    public void setGameStart() { gameStartMs = System.currentTimeMillis(); }
 
     // Aggro tourelle : cible actuelle de chaque tourelle (UUID joueur visé)
     private final Map<String, UUID> turretAggro = new HashMap<>();
@@ -236,4 +242,21 @@ public class TurretManager {
     }
 
     public double getTurretRange() { return attackRadius; }
+
+    public boolean hasPlating(String key) {
+        if (gameStartMs == 0) return false;
+        if (System.currentTimeMillis() - gameStartMs > PLATING_END_MS) return false;
+        return platingLeft.getOrDefault(key, MAX_PLATING) > 0;
+    }
+
+    public void tickPlating(String key, Player attacker) {
+        if (!hasPlating(key)) return;
+        int left = platingLeft.getOrDefault(key, MAX_PLATING);
+        platingLeft.put(key, Math.max(0, left - 1));
+        LolPlugin.getInstance().getGoldManager().addGold(attacker.getUniqueId(), 160);
+        attacker.sendActionBar(net.kyori.adventure.text.Component.text(
+            "Plaque detruite! +160 or (" + Math.max(0, left-1) + " restantes)",
+            net.kyori.adventure.text.format.NamedTextColor.GOLD));
+    }
+
 }

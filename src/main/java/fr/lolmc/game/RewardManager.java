@@ -28,6 +28,24 @@ public class RewardManager {
     public static final double XP_CHAMPION_KILL = 200;
     public static final double XP_ASSIST = 100;
 
+    // ── Bounty système (serie de kills = plus d'or à la mort) ────────────
+    // killStreak[uuid] = nombre de kills consécutifs sans mourir
+    private final java.util.Map<java.util.UUID, Integer> killStreak = new java.util.concurrent.ConcurrentHashMap<>();
+    // Table bounty LoL : 0 kills = 0, 1=100, 2=200, 3=300, 4=400, 5=500, 6+=500 (plafond)
+    private static final int[] BOUNTY = {0, 100, 200, 300, 400, 500, 500};
+
+    // ── Or des sbires croissant par tranche de temps ──────────────────────
+    // En LoL : +0.5 or/sbire toutes les 90s à partir de 1:15, plafonné vers 15min
+    private long gameStartMs = 0;
+    public void setGameStart() { gameStartMs = System.currentTimeMillis(); }
+
+    private int getMinionGoldBonus() {
+        if (gameStartMs == 0) return 0;
+        long elapsed = (System.currentTimeMillis() - gameStartMs) / 1000L;
+        // +1 or toutes les 90s (arrondi à l'entier, max +10)
+        return (int) Math.min(10, elapsed / 90);
+    }
+
     public RewardManager(ChampionManager championManager, GoldManager goldManager) {
         this.championManager = championManager;
         this.goldManager = goldManager;
@@ -37,21 +55,33 @@ public class RewardManager {
 
     public void onMinionKill(Player killer, int goldAmount, double xpAmount) {
         if (!championManager.hasChampion(killer)) return;
-        goldManager.addGold(killer.getUniqueId(), goldAmount);
+        int bonus = getMinionGoldBonus();
+        int total = goldAmount + bonus;
+        goldManager.addGold(killer.getUniqueId(), total);
         grantXP(killer, xpAmount);
-        killer.sendActionBar(Component.text(
-                String.format("+%d or  +%.0f XP", goldAmount, xpAmount), NamedTextColor.GOLD));
+        killer.sendActionBar(net.kyori.adventure.text.Component.text(
+                String.format("+%d or  +%.0f XP", total, xpAmount), NamedTextColor.GOLD));
     }
 
     // ── Kill de champion ──────────────────────────────────────────
 
     public void onChampionKill(Player killer, Player victim) {
         if (!championManager.hasChampion(killer)) return;
-        goldManager.addGold(killer.getUniqueId(), GOLD_CHAMPION_KILL);
+        // Bounty de la victime
+        int victimStreak = killStreak.getOrDefault(victim.getUniqueId(), 0);
+        int bounty = BOUNTY[Math.min(victimStreak, BOUNTY.length - 1)];
+        int totalGold = GOLD_CHAMPION_KILL + bounty;
+        goldManager.addGold(killer.getUniqueId(), totalGold);
         grantXP(killer, XP_CHAMPION_KILL);
-        killer.sendActionBar(Component.text(
-                String.format("⚔ KILL! +%d or +%.0f XP", GOLD_CHAMPION_KILL, XP_CHAMPION_KILL),
-                NamedTextColor.GOLD));
+        // Reset streak de la victime, incrémenter celle du tueur
+        killStreak.put(victim.getUniqueId(), 0);
+        killStreak.merge(killer.getUniqueId(), 1, Integer::sum);
+        // Killing spree announcement
+        int streak = killStreak.get(killer.getUniqueId());
+        String spreeMsg = streak == 3 ? "⚔ KILLING SPREE!" : streak == 4 ? "⚔⚔ RAMPAGE!" : streak == 5 ? "⚔⚔⚔ UNSTOPPABLE!" : streak >= 6 ? "⚔⚔⚔⚔ GODLIKE!" : null;
+        String goldMsg = bounty > 0 ? String.format("⚔ KILL! +%d or (+%d bounty) +%.0f XP", totalGold, bounty, XP_CHAMPION_KILL) : String.format("⚔ KILL! +%d or +%.0f XP", totalGold, XP_CHAMPION_KILL);
+        killer.sendActionBar(net.kyori.adventure.text.Component.text(goldMsg, NamedTextColor.GOLD));
+        if (spreeMsg != null) killer.sendMessage(net.kyori.adventure.text.Component.text(spreeMsg, NamedTextColor.RED));
 
         // Déclencher les passifs on-kill (Hubris, Axiom Arc...)
         var pm = LolPlugin.getInstance().getPassiveManager();
@@ -95,4 +125,6 @@ public class RewardManager {
             if (hud != null) hud.updateHUD(player, champ);
         }
     }
+}
+    public void resetKillStreaks() { killStreak.clear(); gameStartMs = 0; }
 }

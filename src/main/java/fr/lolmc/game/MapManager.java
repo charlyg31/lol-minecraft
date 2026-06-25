@@ -259,4 +259,24 @@ public class MapManager {
 
     public List<GameStructure> getStructures() { return structures; }
     public SchematicManager getSchematics()    { return schematics; }
+
+
+    /** Retourne toutes les structures d'une équipe (pour le TP). */
+    public java.util.List<GameStructure> getStructuresForTeam(fr.lolmc.team.TeamManager.Team team) {
+        var result = new java.util.ArrayList<GameStructure>();
+        for (var s : structures) { if (s.getTeam() == team) result.add(s); }
+        return result;
+    }
+
+
+    /** Remet un inhibiteur a pleine sante (appele apres le timer de 5 min). */
+    public void respawnInhibitor(String key) {
+        for (var s : structures) {
+            String sKey = s.getType().name() + "_" + s.getTeam() + "_" + s.getLane();
+            if (sKey.equals(key) && s.getType() == GameStructure.Type.INHIBITOR) {
+                s.respawn();
+                return;
+            }
+        }
+    }
 }

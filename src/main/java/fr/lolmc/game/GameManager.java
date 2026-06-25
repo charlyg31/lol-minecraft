@@ -11,6 +11,7 @@ import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
 
+import fr.lolmc.game.RewardManager;
 import java.util.*;
 
 /**
@@ -22,6 +23,9 @@ import java.util.*;
 public class GameManager {
 
     private boolean gameRunning = false;
+    // Inhibiteurs détruits avec leur timestamp de respawn (5 min = 300s)
+    private final java.util.Map<String, Long> inhibitorRespawnAt = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final long INHIBITOR_RESPAWN_MS = 300_000L; // 5 minutes
     private long gameStartTime = 0;
 
     // BossBar de timer partagée
@@ -292,5 +296,33 @@ public class GameManager {
             if (bar != null) p.hideBossBar(bar);
             if (timerBar != null) p.hideBossBar(timerBar);
         }
+    }
+
+    /** Enregistre la destruction d'un inhibiteur (clé = team_lane). */
+    public void onInhibitorDestroyed(String key) {
+        inhibitorRespawnAt.put(key, System.currentTimeMillis() + INHIBITOR_RESPAWN_MS);
+        // Annonce
+        org.bukkit.Bukkit.broadcast(net.kyori.adventure.text.Component.text(
+            "🏛 Inhibiteur " + key + " détruit! Respawn dans 5 minutes.", net.kyori.adventure.text.format.NamedTextColor.RED));
+        startInhibitorRespawnCheck(key);
+    }
+
+    private void startInhibitorRespawnCheck(String key) {
+        new org.bukkit.scheduler.BukkitRunnable() {
+            @Override public void run() {
+                Long at = inhibitorRespawnAt.get(key);
+                if (at == null || !gameRunning) { cancel(); return; }
+                if (System.currentTimeMillis() >= at) {
+                    inhibitorRespawnAt.remove(key);
+                    // Notifier MapManager de reconstruire l'inhibiteur
+                    LolPlugin.getInstance().getMapManager().respawnInhibitor(key);
+                    // Arrêter les super-sbires sur cette lane
+                    LolPlugin.getInstance().getMinionManager().onInhibitorRespawned(key);
+                    org.bukkit.Bukkit.broadcast(net.kyori.adventure.text.Component.text(
+                        "🏛 Inhibiteur " + key + " a repoussé!", net.kyori.adventure.text.format.NamedTextColor.GREEN));
+                    cancel();
+                }
+            }
+        }.runTaskTimer(LolPlugin.getInstance(), 20L, 20L);
     }
 }

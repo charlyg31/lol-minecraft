@@ -90,6 +90,10 @@ public class DamageUtil {
 
         // 3. HP
         vc.getHPSystem().takeDamage(afterShield);
+        // Passif Amumu Maudits Larmes : renvoie des degats aux attaquants
+        if ("amumu".equals(vc.getId()) && attacker != null) {
+            fr.lolmc.champion.impl.jungle.Amumu.onHitByEnemy(victim, vc, attacker);
+        }
         // Révéler la victime si elle est dans un bush (combat = visible)
         var bushMgr = LolPlugin.getInstance().getBushManager();
         if (bushMgr != null) bushMgr.revealOnDamage(victim);

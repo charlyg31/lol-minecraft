@@ -298,9 +298,12 @@ public class JungleManager {
                         var dtm = LolPlugin.getInstance().getTeamManager();
                         var dteam = dtm.getTeam(killer);
                         if (dteam != null) {
+                            // Enregistrer le type de dragon si c'est le premier
+                            dragonSoulType.putIfAbsent(dteam, type.buff.replace("drake_", ""));
                             int n = dragonsKilled.merge(dteam, 1, Integer::sum);
                             if (n >= 4) {
-                                applyTeamBuff(killer, "dragon_soul");
+                                String soul = dragonSoulType.getOrDefault(dteam, "infernal");
+                                applyTeamBuff(killer, "dragon_soul_" + soul);
                                 LolPlugin.getInstance().getServer().broadcast(Component.text(
                                         "🐉 L'équipe de " + killer.getName() + " a obtenu l'ÂME DU DRAGON!",
                                         NamedTextColor.LIGHT_PURPLE));

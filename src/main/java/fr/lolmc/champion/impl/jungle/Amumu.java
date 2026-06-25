@@ -33,6 +33,13 @@ public class Amumu extends BaseChampion {
         initSystems(613, 8.0, ResourceSystem.ResourceType.MANA, 480, 10.0);
     }
 
+    // Passif Maudits Larmes : renvoie des dégâts magiques aux attaquants (10 + 1.5% HP max /attaque)
+    public static void onHitByEnemy(org.bukkit.entity.Player amumu, fr.lolmc.champion.base.BaseChampion champ, org.bukkit.entity.LivingEntity attacker) {
+        double dmg = 10 + champ.getStats().getFinalMaxHP() * 0.015;
+        fr.lolmc.util.TargetingUtil.dealDamage(amumu, attacker, dmg, fr.lolmc.util.TargetingUtil.DmgType.MAGICAL);
+        amumu.getWorld().spawnParticle(org.bukkit.Particle.WITCH, amumu.getLocation().add(0,1,0), 5, 0.3, 0.3, 0.3);
+    }
+
     static class AA extends BasicAttackAbility {
         AA(){super("amumu",Material.IRON_SWORD,2.0f,DamageType.PHYSICAL);}
     }
