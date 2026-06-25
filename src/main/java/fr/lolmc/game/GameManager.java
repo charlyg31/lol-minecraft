@@ -25,6 +25,14 @@ import java.util.*;
 public class GameManager {
 
     private boolean gameRunning = false;
+    // Tâches BukkitTask stockées pour annulation explicite
+    private org.bukkit.scheduler.BukkitTask timerTask;
+    private org.bukkit.scheduler.BukkitTask passiveGoldTask;
+    private org.bukkit.scheduler.BukkitTask respawnTask;
+    private org.bukkit.scheduler.BukkitTask respawnTotalSeconds_task;
+    // Temps de respawn figé au moment de la mort (bug bossbar)
+    private final java.util.Map<java.util.UUID, Integer> respawnTotalSecondsMap
+        = new java.util.concurrent.ConcurrentHashMap<>();
     // Inhibiteurs détruits avec leur timestamp de respawn (5 min = 300s)
     private final java.util.Map<String, Long> inhibitorRespawnAt = new java.util.concurrent.ConcurrentHashMap<>();
     private static final long INHIBITOR_RESPAWN_MS = 300_000L; // 5 minutes
@@ -59,9 +67,27 @@ public class GameManager {
     // CYCLE DE PARTIE
     // ══════════════════════════════════════════════════════════════
 
+    /** Démarre les systèmes de partie (tâches BukkitTask). */
+    public void startSystems() {
+        startTimerTask();
+        startPassiveGoldTask();
+        startRespawnTask();
+    }
+
+    /** Arrête les tâches de partie (annulation propre). */
+    public void stopSystems() {
+        stopTimerTask();
+        stopPassiveGoldTask();
+        stopRespawnTask();
+    }
+
     public void startGame() {
         gameRunning = true;
         gameStartTime = System.currentTimeMillis();
+        startSystems();
+        // Démarrer les sous-systèmes
+        var __pm = LolPlugin.getInstance().getPassiveManager();
+        if (__pm != null) __pm.startTasks();
         captureParticipants();
         timerBar = BossBar.bossBar(Component.text("Partie — 00:00"),
                 1.0f, BossBar.Color.WHITE, BossBar.Overlay.PROGRESS);
@@ -72,8 +98,12 @@ public class GameManager {
 
     public void stopGame() {
         gameRunning = false;
-        // Réinitialise les états statiques des champions (anti-fuite + anti-stacks persistants)
+        stopSystems();
+        // États statiques champions
         fr.lolmc.util.ChampionStateReset.resetAll();
+        // Inhibiteurs en attente de respawn
+        inhibitorRespawnAt.clear();
+        respawnTotalSecondsMap.clear();
         if (timerBar != null) {
             for (Player p : WorldContext.getGamePlayers()) p.hideBossBar(timerBar);
         }
@@ -85,6 +115,11 @@ public class GameManager {
         participants.clear();
         participantTeam.clear();
         goldAccumulator.clear();
+        // Remettre les joueurs dans un état normal (SURVIVAL, etc.)
+        for (org.bukkit.entity.Player p : fr.lolmc.util.WorldContext.getGamePlayers()) {
+            if (p.getGameMode() == org.bukkit.GameMode.SPECTATOR)
+                p.setGameMode(org.bukkit.GameMode.SURVIVAL);
+        }
     }
 
     /** Capture les joueurs présents (avec champion) comme participants de la partie. */
@@ -115,7 +150,8 @@ public class GameManager {
     // ── Timer sur BossBar ─────────────────────────────────────────
 
     private void startTimerTask() {
-        new BukkitRunnable() {
+        if (timerTask != null) return;
+        timerTask = new BukkitRunnable() {
             @Override public void run() {
                 if (!gameRunning || timerBar == null) return;
                 long secs = getElapsedSeconds();
@@ -129,12 +165,15 @@ public class GameManager {
         }.runTaskTimer(LolPlugin.getInstance(), 20L, 20L);
     }
 
+    private void stopTimerTask() { if (timerTask != null) { timerTask.cancel(); timerTask = null; } }
+
     // ══════════════════════════════════════════════════════════════
     // OR PASSIF
     // ══════════════════════════════════════════════════════════════
 
     private void startPassiveGoldTask() {
-        new BukkitRunnable() {
+        if (passiveGoldTask != null) return;
+        passiveGoldTask = new BukkitRunnable() {
             @Override public void run() {
                 if (!gameRunning) return;
                 // L'or passif ne démarre qu'à 1:50 (comme LoL)
@@ -157,6 +196,8 @@ public class GameManager {
             }
         }.runTaskTimer(LolPlugin.getInstance(), PASSIVE_GOLD_PERIOD, PASSIVE_GOLD_PERIOD);
     }
+
+    private void stopPassiveGoldTask() { if (passiveGoldTask != null) { passiveGoldTask.cancel(); passiveGoldTask = null; } }
 
     // ══════════════════════════════════════════════════════════════
     // MORT & RESPAWN AVEC TIMER
@@ -233,7 +274,8 @@ public class GameManager {
     }
 
     private void startRespawnTask() {
-        new BukkitRunnable() {
+        if (respawnTask != null) return;
+        respawnTask = new BukkitRunnable() {
             @Override public void run() {
                 long now = System.currentTimeMillis();
                 Iterator<Map.Entry<UUID, Long>> it = respawnAt.entrySet().iterator();
@@ -254,7 +296,7 @@ public class GameManager {
                             bar.name(Component.text("☠ Réapparition dans " + remaining + "s", NamedTextColor.RED));
                             int level = LolPlugin.getInstance().getChampionManager().hasChampion(p)
                                     ? LolPlugin.getInstance().getChampionManager().getChampion(p).getLevelSystem().getLevel() : 1;
-                            int total = computeRespawnSeconds(level);
+                            int total = respawnTotalSecondsMap.getOrDefault(entry.getKey(), computeRespawnSeconds(level));
                             bar.progress(Math.max(0f, Math.min(1f, (float) remaining / total)));
                         }
                     }

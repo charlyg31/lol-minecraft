@@ -259,4 +259,12 @@ public class TurretManager {
             net.kyori.adventure.text.format.NamedTextColor.GOLD));
     }
 
+
+
+    /** Arrête les tâches de tir des tourelles (onDisable). */
+    public void stopTasks() {
+        // Les tâches TurretManager sont par entité ; annuler via le scheduler
+        LolPlugin.getInstance().getServer().getScheduler()
+            .cancelTasks(LolPlugin.getInstance());
+    }
 }

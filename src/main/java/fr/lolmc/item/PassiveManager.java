@@ -683,9 +683,9 @@ public class PassiveManager {
                 player.sendActionBar(Component.text("🗡 BotRK actif! Drain + ralentit", NamedTextColor.RED));
                 }
 
-    private void startTasks() {
+    private void doStartTasks() {
         // ── Tâche principale 1s ──
-        new BukkitRunnable() {
+        tasks.add(new BukkitRunnable() {
             @Override public void run() {
                 for (Player p : WorldContext.getGamePlayers()) {
                     if (!championManager.hasChampion(p)) continue;
@@ -694,10 +694,10 @@ public class PassiveManager {
                     processPeriodicPassives(p, champ, state);
                 }
             }
-        }.runTaskTimer(LolPlugin.getInstance(), 0L, 20L);
+        }.runTaskTimer(LolPlugin.getInstance(), 0L, 20L));
 
         // ── Sunfire / Bami's Cinder: dégâts AoE 2 ticks ──
-        new BukkitRunnable() {
+        tasks.add(new BukkitRunnable() {
             @Override public void run() {
                 for (Player p : WorldContext.getGamePlayers()) {
                     if (!championManager.hasChampion(p)) continue;
@@ -717,10 +717,10 @@ public class PassiveManager {
                         });
                 }
             }
-        }.runTaskTimer(LolPlugin.getInstance(), 0L, 2L);
+        }.runTaskTimer(LolPlugin.getInstance(), 0L, 2L));
 
         // ── Dead Man's Plate: stacks mouvement hors combat ──
-        new BukkitRunnable() {
+        tasks.add(new BukkitRunnable() {
             @Override public void run() {
                 for (Player p : WorldContext.getGamePlayers()) {
                     if (!championManager.hasChampion(p)) continue;
@@ -734,13 +734,13 @@ public class PassiveManager {
                     }
                 }
             }
-        }.runTaskTimer(LolPlugin.getInstance(), 0L, 10L);
+        }.runTaskTimer(LolPlugin.getInstance(), 0L, 10L));
 
         // ── Force of Nature: stacks MR après dégâts magiques ──
         // Géré dans onAbilityDamage
 
         // ── Manamune: recalculer AD bonus ──
-        new BukkitRunnable() {
+        tasks.add(new BukkitRunnable() {
             @Override public void run() {
                 for (Player p : WorldContext.getGamePlayers()) {
                     if (!championManager.hasChampion(p)) continue;
@@ -758,10 +758,10 @@ public class PassiveManager {
                     }
                 }
             }
-        }.runTaskTimer(LolPlugin.getInstance(), 0L, 60L);
+        }.runTaskTimer(LolPlugin.getInstance(), 0L, 60L));
 
         // ── Abyssal Mask: aura -15% MR ennemis proches ──
-        new BukkitRunnable() {
+        tasks.add(new BukkitRunnable() {
             @Override public void run() {
                 for (Player p : WorldContext.getGamePlayers()) {
                     if (!championManager.hasChampion(p)) continue;
@@ -777,7 +777,7 @@ public class PassiveManager {
                         });
                 }
             }
-        }.runTaskTimer(LolPlugin.getInstance(), 0L, 10L);
+        }.runTaskTimer(LolPlugin.getInstance(), 0L, 10L));
     }
 
     private void processPeriodicPassives(Player p, BaseChampion champ, ItemState state) {
@@ -877,5 +877,16 @@ public class PassiveManager {
 
     public boolean isReviving(java.util.UUID uuid) {
         return states.containsKey(uuid) && states.get(uuid).gaActive;
+    }
+
+
+    /** Nettoie l'état d'un joueur (déconnexion / fin de partie). */
+    public void cleanup(java.util.UUID uuid) {
+        states.remove(uuid);
+    }
+
+    /** Nettoie tous les états (fin de partie / onDisable). */
+    public void cleanupAll() {
+        states.clear();
     }
 }

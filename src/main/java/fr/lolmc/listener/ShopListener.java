@@ -60,6 +60,10 @@ public class ShopListener implements Listener {
         inventoryManagers.remove(uuid);
     }
 
+    public void cleanupAll() {
+        inventoryManagers.clear();
+    }
+
     // ── Clics dans l'inventaire ───────────────────────────────────
     @EventHandler
     public void onInventoryClick(InventoryClickEvent event) {
