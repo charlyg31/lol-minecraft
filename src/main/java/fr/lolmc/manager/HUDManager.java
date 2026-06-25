@@ -10,17 +10,12 @@ import fr.lolmc.stats.ResourceSystem;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
-import org.bukkit.Bukkit;
 import org.bukkit.attribute.Attribute;
-import org.bukkit.attribute.AttributeModifier;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
 
-import fr.lolmc.champion.impl.top.Malphite;
 import fr.lolmc.champion.impl.mid.Yasuo;
-import fr.lolmc.champion.impl.support.Blitzcrank;
-import fr.lolmc.champion.impl.support.Janna;
 
 public class HUDManager {
 

@@ -4,7 +4,6 @@ import fr.lolmc.LolPlugin;
 import fr.lolmc.util.WorldContext;
 
 import fr.lolmc.team.TeamManager;
-import fr.lolmc.team.TeamManager.Team;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.block.Block;

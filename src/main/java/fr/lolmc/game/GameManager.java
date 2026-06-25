@@ -13,7 +13,6 @@ import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
 
-import fr.lolmc.game.RewardManager;
 import java.util.*;
 
 /**

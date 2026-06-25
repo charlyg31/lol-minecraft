@@ -6,7 +6,6 @@ import fr.lolmc.util.DamageUtil;
 import fr.lolmc.util.LolUnits;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
-import org.bukkit.Location;
 import org.bukkit.Particle;
 import org.bukkit.Sound;
 import org.bukkit.entity.LivingEntity;
