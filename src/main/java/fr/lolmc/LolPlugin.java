@@ -114,18 +114,27 @@ public class LolPlugin extends JavaPlugin {
         initManagersAndListeners();
         registerCommands();
 
-        // AJOUT : Démarrage de la tâche de chargement forcé des chunks (toutes les 20 ticks = 1 seconde)
-        this.chunkLoaderManager = new ChunkLoaderManager();
-        this.chunkLoaderManager.runTaskTimer(this, 0L, 20L);
-
         // Bridge cross-serveur (BungeeCord)
         this.bridgeManager = new fr.lolmc.bridge.BridgeManager(this);
 
         getLogger().info("LoL MC activé — 20 champions + boutique chargés.");
     }
 
-    /** Cree tous les managers (ordre de dependance preserve) et enregistre les ecouteurs lies. */
+    /**
+     * Bootstrap complet du plugin.
+     * Ordre de dépendance strict :
+     *   Core → Money → Map/Game → Shop → Queue → Listeners → Commands
+     */
     private void initManagersAndListeners() {
+        initCoreManagers();
+        initGameManagers();
+        initShopManagers();
+        initQueueManagers();
+        registerListenersInternal();
+    }
+
+    private void initCoreManagers() {
+        // ── Core (sans dépendances) ────────────────────────────────────
         championManager = new ChampionManager();
         flashManager = new FlashManager();
         hotbarManager = new HotbarManager();
@@ -134,8 +143,15 @@ public class LolPlugin extends JavaPlugin {
         partyManager = new PartyManager();
         matchmakingManager = new MatchmakingManager(partyManager, teamManager);
 
-        schematicManager = new SchematicManager(this);
+        // ── Money (dépend de rien) ─────────────────────────────────────
+        shopGUI   = new ShopGUI();
+        goldManager = new GoldManager();
+        ccManager = new fr.lolmc.game.CCManager();
 
+        chunkLoaderManager = new ChunkLoaderManager();
+        chunkLoaderManager.runTaskTimer(this, 0L, 20L);
+        // ── Map/Game (dépend de goldManager) ──────────────────────────
+        schematicManager = new SchematicManager(this);
         mapManager = new MapManager(schematicManager);
         minionManager = new MinionManager(mapManager);
         turretManager = new TurretManager(mapManager, championManager, teamManager);
@@ -170,10 +186,8 @@ public class LolPlugin extends JavaPlugin {
         matchScoreboard = new MatchScoreboard();
         getServer().getPluginManager().registerEvents(new fr.lolmc.listener.MonsterPassiveListener(), this);
         getServer().getPluginManager().registerEvents(bushManager, this);
+        // ── Shop/Passifs (dépend de goldManager + championManager) ────
         hudManager = new HUDManager(championManager);
-        shopGUI = new ShopGUI();
-        goldManager = new GoldManager();
-        ccManager = new fr.lolmc.game.CCManager();
         shopListener = new ShopListener(shopGUI, championManager, goldManager, hudManager);
         passiveManager = new PassiveManager(championManager, hudManager, shopListener);
         consumableManager = new ConsumableManager(championManager, hudManager);
@@ -183,6 +197,7 @@ public class LolPlugin extends JavaPlugin {
         championGUI     = new ChampionGUI(championManager, headManager);
         guiListener     = new GUIListener(championGUI, championManager, headManager, hudManager);
 
+        // ── Listeners (dépend de tout) ─────────────────────────────────
         abilityListener = new AbilityListener(championManager);
         getServer().getPluginManager().registerEvents(abilityListener, this);
         getServer().getPluginManager().registerEvents(new HealthListener(championManager, hudManager), this);
@@ -241,10 +256,19 @@ public class LolPlugin extends JavaPlugin {
 
     @Override
     public void onDisable() {
-        // AJOUT : Nettoyage forcé de tous les chunks bloqués en mémoire avant l'arrêt
-        if (this.chunkLoaderManager != null) {
-            this.chunkLoaderManager.clearAllForcedChunks();
-        }
+        // ── 1. Arrêt du runtime de partie (si en cours) ─────────────────────
+        if (gameManager != null && gameManager.isRunning()) gameManager.stopGame();
+        if (minionManager != null) minionManager.stopWaves();
+        if (jungleManager != null) jungleManager.stopJungle();
+        if (turretManager != null && turretManager instanceof fr.lolmc.game.TurretManager tm) tm.stopTasks();
+        if (passiveManager != null) passiveManager.stopTasks();
+        if (gameManager != null) gameManager.stopSystems();
+        // ── 2. Nettoyage des états par joueur ────────────────────────────────
+        if (passiveManager != null) passiveManager.cleanupAll();
+        if (shopListener != null) shopListener.cleanupAll();
+        fr.lolmc.util.ChampionStateReset.resetAll();
+        // ── 3. Chunks + services externes ───────────────────────────────────
+        if (chunkLoaderManager != null) chunkLoaderManager.clearAllForcedChunks();
         if (apiServer != null) apiServer.stop();
         if (databaseManager != null) databaseManager.close();
         if (bridgeManager != null) bridgeManager.disable();

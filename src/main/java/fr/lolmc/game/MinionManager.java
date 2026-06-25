@@ -51,7 +51,10 @@ public class MinionManager {
     private static final double MINION_SPEED = 0.25;
 
     private boolean spawning = false;
-    private int waveCount = 0; // pour le sbire canon (toutes les 3 vagues)
+    private int waveCount = 0; // numéro de vague GLOBAL (incrémenté une fois par cycle)
+    // Tâches stockées pour annulation propre
+    private org.bukkit.scheduler.BukkitTask waveTask;
+    private org.bukkit.scheduler.BukkitTask moveTask;
     // Inhibiteurs détruits → super-sbires sur cette lane (clé: "BLUE_top")
     private final java.util.Set<String> superMinionLanes = new java.util.HashSet<>();
     // Modèles custom : sbireUUID → liste des parties (pour nettoyage)
@@ -76,8 +79,8 @@ public class MinionManager {
         new BukkitRunnable() {
             @Override public void run() {
                 if (!spawning) { cancel(); return; }
-                spawnWave(Team.BLUE);
-                spawnWave(Team.RED);
+                spawnWave(Team.BLUE, waveCount);
+                spawnWave(Team.RED, waveCount);
             }
         }.runTaskTimer(LolPlugin.getInstance(), FIRST_WAVE_DELAY, WAVE_PERIOD);
 
@@ -92,7 +95,12 @@ public class MinionManager {
 
     public void stopWaves() {
         spawning = false;
+        if (waveTask != null) { waveTask.cancel(); waveTask = null; }
+        if (moveTask != null) { moveTask.cancel(); moveTask = null; }
         clearAllMinions();
+        waveCount = 0;
+        superMinionLanes.clear();
+        minionDeco.clear();
     }
 
 
@@ -116,7 +124,7 @@ public class MinionManager {
 
     // ── Spawn ─────────────────────────────────────────────────────
 
-    private void spawnWave(Team team) {
+    private void spawnWave(Team team, int wave) {
         // Spawn sur chaque lane configurée
         for (String lane : List.of("top", "mid", "bot")) {
             Location spawnPoint = getMinionSpawn(team, lane);
@@ -529,7 +537,8 @@ public class MinionManager {
 
     /** Force le spawn immédiat d'une vague (admin /lol wave). */
     public void forceWave() {
-        spawnWave(Team.BLUE);
-        spawnWave(Team.RED);
+        waveCount++;
+        spawnWave(Team.BLUE, waveCount);
+        spawnWave(Team.RED, waveCount);
     }
 }
