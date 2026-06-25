@@ -6,6 +6,8 @@ import fr.lolmc.util.MobAnimator;
 import org.bukkit.Material;
 
 import fr.lolmc.LolPlugin;
+import fr.lolmc.util.WorldContext;
+
 import fr.lolmc.team.TeamManager.Team;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -212,7 +214,10 @@ public class MinionManager {
 
     private void moveMinions() {
         var roadManager = LolPlugin.getInstance().getRoadManager();
-        for (var world : LolPlugin.getInstance().getServer().getWorlds()) {
+        java.util.List<org.bukkit.World> __worlds = WorldContext.getGameWorld() != null
+                ? java.util.List.of(WorldContext.getGameWorld())
+                : java.util.List.of();
+            for (var world : __worlds) {
             for (Zombie z : world.getEntitiesByClass(Zombie.class)) {
                 if (!isMinion(z)) continue;
                 Team team = getMinionTeam(z);
@@ -464,7 +469,10 @@ public class MinionManager {
         for (UUID id : minionDeco.keySet()) MobAnimator.unregister(id);
         minionDeco.clear();
         // Retirer les sbires eux-mêmes
-        for (var world : LolPlugin.getInstance().getServer().getWorlds()) {
+        java.util.List<org.bukkit.World> __worlds = WorldContext.getGameWorld() != null
+                ? java.util.List.of(WorldContext.getGameWorld())
+                : java.util.List.of();
+            for (var world : __worlds) {
             for (Entity e : world.getEntities()) {
                 if (e instanceof LivingEntity le && isMinion(le)) {
                     e.remove();

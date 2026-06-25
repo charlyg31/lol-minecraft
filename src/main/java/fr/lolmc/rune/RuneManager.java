@@ -481,4 +481,31 @@ public class RuneManager {
         keystoneStacks.remove(uuid);
         keystoneLastProc.remove(uuid);
     }
+
+
+    /**
+     * Applique les données de rune reçues depuis le lobby via BridgeManager.
+     * @param data Map contenant "keystone", "minors", "spell1", "spell2"
+     */
+    public void applyKeystoneFromBridge(org.bukkit.entity.Player player,
+                                         String keystone,
+                                         java.util.Map<String, String> data) {
+        RunePage page = getPage(player.getUniqueId());
+        page.keystone = keystone;
+        String minorsStr = data.getOrDefault("minors", "");
+        if (!minorsStr.isEmpty()) {
+            String[] parts = minorsStr.split(",");
+            for (int i = 0; i < Math.min(parts.length, 6); i++) {
+                if (i < page.minors.length) page.minors[i] = parts[i].trim();
+            }
+        }
+        playerPages.put(player.getUniqueId(), page);
+        applyRuneStats(player);
+        player.sendMessage(net.kyori.adventure.text.Component.text(
+            "✔ Runes appliquées depuis le lobby!", net.kyori.adventure.text.format.NamedTextColor.GREEN));
+    }
+
+    public RunePage getPage(java.util.UUID uuid) {
+        return playerPages.getOrDefault(uuid, RunePage.defaultPage());
+    }
 }

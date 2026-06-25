@@ -1,6 +1,8 @@
 package fr.lolmc.game;
 
 import fr.lolmc.LolPlugin;
+import fr.lolmc.util.WorldContext;
+
 import net.kyori.adventure.sound.Sound;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -96,7 +98,7 @@ public class AnnouncementManager {
         Component subComp = LegacyText.parse(subtitle);
         Title t = Title.title(titleComp, subComp,
                 Title.Times.times(Duration.ofMillis(300), Duration.ofMillis(2000), Duration.ofMillis(500)));
-        for (Player p : Bukkit.getOnlinePlayers()) {
+        for (Player p : WorldContext.getGamePlayers()) {
             p.showTitle(t);
             p.playSound(sound);
         }

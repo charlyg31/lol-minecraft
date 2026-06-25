@@ -1,3 +1,38 @@
+# ═══════════════════════════════════════════════════════
+# BRIDGE CROSS-SERVEUR (BungeeCord)
+# ═══════════════════════════════════════════════════════
+# Permet aux joueurs de configurer leurs runes, groupes
+# et file d'attente depuis un serveur lobby séparé,
+# puis d'être connectés automatiquement ici pour jouer.
+#
+# Prérequis :
+#  1. BungeeCord avec ce serveur et le serveur lobby
+#  2. "bungeecord: true" dans spigot.yml des deux serveurs
+#  3. Le plugin LolMC-Lobby.jar installé sur le serveur lobby
+#
+bridge:
+  enabled: false
+  # Nom de ce serveur dans la config BungeeCord
+  game-server: "lolmc-01"
+  # Nom du serveur lobby dans la config BungeeCord
+  lobby-server: "lobby"
+
+# ═══════════════════════════════════════════════════════
+# MONDE DE JEU
+# ═══════════════════════════════════════════════════════
+# Nom du monde Minecraft où se déroule la partie LoL.
+# Les mécaniques du plugin (sbires, tourelles, brouillard,
+# HUD...) ne s'activent que pour les joueurs dans ce monde.
+# Cela permet d'avoir d'autres mondes sur le même serveur
+# sans interférence (hub, monde de build, etc.).
+world:
+  # Nom exact du monde de jeu (dossier dans le répertoire serveur)
+  name: "lolmc"
+  # Monde lobby/hub (optionnel). Si renseigné, c'est ici que
+  # les joueurs attendent, configurent leurs runes et forment
+  # leurs groupes avant d'être envoyés dans le monde de jeu.
+  lobby: "lobby"
+
 # LoL MC — Configuration des textures de têtes
 # Pour chaque champion, colle la valeur "Value" depuis :
 # https://minecraft-heads.com/custom-heads/tag/League-of-Legends

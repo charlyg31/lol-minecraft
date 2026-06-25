@@ -2,6 +2,8 @@ package fr.lolmc.listener;
 import fr.lolmc.util.Compat;
 
 import fr.lolmc.LolPlugin;
+import fr.lolmc.util.WorldContext;
+
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.item.HotbarManager;
 import fr.lolmc.item.PassiveManager;
@@ -29,7 +31,7 @@ public class AbilityListener implements Listener {
         // Affichage portée toutes les 2 ticks (uniquement page 1, slots sorts)
         new BukkitRunnable() {
             @Override public void run() {
-                for (Player p : LolPlugin.getInstance().getServer().getOnlinePlayers()) {
+                for (Player p : WorldContext.getGamePlayers()) {
                     if (!manager.hasChampion(p)) continue;
                     if (LolPlugin.getInstance().getHotbarManager().getPage(p) != 1) continue;
                     manager.getChampion(p).displayRangeIfHoldingAbility(p);
@@ -40,7 +42,7 @@ public class AbilityListener implements Listener {
         // Tâche d'affichage des cooldowns sur les items de sort (chaque 5 ticks)
         new BukkitRunnable() {
             @Override public void run() {
-                for (Player p : LolPlugin.getInstance().getServer().getOnlinePlayers()) {
+                for (Player p : WorldContext.getGamePlayers()) {
                     if (!manager.hasChampion(p)) continue;
                     if (LolPlugin.getInstance().getHotbarManager().getPage(p) != 1) continue;
                     updateCooldownDisplay(p, manager.getChampion(p));
@@ -137,6 +139,7 @@ public class AbilityListener implements Listener {
             + " a déclenché PlayerAnimationEvent (hasChampion="
             + manager.hasChampion(caster) + ")");
         if (!manager.hasChampion(caster)) return;
+        if (!fr.lolmc.util.WorldContext.isInGameWorld(caster)) return;
 
         fr.lolmc.util.DebugLogger.log("ArmSwing", caster.getName()
             + " animation=" + e.getAnimationType());
@@ -156,6 +159,7 @@ public class AbilityListener implements Listener {
     public void onInteract(PlayerInteractEvent e) {
         Player caster = e.getPlayer();
         if (!manager.hasChampion(caster)) return;
+        if (!fr.lolmc.util.WorldContext.isInGameWorld(caster)) return;
 
         Action a = e.getAction();
         int slot = caster.getInventory().getHeldItemSlot();
@@ -393,6 +397,12 @@ public class AbilityListener implements Listener {
     }
 
     // ── Nettoyage mémoire à la déconnexion ──
+    @EventHandler
+    public void onJoinBridge(org.bukkit.event.player.PlayerJoinEvent e) {
+        var bridge = LolPlugin.getInstance().getBridgeManager();
+        if (bridge != null && bridge.isEnabled()) bridge.onPlayerJoin(e.getPlayer());
+    }
+
     @EventHandler
     public void onQuit(PlayerQuitEvent e) {
         Player p = e.getPlayer();

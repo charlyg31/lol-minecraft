@@ -2,6 +2,8 @@ package fr.lolmc.manager;
 import fr.lolmc.util.Compat;
 
 import fr.lolmc.LolPlugin;
+import fr.lolmc.util.WorldContext;
+
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.stats.HPSystem;
 import fr.lolmc.stats.ResourceSystem;
@@ -33,7 +35,8 @@ public class HUDManager {
         // ── Affichage ActionBar + sync HP Minecraft — toutes les 2 ticks ──
         new BukkitRunnable() {
             @Override public void run() {
-                for (Player p : Bukkit.getOnlinePlayers()) {
+                for (Player p : WorldContext.getGamePlayers()) {
+                    if (!WorldContext.isInGameWorld(p)) continue;
                     if (!championManager.hasChampion(p)) continue;
                     BaseChampion champ = championManager.getChampion(p);
                     updateHUD(p, champ);
@@ -44,7 +47,8 @@ public class HUDManager {
         // ── Regen HP + Ressource — toutes les 100 ticks (5s) ──
         new BukkitRunnable() {
             @Override public void run() {
-                for (Player p : Bukkit.getOnlinePlayers()) {
+                for (Player p : WorldContext.getGamePlayers()) {
+                    if (!WorldContext.isInGameWorld(p)) continue;
                     if (!championManager.hasChampion(p)) continue;
                     BaseChampion champ = championManager.getChampion(p);
                     HPSystem hp = champ.getHPSystem();
@@ -62,7 +66,8 @@ public class HUDManager {
         // ── Flow Yasuo : +flow si le joueur bouge — toutes les 4 ticks ──
         new BukkitRunnable() {
             @Override public void run() {
-                for (Player p : Bukkit.getOnlinePlayers()) {
+                for (Player p : WorldContext.getGamePlayers()) {
+                    if (!WorldContext.isInGameWorld(p)) continue;
                     if (!championManager.hasChampion(p)) continue;
                     BaseChampion champ = championManager.getChampion(p);
                     ResourceSystem res = champ.getResourceSystem();

@@ -7,6 +7,8 @@ import org.bukkit.Bukkit;
 import org.bukkit.Material;
 
 import fr.lolmc.LolPlugin;
+import fr.lolmc.util.WorldContext;
+
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.team.TeamManager.Team;
 import net.kyori.adventure.text.Component;
@@ -598,7 +600,10 @@ public class JungleManager {
     }
 
     public void clearAllMonsters() {
-        for (var world : LolPlugin.getInstance().getServer().getWorlds()) {
+        java.util.List<org.bukkit.World> __worlds = WorldContext.getGameWorld() != null
+                ? java.util.List.of(WorldContext.getGameWorld())
+                : java.util.List.of();
+            for (var world : __worlds) {
             for (Entity e : world.getEntities()) {
                 if (isJungleMonster(e) || MobAppearance.isDecoration(e)) e.remove();
             }

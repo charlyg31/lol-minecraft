@@ -1,6 +1,8 @@
 package fr.lolmc.game;
 
 import fr.lolmc.LolPlugin;
+import fr.lolmc.util.WorldContext;
+
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.team.TeamManager.Team;
 import net.kyori.adventure.text.Component;
@@ -126,7 +128,7 @@ public class BaseManager {
                 var tm = LolPlugin.getInstance().getTeamManager();
                 var mm = LolPlugin.getInstance().getMapManager();
 
-                for (Player p : LolPlugin.getInstance().getServer().getOnlinePlayers()) {
+                for (Player p : WorldContext.getGamePlayers()) {
                     if (!cm.hasChampion(p)) continue;
                     Team team = tm.getTeam(p);
                     if (team == null) continue;

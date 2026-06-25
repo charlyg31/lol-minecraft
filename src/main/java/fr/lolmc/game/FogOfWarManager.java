@@ -1,6 +1,8 @@
 package fr.lolmc.game;
 
 import fr.lolmc.LolPlugin;
+import fr.lolmc.util.WorldContext;
+
 import fr.lolmc.team.TeamManager;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
@@ -62,7 +64,7 @@ public class FogOfWarManager {
         var bushMgr = LolPlugin.getInstance().getBushManager();
 
         java.util.List<Player> players = new java.util.ArrayList<>();
-        for (Player __p : LolPlugin.getInstance().getServer().getOnlinePlayers()) players.add(__p);
+        for (Player __p : WorldContext.getGamePlayers()) players.add(__p);
 
         for (Player viewer : players) {
             if (!cm.hasChampion(viewer)) continue;

@@ -1,6 +1,8 @@
 package fr.lolmc.game;
 
 import fr.lolmc.LolPlugin;
+import fr.lolmc.util.WorldContext;
+
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.team.TeamManager.Team;
 import net.kyori.adventure.bossbar.BossBar;
@@ -63,7 +65,7 @@ public class GameManager {
         captureParticipants();
         timerBar = BossBar.bossBar(Component.text("Partie — 00:00"),
                 1.0f, BossBar.Color.WHITE, BossBar.Overlay.PROGRESS);
-        for (Player p : Bukkit.getOnlinePlayers()) {
+        for (Player p : WorldContext.getGamePlayers()) {
             p.showBossBar(timerBar);
         }
     }
@@ -73,11 +75,11 @@ public class GameManager {
         // Réinitialise les états statiques des champions (anti-fuite + anti-stacks persistants)
         fr.lolmc.util.ChampionStateReset.resetAll();
         if (timerBar != null) {
-            for (Player p : Bukkit.getOnlinePlayers()) p.hideBossBar(timerBar);
+            for (Player p : WorldContext.getGamePlayers()) p.hideBossBar(timerBar);
         }
         respawnAt.clear();
         for (BossBar bar : respawnBars.values()) {
-            for (Player p : Bukkit.getOnlinePlayers()) p.hideBossBar(bar);
+            for (Player p : WorldContext.getGamePlayers()) p.hideBossBar(bar);
         }
         respawnBars.clear();
         participants.clear();
@@ -91,7 +93,7 @@ public class GameManager {
         participantTeam.clear();
         var cm = LolPlugin.getInstance().getChampionManager();
         var tm = LolPlugin.getInstance().getTeamManager();
-        for (Player p : Bukkit.getOnlinePlayers()) {
+        for (Player p : WorldContext.getGamePlayers()) {
             if (cm.hasChampion(p)) {
                 participants.add(p.getUniqueId());
                 if (tm.hasTeam(p)) participantTeam.put(p.getUniqueId(), tm.getTeam(p));
@@ -120,7 +122,7 @@ public class GameManager {
                 String time = String.format("%02d:%02d", secs / 60, secs % 60);
                 timerBar.name(Component.text("⏱ Partie — " + time, NamedTextColor.WHITE));
                 // S'assurer que les nouveaux joueurs voient la barre
-                for (Player p : Bukkit.getOnlinePlayers()) {
+                for (Player p : WorldContext.getGamePlayers()) {
                     p.showBossBar(timerBar);
                 }
             }
@@ -139,7 +141,7 @@ public class GameManager {
                 if (getElapsedSeconds() < PASSIVE_GOLD_START_SECONDS) return;
                 var goldManager = LolPlugin.getInstance().getGoldManager();
                 var cm = LolPlugin.getInstance().getChampionManager();
-                for (Player p : Bukkit.getOnlinePlayers()) {
+                for (Player p : WorldContext.getGamePlayers()) {
                     if (cm.hasChampion(p) && !isDead(p)) {
                         // Accumuler l'or fractionnaire (1.02/demi-sec) et verser les entiers
                         double acc = goldAccumulator.getOrDefault(p.getUniqueId(), 0.0)
