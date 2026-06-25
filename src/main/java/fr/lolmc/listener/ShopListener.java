@@ -311,10 +311,12 @@ public class ShopListener implements Listener {
 
     // ── Helpers ───────────────────────────────────────────────────
 
+    /** Vrai si le slot correspond à un emplacement d'item LoL (hotbar ou inventaire). */
     private boolean isLolItemSlot(int slot) {
-        for (int s : PlayerInventoryManager.ITEM_SLOTS) {
-            if (s == slot) return true;
-        }
+        // Anciens slots hotbar (compatibilité)
+        for (int s : PlayerInventoryManager.ITEM_SLOTS) if (s == slot) return true;
+        // Slots inventaire LoL (9-14)
+        for (int s : fr.lolmc.item.HotbarManager.INV_ITEM_SLOTS) if (s == slot) return true;
         return false;
     }
 

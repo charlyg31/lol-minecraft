@@ -19,13 +19,16 @@ import java.util.*;
 /**
  * Gère la barre d'action (hotbar) avec un système de 2 pages.
  *
- * PAGE 1 (combat):
- *   0=AA  1=Q  2=W  3=E  4=R  5=Flash  6,7=items actifs  8=→page 2
- * PAGE 2 (utilitaire):
- *   0..6 = reste des items actifs + consommables   8=←page 1
+ * HOTBAR (slots 0-8) — visible en jeu :
+ *   Page 1 : 0=AA  1=Q  2=W  3=E  4=R  5=Flash  6,7=items ACTIFS  8=→page2
+ *   Page 2 : 0..6=items actifs + consommables  7=Recall  8=←page1
  *
- * Les items achetés (passifs ET actifs) vivent dans l'inventaire haut (slots 9-35)
- * et appliquent leurs stats. Seuls les items à ACTIF sont aussi placés dans la hotbar.
+ * INVENTAIRE (slots 9-35) — items achetés affichés (passifs ET actifs) :
+ *   Slots 9-14 : 6 emplacements d'items LoL (icônes avec stats)
+ *   Slots 15-35 : vides (réservés / inaccessibles)
+ *
+ * Règle : les items PASSIFS n'apparaissent QUE dans l'inventaire (9-14).
+ *         les items ACTIFS apparaissent dans l'inventaire ET dans la hotbar.
  *
  * Identification fiable via PersistentDataContainer (PDC), pas via le lore.
  */
@@ -48,6 +51,10 @@ public class HotbarManager {
     }
     // Items achetés par joueur (max 6) — index 0..5
     private final Map<UUID, List<String>> ownedItems = new HashMap<>();
+
+    // Slots INVENTAIRE (2e/3e rangée) pour afficher les 6 items achetés
+    // Slots 9-14 : première rangée de l'inventaire (sous la hotbar)
+    public static final int[] INV_ITEM_SLOTS = {9, 10, 11, 12, 13, 14};
 
     // Slots hotbar réservés aux items actifs en page 1 (après Flash)
     private static final int[] PAGE1_ACTIVE_SLOTS = {6, 7};
@@ -102,6 +109,8 @@ public class HotbarManager {
         int page = currentPage.getOrDefault(player.getUniqueId(), 1);
         if (page == 1) renderPage1(player, champ);
         else renderPage2(player, champ);
+        // Toujours synchroniser l'inventaire (items achetés)
+        renderInventoryItems(player);
     }
 
     private void renderPage1(Player player, BaseChampion champ) {
@@ -366,6 +375,50 @@ public class HotbarManager {
     public void removeConsumable(Player player, String consId) {
         List<String> list = consumables.get(player.getUniqueId());
         if (list != null) list.remove(consId);
+    }
+
+
+    /**
+     * Affiche les items achetés dans l'inventaire Minecraft (slots 9-14).
+     * Les items passifs et actifs y sont tous visibles.
+     * Appelée après chaque rendu de page.
+     */
+    public void renderInventoryItems(Player player) {
+        var inv = player.getInventory();
+        List<String> owned = getOwnedItems(player);
+        for (int i = 0; i < INV_ITEM_SLOTS.length; i++) {
+            int mcSlot = INV_ITEM_SLOTS[i];
+            if (i < owned.size()) {
+                LolItem item = ItemRegistry.get(owned.get(i));
+                if (item != null) {
+                    ItemStack stack = item.buildItemStack();
+                    // Marquer PDC pour bloquer le déplacement
+                    tag(stack, "inv_item", item.getId(), i);
+                    inv.setItem(mcSlot, stack);
+                } else {
+                    inv.setItem(mcSlot, emptyInvSlot(i + 1));
+                }
+            } else {
+                inv.setItem(mcSlot, emptyInvSlot(i + 1));
+            }
+        }
+        // Vider les slots restants 15-35 (protection)
+        for (int s = 15; s <= 35; s++) {
+            if (inv.getItem(s) != null && isLolItem(inv.getItem(s)))
+                inv.setItem(s, null);
+        }
+    }
+
+    private ItemStack emptyInvSlot(int number) {
+        ItemStack empty = new ItemStack(Material.LIGHT_GRAY_STAINED_GLASS_PANE);
+        ItemMeta meta = empty.getItemMeta();
+        if (meta != null) {
+            meta.displayName(Component.text("Slot item " + number, NamedTextColor.DARK_GRAY)
+                .decoration(TextDecoration.ITALIC, false));
+            tag(empty, "inv_empty", "", -1);
+            empty.setItemMeta(meta);
+        }
+        return empty;
     }
 
     // Nettoyage mémoire (appelé à la déconnexion)

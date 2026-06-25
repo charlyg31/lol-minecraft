@@ -620,4 +620,153 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
         if (args.length == 4 && args[0].equalsIgnoreCase("set")) return List.of("top", "mid", "bot", "base");
         return List.of();
     }
+
+    // ══════════════════════════════════════════════════════════════
+    // COMMANDES ADMIN AVANCÉES
+    // ══════════════════════════════════════════════════════════════
+
+    // ── /lol spawn <type> [équipe] ─────────────────────────────────────
+    // Types: minion_melee, minion_caster, minion_cannon, minion_super,
+    //        dragon, baron, herald, wolf, blue, red, gromp, raptor, krug
+    private void handleSpawn(Player player, String[] args) {
+        if (args.length < 2) {
+            player.sendMessage(Component.text("§c/lol spawn <entité> [team:blue|red]", NamedTextColor.RED));
+            player.sendMessage(Component.text("§7Entités: minion_melee minion_caster minion_cannon minion_super", NamedTextColor.GRAY));
+            player.sendMessage(Component.text("§7         dragon baron herald wolf blue red gromp raptor krug", NamedTextColor.GRAY));
+            return;
+        }
+        String type = args[1].toLowerCase();
+        var loc = player.getLocation();
+        var plugin = LolPlugin.getInstance();
+        fr.lolmc.team.TeamManager.Team team = fr.lolmc.team.TeamManager.Team.BLUE;
+        if (args.length >= 3) {
+            try { team = fr.lolmc.team.TeamManager.Team.valueOf(args[2].toUpperCase()); } catch (Exception ignored) {}
+        }
+
+        switch (type) {
+            case "minion_melee"  -> { plugin.getMinionManager().spawnTestMinion(loc, team, "melee");  player.sendMessage(Component.text("✔ Sbire mêlée spawné", NamedTextColor.GREEN)); }
+            case "minion_caster" -> { plugin.getMinionManager().spawnTestMinion(loc, team, "caster"); player.sendMessage(Component.text("✔ Sbire caster spawné", NamedTextColor.GREEN)); }
+            case "minion_cannon" -> { plugin.getMinionManager().spawnTestMinion(loc, team, "cannon"); player.sendMessage(Component.text("✔ Sbire canon spawné", NamedTextColor.GREEN)); }
+            case "minion_super"  -> { plugin.getMinionManager().spawnTestMinion(loc, team, "super");  player.sendMessage(Component.text("✔ Super-sbire spawné", NamedTextColor.GREEN)); }
+            case "dragon"        -> { plugin.getJungleManager().spawnTestMonster(loc, "DRAGON_INFERNAL"); player.sendMessage(Component.text("✔ Dragon spawné", NamedTextColor.RED)); }
+            case "baron"         -> { plugin.getJungleManager().spawnTestMonster(loc, "BARON");           player.sendMessage(Component.text("✔ Baron Nashor spawné", NamedTextColor.LIGHT_PURPLE)); }
+            case "herald"        -> { plugin.getJungleManager().spawnTestMonster(loc, "HERALD");          player.sendMessage(Component.text("✔ Héraut spawné", NamedTextColor.AQUA)); }
+            case "wolf"          -> { plugin.getJungleManager().spawnTestMonster(loc, "WOLF");            player.sendMessage(Component.text("✔ Loup spawné", NamedTextColor.GRAY)); }
+            case "blue"          -> { plugin.getJungleManager().spawnTestMonster(loc, "BLUE");            player.sendMessage(Component.text("✔ Blue Sentinel spawné", NamedTextColor.BLUE)); }
+            case "red"           -> { plugin.getJungleManager().spawnTestMonster(loc, "RED");             player.sendMessage(Component.text("✔ Red Brambleback spawné", NamedTextColor.RED)); }
+            case "gromp"         -> { plugin.getJungleManager().spawnTestMonster(loc, "GROMP");           player.sendMessage(Component.text("✔ Gromp spawné", NamedTextColor.GREEN)); }
+            case "raptor"        -> { plugin.getJungleManager().spawnTestMonster(loc, "RAPTOR");          player.sendMessage(Component.text("✔ Raptors spawnés", NamedTextColor.YELLOW)); }
+            case "krug"          -> { plugin.getJungleManager().spawnTestMonster(loc, "KRUG");            player.sendMessage(Component.text("✔ Krugs spawnés", NamedTextColor.GOLD)); }
+            default -> player.sendMessage(Component.text("§cEntité inconnue: " + type, NamedTextColor.RED));
+        }
+    }
+
+    // ── /lol buff <type> [joueur] ─────────────────────────────────────
+    // Buffs: red, blue, baron, dragon_infernal, dragon_ocean, dragon_mountain,
+    //        dragon_cloud, dragon_chemtech, dragon_elder, dragon_soul
+    private void handleBuff(Player player, String[] args) {
+        if (args.length < 2) {
+            player.sendMessage(Component.text("§c/lol buff <type> [joueur]", NamedTextColor.RED));
+            player.sendMessage(Component.text("§7Types: red blue baron dragon_infernal dragon_ocean dragon_mountain dragon_cloud dragon_chemtech dragon_elder dragon_soul", NamedTextColor.GRAY));
+            return;
+        }
+        String buffType = args[1].toLowerCase();
+        Player target = player;
+        if (args.length >= 3) {
+            target = org.bukkit.Bukkit.getPlayerExact(args[2]);
+            if (target == null) { player.sendMessage(Component.text("§cJoueur introuvable", NamedTextColor.RED)); return; }
+        }
+        var cm = LolPlugin.getInstance().getChampionManager();
+        if (!cm.hasChampion(target)) { player.sendMessage(Component.text("§cLa cible n'a pas de champion", NamedTextColor.RED)); return; }
+        LolPlugin.getInstance().getJungleManager().applyBuffPublic(target, buffType);
+        player.sendMessage(Component.text("✔ Buff '" + buffType + "' appliqué à " + target.getName(), NamedTextColor.GREEN));
+        if (!target.equals(player)) target.sendMessage(Component.text("✔ Buff '" + buffType + "' reçu de " + player.getName(), NamedTextColor.GOLD));
+    }
+
+    // ── /lol resetcd [joueur] ─────────────────────────────────────────────
+    // Remet tous les cooldowns de sorts à 0 pour le joueur
+    private void handleResetCd(Player player, String[] args) {
+        Player target = player;
+        if (args.length >= 2) {
+            target = org.bukkit.Bukkit.getPlayerExact(args[1]);
+            if (target == null) { player.sendMessage(Component.text("§cJoueur introuvable", NamedTextColor.RED)); return; }
+        }
+        var cm = LolPlugin.getInstance().getChampionManager();
+        if (!cm.hasChampion(target)) { player.sendMessage(Component.text("§cPas de champion", NamedTextColor.RED)); return; }
+        var champ = cm.getChampion(target);
+        // Réinitialiser tous les cooldowns en triggerant avec dynamicCooldown=0
+        for (var ab : champ.getAbilities()) {
+            if (ab != null) {
+                ab.setDynamicCooldown(0.001);
+                ab.triggerCooldown(target);
+                // Remettre à -1 (utilise baseCooldown) au tick suivant
+                final var finalAb = ab;
+                new org.bukkit.scheduler.BukkitRunnable() {
+                    @Override public void run() { finalAb.setDynamicCooldown(-1); }
+                }.runTaskLater(LolPlugin.getInstance(), 1L);
+            }
+        }
+        // Reset Flash
+        LolPlugin.getInstance().getFlashManager().resetCooldown(target);
+        player.sendMessage(Component.text("✔ Cooldowns réinitialisés pour " + target.getName(), NamedTextColor.GREEN));
+        if (!target.equals(player)) target.sendMessage(Component.text("✔ Tes cooldowns ont été réinitialisés par " + player.getName(), NamedTextColor.GOLD));
+    }
+
+    // ── /lol hp <montant|full> [joueur] ───────────────────────────────────
+    private void handleHp(Player player, String[] args) {
+        if (args.length < 2) { player.sendMessage(Component.text("§c/lol hp <montant|full> [joueur]", NamedTextColor.RED)); return; }
+        Player target = player;
+        if (args.length >= 3) {
+            target = org.bukkit.Bukkit.getPlayerExact(args[2]);
+            if (target == null) { player.sendMessage(Component.text("§cJoueur introuvable", NamedTextColor.RED)); return; }
+        }
+        var cm = LolPlugin.getInstance().getChampionManager();
+        if (!cm.hasChampion(target)) { player.sendMessage(Component.text("§cPas de champion", NamedTextColor.RED)); return; }
+        var hp = cm.getChampion(target).getHPSystem();
+        if (args[1].equalsIgnoreCase("full")) {
+            hp.setCurrentHP(hp.getMaxHP());
+            player.sendMessage(Component.text("✔ HP plein pour " + target.getName(), NamedTextColor.GREEN));
+        } else {
+            try {
+                double amount = Double.parseDouble(args[1]);
+                hp.setCurrentHP(amount);
+                player.sendMessage(Component.text("✔ HP de " + target.getName() + " → " + (int)amount, NamedTextColor.GREEN));
+            } catch (NumberFormatException e) {
+                player.sendMessage(Component.text("§cMontant invalide", NamedTextColor.RED));
+            }
+        }
+    }
+
+    // ── /lol wave ────────────────────────────────────────────────────────
+    // Force le spawn immédiat d'une vague de sbires
+    private void handleWave(Player player) {
+        LolPlugin.getInstance().getMinionManager().forceWave();
+        player.sendMessage(Component.text("✔ Vague forcée!", NamedTextColor.GREEN));
+    }
+
+    // ── /lol help ────────────────────────────────────────────────────────
+    private void handleAdminHelp(Player player) {
+        player.sendMessage(Component.text("═══ /lol — Commandes admin ═══", NamedTextColor.GOLD));
+        String[][] cmds = {
+            {"/lol solo [champion]",        "Mode test solo (niveau 18, 20k or)"},
+            {"/lol give <champion>",         "Assigner un champion"},
+            {"/lol level <1-18>",            "Changer de niveau"},
+            {"/lol gold <montant>",          "Ajouter de l'or"},
+            {"/lol hp <montant|full> [j]",   "Modifier les HP"},
+            {"/lol resetcd [joueur]",        "Reset tous les cooldowns"},
+            {"/lol buff <type> [joueur]",    "Appliquer un buff"},
+            {"/lol spawn <entité> [team]",   "Spawner une entité"},
+            {"/lol wave",                    "Forcer une vague de sbires"},
+            {"/lol ff",                      "Vote de surrender"},
+            {"/lol start",                   "Lancer la partie"},
+            {"/lol stop",                    "Arrêter la partie"},
+            {"/lol testgame",                "Lancer une partie test"},
+            {"/lol debug on|off",            "Activer/désactiver le debug"},
+            {"/lol reload",                  "Recharger champions.yml"},
+        };
+        for (String[] cmd : cmds) {
+            player.sendMessage(Component.text("§e" + cmd[0] + " §7— " + cmd[1]));
+        }
+    }
+
 }
