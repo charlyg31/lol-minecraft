@@ -1,6 +1,7 @@
 package fr.lolmc.util;
 
 import fr.lolmc.champion.impl.top.Nasus;
+import fr.lolmc.champion.impl.mid.Annie;
 import fr.lolmc.champion.impl.mid.Veigar;
 import fr.lolmc.champion.impl.mid.Yasuo;
 import fr.lolmc.champion.impl.mid.Zed;
@@ -24,6 +25,7 @@ public final class ChampionStateReset {
     /** Réinitialise l'état d'un seul joueur (déconnexion, changement de champion). */
     public static void resetPlayer(UUID id) {
         Nasus.resetState(id);
+        Annie.resetState(id);
         Veigar.resetState(id);
         Yasuo.resetState(id);
         Zed.resetState(id);
@@ -33,6 +35,7 @@ public final class ChampionStateReset {
     /** Réinitialise tout (fin de partie). */
     public static void resetAll() {
         Nasus.resetAllState();
+        Annie.resetAllState();
         Veigar.resetAllState();
         Yasuo.resetAllState();
         Zed.resetAllState();

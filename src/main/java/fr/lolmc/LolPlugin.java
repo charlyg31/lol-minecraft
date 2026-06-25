@@ -242,6 +242,7 @@ public class LolPlugin extends JavaPlugin {
         }
         if (apiServer != null) apiServer.stop();
         if (databaseManager != null) databaseManager.close();
+        fr.lolmc.util.DebugLogger.close();
         getLogger().info("LoL MC désactivé.");
     }
 

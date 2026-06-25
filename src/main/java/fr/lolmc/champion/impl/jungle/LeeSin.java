@@ -37,7 +37,7 @@ public class LeeSin extends BaseChampion {
         AA(){super("leesin",Material.IRON_SWORD,2.0f,DamageType.PHYSICAL);}
     }
 
-    private static final Map<UUID,UUID> sonicTarget=new HashMap<>();
+    private static final Map<UUID,UUID> sonicTarget=new java.util.concurrent.ConcurrentHashMap<>();
     public static void resetState(UUID id){ sonicTarget.remove(id); }
     public static void resetAllState(){ sonicTarget.clear(); }
 

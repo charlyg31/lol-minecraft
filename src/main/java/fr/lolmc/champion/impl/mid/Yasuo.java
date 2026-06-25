@@ -32,7 +32,7 @@ public class Yasuo extends BaseChampion {
         initSystems(523, 0.0, ResourceSystem.ResourceType.FLOW, 100, 0.0);
     }
 
-    public static final Map<UUID,Integer> qCasts=new HashMap<>();
+    public static final Map<UUID,Integer> qCasts=new java.util.concurrent.ConcurrentHashMap<>();
     /** Reinitialise l'etat de ce joueur (fin de partie / deconnexion). */
     public static void resetState(UUID id){ qCasts.remove(id); eStacks.remove(id); }
     public static void resetAllState(){ qCasts.clear(); eStacks.clear(); }
@@ -85,7 +85,7 @@ public class Yasuo extends BaseChampion {
     }
 
     // Stacks de dégâts E (Lame Déferlante) par joueur
-    public static final Map<UUID,Integer> eStacks=new HashMap<>();
+    public static final Map<UUID,Integer> eStacks=new java.util.concurrent.ConcurrentHashMap<>();
 
     static class E extends BaseAbility {
         E(){super("e_yasuo","Lame Déferlante",Material.FEATHER,AbilitySlot.E,

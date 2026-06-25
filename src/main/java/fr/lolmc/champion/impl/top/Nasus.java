@@ -33,7 +33,7 @@ public class Nasus extends BaseChampion {
     }
 
     // Stacks Q globaux par UUID
-    public static final Map<UUID,Integer> qStacks=new HashMap<>();
+    public static final Map<UUID,Integer> qStacks=new java.util.concurrent.ConcurrentHashMap<>();
     private static final int MAX_Q_STACKS = 500; // plafond anti-scaling infini
     /** Réinitialise les stacks de ce joueur (fin de partie / déconnexion). */
     public static void resetState(UUID id){ qStacks.remove(id); }
