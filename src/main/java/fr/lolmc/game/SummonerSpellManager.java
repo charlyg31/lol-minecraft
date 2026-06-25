@@ -115,6 +115,9 @@ public class SummonerSpellManager {
         double totalDamage = 50 + 20 * casterLevel;
         double perTick = totalDamage / 5.0;
 
+        // Ignite applique GW60 (60% réduction de soin) pendant 5s
+        var cmGW = LolPlugin.getInstance().getChampionManager();
+        if (cmGW.hasChampion(target)) cmGW.getChampion(target).getStats().applyGrievousWounds(0.60, 5000L);
         new org.bukkit.scheduler.BukkitRunnable() {
             int ticks = 0;
             @Override public void run() {

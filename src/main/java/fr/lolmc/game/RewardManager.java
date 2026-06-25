@@ -34,6 +34,33 @@ public class RewardManager {
     // Table bounty LoL : 0 kills = 0, 1=100, 2=200, 3=300, 4=400, 5=500, 6+=500 (plafond)
     private static final int[] BOUNTY = {0, 100, 200, 300, 400, 500, 500};
 
+    // ── Système d'assists ─────────────────────────────────────────────────
+    // Map<victim_uuid, Map<attacker_uuid, lastDamageTimestamp>>
+    // Fenêtre : dégâts infligés dans les 10s avant la mort = assist
+    private final java.util.Map<java.util.UUID,
+        java.util.Map<java.util.UUID, Long>> damageContrib = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final long ASSIST_WINDOW_MS = 10_000L;
+
+    /** Enregistre un dégât infligé par [attacker] sur [victim] (appelé depuis DamageUtil). */
+    public void recordDamage(java.util.UUID attacker, java.util.UUID victim) {
+        damageContrib
+            .computeIfAbsent(victim, k -> new java.util.concurrent.ConcurrentHashMap<>())
+            .put(attacker, System.currentTimeMillis());
+    }
+
+    /** Retourne les joueurs éligibles à l'assist (ont infligé des dégâts dans les 10s). */
+    public java.util.Set<java.util.UUID> getAssistants(java.util.UUID victim, java.util.UUID killer) {
+        var contribs = damageContrib.remove(victim);
+        if (contribs == null) return java.util.Collections.emptySet();
+        long threshold = System.currentTimeMillis() - ASSIST_WINDOW_MS;
+        var result = new java.util.HashSet<java.util.UUID>();
+        for (var entry : contribs.entrySet()) {
+            if (!entry.getKey().equals(killer) && entry.getValue() >= threshold)
+                result.add(entry.getKey());
+        }
+        return result;
+    }
+
     // ── Or des sbires croissant par tranche de temps ──────────────────────
     // En LoL : +0.5 or/sbire toutes les 90s à partir de 1:15, plafonné vers 15min
     private long gameStartMs = 0;

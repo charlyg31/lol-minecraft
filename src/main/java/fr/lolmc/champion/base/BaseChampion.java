@@ -36,6 +36,7 @@ public abstract class BaseChampion {
                                 ResourceSystem.ResourceType resType,
                                 double maxResource, double resRegen) {
         this.hpSystem = new HPSystem(maxHP, hpRegen);
+        this.hpSystem.linkStats(this.stats); // lier pour GW
         this.resourceSystem = new ResourceSystem(resType, maxResource, resRegen);
     }
 
@@ -150,7 +151,7 @@ public abstract class BaseChampion {
     public LevelSystem       getLevelSystem() { return levelSystem; }
 
     public double getAutoAttackRange()       { return autoAttackRange; }
-    protected void setAutoAttackRange(double r) { this.autoAttackRange = r; }
+    public void setAutoAttackRange(double r) { this.autoAttackRange = r; }
 
     /**
      * Améliore un sort si un point est disponible. Synchronise le level interne.

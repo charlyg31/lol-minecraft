@@ -230,6 +230,7 @@ public class LolPlugin extends JavaPlugin {
         }
         getServer().getPluginManager().registerEvents(
                 new fr.lolmc.listener.StructureDamageListener(mapManager, championManager, teamManager), this);
+        getServer().getPluginManager().registerEvents(new fr.lolmc.listener.ChatListener(), this);
         getServer().getPluginManager().registerEvents(
                 new EntityDeathListener(championManager, rewardManager), this);
     }

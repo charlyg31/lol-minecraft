@@ -26,6 +26,9 @@ public class Jinx extends BaseChampion {
                 new ChampionStats(630,59,0,26,30,0.625,0,325,5.25,3.8));
         getStats().setGrowthStats(100.0,3.4,4.7,1.30,0.01360,0.50);
     }
+    private static final java.util.Map<java.util.UUID, Boolean> fishbonesMode
+        = new java.util.concurrent.ConcurrentHashMap<>();
+
     @Override protected void registerAbilities() {
         setAbility(0,new AA()); setAbility(1,new Q());
         setAbility(2,new W()); setAbility(3,new E()); setAbility(4,new R());
@@ -42,10 +45,24 @@ public class Jinx extends BaseChampion {
                 new double[]{0,0,0,0,0},25,3,DamageType.PHYSICAL);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            c.addPotionEffect(new PotionEffect(PotionEffectType.HASTE,40,1,false,true));
-            c.sendActionBar(Component.text("💥 Bazooka actif!",NamedTextColor.RED));
+            boolean fish = !fishbonesMode.getOrDefault(c.getUniqueId(), false);
+            fishbonesMode.put(c.getUniqueId(), fish);
+            if (fish) {
+                // Mode Fishbones (bazooka) : portée étendue +2 blocs, dégâts AoE
+                c.sendActionBar(Component.text("💥 Fishbones! Bazooka activé (+portée, AoE)", NamedTextColor.RED));
+                // Augmenter la portée AA
+                var cm = LolPlugin.getInstance().getChampionManager();
+                if (cm.hasChampion(c)) cm.getChampion(c).setAutoAttackRange(cm.getChampion(c).getAutoAttackRange() + 2);
+            } else {
+                // Mode Mini-canons : vitesse d'attaque
+                c.sendActionBar(Component.text("⚡ Mini-canons! Vitesse d'attaque", NamedTextColor.YELLOW));
+                c.addPotionEffect(new PotionEffect(PotionEffectType.HASTE, 40, 1, false, true));
+                var cm = LolPlugin.getInstance().getChampionManager();
+                if (cm.hasChampion(c)) cm.getChampion(c).setAutoAttackRange(6.0);
+            }
+            c.getWorld().playSound(c.getLocation(), org.bukkit.Sound.ENTITY_FIREWORK_ROCKET_BLAST, 0.5f, fish ? 0.7f : 1.5f);
         }
-        @Override public String getDynamicDescription(ChampionStats s){return "Alterne mini-canons (vitesse) et Fishbones (AoE, portée+).";}
+        @Override public String getDynamicDescription(ChampionStats s){return "Toggle Fishbones/Mini-canons. Fishbones: +portée +AoE. Mini-canons: +AS.";}
     }
 
     static class W extends BaseAbility {
