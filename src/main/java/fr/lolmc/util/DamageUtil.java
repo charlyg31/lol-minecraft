@@ -90,6 +90,11 @@ public class DamageUtil {
 
         // 3. HP
         vc.getHPSystem().takeDamage(afterShield);
+        // Enregistrer la contribution pour les assists
+        if (attacker != null) {
+            var rw = LolPlugin.getInstance().getRewardManager();
+            if (rw != null) rw.recordDamage(attacker.getUniqueId(), victim.getUniqueId());
+        }
         // Passif Amumu Maudits Larmes : renvoie des degats aux attaquants
         if ("amumu".equals(vc.getId()) && attacker != null) {
             fr.lolmc.champion.impl.jungle.Amumu.onHitByEnemy(victim, vc, attacker);

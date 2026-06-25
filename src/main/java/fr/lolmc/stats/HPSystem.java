@@ -24,6 +24,8 @@ public class HPSystem {
     // Délai avant reprise de la regen (5s dans LoL)
     private static final long COMBAT_COOLDOWN_MS = 5000L;
 
+    private fr.lolmc.stats.ChampionStats stats; // référence pour GW
+
     public HPSystem(double maxHP, double hpRegenPer5s) {
         this.maxHP = maxHP;
         this.currentHP = maxHP; // démarrer full HP
@@ -39,8 +41,11 @@ public class HPSystem {
     }
 
     public void heal(double amount) {
-        currentHP = Math.min(maxHP, currentHP + amount);
+        double mult = (stats != null) ? stats.getHealMultiplier() : 1.0;
+        currentHP = Math.min(maxHP, currentHP + amount * mult);
     }
+    /** Lie HPSystem aux ChampionStats pour l'antiheal. */
+    public void linkStats(fr.lolmc.stats.ChampionStats s) { this.stats = s; }
 
     public boolean isDead() { return currentHP <= 0; }
 

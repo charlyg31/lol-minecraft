@@ -33,6 +33,10 @@ public class ChampionStats {
     private double aaPercentReduction;      // Plated Steelcaps -12% des AA
     private double tenacity;                // 0.0..1.0 réduction durée CC
 
+    // ── Grievous Wounds (antiheal) ──
+    private double grievousWoundsReduction = 0; // 0.0 = normal, 0.40 = GW40, 0.60 = GW60
+    private long grievousWoundsExpire = 0;       // timestamp d'expiration
+
     // ── Bonus objets ──
     private double bonusMaxHP, bonusAttackDamage, bonusAbilityPower;
     private double bonusArmor, bonusMagicResist, bonusAttackSpeed;
@@ -284,6 +288,7 @@ public class ChampionStats {
         bonusArmorPenPercent=bonusFlatMagicPen=bonusMagicPenPercent=0;
         flatDamageReduction=percentDamageReduction=aaPercentReduction=tenacity=0;
         multAttackDamage=multAbilityPower=multMovementSpeed=multAttackSpeed=multMaxHP=1.0;
+        grievousWoundsReduction = 0; grievousWoundsExpire = 0;
     }
 
     // Getters de base (affichage + passifs)
@@ -292,4 +297,24 @@ public class ChampionStats {
     public double getBonusHP() { return bonusMaxHP; }
     public double getBonusAD() { return bonusAttackDamage; }
     public double getBonusAP() { return bonusAbilityPower; }
+
+    // ── Grievous Wounds ──────────────────────────────────────────
+    /** Applique les Blessures Graves (GW) pendant durée ms. 0.40 = GW40, 0.60 = GW60. */
+    public void applyGrievousWounds(double reduction, long durationMs) {
+        if (reduction > grievousWoundsReduction) grievousWoundsReduction = reduction;
+        long expire = System.currentTimeMillis() + durationMs;
+        if (expire > grievousWoundsExpire) grievousWoundsExpire = expire;
+    }
+
+    /** Retourne le multiplicateur de soin effectif (1.0 = normal, 0.6 = GW40, 0.4 = GW60). */
+    public double getHealMultiplier() {
+        if (grievousWoundsExpire > 0 && System.currentTimeMillis() > grievousWoundsExpire) {
+            grievousWoundsReduction = 0; grievousWoundsExpire = 0;
+        }
+        return 1.0 - grievousWoundsReduction;
+    }
+
+    public boolean hasGrievousWounds() {
+        return grievousWoundsExpire > 0 && System.currentTimeMillis() <= grievousWoundsExpire;
+    }
 }

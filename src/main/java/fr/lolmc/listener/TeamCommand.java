@@ -69,4 +69,25 @@ public class TeamCommand implements CommandExecutor, TabCompleter {
         if (args.length == 1) return List.of("bleu", "rouge", "auto");
         return List.of();
     }
+
+
+    /** Sous-commande: /team chat <message> — envoie un message à l'équipe. */
+    // Note: aussi accessible via /t (alias)
+    public void sendTeamChat(org.bukkit.entity.Player sender, String message) {
+        var tm = LolPlugin.getInstance().getTeamManager();
+        var team = tm.getTeam(sender);
+        if (team == null) {
+            sender.sendMessage(net.kyori.adventure.text.Component.text("Tu n'as pas d'équipe.", net.kyori.adventure.text.format.NamedTextColor.RED));
+            return;
+        }
+        net.kyori.adventure.text.Component msg = net.kyori.adventure.text.Component.text(
+            "[" + team.name() + "] " + sender.getName() + ": " + message,
+            team.chatColor);
+        for (java.util.UUID id : tm.getTeamMembers(team)) {
+            var p = LolPlugin.getInstance().getServer().getPlayer(id);
+            if (p != null && p.isOnline()) p.sendMessage(msg);
+        }
+        // Log pour le joueur lui-même (confirmé)
+        if (tm.getTeamMembers(team).isEmpty()) sender.sendMessage(msg);
+    }
 }

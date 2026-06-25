@@ -108,9 +108,11 @@ public class StructureDamageListener implements Listener {
         if (structure.getType() == Type.INHIBITOR) {
             LolPlugin.getInstance().getMinionManager()
                     .enableSuperMinions(enemyTeam, structure.getLane());
-            LolPlugin.getInstance().getServer().broadcast(net.kyori.adventure.text.Component.text(
-                    "💎 Inhibiteur " + structure.getLane() + " (" + enemyTeam.name()
-                    + ") détruit! Super-sbires activés!", NamedTextColor.AQUA));
+            // Déclencher le timer de respawn (5 min)
+            String inhKey = structure.getType().name() + "_" + enemyTeam.name() + "_" + structure.getLane();
+            LolPlugin.getInstance().getGameManager().onInhibitorDestroyed(inhKey);
+            LolPlugin.getInstance().getAnnouncementManager().announceInhibitorDestroyed(
+                    structure.getLane(), enemyTeam.name());
         }
 
         // Annonce

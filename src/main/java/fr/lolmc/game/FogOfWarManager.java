@@ -36,6 +36,26 @@ public class FogOfWarManager {
         }.runTaskTimer(LolPlugin.getInstance(), 0L, 10L); // 2x/seconde
     }
 
+    /**
+     * Vérifie si un ennemi est visible par les sbires alliés
+     * (un sbire allié à portée révèle les ennemis proches).
+     */
+    private boolean revealedByAllyMinion(org.bukkit.entity.Player viewer,
+                                          org.bukkit.entity.Player target) {
+        var tm = LolPlugin.getInstance().getTeamManager();
+        var team = tm.getTeam(viewer);
+        if (team == null) return false;
+        // Chercher un sbire allié à portée de la cible ennemie
+        for (var entity : target.getNearbyEntities(8, 4, 8)) {
+            if (fr.lolmc.game.MinionManager.isMinion(entity)) {
+                var minionTeam = fr.lolmc.game.MinionManager.getMinionTeam(
+                    (org.bukkit.entity.LivingEntity) entity);
+                if (minionTeam == team) return true;
+            }
+        }
+        return false;
+    }
+
     private void updateVision() {
         var cm = LolPlugin.getInstance().getChampionManager();
         var wardMgr = LolPlugin.getInstance().getWardManager();
@@ -51,7 +71,9 @@ public class FogOfWarManager {
                 if (!cm.hasChampion(target)) continue;
 
                 // Alliés toujours visibles
-                if (!teamManager.areEnemies(viewer, target)) {
+                // Un allié est toujours visible; un ennemi révélé par sbire allié aussi
+                boolean revealedByMinion = revealedByAllyMinion(viewer, target);
+                if (!teamManager.areEnemies(viewer, target) || revealedByMinion) {
                     viewer.showPlayer(LolPlugin.getInstance(), target);
                     continue;
                 }

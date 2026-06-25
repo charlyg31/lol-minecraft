@@ -29,6 +29,8 @@ public class BaseManager {
     private final Map<UUID, Location> recallStartLoc = new HashMap<>();
 
     private static final int RECALL_SECONDS = 8;
+    // Fontaine : 10 000 vrais dégâts/s sur les ennemis dans la zone
+    private static final double FOUNTAIN_DAMAGE_PER_SEC = 10000.0;
     private static final double HEAL_RING_RADIUS = 8.0;
 
     public BaseManager() {

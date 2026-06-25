@@ -52,6 +52,18 @@ public class PassiveManager {
         if (!championManager.hasChampion(caster)) return;
         ItemState state = getState(caster);
         BaseChampion champ = championManager.getChampion(caster);
+        // ── Sudden Impact : +12 létalité/+9 pén. magique pendant 5s après dash ──
+        var runePageSI = LolPlugin.getInstance().getRuneManager();
+        if (runePageSI != null && runePageSI.getPage(caster.getUniqueId()).has("sudden_impact")) {
+            champ.getStats().addBonusLethality(12);
+            champ.getStats().addBonusFlatMagicPen(9);
+            new org.bukkit.scheduler.BukkitRunnable() { @Override public void run() {
+                if (championManager.hasChampion(caster)) {
+                    championManager.getChampion(caster).getStats().addBonusLethality(-12);
+                    championManager.getChampion(caster).getStats().addBonusFlatMagicPen(-9);
+                }
+            }}.runTaskLater(LolPlugin.getInstance(), 100L);
+        }
 
         // ── Spellblade (Trinity, Lich Bane, Sheen, Divine Sunderer, Essence Reaver) ──
         if (hasAnyItem(caster, "trinity_force","trinity_force2","lich_bane","sheen",
@@ -210,15 +222,26 @@ public class PassiveManager {
             }
         }
 
-        // ── Antiheal: Chempunk, Mortal Reminder ──
-        if (hasAnyItem(attacker,"chempunk_chainsword","mortal_reminder")) {
+        // ── Antiheal: Chempunk (GW40 3s), Mortal Reminder (GW40 3s), Thornmail (GW40 3s) ──
+        if (hasAnyItem(attacker,"chempunk_chainsword","mortal_reminder","executioners_calling")) {
+            vs.applyGrievousWounds(0.40, 3000L);
             state.antihealTargets.put(vid, System.currentTimeMillis() + 3000L);
+            if (victim.isOnline())
+                victim.sendActionBar(net.kyori.adventure.text.Component.text(
+                    "🩹 Blessures Graves! (-40% soins)", net.kyori.adventure.text.format.NamedTextColor.DARK_RED));
         }
 
         // ── Navori Quickblades: si crit → -15% CD sorts ──
         if (hasAnyItem(attacker,"navori_quickblades") && isCrit) {
             // Réduire les CD actifs de 15%
             // Implémenté comme bonus CD reducé dans getCurrentCooldown()
+        }
+
+        // ── Frostfire Gauntlet: zone de glace ralentissante sur AA ──
+        if (hasAnyItem(attacker,"frostfire_gauntlet","frostfire")) {
+            victim.getWorld().spawnParticle(org.bukkit.Particle.SNOWFLAKE,
+                victim.getLocation().add(0,0.5,0), 12, 1.0, 0.3, 1.0);
+            LolPlugin.getInstance().getCCManager().slow(victim, 0.15, 40);
         }
 
         // ── Titanic Hydra: AoE AA ──
@@ -230,6 +253,19 @@ public class PassiveManager {
                     if (championManager.hasChampion((Player)e))
                         championManager.getChampion((Player)e).getHPSystem().takeDamage(titanicDmg);
                 });
+        }
+
+        // ── Rapidfire Cannon: prochaine AA bonus si hors portée normale ──
+        if (hasAnyItem(attacker,"rapidfire_cannon")) {
+            state.voltaicStacks = Math.min(100, state.voltaicStacks + 5);
+            if (state.voltaicStacks >= 100) {
+                state.voltaicStacks = 0;
+                // Bonus dégâts électriques sur la prochaine AA
+                DamageUtil.damage(attacker, victim,
+                    as.getFinalAD() * 0.60, false, DamageUtil.Type.MAGICAL);
+                victim.getWorld().spawnParticle(org.bukkit.Particle.ELECTRIC_SPARK,
+                    victim.getLocation().add(0,1,0), 10, 0.5,0.5,0.5);
+            }
         }
 
         // ── Voltaic Cyclosword: stacks → éclair ──
@@ -299,12 +335,40 @@ public class PassiveManager {
             // Les boucliers ne sont pas implémentés comme HP séparés → skip
         }
 
+        // ── Taste of Blood : soin sur dégâts à champion (CD 20s) ──
+        if (LolPlugin.getInstance().getRuneManager() != null) {
+            var pageToB = LolPlugin.getInstance().getRuneManager().getPage(caster.getUniqueId());
+            if (pageToB.has("taste_blood")) {
+                var cm = LolPlugin.getInstance().getChampionManager();
+                if (cm.hasChampion(caster)) {
+                    int lvl = cm.getChampion(caster).getLevelSystem().getLevel();
+                    ahp.heal(16 + lvl * 1.5);
+                }
+            }
+        }
+
         // ── Omnivamp sur sorts ──
         double omnivamp = as.getFinalOmnivamp();
         if (omnivamp > 0) ahp.heal(rawDamage * omnivamp);
 
-        // ── Antiheal: vérifier si la cible est sous antiheal ──
-        // Déjà appliqué via les stacks d'antiheal dans onAutoAttack
+        // ── Cheap Shot : 10+lvl dégâts vrais sur cible CC ──
+        if (LolPlugin.getInstance().getRuneManager() != null) {
+            var pageCS = LolPlugin.getInstance().getRuneManager().getPage(caster.getUniqueId());
+            if (pageCS.has("cheap_shot")) {
+                var cc = LolPlugin.getInstance().getCCManager();
+                if (cc != null && (cc.isStunned(victim.getUniqueId()) || cc.isRooted(victim.getUniqueId())
+                        || cc.isSilenced(victim.getUniqueId()))) {
+                    var cm = LolPlugin.getInstance().getChampionManager();
+                    if (cm.hasChampion(caster)) {
+                        int lvl = cm.getChampion(caster).getLevelSystem().getLevel();
+                        DamageUtil.trueDamage(caster, victim, 10 + lvl * 1.0);
+                    }
+                }
+            }
+        }
+
+        // ── Antiheal: vérifier si la cible est sous antiheal (GW) ──
+        // Les GW sont appliquées directement sur ChampionStats.grievousWoundsReduction
     }
 
     // ════════════════════════════════════════════════════════
@@ -387,6 +451,13 @@ public class PassiveManager {
     // ÉVÉNEMENT: KILL / ASSIST
     // ════════════════════════════════════════════════════════
     public void onKill(Player killer, Player victim) {
+        // ── Ravenous Hunter : omnivamp croissant par takedown ──
+        if (LolPlugin.getInstance().getRuneManager() != null) {
+            var page = LolPlugin.getInstance().getRuneManager().getPage(killer.getUniqueId());
+            if (page.has("ravenous_hunter") && championManager.hasChampion(killer)) {
+                championManager.getChampion(killer).getStats().addBonusOmnivamp(0.03);
+            }
+        }
         if (!championManager.hasChampion(killer)) return;
         BaseChampion champ = championManager.getChampion(killer);
         ChampionStats stats = champ.getStats();

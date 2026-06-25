@@ -47,8 +47,10 @@ public class Garen extends BaseChampion {
             double[] base=fr.lolmc.util.Balance.base("q_garen",new double[]{30,55,80,105,130});
             double dmg=base[getLevel()-1]+s.getFinalAD()*fr.lolmc.util.Balance.ratio("q_garen","ad",0.5);
             TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.PHYSICAL);
-            // Silence 1.5s (approx via lenteur+faiblesse) + boost de vitesse pour Garen
-            tgt.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,30,2,false,true));
+            // Silence 1.5s via CCManager
+            var cc = LolPlugin.getInstance().getCCManager();
+            if (cc != null) cc.silence(tgt, 30);
+            tgt.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,10,0,false,true));
             c.addPotionEffect(new PotionEffect(PotionEffectType.SPEED,30,1,false,true));
             if(tgt instanceof Player _tp)_tp.sendActionBar(Component.text("⚠ Silence — Garen Q",NamedTextColor.RED));
             c.getWorld().spawnParticle(Particle.SWEEP_ATTACK,tgt.getLocation().add(0,1,0),3);

@@ -143,14 +143,14 @@ public class RuneManager {
             // ── SORCELLERIE ──
             case "transcendence" -> s.addBonusAbilityHaste(5);
             case "absolute_focus" -> s.addBonusAD(3);
-            case "gathering_storm" -> { /* croissance avec le temps, géré dynamiquement */ }
-            case "manaflow_band" -> { /* mana géré on-hit */ }
-            case "scorch" -> { /* dégâts géré on-ability */ }
+            case "gathering_storm" -> { /* croissance gérée dans tickRunes() */ }
+            case "manaflow_band" -> s.addBonusHP(250); // simule le bonus de mana converti
+            case "scorch" -> { /* dégâts à implémenter dans onAbilityDamage */ }
             // ── DÉTERMINATION ──
-            case "conditioning" -> { /* +résistances après 12min, géré dynamiquement */ }
-            case "overgrowth" -> { /* PV par monstres morts, géré dynamiquement */ }
-            case "second_wind" -> { /* soin après dégâts, géré on-damage-taken */ }
-            case "bone_plating" -> { /* réduction dégâts, géré on-damage-taken */ }
+            case "conditioning" -> { s.addBonusArmor(9); s.addBonusMR(9); } // +résistances
+            case "overgrowth" -> s.addBonusHP(100); // bonus de base
+            case "second_wind" -> { /* géré dans onDamageTaken */ }
+            case "bone_plating" -> { /* géré dans onDamageTaken via state */ }
             case "font_life" -> { /* soin de zone */ }
             // ── INSPIRATION ──
             case "cosmic_insight" -> s.addBonusAbilityHaste(18); // +hâte invocateur/objets (approx)
@@ -164,6 +164,21 @@ public class RuneManager {
      * (Second Souffle, Plaques Osseuses, Réplique...)
      */
     public void onDamageTaken(Player victim, double amount) {
+        RunePage page = getPage(victim.getUniqueId());
+        // Second Wind : soin 6 + 4% PV manquants pendant 10s après avoir pris des dégâts
+        if (page.has("second_wind")) {
+            var cm = LolPlugin.getInstance().getChampionManager();
+            if (cm.hasChampion(victim)) {
+                var hp = cm.getChampion(victim).getHPSystem();
+                double heal = 6 + (hp.getMaxHP() - hp.getCurrentHP()) * 0.04;
+                new org.bukkit.scheduler.BukkitRunnable() { int t = 0;
+                    @Override public void run() {
+                        if (t++ >= 10 || !victim.isOnline()) { cancel(); return; }
+                        if (cm.hasChampion(victim)) cm.getChampion(victim).getHPSystem().heal(heal/10.0);
+                    }
+                }.runTaskTimer(LolPlugin.getInstance(), 20L, 20L);
+            }
+        }
         RunePage page = getPage(victim.getUniqueId());
         var cm = LolPlugin.getInstance().getChampionManager();
         if (!cm.hasChampion(victim)) return;
@@ -290,13 +305,125 @@ public class RuneManager {
                     DamageUtil.damage(attacker, victim, 30 + level * 5, true, DamageUtil.Type.MAGICAL);
                 }
             }
-            case "phase_rush", "press_attack_alt" -> {
+            case "phase_rush" -> {
                 int stacks = keystoneStacks.getOrDefault(attacker.getUniqueId(), 0) + 1;
                 keystoneStacks.put(attacker.getUniqueId(), stacks);
                 if (stacks >= 3) {
                     keystoneStacks.put(attacker.getUniqueId(), 0);
-                    attacker.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 60, 2, false, true));
-                    attacker.sendActionBar(Component.text("💨 Ruée de Phase!", NamedTextColor.AQUA));
+                    attacker.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 75, 2, false, true));
+                    attacker.sendActionBar(Component.text("💨 Ruée de Phase! 75% vitesse 3.75s", NamedTextColor.AQUA));
+                }
+            }
+            case "grasp_undying" -> {
+                // 4 AA/sorts sur champion → AA renforcée (3.5% HP max) + 5 HP max permanent
+                int stacks = keystoneStacks.getOrDefault(attacker.getUniqueId(), 0) + 1;
+                keystoneStacks.put(attacker.getUniqueId(), stacks);
+                if (stacks >= 4) {
+                    keystoneStacks.put(attacker.getUniqueId(), 0);
+                    var cm = LolPlugin.getInstance().getChampionManager();
+                    if (cm.hasChampion(attacker)) {
+                        var champ = cm.getChampion(attacker);
+                        double graspDmg = champ.getStats().getFinalMaxHP() * 0.035;
+                        DamageUtil.damage(attacker, victim, graspDmg, true, DamageUtil.Type.MAGICAL);
+                        champ.getHPSystem().heal(graspDmg);
+                        champ.getStats().addBonusHP(5); // +5 HP max permanent
+                        attacker.sendActionBar(Component.text("🌿 Emprise! +5 HP permanent", NamedTextColor.GREEN));
+                    }
+                }
+            }
+            case "fleet_footwork" -> {
+                // 100 énergie accumulée par AA/mouvement → AA bonus soin + vitesse
+                int stacks = Math.min(100, keystoneStacks.getOrDefault(attacker.getUniqueId(), 0) + 20);
+                keystoneStacks.put(attacker.getUniqueId(), stacks);
+                if (stacks >= 100) {
+                    keystoneStacks.put(attacker.getUniqueId(), 0);
+                    var cm = LolPlugin.getInstance().getChampionManager();
+                    if (cm.hasChampion(attacker)) {
+                        int lvl = cm.getChampion(attacker).getLevelSystem().getLevel();
+                        double heal = 10 + lvl * 4;
+                        cm.getChampion(attacker).getHPSystem().heal(heal);
+                        attacker.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 30, 0, false, true));
+                        attacker.sendActionBar(Component.text("🏃 Jeu de Jambes! Soin + vitesse", NamedTextColor.GOLD));
+                    }
+                }
+            }
+            case "lethal_tempo" -> {
+                // Stacks de vitesse d'attaque sur champion (max 6), dure 6s
+                int stacks = Math.min(6, keystoneStacks.getOrDefault(attacker.getUniqueId(), 0) + 1);
+                keystoneStacks.put(attacker.getUniqueId(), stacks);
+                keystoneLastProc.put(attacker.getUniqueId(), System.currentTimeMillis());
+                // +13% AS par stack (total +78% AS à 6 stacks)
+                var cm = LolPlugin.getInstance().getChampionManager();
+                if (cm.hasChampion(attacker)) {
+                    cm.getChampion(attacker).getStats().addBonusAttackSpeed(0.13);
+                    new org.bukkit.scheduler.BukkitRunnable() {
+                        @Override public void run() {
+                            if (cm.hasChampion(attacker))
+                                cm.getChampion(attacker).getStats().addBonusAttackSpeed(-0.13);
+                        }
+                    }.runTaskLater(LolPlugin.getInstance(), 120L); // 6s
+                }
+            }
+            case "hail_blades" -> {
+                // 3 attaques rapides sur champion (ignore AS normale pendant 2s)
+                Long last = keystoneLastProc.get(attacker.getUniqueId());
+                if (last == null || System.currentTimeMillis() - last > 8000L) {
+                    keystoneLastProc.put(attacker.getUniqueId(), System.currentTimeMillis());
+                    attacker.addPotionEffect(new PotionEffect(PotionEffectType.HASTE, 40, 2, false, true));
+                    attacker.sendActionBar(Component.text("⚔ Grêle de Lames! AS max 2s", NamedTextColor.RED));
+                }
+            }
+            case "summon_aery" -> {
+                // Dégâts à un ennemi ou bouclier sur un allié
+                if (isAbility) {
+                    var cm = LolPlugin.getInstance().getChampionManager();
+                    if (cm.hasChampion(attacker)) {
+                        int lvl = cm.getChampion(attacker).getLevelSystem().getLevel();
+                        double dmg = 8 + lvl * 4 + cm.getChampion(attacker).getStats().getFinalAD() * 0.10
+                                      + cm.getChampion(attacker).getStats().getFinalAP() * 0.25;
+                        DamageUtil.damage(attacker, victim, dmg, true, DamageUtil.Type.MAGICAL);
+                        attacker.sendActionBar(Component.text("🎐 Aery envoyée!", NamedTextColor.YELLOW));
+                    }
+                }
+            }
+            case "first_strike" -> {
+                // Premier hit hors combat → dégâts bonus + or
+                Long last = keystoneLastProc.get(attacker.getUniqueId());
+                var acm = LolPlugin.getInstance().getChampionManager();
+                if (last == null || System.currentTimeMillis() - last > 5000L) {
+                    if (acm.hasChampion(attacker) && !acm.getChampion(attacker).getHPSystem().isInCombat()) {
+                        keystoneLastProc.put(attacker.getUniqueId(), System.currentTimeMillis());
+                        double bonusDmg = acm.getChampion(attacker).getStats().getFinalAD() * 0.12
+                                        + acm.getChampion(attacker).getStats().getFinalAP() * 0.20;
+                        DamageUtil.damage(attacker, victim, bonusDmg, true, DamageUtil.Type.MAGICAL);
+                        // +or proportionnel aux dégâts
+                        int gold = (int)(bonusDmg * 0.35);
+                        LolPlugin.getInstance().getGoldManager().addGold(attacker.getUniqueId(), gold);
+                        attacker.sendActionBar(Component.text(
+                            String.format("💰 Premier Coup! +%.0f dégâts +%d or", bonusDmg, gold), NamedTextColor.GOLD));
+                    }
+                }
+            }
+            case "predator" -> {
+                // Actif : +60% vitesse 10s, à l'attaque = dégâts de charge
+                // (Implémenté comme passif ON, non actif pour simplifier)
+                Long last = keystoneLastProc.get(attacker.getUniqueId());
+                if (last == null || System.currentTimeMillis() - last > 150_000L) { // CD 150s
+                    keystoneLastProc.put(attacker.getUniqueId(), System.currentTimeMillis());
+                    attacker.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 200, 3, false, true));
+                    int lvl = LolPlugin.getInstance().getChampionManager().hasChampion(attacker)
+                        ? LolPlugin.getInstance().getChampionManager().getChampion(attacker).getLevelSystem().getLevel() : 1;
+                    DamageUtil.damage(attacker, victim, 40 + lvl * 20, true, DamageUtil.Type.MAGICAL);
+                    attacker.sendActionBar(Component.text("🏃 PREDATEUR! Frappe de charge!", NamedTextColor.RED));
+                }
+            }
+            case "glacial_augment" -> {
+                // AA ralentit 30% + crée des zones gelées
+                if (!isAbility) {
+                    LolPlugin.getInstance().getCCManager().slow(victim, 0.30, 40);
+                    victim.getWorld().spawnParticle(org.bukkit.Particle.SNOWFLAKE,
+                        victim.getLocation().add(0,1,0), 8, 0.5, 0.5, 0.5);
+                    attacker.sendActionBar(Component.text("❄ Augment Glacial!", NamedTextColor.AQUA));
                 }
             }
             default -> {}
