@@ -167,14 +167,52 @@ public class ShopListener implements Listener {
             player.sendActionBar(Component.text(
                 "🧪 " + item.getDisplayName() + " ajouté (page 2)", NamedTextColor.GREEN));
         } else {
-            // Items normaux : vérifier capacité avant de débiter l'or
+            // Items normaux : si inventaire plein, chercher un composant upgradeable
             if (inv.isFull()) {
-                player.sendMessage(Component.text("❌ Inventaire plein (6/6 items)!", NamedTextColor.RED));
-                return false;
+                int upgradeSlot = findUpgradeSlot(inv, item);
+                if (upgradeSlot == -1) {
+                    player.sendMessage(Component.text("❌ Inventaire plein (6/6 items)!", NamedTextColor.RED));
+                    return false;
+                }
+                // Upgrade : rembourser le composant (70%) et équiper l'item final
+                LolItem component = inv.getItem(upgradeSlot);
+                int componentRefund = inv.sellItem(player, champ, upgradeSlot);
+                // Clamp HP après retrait du composant
+                var hp = champ.getHPSystem();
+                if (hp.getCurrentHP() > hp.getMaxHP()) hp.setCurrentHP(hp.getMaxHP());
+                // Réduire le coût de l'item final du remboursement du composant
+                int effectiveCost = Math.max(0, item.getGoldCost() - componentRefund);
+                if (gold < effectiveCost) {
+                    // Pas assez d'or même avec le remboursement : annuler et remettre le composant
+                    component.applyStats(champ.getStats(), champ.getHPSystem(), champ.getResourceSystem());
+                    inv.equipItem(player, champ, component); // remet dans le slot
+                    player.sendMessage(Component.text(
+                        String.format("❌ Or insuffisant pour upgrader! Il te faut %d or (remboursement: %d).",
+                            effectiveCost, componentRefund), NamedTextColor.RED));
+                    return false;
+                }
+                if (!goldManager.spendGold(player.getUniqueId(), effectiveCost)) return false;
+                hb.removeItem(player, component.getId());
+                if (!inv.equipItem(player, champ, item)) {
+                    // Échec : rembourser et remettre le composant
+                    goldManager.addGold(player.getUniqueId(), effectiveCost);
+                    component.applyStats(champ.getStats(), champ.getHPSystem(), champ.getResourceSystem());
+                    inv.equipItem(player, champ, component);
+                    hb.addItem(player, component.getId());
+                    return false;
+                }
+                hb.addItem(player, item.getId());
+                hb.renderPage(player, champ);
+                hudManager.updateHUD(player, champ);
+                player.sendActionBar(Component.text(
+                    String.format("⬆ Upgrade! %s → %s | Or: %d",
+                        component.getDisplayName(), item.getDisplayName(),
+                        goldManager.getGold(player.getUniqueId())), NamedTextColor.GREEN));
+                player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 1f, 1.3f);
+                return true;
             }
-            // Débiter l'or seulement après les vérifications
+            // Inventaire non plein : achat normal
             if (!goldManager.spendGold(player.getUniqueId(), item.getGoldCost())) return false;
-            // Équiper — si ça échoue, rembourser l'or immédiatement
             if (!inv.equipItem(player, champ, item)) {
                 goldManager.addGold(player.getUniqueId(), item.getGoldCost());
                 player.sendMessage(Component.text("❌ Impossible d'équiper l'item.", NamedTextColor.RED));
@@ -190,6 +228,22 @@ public class ShopListener implements Listener {
             String.format("💰 Or: %d | %s acheté!", goldManager.getGold(player.getUniqueId()),
                 item.getDisplayName()), NamedTextColor.GOLD));
         return true;
+    }
+
+    /**
+     * Cherche dans l'inventaire un composant qui est un ingrédient direct de l'item cible.
+     * @return l'index de slot (0-5) du composant trouvé, ou -1 si aucun.
+     */
+    private int findUpgradeSlot(PlayerInventoryManager inv, LolItem targetItem) {
+        for (String componentId : targetItem.getBuildsFrom()) {
+            for (int i = 0; i < 6; i++) {
+                LolItem owned = inv.getItem(i);
+                if (owned != null && owned.getId().equals(componentId)) {
+                    return i;
+                }
+            }
+        }
+        return -1;
     }
 
     private void trySellItem(Player player, int mcSlot) {
