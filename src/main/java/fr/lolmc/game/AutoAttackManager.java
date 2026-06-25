@@ -1,31 +1,47 @@
 package fr.lolmc.game;
 
 import fr.lolmc.LolPlugin;
+import fr.lolmc.ability.base.BaseAbility;
+import fr.lolmc.ability.base.BasicAttackAbility;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.util.DamageUtil;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
-import org.bukkit.Particle;
-import org.bukkit.Sound;
+import org.bukkit.*;
+import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
+import org.bukkit.scheduler.BukkitRunnable;
+import org.bukkit.util.Vector;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
 /**
- * Gère les auto-attaques façon LoL :
- *  - Portée propre à chaque champion (mêlée ~2 blocs, distance ~5-6 blocs)
- *  - Cadence basée sur la vitesse d'attaque (attack speed)
- *  - Les ADC à distance tirent un projectile, les mêlées frappent au contact
+ * Gère les auto-attaques façon LoL avec 3 types d'animation :
+ *
+ *  MELEE  (portée ≤ 3 blocs) : slash SWEEP_ATTACK + impact CRIT au contact.
+ *  MAGE   (portée > 3, dégâts MAGICAL) : orbe magique animée (WITCH_MAGIC_PARTICLE)
+ *         qui voyage vers la cible avec une traînée.
+ *  ADC    (portée > 3, dégâts PHYSICAL) : projectile rapide (CRIT + traînée blanche)
+ *         simulant une flèche/balle, avec son de tir.
+ *
+ * Le type est déduit de la BasicAttackAbility du champion (slot 0).
  */
 public class AutoAttackManager {
+
+    /** Les 3 types d'animation d'auto-attaque. */
+    public enum AAType { MELEE, MAGE, ADC }
 
     // Dernière auto-attaque par joueur (pour respecter la cadence)
     private final Map<UUID, Long> lastAttack = new HashMap<>();
 
+    // ════════════════════════════════════════════════════════
+    // LOGIQUE PRINCIPALE
+    // ════════════════════════════════════════════════════════
+
     /**
-     * Tente une auto-attaque sur une cible.
+     * Tente une auto-attaque sur un joueur.
      * @return true si l'attaque a eu lieu
      */
     public boolean tryAutoAttack(Player attacker, Player target) {
@@ -34,121 +50,247 @@ public class AutoAttackManager {
 
         BaseChampion champ = cm.getChampion(attacker);
 
-        // 1. Vérifier la portée du champion
+        // Vérifier portée
         double range = champ.getAutoAttackRange();
         double dist = attacker.getLocation().distance(target.getLocation());
         if (dist > range) {
             attacker.sendActionBar(Component.text("⚔ Hors de portée", NamedTextColor.GRAY));
             return false;
         }
+        if (!checkRangeAndCooldown(attacker, champ)) return false;
 
-        // 2. Vérifier la cadence (attack speed)
-        long now = System.currentTimeMillis();
-        double attackSpeed = champ.getStats().getFinalAttackSpeed();
-        long cooldownMs = (long) (1000.0 / Math.max(0.1, attackSpeed));
-        Long last = lastAttack.get(attacker.getUniqueId());
-        if (last != null && (now - last) < cooldownMs) {
-            return false; // trop tôt
-        }
-        lastAttack.put(attacker.getUniqueId(), now);
-
-        // 3. Calculer les dégâts (avec crit géré par calcAutoAttackDamage)
         double rawDamage = champ.getStats().getFinalAD();
         boolean crit = Math.random() < champ.getStats().getFinalCritChance();
         if (crit) rawDamage *= champ.getStats().getFinalCritDamage();
 
-        // 4. Animation selon mêlée/distance
-        boolean ranged = range > 3.0;
-        if (ranged) {
-            shootProjectile(attacker, target);
-        } else {
-            attacker.getWorld().spawnParticle(Particle.SWEEP_ATTACK,
-                    target.getLocation().add(0, 1, 0), 1);
-        }
-        attacker.getWorld().playSound(attacker.getLocation(),
-                ranged ? Sound.ENTITY_ARROW_SHOOT : Sound.ENTITY_PLAYER_ATTACK_STRONG, 0.7f, 1f);
+        // Animation selon le type d'AA du champion
+        AAType type = getAAType(champ);
+        playAnimation(attacker, target, type, crit);
 
-        // 5. Appliquer les dégâts (physique, auto-attaque)
+        // Dégâts
         DamageUtil.damage(attacker, target, rawDamage, false, DamageUtil.Type.PHYSICAL);
 
-        // 6. Déclencher les passifs on-hit (BotRK, Kraken, etc.)
+        // Passifs on-hit
         var pm = LolPlugin.getInstance().getPassiveManager();
         if (pm != null) pm.onAutoAttack(attacker, target);
 
-        if (crit) {
-            target.getWorld().spawnParticle(Particle.CRIT,
-                    target.getLocation().add(0, 1, 0), 10, 0.3, 0.3, 0.3);
-        }
         return true;
     }
 
     /**
      * Auto-attaque sur une entité non-joueur (sbire, monstre de jungle).
-     * Respecte la PORTÉE et la CADENCE du champion (anti-spam), comme l'AA sur joueur.
-     * @return true si l'attaque a été portée, false si hors de portée ou trop tôt.
+     * @return true si l'attaque a été portée
      */
-    public boolean tryAutoAttackEntity(Player attacker, org.bukkit.entity.LivingEntity target) {
+    public boolean tryAutoAttackEntity(Player attacker, LivingEntity target) {
         var cm = LolPlugin.getInstance().getChampionManager();
         if (!cm.hasChampion(attacker)) return false;
         BaseChampion champ = cm.getChampion(attacker);
 
-        // 1. Portée
+        // Vérifier portée
         double range = champ.getAutoAttackRange();
         double dist = attacker.getLocation().distance(target.getLocation());
         if (dist > range) {
             attacker.sendActionBar(Component.text("⚔ Hors de portée", NamedTextColor.GRAY));
             return false;
         }
+        if (!checkRangeAndCooldown(attacker, champ)) return false;
 
-        // 2. Cadence (attack speed) — MÊME compteur que l'AA joueur (anti-spam global)
-        long now = System.currentTimeMillis();
-        double attackSpeed = champ.getStats().getFinalAttackSpeed();
-        long cooldownMs = (long) (1000.0 / Math.max(0.1, attackSpeed));
-        Long last = lastAttack.get(attacker.getUniqueId());
-        if (last != null && (now - last) < cooldownMs) {
-            return false; // trop tôt : on bloque le spam
-        }
-        lastAttack.put(attacker.getUniqueId(), now);
-
-        // 3. Dégâts (+ crit)
         double rawDamage = champ.getStats().getFinalAD();
         boolean crit = Math.random() < champ.getStats().getFinalCritChance();
         if (crit) rawDamage *= champ.getStats().getFinalCritDamage();
 
-        // 4. Animation
-        boolean ranged = range > 3.0;
-        if (ranged) {
-            attacker.getWorld().spawnParticle(Particle.CRIT,
-                    target.getLocation().add(0, 1, 0), 3, 0.2, 0.2, 0.2);
-        } else {
-            attacker.getWorld().spawnParticle(Particle.SWEEP_ATTACK,
-                    target.getLocation().add(0, 1, 0), 1);
-        }
-        attacker.getWorld().playSound(attacker.getLocation(),
-                ranged ? Sound.ENTITY_ARROW_SHOOT : Sound.ENTITY_PLAYER_ATTACK_STRONG, 0.7f, 1f);
+        AAType type = getAAType(champ);
+        playAnimation(attacker, target, type, crit);
 
-        // 5. Appliquer les dégâts directement (sbire/monstre, pas de système de résistance)
         double newHealth = Math.max(0, target.getHealth() - rawDamage);
         target.setHealth(newHealth);
-
-        // CORRECTION MODERNE : Utilisation de playHurtAnimation avec le yaw de l'attaquant pour l'effet directionnel
         target.playHurtAnimation(attacker.getLocation().getYaw());
 
-        // 6. Passifs on-hit
         var pm = LolPlugin.getInstance().getPassiveManager();
         if (pm != null) pm.onAutoAttackEntity(attacker, target);
 
         return true;
     }
 
-    private void shootProjectile(Player from, Player to) {
-        var dir = to.getLocation().add(0, 1, 0).toVector()
-                .subtract(from.getEyeLocation().toVector()).normalize();
-        double dist = from.getLocation().distance(to.getLocation());
-        for (double d = 0; d < dist; d += 0.5) {
-            var point = from.getEyeLocation().add(dir.clone().multiply(d));
-            from.getWorld().spawnParticle(Particle.CRIT, point, 1, 0, 0, 0, 0);
+    // ════════════════════════════════════════════════════════
+    // DÉTERMINATION DU TYPE D'AA
+    // ════════════════════════════════════════════════════════
+
+    /**
+     * Déduit le type d'animation depuis la BasicAttackAbility du champion.
+     *  - Portée > 3 + DamageType MAGICAL → MAGE
+     *  - Portée > 3 + DamageType PHYSICAL → ADC
+     *  - Portée ≤ 3 → MELEE (quelle que soit le type de dégâts)
+     */
+    public static AAType getAAType(BaseChampion champ) {
+        double range = champ.getAutoAttackRange();
+        if (range <= 3.0) return AAType.MELEE;
+
+        BaseAbility aa = champ.getAbility(0);
+        if (aa instanceof BasicAttackAbility baa) {
+            if (baa.getDamageType() == BaseAbility.DamageType.MAGICAL) return AAType.MAGE;
         }
+        return AAType.ADC;
+    }
+
+    // ════════════════════════════════════════════════════════
+    // ANIMATIONS
+    // ════════════════════════════════════════════════════════
+
+    /** Joue l'animation d'AA appropriée entre attaquant et cible. */
+    private void playAnimation(Player attacker, LivingEntity target, AAType type, boolean crit) {
+        switch (type) {
+            case MELEE -> playMeleeAnimation(attacker, target, crit);
+            case MAGE  -> playMageAnimation(attacker, target, crit);
+            case ADC   -> playADCAnimation(attacker, target, crit);
+        }
+    }
+
+    /**
+     * MÊLÉE : slash SWEEP + impact CRIT au contact.
+     * Ligne de particules courte du poignet vers la cible pour simuler le swing.
+     */
+    private void playMeleeAnimation(Player attacker, LivingEntity target, boolean crit) {
+        Location impactLoc = target.getLocation().add(0, 1, 0);
+        World world = attacker.getWorld();
+
+        // Ligne de swing (poignet → cible)
+        Vector dir = impactLoc.toVector()
+                .subtract(attacker.getEyeLocation().toVector()).normalize();
+        Location start = attacker.getEyeLocation().add(dir.clone().multiply(0.5));
+        double dist = start.distance(impactLoc);
+        for (double d = 0; d < Math.min(dist, 2.5); d += 0.3) {
+            world.spawnParticle(Particle.SWEEP_ATTACK,
+                    start.clone().add(dir.clone().multiply(d)), 1, 0, 0, 0, 0);
+        }
+
+        // Impact
+        world.spawnParticle(Particle.SWEEP_ATTACK, impactLoc, 3, 0.2, 0.2, 0.2, 0);
+        if (crit) {
+            world.spawnParticle(Particle.CRIT, impactLoc, 12, 0.3, 0.3, 0.3, 0.1);
+            world.playSound(attacker.getLocation(), Sound.ENTITY_PLAYER_ATTACK_CRIT, 0.8f, 1.1f);
+        } else {
+            world.spawnParticle(Particle.CRIT, impactLoc, 4, 0.2, 0.2, 0.2, 0.05);
+            world.playSound(attacker.getLocation(), Sound.ENTITY_PLAYER_ATTACK_STRONG, 0.8f, 1.0f);
+        }
+    }
+
+    /**
+     * MAGE : orbe magique animée qui voyage de l'attaquant vers la cible.
+     * Traînée WITCH_MAGIC_PARTICLE + explosion ENCHANT à l'impact.
+     * L'orbe est simulée en ticks (BukkitRunnable) pour un effet fluide.
+     */
+    private void playMageAnimation(Player attacker, LivingEntity target, boolean crit) {
+        Location start = attacker.getEyeLocation();
+        Location end   = target.getLocation().add(0, 1, 0);
+        World world = attacker.getWorld();
+
+        double totalDist = start.distance(end);
+        int totalSteps = Math.max(4, (int)(totalDist / 0.35));
+        Vector step = end.toVector().subtract(start.toVector())
+                .normalize().multiply(totalDist / totalSteps);
+
+        // Couleur de l'orbe : bleu-violet magique
+        Particle.DustOptions mageDust = new Particle.DustOptions(
+                Color.fromRGB(120, 60, 255), 1.2f);
+        Particle.DustOptions trailDust = new Particle.DustOptions(
+                Color.fromRGB(200, 130, 255), 0.8f);
+
+        new BukkitRunnable() {
+            int step_ = 0;
+            Location current = start.clone();
+            @Override public void run() {
+                if (step_ >= totalSteps) {
+                    // Impact
+                    world.spawnParticle(Particle.ENCHANTED_HIT, end, 15, 0.4, 0.4, 0.4, 0.1);
+                    world.spawnParticle(Particle.DUST, end, 8, 0.3, 0.3, 0.3, 0, mageDust);
+                    world.spawnParticle(Particle.WITCH, end, 6, 0.3, 0.5, 0.3, 0.1);
+                    if (crit) {
+                        world.spawnParticle(Particle.FLASH, end, 1);
+                        world.playSound(end, Sound.ENTITY_GENERIC_EXPLODE, 0.3f, 1.8f);
+                    } else {
+                        world.playSound(end, Sound.ENTITY_BLAZE_HURT, 0.5f, 1.4f);
+                    }
+                    cancel();
+                    return;
+                }
+                current.add(step);
+                // Noyau de l'orbe
+                world.spawnParticle(Particle.DUST, current, 2, 0.05, 0.05, 0.05, 0, mageDust);
+                // Traînée
+                world.spawnParticle(Particle.DUST, current, 1, 0.1, 0.1, 0.1, 0, trailDust);
+                world.spawnParticle(Particle.WITCH, current, 1, 0.05, 0.05, 0.05, 0.02);
+                step_++;
+            }
+        }.runTaskTimer(LolPlugin.getInstance(), 0L, 1L);
+
+        world.playSound(attacker.getLocation(), Sound.ENTITY_BLAZE_SHOOT, 0.4f, 1.6f);
+    }
+
+    /**
+     * ADC : projectile physique rapide (flèche / balle) en CRIT + traînée blanche.
+     * Plus rapide que l'orbe mage : avance de 0.6 blocs/tick.
+     */
+    private void playADCAnimation(Player attacker, LivingEntity target, boolean crit) {
+        Location start = attacker.getEyeLocation();
+        Location end   = target.getLocation().add(0, 1, 0);
+        World world = attacker.getWorld();
+
+        double totalDist = start.distance(end);
+        // Projectile rapide : 0.6 blocs/tick (≈ 12 blocs/s)
+        int totalSteps = Math.max(3, (int)(totalDist / 0.6));
+        Vector step = end.toVector().subtract(start.toVector())
+                .normalize().multiply(totalDist / totalSteps);
+
+        Particle.DustOptions whiteDust = new Particle.DustOptions(
+                Color.fromRGB(255, 240, 180), 0.7f);
+
+        new BukkitRunnable() {
+            int step_ = 0;
+            Location current = start.clone();
+            @Override public void run() {
+                if (step_ >= totalSteps) {
+                    // Impact
+                    world.spawnParticle(Particle.CRIT, end, crit ? 16 : 6,
+                            0.25, 0.25, 0.25, 0.08);
+                    world.spawnParticle(Particle.DUST, end, 4, 0.1, 0.1, 0.1, 0, whiteDust);
+                    if (crit) {
+                        world.spawnParticle(Particle.LARGE_SMOKE, end, 4, 0.2, 0.2, 0.2, 0.02);
+                        world.playSound(end, Sound.ENTITY_ARROW_HIT_PLAYER, 0.7f, 0.8f);
+                    } else {
+                        world.playSound(end, Sound.ENTITY_ARROW_HIT, 0.6f, 1.1f);
+                    }
+                    cancel();
+                    return;
+                }
+                current.add(step);
+                // Tête du projectile
+                world.spawnParticle(Particle.CRIT, current, 1, 0, 0, 0, 0);
+                // Traînée légère
+                world.spawnParticle(Particle.DUST, current, 1, 0.03, 0.03, 0.03, 0, whiteDust);
+                step_++;
+            }
+        }.runTaskTimer(LolPlugin.getInstance(), 0L, 1L);
+
+        // Son de tir immédiat
+        world.playSound(attacker.getLocation(),
+                crit ? Sound.ENTITY_ARROW_SHOOT : Sound.ENTITY_ARROW_SHOOT, 0.8f,
+                crit ? 0.9f : 1.1f);
+    }
+
+    // ════════════════════════════════════════════════════════
+    // UTILITAIRES
+    // ════════════════════════════════════════════════════════
+
+    /** Vérifie la cadence d'attaque. Renvoie false si trop tôt. */
+    private boolean checkRangeAndCooldown(Player attacker, BaseChampion champ) {
+        long now = System.currentTimeMillis();
+        double attackSpeed = champ.getStats().getFinalAttackSpeed();
+        long cooldownMs = (long)(1000.0 / Math.max(0.1, attackSpeed));
+        Long last = lastAttack.get(attacker.getUniqueId());
+        if (last != null && (now - last) < cooldownMs) return false;
+        lastAttack.put(attacker.getUniqueId(), now);
+        return true;
     }
 
     public void cleanup(UUID uuid) {
