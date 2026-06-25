@@ -152,6 +152,5 @@ public class RewardManager {
             if (hud != null) hud.updateHUD(player, champ);
         }
     }
-}
     public void resetKillStreaks() { killStreak.clear(); gameStartMs = 0; }
 }

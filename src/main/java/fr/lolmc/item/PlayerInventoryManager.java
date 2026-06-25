@@ -90,22 +90,6 @@ public class PlayerInventoryManager {
         // Affichage géré par HotbarManager désormais
     }
 
-    /**
-     * Met à jour un slot spécifique dans l'inventaire Minecraft.
-     */ else {
-            // Ajouter le tag LoL dans le lore pour identifier l'item
-            ItemStack stack = item.buildItemStack();
-            ItemMeta meta = stack.getItemMeta();
-            if (meta != null) {
-                List<Component> lore = meta.lore() != null ? new ArrayList<>(meta.lore()) : new ArrayList<>();
-                // Tag caché pour retrouver l'item ID
-                lore.add(Component.text(LOL_ITEM_TAG + item.getId()));
-                meta.lore(lore);
-                stack.setItemMeta(meta);
-            }
-            player.getInventory().setItem(mcSlot, stack);
-        }
-    }
 
 
     /**
