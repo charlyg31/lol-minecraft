@@ -36,11 +36,26 @@ public class PassiveManager {
     // État par joueur
     private final Map<UUID, ItemState> states = new HashMap<>();
 
+    // Tâches BukkitTask stockées pour annulation propre
+    private final java.util.List<org.bukkit.scheduler.BukkitTask> tasks = new java.util.ArrayList<>();
+
     public PassiveManager(ChampionManager cm, HUDManager hud, ShopListener sl) {
         this.championManager = cm;
         this.hudManager = hud;
         this.shopListener = sl;
-        startTasks();
+        // NE PAS démarrer les tâches ici — appelé par GameManager.startGame()
+    }
+
+    /** Démarre les tâches runtime (appelé par GameManager.startGame). */
+    public void startTasks() {
+        if (!tasks.isEmpty()) return;
+        doStartTasks();
+    }
+
+    /** Arrête et libère toutes les tâches runtime. */
+    public void stopTasks() {
+        tasks.forEach(org.bukkit.scheduler.BukkitTask::cancel);
+        tasks.clear();
     }
 
     public ItemState getState(Player player) {
@@ -54,9 +69,16 @@ public class PassiveManager {
         if (!championManager.hasChampion(caster)) return;
         ItemState state = getState(caster);
         BaseChampion champ = championManager.getChampion(caster);
-        // ── Sudden Impact : +12 létalité/+9 pén. magique pendant 5s après dash ──
+        // ── Sudden Impact : +12 létalité/+9 pén. magique pendant 5s (une seule instance active) ──
         var runePageSI = LolPlugin.getInstance().getRuneManager();
-        if (runePageSI != null && runePageSI.getPage(caster.getUniqueId()).has("sudden_impact")) {
+        long __siExpire = getState(caster).antihealTargets.getOrDefault(
+            new java.util.UUID(0L, caster.getUniqueId().getLeastSignificantBits()), 0L);
+        boolean __siActive = System.currentTimeMillis() < __siExpire;
+        if (!__siActive && runePageSI != null && runePageSI.getPage(caster.getUniqueId()).has("sudden_impact")) {
+            // Marquer actif (5s) via une clé dédiée dans antihealTargets
+            getState(caster).antihealTargets.put(
+                new java.util.UUID(0L, caster.getUniqueId().getLeastSignificantBits()),
+                System.currentTimeMillis() + 5000L);
             champ.getStats().addBonusLethality(12);
             champ.getStats().addBonusFlatMagicPen(9);
             new org.bukkit.scheduler.BukkitRunnable() { @Override public void run() {
@@ -246,14 +268,17 @@ public class PassiveManager {
             LolPlugin.getInstance().getCCManager().slow(victim, 0.15, 40);
         }
 
-        // ── Titanic Hydra: AoE AA ──
+        // ── Titanic Hydra: AoE AA (filtre équipe + hasChampion) ──
         if (hasAnyItem(attacker,"titanic_hydra")) {
             double titanicDmg = as.calcPhysicalDamage(5 + vhp.getMaxHP() * 0.01, vs);
+            var __tmTH = LolPlugin.getInstance().getTeamManager();
             attacker.getWorld().getNearbyEntities(victim.getLocation(), 3, 2, 3).stream()
-                .filter(e -> e instanceof Player && !e.equals(victim) && !e.equals(attacker))
+                .filter(e -> e instanceof Player pe
+                    && !pe.equals(victim) && !pe.equals(attacker)
+                    && championManager.hasChampion(pe)
+                    && __tmTH.areEnemies(attacker, pe))
                 .forEach(e -> {
-                    if (championManager.hasChampion((Player)e))
-                        championManager.getChampion((Player)e).getHPSystem().takeDamage(titanicDmg);
+                    championManager.getChampion((Player)e).getHPSystem().takeDamage(titanicDmg);
                 });
         }
 
@@ -694,7 +719,7 @@ public class PassiveManager {
                     processPeriodicPassives(p, champ, state);
                 }
             }
-        }.runTaskTimer(LolPlugin.getInstance(), 0L, 20L));
+        }.runTaskTimer(LolPlugin.getInstance(), 0L, 20L)));
 
         // ── Sunfire / Bami's Cinder: dégâts AoE 2 ticks ──
         tasks.add(new BukkitRunnable() {
@@ -717,7 +742,7 @@ public class PassiveManager {
                         });
                 }
             }
-        }.runTaskTimer(LolPlugin.getInstance(), 0L, 2L));
+        }.runTaskTimer(LolPlugin.getInstance(), 0L, 2L)));
 
         // ── Dead Man's Plate: stacks mouvement hors combat ──
         tasks.add(new BukkitRunnable() {
@@ -734,7 +759,7 @@ public class PassiveManager {
                     }
                 }
             }
-        }.runTaskTimer(LolPlugin.getInstance(), 0L, 10L));
+        }.runTaskTimer(LolPlugin.getInstance(), 0L, 10L)));
 
         // ── Force of Nature: stacks MR après dégâts magiques ──
         // Géré dans onAbilityDamage
@@ -758,7 +783,7 @@ public class PassiveManager {
                     }
                 }
             }
-        }.runTaskTimer(LolPlugin.getInstance(), 0L, 60L));
+        }.runTaskTimer(LolPlugin.getInstance(), 0L, 60L)));
 
         // ── Abyssal Mask: aura -15% MR ennemis proches ──
         tasks.add(new BukkitRunnable() {
@@ -777,7 +802,7 @@ public class PassiveManager {
                         });
                 }
             }
-        }.runTaskTimer(LolPlugin.getInstance(), 0L, 10L));
+        }.runTaskTimer(LolPlugin.getInstance(), 0L, 10L)));
     }
 
     private void processPeriodicPassives(Player p, BaseChampion champ, ItemState state) {

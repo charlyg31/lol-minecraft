@@ -76,16 +76,17 @@ public class MinionManager {
         if (spawning) return;
         spawning = true;
 
-        new BukkitRunnable() {
+        waveTask = new BukkitRunnable() {
             @Override public void run() {
                 if (!spawning) { cancel(); return; }
+                waveCount++; // 1 incrément par cycle de vague global
                 spawnWave(Team.BLUE, waveCount);
                 spawnWave(Team.RED, waveCount);
             }
         }.runTaskTimer(LolPlugin.getInstance(), FIRST_WAVE_DELAY, WAVE_PERIOD);
 
         // Tâche de déplacement des sbires (toutes les 10 ticks)
-        new BukkitRunnable() {
+        moveTask = new BukkitRunnable() {
             @Override public void run() {
                 if (!spawning) { cancel(); return; }
                 moveMinions();
@@ -135,7 +136,7 @@ public class MinionManager {
                 // LoL : 3 sbires de mêlée puis 3 sbires à distance (mages)
                 // 3e vague = un sbire canon à la place du 1er caster
                     final MinionType type;
-                    if (waveCount % 3 == 2 && i == MINIONS_PER_WAVE / 2) {
+                    if (wave % 3 == 0 && i == MINIONS_PER_WAVE / 2) {
                         type = MinionType.CANNON;
                     } else {
                         type = (i < MINIONS_PER_WAVE / 2) ? MinionType.MELEE : MinionType.CASTER;
@@ -146,7 +147,6 @@ public class MinionManager {
                     }
                 }.runTaskLater(LolPlugin.getInstance(), delay);
             }
-            waveCount++; // incrémenter le compteur de vagues
             // Super-sbire si l'inhibiteur ennemi est détruit sur cette lane
             if (hasSuperMinions(team, lane)) {
                 final Location sp = spawnPoint;
