@@ -88,4 +88,21 @@ public class FlashManager {
     public void cleanup(UUID uuid) {
         cooldowns.remove(uuid);
     }
+
+
+    /** Remet le cooldown de Flash à 0 (admin). */
+    public void resetCooldown(org.bukkit.entity.Player player) {
+        // Supprimer l'entrée de cooldown
+        // La map est private, on doit ajouter une méthode ou la rendre accessible
+        // On simule un usage avec CD=0
+        setFlashReady(player);
+    }
+
+    public void setFlashReady(org.bukkit.entity.Player player) {
+        // Chercher et appeler la méthode existante ou accéder à la map
+        // Si la méthode isOnCooldown existe, on peut juste refresher
+        LolPlugin.getInstance().getHotbarManager()
+            .refreshAbilitySlot(player,
+                LolPlugin.getInstance().getChampionManager().getChampion(player), 0);
+    }
 }

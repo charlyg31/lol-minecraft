@@ -32,7 +32,7 @@ commands:
     permission: lolmc.player.queue
   lol:
     description: Configuration de la carte et tests (admin)
-    usage: /lol <set|position|lane|start|stop|solo|give|level|gold|team|testgame|ff>
+    usage: /lol <set|position|lane|start|stop|solo|give|level|gold|hp|resetcd|buff|spawn|wave|ff|help>
     permission: lolmc.admin
   recall:
     description: Retour à la base

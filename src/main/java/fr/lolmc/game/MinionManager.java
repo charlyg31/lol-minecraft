@@ -36,8 +36,13 @@ public class MinionManager {
     private final Map<String, List<Location>> blueLaneWaypoints = new HashMap<>();
     private final Map<String, List<Location>> redLaneWaypoints = new HashMap<>();
 
-    private static final long WAVE_PERIOD = 600L;        // 30s entre vagues (fidèle LoL)
-    private static final long FIRST_WAVE_DELAY = 1300L;  // 1ère vague à 1:05 (fidèle LoL)
+    // Vrais timers LoL (patch 14.x)
+    // 1ère vague : exactement 1:05 après le début = 65s = 1300 ticks
+    // Intervalle entre vagues : 30s = 600 ticks
+    // ATTENTION : ces délais comptent depuis l'appel à startWaves() ;
+    //             startWaves() doit être appelé exactement au début de la partie.
+    private static final long WAVE_PERIOD      = 600L;   // 30s = 600 ticks
+    private static final long FIRST_WAVE_DELAY = 1300L;  // 1:05 = 65s = 1300 ticks
     private static final int MINIONS_PER_WAVE = 6;
     private static final double MINION_HP = 477;
     private static final double CANNON_HP = 1257;
@@ -481,5 +486,42 @@ public class MinionManager {
         var pdc = e.getPersistentDataContainer();
         return pdc.has(KEY_LANE, org.bukkit.persistence.PersistentDataType.STRING)
             ? pdc.get(KEY_LANE, org.bukkit.persistence.PersistentDataType.STRING) : "melee";
+    }
+
+
+    /** Fréquence du sbire canon selon le temps de partie (LoL officiel). */
+    private int getCannonFrequency() {
+        var gm = LolPlugin.getInstance().getGameManager();
+        if (gm == null || !gm.isRunning()) return 3;
+        long elapsed = gm.getElapsedSeconds();
+        if (elapsed >= 25 * 60) return 1;  // >25min : chaque vague
+        if (elapsed >= 15 * 60) return 2;  // 15-25min : 1 vague sur 2
+        return 3;                           // <15min : 1 vague sur 3
+    }
+
+
+    /** Spawn un sbire de test à la position donnée (admin /lol spawn). */
+    public void spawnTestMinion(org.bukkit.Location loc, Team team, String typeStr) {
+        MinionType type = switch (typeStr.toLowerCase()) {
+            case "caster" -> MinionType.CASTER;
+            case "cannon" -> MinionType.CANNON;
+            case "super"  -> MinionType.SUPER;
+            default       -> MinionType.MELEE;
+        };
+        if (type == MinionType.SUPER) { spawnSuperMinion(loc, team); return; }
+        var e = type == MinionType.CASTER
+            ? loc.getWorld().spawn(loc, org.bukkit.entity.WitherSkeleton.class)
+            : loc.getWorld().spawn(loc, org.bukkit.entity.Zombie.class);
+        var pdc = e.getPersistentDataContainer();
+        pdc.set(KEY_MINION, org.bukkit.persistence.PersistentDataType.BYTE, (byte)1);
+        pdc.set(KEY_TEAM,   org.bukkit.persistence.PersistentDataType.STRING, team.name());
+        pdc.set(KEY_LANE,   org.bukkit.persistence.PersistentDataType.STRING, typeStr.toLowerCase());
+        applyMinionModel(e, type, team, type == MinionType.CASTER ? 0.7f : 1.0f);
+    }
+
+    /** Force le spawn immédiat d'une vague (admin /lol wave). */
+    public void forceWave() {
+        spawnWave(Team.BLUE);
+        spawnWave(Team.RED);
     }
 }

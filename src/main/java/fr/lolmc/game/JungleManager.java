@@ -634,4 +634,28 @@ public class JungleManager {
     }
 
     public Map<String, CampSpawn> getCamps() { return camps; }
+
+
+    /** Spawn un monstre de jungle de test à la position donnée. */
+    public void spawnTestMonster(org.bukkit.Location loc, String monsterTypeName) {
+        try {
+            MonsterType type = MonsterType.valueOf(monsterTypeName.toUpperCase());
+            var entity = loc.getWorld().spawn(loc, type.entityType.getEntityClass());
+            if (entity instanceof org.bukkit.entity.LivingEntity le) {
+                var pdc = le.getPersistentDataContainer();
+                pdc.set(KEY_MONSTER, org.bukkit.persistence.PersistentDataType.STRING, type.name());
+                var hpAttr = le.getAttribute(fr.lolmc.util.Compat.maxHealth());
+                if (hpAttr != null) { hpAttr.setBaseValue(type.maxHP); le.setHealth(type.maxHP); }
+                liveMonsters.put(le.getUniqueId(), type);
+                // Apparence appliquée par applyMonsterAppearance si configurée
+            }
+        } catch (IllegalArgumentException e) {
+            LolPlugin.getInstance().getLogger().warning("Monster inconnu: " + monsterTypeName);
+        }
+    }
+
+    /** Expose applyBuff() en public pour les commandes admin. */
+    public void applyBuffPublic(org.bukkit.entity.Player player, String buff) {
+        applyBuff(player, buff);
+    }
 }
