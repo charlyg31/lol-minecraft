@@ -1,7 +1,6 @@
 package fr.lolmc.bridge;
 
 import fr.lolmc.LolPlugin;
-import fr.lolmc.util.WorldContext;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;

@@ -378,6 +378,8 @@ public class MinionManager {
         redLaneWaypoints.put(lane, reversed);
     }
 
+    // Méthode préservée pour usage futur (actuellement la logique est inline dans tickMinionMovement)
+    @SuppressWarnings("unused")
     private Location getNextWaypoint(Team team, String lane, Location current) {
         var waypoints = (team == Team.BLUE ? blueLaneWaypoints : redLaneWaypoints).get(lane);
         if (waypoints == null || waypoints.isEmpty()) return null;
@@ -505,15 +507,6 @@ public class MinionManager {
     }
 
 
-    /** Fréquence du sbire canon selon le temps de partie (LoL officiel). */
-    private int getCannonFrequency() {
-        var gm = LolPlugin.getInstance().getGameManager();
-        if (gm == null || !gm.isRunning()) return 3;
-        long elapsed = gm.getElapsedSeconds();
-        if (elapsed >= 25 * 60) return 1;  // >25min : chaque vague
-        if (elapsed >= 15 * 60) return 2;  // 15-25min : 1 vague sur 2
-        return 3;                           // <15min : 1 vague sur 3
-    }
 
 
     /** Spawn un sbire de test à la position donnée (admin /lol spawn). */

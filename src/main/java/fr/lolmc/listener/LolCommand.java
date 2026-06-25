@@ -80,6 +80,12 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
             case "team" -> handleTeamCmd(player, args);
             case "testgame" -> handleTestGame(player);
             case "debug" -> handleDebug(player, args);
+            case "spawn"   -> handleSpawn(player, args);
+            case "buff"    -> handleBuff(player, args);
+            case "resetcd" -> handleResetCd(player, args);
+            case "hp"      -> handleHp(player, args);
+            case "wave"    -> handleWave(player);
+            case "help"    -> handleAdminHelp(player);
             case "reload" -> {
                 LolPlugin.getInstance().reloadConfig();
                 fr.lolmc.util.Balance.load();

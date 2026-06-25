@@ -12,7 +12,6 @@ import fr.lolmc.stats.HPSystem;
 import fr.lolmc.stats.ResourceSystem;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
-import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Particle;
 import org.bukkit.entity.Player;
@@ -218,15 +217,17 @@ public class PassiveManager {
             victim.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 20, 1, false, false));
         }
 
-        // ── Black Cleaver: -6% armure/stack (max 6) sur la cible ──
+        // ── Black Cleaver : stacks armure (max 6, expiration 6s) ──
+        // La réduction est appliquée lors du calcul dans DamageUtil (stacks × 6% armure)
         if (hasAnyItem(attacker,"black_cleaver","black_cleaver2")) {
             int stacks = Math.min(6, state.blackCleaverStacks.getOrDefault(vid, 0) + 1);
             state.blackCleaverStacks.put(vid, stacks);
-            // Appliquer la réduction d'armure à la cible dynamiquement dans calcPhysicalDamage
-            double armorReduction = vs.getFinalArmor() * (stacks * 0.06);
-            vs.addBonusArmor(-armorReduction); // Temporaire
-            new BukkitRunnable() { // Expirer après 6s
-                @Override public void run() { vs.addBonusArmor(armorReduction); }
+            // Décrémenter 1 stack après 6s
+            final java.util.UUID fvid = vid;
+            new org.bukkit.scheduler.BukkitRunnable() {
+                @Override public void run() {
+                    state.blackCleaverStacks.merge(fvid, -1, (a, b) -> Math.max(0, a + b));
+                }
             }.runTaskLater(LolPlugin.getInstance(), 120L);
         }
 

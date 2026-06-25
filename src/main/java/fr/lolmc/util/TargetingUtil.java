@@ -3,7 +3,6 @@ package fr.lolmc.util;
 import fr.lolmc.LolPlugin;
 import fr.lolmc.game.JungleManager;
 import fr.lolmc.game.MinionManager;
-import fr.lolmc.stats.ChampionStats;
 import fr.lolmc.team.TeamManager.Team;
 import org.bukkit.Location;
 import org.bukkit.entity.LivingEntity;

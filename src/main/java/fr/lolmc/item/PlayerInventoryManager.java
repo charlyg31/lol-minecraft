@@ -92,13 +92,7 @@ public class PlayerInventoryManager {
 
     /**
      * Met à jour un slot spécifique dans l'inventaire Minecraft.
-     */
-    private void updateSlot(Player player, int slotIndex) {
-        int mcSlot = ITEM_SLOTS[slotIndex];
-        LolItem item = equippedItems[slotIndex];
-        if (item == null) {
-            player.getInventory().setItem(mcSlot, emptySlot(slotIndex + 1));
-        } else {
+     */ else {
             // Ajouter le tag LoL dans le lore pour identifier l'item
             ItemStack stack = item.buildItemStack();
             ItemMeta meta = stack.getItemMeta();
@@ -113,9 +107,6 @@ public class PlayerInventoryManager {
         }
     }
 
-    private void clearSlot(Player player, int slotIndex) {
-        player.getInventory().setItem(ITEM_SLOTS[slotIndex], emptySlot(slotIndex + 1));
-    }
 
     /**
      * Crée un item "slot vide" affiché dans l'inventaire.

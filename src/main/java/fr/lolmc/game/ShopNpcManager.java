@@ -14,7 +14,6 @@ import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.persistence.PersistentDataType;
 
 import java.io.File;
-import java.util.UUID;
 
 /**
  * Gère le PNJ boutique (un villageois) posé à chaque base.
