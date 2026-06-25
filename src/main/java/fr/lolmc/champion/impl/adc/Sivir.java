@@ -109,4 +109,3 @@ public class Sivir extends BaseChampion {
         }
         @Override public String getDynamicDescription(ChampionStats s){return "+30%% vitesse et haste pendant 4s.";}
     }
-}

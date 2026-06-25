@@ -720,7 +720,7 @@ public class PassiveManager {
                     processPeriodicPassives(p, champ, state);
                 }
             }
-        }.runTaskTimer(LolPlugin.getInstance(), 0L, 20L)));
+        }.runTaskTimer(LolPlugin.getInstance(), 0L, 20L));
 
         // ── Sunfire / Bami's Cinder: dégâts AoE 2 ticks ──
         tasks.add(new BukkitRunnable() {
@@ -743,7 +743,7 @@ public class PassiveManager {
                         });
                 }
             }
-        }.runTaskTimer(LolPlugin.getInstance(), 0L, 2L)));
+        }.runTaskTimer(LolPlugin.getInstance(), 0L, 2L));
 
         // ── Dead Man's Plate: stacks mouvement hors combat ──
         tasks.add(new BukkitRunnable() {
@@ -760,7 +760,7 @@ public class PassiveManager {
                     }
                 }
             }
-        }.runTaskTimer(LolPlugin.getInstance(), 0L, 10L)));
+        }.runTaskTimer(LolPlugin.getInstance(), 0L, 10L));
 
         // ── Force of Nature: stacks MR après dégâts magiques ──
         // Géré dans onAbilityDamage
@@ -784,7 +784,7 @@ public class PassiveManager {
                     }
                 }
             }
-        }.runTaskTimer(LolPlugin.getInstance(), 0L, 60L)));
+        }.runTaskTimer(LolPlugin.getInstance(), 0L, 60L));
 
         // ── Abyssal Mask: aura -15% MR ennemis proches ──
         tasks.add(new BukkitRunnable() {
@@ -803,7 +803,7 @@ public class PassiveManager {
                         });
                 }
             }
-        }.runTaskTimer(LolPlugin.getInstance(), 0L, 10L)));
+        }.runTaskTimer(LolPlugin.getInstance(), 0L, 10L));
     }
 
     private void processPeriodicPassives(Player p, BaseChampion champ, ItemState state) {

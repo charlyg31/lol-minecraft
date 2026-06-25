@@ -161,4 +161,3 @@ public class MissFortune extends BaseChampion {
             return String.format("Canalise 3s: 8 vagues en cône, %.0f dégâts/vague (peut critiquer).",perWave);
         }
     }
-}

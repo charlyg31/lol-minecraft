@@ -197,17 +197,18 @@ public class BridgeManager implements PluginMessageListener {
 
     /** Notifie le lobby du statut de la file d'un joueur. */
     public void notifyQueueStatus(UUID uuid, String status, int queueSize) {
-        sendToLobby("{"type":"QUEUE_STATUS","uuid":"" + uuid + "","
-                  + ""status":"" + status + "","queueSize":" + queueSize + "}");
+        sendToLobby("{\"type\":\"QUEUE_STATUS\",\"uuid\":\"" + uuid
+                  + "\",\"status\":\"" + status
+                  + "\",\"queueSize\":" + queueSize + "}");
     }
 
     /** Notifie le lobby du démarrage d'une partie (pour envoyer les joueurs sur ce serveur). */
     public void notifyGameStart(java.util.List<UUID> players) {
-        StringBuilder sb = new StringBuilder("{"type":"GAME_START","server":"")
-            .append(gameServer).append("","players":[");
+        StringBuilder sb = new StringBuilder();
+        sb.append("{\"type\":\"GAME_START\",\"server\":\"").append(gameServer).append("\",\"players\":[");
         for (int i = 0; i < players.size(); i++) {
             if (i > 0) sb.append(",");
-            sb.append(""").append(players.get(i)).append(""");
+            sb.append("\"").append(players.get(i)).append("\"");
         }
         sb.append("]}");
         sendToLobby(sb.toString());
@@ -216,12 +217,11 @@ public class BridgeManager implements PluginMessageListener {
     /** Notifie le lobby de la fin de partie (stats, résultat). */
     public void notifyGameEnd(String winner, long durationSeconds,
                               java.util.List<fr.lolmc.stats.persistence.PlayerStats> stats) {
-        StringBuilder sb = new StringBuilder("{"type":"GAME_END","
-            + ""winner":"" + winner + "","
-            + ""duration":" + durationSeconds + ","
-            + ""server":"" + gameServer + "","
-            + ""players":[");
-        // On simplifie : envoyer juste les UUIDs
+        StringBuilder sb = new StringBuilder();
+        sb.append("{\"type\":\"GAME_END\",\"winner\":\"").append(winner)
+          .append("\",\"duration\":").append(durationSeconds)
+          .append(",\"server\":\"").append(gameServer)
+          .append("\",\"players\":[");
         boolean first = true;
         for (var st : stats) {
             if (!first) sb.append(",");
