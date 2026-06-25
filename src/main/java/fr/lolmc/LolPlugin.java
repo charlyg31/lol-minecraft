@@ -127,10 +127,10 @@ public class LolPlugin extends JavaPlugin {
      */
     private void initManagersAndListeners() {
         initCoreManagers();
-        initGameManagers();
-        initShopManagers();
-        initQueueManagers();
-        registerListenersInternal();
+//         initGameManagers();
+//         initShopManagers();
+//         initQueueManagers();
+//         registerListenersInternal();
     }
 
     private void initCoreManagers() {

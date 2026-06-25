@@ -79,6 +79,7 @@ public class GameManager {
         stopRespawnTask();
     }
 
+    private void stopRespawnTask() { if (respawnTask != null) { respawnTask.cancel(); respawnTask = null; } }
     public void startGame() {
         gameRunning = true;
         gameStartTime = System.currentTimeMillis();
@@ -196,6 +197,8 @@ public class GameManager {
     }
 
     private void stopPassiveGoldTask() { if (passiveGoldTask != null) { passiveGoldTask.cancel(); passiveGoldTask = null; } }
+    
+    
 
     // ══════════════════════════════════════════════════════════════
     // MORT & RESPAWN AVEC TIMER

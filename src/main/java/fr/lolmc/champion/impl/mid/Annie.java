@@ -44,12 +44,7 @@ public class Annie extends BaseChampion {
     }
     public static boolean hasPyromancyStun(UUID id) { return pyroStacks.getOrDefault(id, 0) == 0 && pyroStacks.containsKey(id); }
 
-    public static void resetState(UUID id) {
-        if (activeTibbers.containsKey(id)) {
-            var golem = activeTibbers.remove(id);
-            if (golem != null && golem.isValid()) golem.remove();
-        }
-    }
+
     public static void resetState(UUID id) {
         if (activeTibbers.containsKey(id)) {
             var golem = activeTibbers.remove(id);

@@ -1,4 +1,5 @@
 package fr.lolmc.item;
+import fr.lolmc.util.DamageUtil;
 
 import fr.lolmc.LolPlugin;
 import fr.lolmc.util.WorldContext;
@@ -266,7 +267,7 @@ public class PassiveManager {
         if (hasAnyItem(attacker,"frostfire_gauntlet","frostfire")) {
             victim.getWorld().spawnParticle(org.bukkit.Particle.SNOWFLAKE,
                 victim.getLocation().add(0,0.5,0), 12, 1.0, 0.3, 1.0);
-            LolPlugin.getInstance().getCCManager().slow(victim, 0.15, 40);
+            LolPlugin.getInstance().getCCManager().slow(victim, 15, 40);
         }
 
         // ── Titanic Hydra: AoE AA (filtre équipe + hasChampion) ──

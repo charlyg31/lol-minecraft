@@ -51,7 +51,6 @@ public class MissFortune extends BaseChampion {
             }
         }
     }
-    }
 
     static class Q extends BaseAbility {
         Q(){super("q_missfortune","Doublé",Material.FLINT_AND_STEEL,AbilitySlot.Q,
@@ -161,3 +160,4 @@ public class MissFortune extends BaseChampion {
             return String.format("Canalise 3s: 8 vagues en cône, %.0f dégâts/vague (peut critiquer).",perWave);
         }
     }
+}
