@@ -21,16 +21,18 @@ import java.util.*;
  * Éditeur complet de page de runes.
  *
  * Le joueur construit sa page en plusieurs étapes dans un seul inventaire :
- *  - Ligne 0 : choix de la voie primaire (5 voies)
- *  - Ligne 1 : keystone de la voie primaire
- *  - Lignes 2-4 : les 3 slots de runes mineures primaires
- *  - Ligne 5 : voie secondaire + ses 2 runes + fragments de stats
+ * - Ligne 0 : choix de la voie primaire (5 voies)
+ * - Ligne 1 : keystone de la voie primaire
+ * - Lignes 2-4 : les 3 slots de runes mineures primaires
+ * - Ligne 5 : voie secondaire + ses 2 runes + fragments de stats
  *
  * L'état en cours d'édition est gardé par joueur jusqu'à validation.
  */
 public class RuneGUI implements Listener {
 
-    private static final String TITLE = "§5Éditeur de Runes";
+    // CORRECTION : Transformation du titre en Component moderne (DARK_PURPLE remplace §5)
+    private static final Component TITLE = Component.text("Éditeur de Runes", NamedTextColor.DARK_PURPLE)
+            .decoration(TextDecoration.ITALIC, false);
 
     // Page en cours d'édition par joueur
     private final Map<UUID, RunePage> editing = new HashMap<>();
@@ -50,6 +52,8 @@ public class RuneGUI implements Listener {
     private void render(Player player) {
         RunePage page = editing.get(player.getUniqueId());
         if (page == null) return;
+
+        // Appelle automatiquement la méthode non-dépréciée acceptant un Component
         Inventory inv = Bukkit.createInventory(null, 54, TITLE);
 
         // ── Ligne 0 : voies primaires (slots 0-4) ──
@@ -96,7 +100,8 @@ public class RuneGUI implements Listener {
         }
 
         // ── Boutons : fragments de stats + valider ──
-        inv.setItem(51, button(Material.NETHER_STAR, "§eFragments: " + shardSummary(page),
+        // CORRECTION : Passage d'un Component propre (YELLOW remplace §e)
+        inv.setItem(51, button(Material.NETHER_STAR, Component.text("Fragments: " + shardSummary(page), NamedTextColor.YELLOW),
                 "Clique pour changer les fragments"));
         inv.setItem(53, validateButton(page));
 
@@ -125,7 +130,8 @@ public class RuneGUI implements Listener {
 
     @EventHandler
     public void onClick(InventoryClickEvent e) {
-        if (!TITLE.equals(e.getView().getTitle())) return;
+        // CORRECTION : Utilisation de e.getView().title() au lieu de getTitle() déprécié
+        if (!TITLE.equals(e.getView().title())) return;
         e.setCancelled(true);
         if (!(e.getWhoClicked() instanceof Player player)) return;
 
@@ -267,7 +273,7 @@ public class RuneGUI implements Listener {
         var meta = item.getItemMeta();
         if (meta != null) {
             meta.displayName(Component.text((selected ? "✔ " : "") + path.displayName + " (" + role + ")",
-                    selected ? NamedTextColor.GREEN : NamedTextColor.WHITE)
+                            selected ? NamedTextColor.GREEN : NamedTextColor.WHITE)
                     .decoration(TextDecoration.ITALIC, false));
             if (selected) {
                 meta.addEnchant(fr.lolmc.util.Compat.glowEnchant(), 1, true);
@@ -283,7 +289,7 @@ public class RuneGUI implements Listener {
         var meta = item.getItemMeta();
         if (meta != null) {
             meta.displayName(Component.text((selected ? "✔ " : "") + rune.name(),
-                    selected ? NamedTextColor.GREEN : NamedTextColor.LIGHT_PURPLE)
+                            selected ? NamedTextColor.GREEN : NamedTextColor.LIGHT_PURPLE)
                     .decoration(TextDecoration.ITALIC, false));
             meta.lore(List.of(Component.text(rune.description(), NamedTextColor.GRAY)
                     .decoration(TextDecoration.ITALIC, false)));
@@ -304,11 +310,12 @@ public class RuneGUI implements Listener {
         return item;
     }
 
-    private ItemStack button(Material mat, String name, String lore) {
+    // CORRECTION : Modification de la signature pour accepter directement un Component
+    private ItemStack button(Material mat, Component modernName, String lore) {
         ItemStack item = new ItemStack(mat);
         var meta = item.getItemMeta();
         if (meta != null) {
-            meta.displayName(Component.text(name).decoration(TextDecoration.ITALIC, false));
+            meta.displayName(modernName.decoration(TextDecoration.ITALIC, false));
             meta.lore(List.of(Component.text(lore, NamedTextColor.GRAY)
                     .decoration(TextDecoration.ITALIC, false)));
             item.setItemMeta(meta);

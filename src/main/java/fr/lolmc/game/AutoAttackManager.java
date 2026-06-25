@@ -130,7 +130,9 @@ public class AutoAttackManager {
         // 5. Appliquer les dégâts directement (sbire/monstre, pas de système de résistance)
         double newHealth = Math.max(0, target.getHealth() - rawDamage);
         target.setHealth(newHealth);
-        target.playEffect(org.bukkit.EntityEffect.HURT);
+
+        // CORRECTION MODERNE : Utilisation de playHurtAnimation avec le yaw de l'attaquant pour l'effet directionnel
+        target.playHurtAnimation(attacker.getLocation().getYaw());
 
         // 6. Passifs on-hit
         var pm = LolPlugin.getInstance().getPassiveManager();

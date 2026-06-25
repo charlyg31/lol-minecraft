@@ -1,5 +1,6 @@
 package fr.lolmc.util;
 
+import org.bukkit.Bukkit;
 import org.bukkit.NamespacedKey;
 import org.bukkit.Registry;
 import org.bukkit.attribute.Attribute;
@@ -75,16 +76,24 @@ public final class Compat {
      * Enchantement utilisé pour faire "briller" un item (glow).
      * On utilise un enchantement quelconque (Unbreaking) résolu via Registry.
      */
+    @SuppressWarnings("deprecation") // CORRECTION : Supprime le warning de dépréciation proprement
     public static Enchantment glowEnchant() {
-        // Registry moderne (Enchantment n'est plus une enum en 26.1.2)
+        // Retour à la méthode de classe stable pour votre version de l'API
         try {
-            Enchantment e = Registry.ENCHANTMENT.get(NamespacedKey.minecraft("unbreaking"));
-            if (e != null) return e;
-        } catch (Throwable ignored) {}
-        // Fallback : premier enchantement disponible dans le registre
-        try {
-            for (Enchantment e : Registry.ENCHANTMENT) {
+            Registry<Enchantment> registry = Bukkit.getRegistry(Enchantment.class);
+            if (registry != null) {
+                Enchantment e = registry.get(NamespacedKey.minecraft("unbreaking"));
                 if (e != null) return e;
+            }
+        } catch (Throwable ignored) {}
+
+        // Fallback : premier enchantement disponible
+        try {
+            Registry<Enchantment> registry = Bukkit.getRegistry(Enchantment.class);
+            if (registry != null) {
+                for (Enchantment e : registry) {
+                    if (e != null) return e;
+                }
             }
         } catch (Throwable ignored) {}
         return null;

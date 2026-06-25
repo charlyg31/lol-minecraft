@@ -137,7 +137,7 @@ public class MinionManager {
 
     private void spawnMinion(Team team, String lane, Location loc, MinionType type) {
         Zombie minion = loc.getWorld().spawn(loc, Husk.class, z -> {
-            z.setBaby(false);
+            z.setAdult(); // CORRECTION : Remplace le setBaby(false) déprécié
             z.setShouldBurnInDay(false);
             z.setCustomNameVisible(false);
             // Empêcher le zombie de cibler les joueurs tout seul (IA vanilla)
@@ -169,6 +169,7 @@ public class MinionManager {
     /** Spawn un super-sbire (Husk costaud, beaucoup de HP). */
     private void spawnSuperMinion(Team team, String lane, Location loc) {
         org.bukkit.entity.Husk superMinion = loc.getWorld().spawn(loc, org.bukkit.entity.Husk.class, h -> {
+            h.setAdult(); // SÉCURITÉ : On s'assure également qu'il s'agit d'un adulte via l'API moderne
             h.setShouldBurnInDay(false);
             h.setCustomNameVisible(true);
             h.getAttribute(Compat.maxHealth()).setBaseValue(MINION_HP * 3);
