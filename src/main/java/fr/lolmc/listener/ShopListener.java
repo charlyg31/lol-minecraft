@@ -174,40 +174,39 @@ public class ShopListener implements Listener {
                     player.sendMessage(Component.text("❌ Inventaire plein (6/6 items)!", NamedTextColor.RED));
                     return false;
                 }
-                // Upgrade : rembourser le composant (70%) et équiper l'item final
+                // Upgrade LoL : on paie la DIFFÉRENCE de prix (prix_final - prix_composant),
+                // pas un remboursement à 70%. Le composant est retiré sans rembourser.
                 LolItem component = inv.getItem(upgradeSlot);
-                int componentRefund = inv.sellItem(player, champ, upgradeSlot);
-                // Clamp HP après retrait du composant
-                var hp = champ.getHPSystem();
-                if (hp.getCurrentHP() > hp.getMaxHP()) hp.setCurrentHP(hp.getMaxHP());
-                // Réduire le coût de l'item final du remboursement du composant
-                int effectiveCost = Math.max(0, item.getGoldCost() - componentRefund);
+                int effectiveCost = Math.max(0, item.getGoldCost() - component.getGoldCost());
                 if (gold < effectiveCost) {
-                    // Pas assez d'or même avec le remboursement : annuler et remettre le composant
-                    component.applyStats(champ.getStats(), champ.getHPSystem(), champ.getResourceSystem());
-                    inv.equipItem(player, champ, component); // remet dans le slot
                     player.sendMessage(Component.text(
-                        String.format("❌ Or insuffisant pour upgrader! Il te faut %d or (remboursement: %d).",
-                            effectiveCost, componentRefund), NamedTextColor.RED));
+                        String.format("❌ Or insuffisant pour upgrader! Il te faut %d or (différence %s → %s).",
+                            effectiveCost, component.getDisplayName(), item.getDisplayName()),
+                        NamedTextColor.RED));
                     return false;
                 }
                 if (!goldManager.spendGold(player.getUniqueId(), effectiveCost)) return false;
+                // Retirer le composant (stats + slot, sans remboursement)
+                inv.removeItemNoRefund(champ, upgradeSlot);
                 hb.removeItem(player, component.getId());
+                // Équiper l'item final
                 if (!inv.equipItem(player, champ, item)) {
-                    // Échec : rembourser et remettre le composant
+                    // Rollback complet
                     goldManager.addGold(player.getUniqueId(), effectiveCost);
                     component.applyStats(champ.getStats(), champ.getHPSystem(), champ.getResourceSystem());
                     inv.equipItem(player, champ, component);
                     hb.addItem(player, component.getId());
+                    player.sendMessage(Component.text("❌ Impossible d'équiper l'item.", NamedTextColor.RED));
                     return false;
                 }
                 hb.addItem(player, item.getId());
                 hb.renderPage(player, champ);
                 hudManager.updateHUD(player, champ);
                 player.sendActionBar(Component.text(
-                    String.format("⬆ Upgrade! %s → %s | Or: %d",
+                    String.format("⬆ Upgrade! %s → %s (coût: %d) | Or: %d",
                         component.getDisplayName(), item.getDisplayName(),
-                        goldManager.getGold(player.getUniqueId())), NamedTextColor.GREEN));
+                        effectiveCost, goldManager.getGold(player.getUniqueId())),
+                    NamedTextColor.GREEN));
                 player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 1f, 1.3f);
                 return true;
             }
