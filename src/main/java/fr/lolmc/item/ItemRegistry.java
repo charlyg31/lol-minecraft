@@ -132,7 +132,6 @@ public class ItemRegistry {
         reg(new LolItem("imperial_mandate","Imperial Mandate", 2200, Material.GOLD_INGOT,     SUPPORT).ap(40).hp(200).ah(20).manaRegen(100).passive("Coordinated Fire","CC: marque. Allié attaquant: +90+30%%AP dégâts."));
         reg(new LolItem("malignance",     "Malignance",        2700, Material.PURPLE_STAINED_GLASS,MAGE).ap(80).mana(600).ah(20).passive("Haunt","Dégâts d'ultime: -20%% MR 3s."));
         reg(new LolItem("seraphs_embrace","Seraph's Embrace",  3200, Material.CYAN_DYE,       MAGE).ap(80).ah(25).mana(860).passive("Lifeline","HP crit bas: bouclier.").passive("Awe","+1%% AP / 100 mana."));
-        reg(new LolItem("night_cap",      "Rabadon's Deathcap",3600, Material.POINTED_DRIPSTONE,MAGE).ap(120).passive("Amplification","+35%% AP total."));
         reg(new LolItem("twin_shadows",   "Ixtali Seedjar",    2300, Material.AZALEA,         MAGE).ap(50).ah(20).ms(5).passive("Ancestral Gifts","Actif: envoie fantômes ralentissants."));
 
         // ════════════════════════════════════════════════════════════

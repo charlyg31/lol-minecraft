@@ -154,33 +154,37 @@ public class ShopListener implements Listener {
         }
 
         PlayerInventoryManager inv = getOrCreate(player);
-        if (item.getCategory() != ItemCategory.CONSUMABLE && inv.isFull()) {
-            player.sendMessage(Component.text("❌ Inventaire plein (6/6 items)!", NamedTextColor.RED));
-            return false;
-        }
-
         BaseChampion champ = championManager.getChampion(player);
-        if (!goldManager.spendGold(player.getUniqueId(), item.getGoldCost())) return false;
 
         ConsumableManager cm = LolPlugin.getInstance().getConsumableManager();
+        var hb = LolPlugin.getInstance().getHotbarManager();
+
         if (item.getCategory() == ItemCategory.CONSUMABLE && cm != null) {
-            var hb = LolPlugin.getInstance().getHotbarManager();
+            // Consommables : pas de limite de 6 slots
+            if (!goldManager.spendGold(player.getUniqueId(), item.getGoldCost())) return false;
             hb.addConsumable(player, item.getId());
             hb.renderPage(player, champ);
             player.sendActionBar(Component.text(
                 "🧪 " + item.getDisplayName() + " ajouté (page 2)", NamedTextColor.GREEN));
         } else {
-            try {
-                inv.equipItem(player, champ, item);
-                var hb = LolPlugin.getInstance().getHotbarManager();
-                hb.addItem(player, item.getId());
-                hb.renderPage(player, champ);
-                hudManager.updateHUD(player, champ);
-            } catch (Exception ex) {
-                player.sendMessage(Component.text("❌ Erreur achat: " + ex.getMessage(), NamedTextColor.RED));
+            // Items normaux : vérifier capacité avant de débiter l'or
+            if (inv.isFull()) {
+                player.sendMessage(Component.text("❌ Inventaire plein (6/6 items)!", NamedTextColor.RED));
                 return false;
             }
+            // Débiter l'or seulement après les vérifications
+            if (!goldManager.spendGold(player.getUniqueId(), item.getGoldCost())) return false;
+            // Équiper — si ça échoue, rembourser l'or immédiatement
+            if (!inv.equipItem(player, champ, item)) {
+                goldManager.addGold(player.getUniqueId(), item.getGoldCost());
+                player.sendMessage(Component.text("❌ Impossible d'équiper l'item.", NamedTextColor.RED));
+                return false;
+            }
+            hb.addItem(player, item.getId());
+            hb.renderPage(player, champ);
+            hudManager.updateHUD(player, champ);
         }
+
         player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1f, 1.3f);
         player.sendActionBar(Component.text(
             String.format("💰 Or: %d | %s acheté!", goldManager.getGold(player.getUniqueId()),
