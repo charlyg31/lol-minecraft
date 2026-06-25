@@ -11,7 +11,7 @@ import fr.lolmc.matchmaking.PartyManager;
 import fr.lolmc.matchmaking.MatchmakingManager;
 import fr.lolmc.listener.PartyCommand;
 import fr.lolmc.listener.LolCommand;
-import fr.lolmc.manager.SchematicManager; // CORRECTION : Importation du bon dossier
+import fr.lolmc.manager.SchematicManager;
 import fr.lolmc.game.MapManager;
 import fr.lolmc.game.TurretManager;
 import fr.lolmc.game.MinionManager;
@@ -27,6 +27,7 @@ import fr.lolmc.game.ShopNpcManager;
 import fr.lolmc.game.AutoAttackManager;
 import fr.lolmc.game.AnnouncementManager;
 import fr.lolmc.game.SummonerSpellManager;
+import fr.lolmc.game.ChunkLoaderManager; // AJOUT : Import du gestionnaire de chunks
 import fr.lolmc.rune.RuneManager;
 import fr.lolmc.game.ChampSelectManager;
 import fr.lolmc.game.ChampSelectGUI;
@@ -88,6 +89,7 @@ public class LolPlugin extends JavaPlugin {
     private AutoAttackManager autoAttackManager;
     private AnnouncementManager announcementManager;
     private SummonerSpellManager summonerSpellManager;
+    private ChunkLoaderManager chunkLoaderManager; // AJOUT : Variable d'instance
     private RuneManager runeManager;
     private ChampSelectManager champSelectManager;
     private ChampSelectGUI champSelectGUI;
@@ -110,6 +112,11 @@ public class LolPlugin extends JavaPlugin {
 
         initManagersAndListeners();
         registerCommands();
+
+        // AJOUT : Démarrage de la tâche de chargement forcé des chunks (toutes les 20 ticks = 1 seconde)
+        this.chunkLoaderManager = new ChunkLoaderManager();
+        this.chunkLoaderManager.runTaskTimer(this, 0L, 20L);
+
         getLogger().info("LoL MC activé — 20 champions + boutique chargés.");
     }
 
@@ -123,7 +130,6 @@ public class LolPlugin extends JavaPlugin {
         partyManager = new PartyManager();
         matchmakingManager = new MatchmakingManager(partyManager, teamManager);
 
-        // CORRECTION : Passage de "this" (l'instance du plugin) au constructeur
         schematicManager = new SchematicManager(this);
 
         mapManager = new MapManager(schematicManager);
@@ -230,6 +236,10 @@ public class LolPlugin extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        // AJOUT : Nettoyage forcé de tous les chunks bloqués en mémoire avant l'arrêt
+        if (this.chunkLoaderManager != null) {
+            this.chunkLoaderManager.clearAllForcedChunks();
+        }
         if (apiServer != null) apiServer.stop();
         if (databaseManager != null) databaseManager.close();
         getLogger().info("LoL MC désactivé.");
@@ -269,6 +279,7 @@ public class LolPlugin extends JavaPlugin {
     public AutoAttackManager getAutoAttackManager() { return autoAttackManager; }
     public AnnouncementManager getAnnouncementManager() { return announcementManager; }
     public SummonerSpellManager getSummonerSpellManager() { return summonerSpellManager; }
+    public ChunkLoaderManager getChunkLoaderManager() { return chunkLoaderManager; } // AJOUT : Getter associé
     public RuneManager getRuneManager()         { return runeManager; }
     public ChampSelectManager getChampSelectManager() { return champSelectManager; }
     public ChampSelectGUI getChampSelectGUI()   { return champSelectGUI; }
