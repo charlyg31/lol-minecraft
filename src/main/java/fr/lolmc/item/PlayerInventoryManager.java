@@ -30,8 +30,8 @@ public class PlayerInventoryManager {
 
     // Slots Minecraft pour les 6 items LoL
     public static final int[] ITEM_SLOTS = {5, 6, 7, 8, 18, 19};
-    // Tag NBT pour identifier un item LoL dans l'inventaire
-    public static final String LOL_ITEM_TAG = "§0LOL_ITEM:";
+    // Tag identifiant un item LoL dans le lore (sans séquence de couleur legacy)
+    public static final String LOL_ITEM_TAG = "LOL_ITEM:";
 
     // Items équipés par joueur [0..5]
     private final LolItem[] equippedItems = new LolItem[6];
@@ -56,11 +56,15 @@ public class PlayerInventoryManager {
 
     /**
      * Vend l'item du slot donné (remboursement 70%).
+     * Après removeStats, on clamp les HP au nouveau max pour éviter currentHP > maxHP.
      */
     public int sellItem(Player player, BaseChampion champ, int slotIndex) {
         if (slotIndex < 0 || slotIndex >= 6 || equippedItems[slotIndex] == null) return 0;
         LolItem item = equippedItems[slotIndex];
         item.removeStats(champ.getStats(), champ.getHPSystem(), champ.getResourceSystem());
+        // Clamp HP au nouveau max (evite currentHP > maxHP apres retrait d'un item de vie)
+        var hp = champ.getHPSystem();
+        if (hp.getCurrentHP() > hp.getMaxHP()) hp.setCurrentHP(hp.getMaxHP());
         equippedItems[slotIndex] = null;
         int refund = (int)(item.getGoldCost() * 0.70);
         return refund;
@@ -158,8 +162,8 @@ public class PlayerInventoryManager {
         if (lore == null) return null;
         for (Component line : lore) {
             String plain = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(line);
-            if (plain.startsWith(LOL_ITEM_TAG.replace("§0", ""))) {
-                return plain.substring(LOL_ITEM_TAG.replace("§0", "").length());
+            if (plain.startsWith(LOL_ITEM_TAG)) {
+                return plain.substring(LOL_ITEM_TAG.length());
             }
         }
         return null;

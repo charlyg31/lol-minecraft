@@ -423,6 +423,7 @@ public class AbilityListener implements Listener {
         fr.lolmc.util.ChampionStateReset.resetPlayer(p.getUniqueId());
         LolPlugin.getInstance().getCCManager().clear(p.getUniqueId());
         LolPlugin.getInstance().getHotbarManager().cleanup(p.getUniqueId());
+        LolPlugin.getInstance().getShopListener().cleanup(p.getUniqueId());
         LolPlugin.getInstance().getFlashManager().cleanup(p.getUniqueId());
         LolPlugin.getInstance().getWardManager().cleanup(p.getUniqueId());
         LolPlugin.getInstance().getTeamManager().removePlayer(p.getUniqueId());

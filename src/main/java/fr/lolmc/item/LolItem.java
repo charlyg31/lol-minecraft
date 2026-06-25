@@ -175,7 +175,9 @@ public class LolItem {
     private void removePassive(ChampionStats stats) {
         if (passiveName == null) return;
         switch (passiveName) {
-            case "Amplification" -> stats.multiplyAP(1.0 / 1.35); // Annuler Rabadon's
+            // Rabadon's : annuler le ×1.35 appliqué à l'achat
+            // multiplyAP(1/1.35) annule exactement multiplyAP(1.35)
+            case "Amplification" -> stats.multiplyAP(1.0 / 1.35);
         }
     }
 
