@@ -104,7 +104,8 @@ public class BungeeQueueManager {
     /** Envoie les données d'un joueur au serveur de jeu via PluginMessage. */
     private void sendPlayerData(ProxiedPlayer carrier, ProxiedPlayer player, List<UUID> allPlayers) {
         Map<String, String> runes = runeManager.getPage(player.getUniqueId());
-        String role  = roleManager.getRole(player.getUniqueId());
+        List<String> roles = roleManager.getRoles(player.getUniqueId());
+        String role = String.join(",", roles);
         List<UUID> party = partyManager.getPartyMembers(player.getUniqueId());
         String origin = plugin.getOriginTracker().getPreviousServer(player.getUniqueId());
 

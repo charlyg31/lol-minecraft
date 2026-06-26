@@ -48,6 +48,9 @@ public class LolBungeePlugin extends Plugin {
         this.queueManager  = new BungeeQueueManager(this, partyManager, runeManager, roleManager);
         this.originTracker = new OriginTracker(this);
 
+        // Commandes
+        getProxy().getPluginManager().registerCommand(this, new LolCommand(this));
+
         // Listeners
         getProxy().getPluginManager().registerListener(this, new ServerSwitchListener(this, originTracker));
         getProxy().getPluginManager().registerListener(this, new BungeeMessageListener(this));
