@@ -207,6 +207,10 @@ public class MatchmakingManager {
         }
     }
 
+    // Positions sauvegardées avant l'envoi en partie
+    private final java.util.Map<UUID, org.bukkit.Location> preGameLocations
+        = new java.util.concurrent.ConcurrentHashMap<>();
+
     private void startMatch(List<UUID> blue, List<UUID> red) {
         announce(blue, red);
         // Notifier le bridge (lobby cross-serveur)
@@ -226,13 +230,19 @@ public class MatchmakingManager {
         if (gameWorld != null && mapMgr != null) {
             for (UUID id : blue) {
                 Player p = Bukkit.getPlayer(id);
-                org.bukkit.Location spawn = mapMgr.getSpawn(fr.lolmc.team.TeamManager.Team.BLUE, 0);
-                if (p != null && spawn != null) p.teleport(spawn);
+                if (p != null) {
+                    preGameLocations.put(id, p.getLocation().clone()); // sauvegarder
+                    org.bukkit.Location spawn = mapMgr.getSpawn(fr.lolmc.team.TeamManager.Team.BLUE, 0);
+                    if (spawn != null) p.teleport(spawn);
+                }
             }
             for (UUID id : red) {
                 Player p = Bukkit.getPlayer(id);
-                org.bukkit.Location spawn = mapMgr.getSpawn(fr.lolmc.team.TeamManager.Team.RED, 0);
-                if (p != null && spawn != null) p.teleport(spawn);
+                if (p != null) {
+                    preGameLocations.put(id, p.getLocation().clone()); // sauvegarder
+                    org.bukkit.Location spawn = mapMgr.getSpawn(fr.lolmc.team.TeamManager.Team.RED, 0);
+                    if (spawn != null) p.teleport(spawn);
+                }
             }
         }
         // Phase de ban → pick → démarrage
@@ -241,6 +251,23 @@ public class MatchmakingManager {
                 LolPlugin.getInstance().getChampSelectManager().startBanPhase();
             }
         }.runTaskLater(LolPlugin.getInstance(), 60L); // 3s après téléportation
+    }
+
+    /** Renvoie un joueur à sa position d'avant la partie (appelé à la fin). */
+    public void returnPlayerToPreGameLocation(Player player) {
+        org.bukkit.Location loc = preGameLocations.remove(player.getUniqueId());
+        if (loc != null && loc.getWorld() != null) {
+            player.teleport(loc);
+        }
+    }
+
+    /** Renvoie tous les joueurs à leur position d'avant la partie. */
+    public void returnAllToPreGameLocations() {
+        for (UUID id : new java.util.HashSet<>(preGameLocations.keySet())) {
+            Player p = Bukkit.getPlayer(id);
+            if (p != null && p.isOnline()) returnPlayerToPreGameLocation(p);
+            else preGameLocations.remove(id);
+        }
     }
 
     private void announce(List<UUID> blue, List<UUID> red) {
