@@ -146,47 +146,55 @@ public class BungeeQueueManager {
     private void tryProposeFill(List<UUID> gamePlayers, String missingRole, Set<UUID> excluded) {
         Set<UUID> gameSet = new HashSet<>(gamePlayers);
 
+        // Deux passes : d'abord les solos qui cherchent déjà ce rôle,
+        // ensuite tous les autres solos
+        List<UUID> priority = new ArrayList<>();
+        List<UUID> fallback = new ArrayList<>();
+
         for (UUID uid : new ArrayList<>(queue)) {
-            // Ignorer les joueurs déjà dans la partie ou exclus
             if (gameSet.contains(uid) || excluded.contains(uid)) continue;
-
-            // Doit être solo (pas en groupe)
             if (partyManager.inParty(uid)) continue;
-
-            // Trouver le joueur (on propose à tout solo, peu importe ses rôles habituels)
             ProxiedPlayer solo = ProxyServer.getInstance().getPlayer(uid);
             if (solo == null) continue;
 
-            // Envoyer la proposition
-            solo.sendMessage(new TextComponent(
-                "§6§l⚔ Proposition de partie !"));
+            List<String> roles = roleManager.getRoles(uid);
+            boolean wantsRole = roles.contains(missingRole)
+                || roles.containsAll(List.of("TOP","JUNGLE","MID","ADC","SUPPORT"));
+            if (wantsRole) priority.add(uid);
+            else           fallback.add(uid);
+        }
+
+        // Fusionner : priorité d'abord
+        List<UUID> ordered = new ArrayList<>(priority);
+        ordered.addAll(fallback);
+
+        for (UUID uid : ordered) {
+            ProxiedPlayer solo = ProxyServer.getInstance().getPlayer(uid);
+            if (solo == null) continue;
+
+            solo.sendMessage(new TextComponent("§6§l⚔ Proposition de partie !"));
             solo.sendMessage(new TextComponent(
                 "§7Un groupe cherche un §e" + formatRole(missingRole) + "§7."));
             solo.sendMessage(new TextComponent(
                 "§aTape §l/lol accepte §r§7ou §c§l/lol refuse §r§7(§720s§7)"));
 
-            // Créer le timeout 20s
             Set<UUID> newExcluded = new HashSet<>(excluded);
             newExcluded.add(uid);
 
             FillProposal proposal = new FillProposal(gamePlayers, missingRole, newExcluded);
             pendingProposals.put(uid, proposal);
 
-            // Timeout automatique
             var task = ProxyServer.getInstance().getScheduler().schedule(plugin, () -> {
                 FillProposal p = pendingProposals.remove(uid);
                 if (p != null) {
                     solo.sendMessage(new TextComponent("§7Proposition expirée — tu restes en file."));
-                    // Proposer au suivant
                     tryProposeFill(gamePlayers, missingRole, newExcluded);
                 }
             }, 20, TimeUnit.SECONDS);
 
             proposal.timeoutTask = task;
-            return; // Une seule proposition à la fois
+            return;
         }
-
-        // Aucun solo trouvé — on attend que quelqu'un rejoigne la file
     }
 
     // ══════════════════════════════════════════════════════════════════════
