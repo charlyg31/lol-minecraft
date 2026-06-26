@@ -456,7 +456,4 @@ public class HotbarManager {
         ownedItems.remove(uuid);
         consumables.remove(uuid);
     }
-
-    /**
 }
-
