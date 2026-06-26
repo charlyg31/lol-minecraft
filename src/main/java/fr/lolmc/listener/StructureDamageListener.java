@@ -138,11 +138,11 @@ public class StructureDamageListener implements Listener {
         // ── Victoire si Nexus principal détruit ──
         if (structure.getType() == Type.NEXUS_BASE) {
             Team winner = enemyTeam.opposite();
-            announceVictory(winner);
+            announceVictory(winner, destroyer);
         }
     }
 
-    private void announceVictory(Team winner) {
+    private void announceVictory(Team winner, Player destroyer) {
         Component msg = Component.text("🏆 VICTOIRE DE L'ÉQUIPE " + winner.name() + " ! 🏆",
                 winner.chatColor);
         for (Player p : LolPlugin.getInstance().getServer().getOnlinePlayers()) {
@@ -165,7 +165,8 @@ public class StructureDamageListener implements Listener {
         var mm  = LolPlugin.getInstance().getMatchmakingManager();
         var im  = LolPlugin.getInstance().getInstanceManager();
         // Trouver l'instance du joueur qui a détruit le Nexus
-        var winnerInstance = (destroyer != null) ? im.getInstanceOf(destroyer) : null;
+        final Player nexusDestroyer = destroyer;
+        var winnerInstance = (nexusDestroyer != null) ? im.getInstanceOf(nexusDestroyer) : null;
         new org.bukkit.scheduler.BukkitRunnable() {
             int countdown = 30;
             @Override public void run() {

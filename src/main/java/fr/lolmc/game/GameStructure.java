@@ -115,6 +115,7 @@ public class GameStructure {
     public String getLane()         { return lane; }
     public int getIndex()           { return index; }
     public Location getCenter()     { return center; }
+    public void setCenter(Location c) { this.center = c; }
     public int getAngle()           { return angle; }
     public void setAngle(int a)     { this.angle = a; }
     public double getMaxHP()        { return maxHP; }
