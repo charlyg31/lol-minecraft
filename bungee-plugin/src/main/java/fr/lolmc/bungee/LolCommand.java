@@ -167,7 +167,7 @@ public class LolCommand extends Command implements TabExecutor {
                 pm.transferLeader(player, args[2]);
             }
 
-            case "info", "status", "statut", "list" -> pm.sendPartyInfo(player);
+            case "info", "status", "statut", "list", "liste" -> pm.sendPartyInfo(player);
 
             default -> sendPartyHelp(player);
         }
