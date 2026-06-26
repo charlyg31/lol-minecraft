@@ -160,7 +160,6 @@ public class StructureDamageListener implements Listener {
         LolPlugin.getInstance().getJungleManager().stopJungle();
         LolPlugin.getInstance().getGameManager().stopGame();
         // Retour au lobby après 30s
-        var bridge = LolPlugin.getInstance().getBridgeManager();
         var mm = LolPlugin.getInstance().getMatchmakingManager();
         new org.bukkit.scheduler.BukkitRunnable() {
             int countdown = 30;
@@ -168,12 +167,6 @@ public class StructureDamageListener implements Listener {
                 if (countdown <= 0) {
                     // Renvoyer à la position d'avant la partie
                     if (mm != null) mm.returnAllToPreGameLocations();
-                    // Si BungeeCord actif, envoyer au lobby en plus
-                    if (bridge != null && bridge.isEnabled()) {
-                        for (Player p : fr.lolmc.util.WorldContext.getGamePlayers()) {
-                            bridge.sendPlayerToLobby(p);
-                        }
-                    }
                     cancel();
                     return;
                 }
