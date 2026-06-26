@@ -25,33 +25,23 @@ public class LobbyQueueManager {
     public void setBridge(LobbyBridge b) { this.bridge = b; }
 
     public void join(Player player) {
-        if (queue.contains(player.getUniqueId())) {
-            player.sendMessage(Component.text("Tu es déjà en file.", NamedTextColor.YELLOW)); return;
-        }
-        // Ajouter le groupe entier
+        if (queue.contains(player.getUniqueId())) return;
         List<UUID> group = partyManager.getPartyMembers(player.getUniqueId());
-        if (queue.size() + group.size() > playersNeeded) {
-            player.sendMessage(Component.text("File presque pleine, attends!", NamedTextColor.RED)); return;
-        }
+        if (queue.size() + group.size() > playersNeeded) return;
         queue.addAll(group);
-        broadcastQueueStatus();
+        // Un seul message dans le tchat pour chaque joueur ajouté
+        for (UUID id : group) {
+            Player p = plugin.getServer().getPlayer(id);
+            if (p != null)
+                p.sendMessage(Component.text(
+                    "Vous êtes dans la file d'attente.",
+                    NamedTextColor.GREEN));
+        }
         checkAndStartGame();
     }
 
     public void leave(Player player) {
-        boolean removed = queue.remove(player.getUniqueId());
-        if (removed) {
-            player.sendMessage(Component.text("Tu as quitté la file.", NamedTextColor.GRAY));
-            broadcastQueueStatus();
-        }
-    }
-
-    private void broadcastQueueStatus() {
-        String msg = String.format("File d'attente: %d/%d joueurs", queue.size(), playersNeeded);
-        for (UUID id : queue) {
-            Player p = plugin.getServer().getPlayer(id);
-            if (p != null) p.sendActionBar(Component.text(msg, NamedTextColor.YELLOW));
-        }
+        queue.remove(player.getUniqueId());
     }
 
     private void checkAndStartGame() {
@@ -73,7 +63,6 @@ public class LobbyQueueManager {
                 }, 40L);
             }
         }
-        broadcastQueueStatus();
     }
 
     public int getQueueSize()     { return queue.size(); }
