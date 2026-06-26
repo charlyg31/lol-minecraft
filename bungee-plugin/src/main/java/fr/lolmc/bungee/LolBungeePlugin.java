@@ -1,45 +1,74 @@
 package fr.lolmc.bungee;
 
+import fr.lolmc.bungee.bridge.BungeeMessageListener;
+import fr.lolmc.bungee.party.BungeePartyManager;
+import fr.lolmc.bungee.queue.BungeeQueueManager;
+import fr.lolmc.bungee.role.BungeeRoleManager;
+import fr.lolmc.bungee.rune.BungeeRuneManager;
 import net.md_5.bungee.api.plugin.Plugin;
 
 /**
  * LolMC-Bungee — Plugin proxy BungeeCord.
  *
- * Rôle unique : intercepter les changements de serveur et transmettre
- * le serveur d'origine de chaque joueur au plugin lobby.
+ * Gère depuis le proxy :
+ *  - File d'attente (queue) — tous les serveurs
+ *  - Groupes (party) — cross-serveur
+ *  - Runes + sorts d'invocateur — persistés dans /plugins/LolMC-Bungee/
+ *  - Rôles — persistés dans /plugins/LolMC-Bungee/
+ *  - Serveur d'origine — pour le retour après la partie
+ *
+ * Le menu GUI reste sur chaque serveur Spigot (plugin léger LolMC-Menu.jar).
+ * Le proxy reçoit les actions du joueur via PluginMessage (canal lolmc:bridge).
  *
  * Installation :
- *   → Mettre LolMC-Bungee.jar dans /plugins/ du proxy BungeeCord
- *   → Configurer bungee.yml (nom du serveur lobby)
- *   → Rien à configurer côté Spigot/Paper
+ *   → LolMC-Bungee.jar dans /plugins/ du PROXY uniquement
+ *   → LolMC-Menu.jar dans /plugins/ de CHAQUE serveur Spigot (survie, skyblock, etc.)
+ *   → LolMC.jar dans /plugins/ du serveur de jeu uniquement
  */
 public class LolBungeePlugin extends Plugin {
 
     private static LolBungeePlugin instance;
-    private OriginTracker originTracker;
+
+    private BungeeQueueManager  queueManager;
+    private BungeePartyManager  partyManager;
+    private BungeeRuneManager   runeManager;
+    private BungeeRoleManager   roleManager;
+    private OriginTracker       originTracker;
 
     @Override
     public void onEnable() {
         instance = this;
-        saveDefaultConfig(); // crée bungee.yml si absent
+        getDataFolder().mkdirs();
+        saveDefaultConfig();
 
+        // Init managers
+        this.runeManager   = new BungeeRuneManager(this);
+        this.roleManager   = new BungeeRoleManager(this);
+        this.partyManager  = new BungeePartyManager(this);
+        this.queueManager  = new BungeeQueueManager(this, partyManager, runeManager, roleManager);
         this.originTracker = new OriginTracker(this);
 
-        // Enregistrer le listener de changement de serveur
+        // Listeners
         getProxy().getPluginManager().registerListener(this, new ServerSwitchListener(this, originTracker));
+        getProxy().getPluginManager().registerListener(this, new BungeeMessageListener(this));
 
-        // Enregistrer le canal de communication avec le lobby
-        getProxy().registerChannel(OriginTracker.CHANNEL);
+        // Canaux PluginMessage
+        getProxy().registerChannel("lolmc:bridge");
 
-        getLogger().info("LolMC-Bungee activé — suivi du serveur d'origine actif.");
+        getLogger().info("LolMC-Bungee activé — file, groupes, runes gérés depuis le proxy.");
     }
 
     @Override
     public void onDisable() {
-        getProxy().unregisterChannel(OriginTracker.CHANNEL);
+        getProxy().unregisterChannel("lolmc:bridge");
         getLogger().info("LolMC-Bungee désactivé.");
     }
 
     public static LolBungeePlugin getInstance() { return instance; }
-    public OriginTracker getOriginTracker()     { return originTracker; }
+
+    public BungeeQueueManager  getQueueManager()  { return queueManager; }
+    public BungeePartyManager  getPartyManager()  { return partyManager; }
+    public BungeeRuneManager   getRuneManager()   { return runeManager; }
+    public BungeeRoleManager   getRoleManager()   { return roleManager; }
+    public OriginTracker       getOriginTracker() { return originTracker; }
 }

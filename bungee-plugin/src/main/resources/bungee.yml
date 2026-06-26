@@ -1,9 +1,4 @@
 name: LolMC-Bungee
 version: 1.0.0
 main: fr.lolmc.bungee.LolBungeePlugin
-description: Plugin proxy BungeeCord pour LolMC — capture le serveur d'origine des joueurs
-
-# Nom du serveur lobby EXACTEMENT comme dans la config BungeeCord (config.yml du proxy)
-# Exemple si tu as:  servers:  lobby: { motd: "...", address: "..." }
-# alors mets:        lobby-server: "lobby"
-lobby-server: "lobby"
+description: Plugin proxy BungeeCord — file, groupes, runes, retour serveur d'origine
