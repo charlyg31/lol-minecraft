@@ -161,17 +161,17 @@ public class StructureDamageListener implements Listener {
         LolPlugin.getInstance().getGameManager().stopGame();
         // Retour au lobby après 30s
         var bridge = LolPlugin.getInstance().getBridgeManager();
+        var mm = LolPlugin.getInstance().getMatchmakingManager();
         new org.bukkit.scheduler.BukkitRunnable() {
             int countdown = 30;
             @Override public void run() {
                 if (countdown <= 0) {
-                    // Envoyer tous les joueurs au lobby
-                    for (Player p : fr.lolmc.util.WorldContext.getGamePlayers()) {
-                        if (bridge != null && bridge.isEnabled()) {
+                    // Renvoyer à la position d'avant la partie
+                    if (mm != null) mm.returnAllToPreGameLocations();
+                    // Si BungeeCord actif, envoyer au lobby en plus
+                    if (bridge != null && bridge.isEnabled()) {
+                        for (Player p : fr.lolmc.util.WorldContext.getGamePlayers()) {
                             bridge.sendPlayerToLobby(p);
-                        } else {
-                            // Pas de BungeeCord : téléporter au spawn du monde
-                            p.teleport(p.getWorld().getSpawnLocation());
                         }
                     }
                     cancel();
@@ -180,7 +180,7 @@ public class StructureDamageListener implements Listener {
                 if (countdown <= 10 || countdown % 10 == 0) {
                     for (Player p : fr.lolmc.util.WorldContext.getGamePlayers()) {
                         p.sendActionBar(net.kyori.adventure.text.Component.text(
-                            "🏠 Retour au lobby dans " + countdown + "s",
+                            "🏠 Retour dans " + countdown + "s",
                             net.kyori.adventure.text.format.NamedTextColor.YELLOW));
                     }
                 }
