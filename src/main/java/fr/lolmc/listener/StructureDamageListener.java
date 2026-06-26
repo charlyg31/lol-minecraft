@@ -168,9 +168,21 @@ public class StructureDamageListener implements Listener {
             int countdown = 30;
             @Override public void run() {
                 if (countdown <= 0) {
-                    // Renvoyer à la position d'avant la partie
+                    var bridge = LolPlugin.getInstance().getBridgeManager();
+                    // Pour chaque joueur : retour sur son serveur d'origine
+                    // (ou téléportation locale si pas de BungeeCord)
+                    for (Player p : fr.lolmc.util.WorldContext.getGamePlayers()) {
+                        if (bridge != null && bridge.isEnabled()) {
+                            // BungeeCord : envoyer vers le serveur d'origine
+                            bridge.sendPlayerToOrigin(p);
+                        } else {
+                            // Pas de BungeeCord : téléporter à la position sauvegardée
+                            if (mm != null) mm.returnPlayerToPreGameLocation(p);
+                        }
+                    }
+                    // Aussi nettoyer les joueurs des instances
                     if (mm != null) mm.returnAllToPreGameLocations();
-                    // Fermer l'instance (décharge + supprime le monde)
+                    // Fermer l'instance
                     if (winnerInstance != null)
                         im.closeInstance(winnerInstance, 60L);
                     cancel();
