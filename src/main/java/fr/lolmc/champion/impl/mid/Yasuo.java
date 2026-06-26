@@ -146,12 +146,15 @@ public class Yasuo extends BaseChampion {
             double[] base=fr.lolmc.util.Balance.base("r_yasuo",new double[]{200,350,500});
             int r=Math.min(getLevel()-1,2);
             double dmg=base[r]+s.getFinalAD()*fr.lolmc.util.Balance.ratio("r_yasuo","ad",1.5);
+            // Yasuo R : propulse en l'air tous les ennemis dans la zone
+            var cc = LolPlugin.getInstance().getCCManager();
             for(var __t : TargetingUtil.enemiesAround(c, 4.0)){
                 TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.PHYSICAL);
-                __t.setVelocity(new Vector(0,0.8,0)); // maintient en l'air
+                if (cc != null) cc.setAirborne(__t, 30); // 1.5s en l'air
                 if(__t instanceof Player __p)
-                    __p.sendActionBar(Component.text("⚔ DERNIER SOUFFLE!",NamedTextColor.DARK_GRAY));
+                    __p.sendActionBar(Component.text("⚔ DERNIER SOUFFLE! Propulsé!",NamedTextColor.DARK_GRAY));
             }
+
             c.getWorld().spawnParticle(Particle.SWEEP_ATTACK,c.getLocation().add(0,1,0),10,2,2,2);
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_PLAYER_ATTACK_CRIT, 1.5f, 0.7f);
         }

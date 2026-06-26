@@ -183,6 +183,15 @@ public class Zed extends BaseChampion {
             double[] ampPct={0.25,0.40,0.55};
             int rank=Math.min(getLevel()-1,2);
             double ad=s.getFinalAD();
+            // Créer une ombre miroir (à l'opposé de la cible)
+            Location shadowRLoc = tgt.getLocation().clone().subtract(
+                c.getLocation().toVector().subtract(tgt.getLocation().toVector()).normalize().multiply(2.0));
+            shadowRLoc.setY(tgt.getLocation().getY());
+            tgt.getWorld().spawnParticle(Particle.SMOKE, shadowRLoc.add(0,1,0), 15, 0.5,1,0.5);
+            // L'ombre lance Q (shuriken) et E (taillade) depuis sa position
+            double shadowQDmg = ad * 0.65; // Q de l'ombre
+            double shadowEDmg = ad * 0.49; // E de l'ombre (70% du E réel)
+            final Location shadowFinalLoc = shadowRLoc;
             new BukkitRunnable(){
                 @Override public void run(){
                     if(tgt.isDead())return;
@@ -192,6 +201,14 @@ public class Zed extends BaseChampion {
                     tgt.getWorld().spawnParticle(Particle.FLASH,tgt.getLocation().add(0,1,0),2);
                     TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.TRUE);
                     if(tgt instanceof Player _tp)_tp.sendMessage(Component.text("☠ DÉTONATION! Marque de Mort",NamedTextColor.DARK_RED));
+                // Ombre miroir : lance Q puis E sur les ennemis proches
+                for (var nearTgt : TargetingUtil.entitiesInRadius(c, shadowFinalLoc.clone().subtract(0,1,0), 5.0)) {
+                    TargetingUtil.dealDamage(c, nearTgt, shadowQDmg, TargetingUtil.DmgType.PHYSICAL);
+                }
+                for (var nearTgt : TargetingUtil.entitiesInRadius(c, shadowFinalLoc.clone().subtract(0,1,0), 4.0)) {
+                    TargetingUtil.dealDamage(c, nearTgt, shadowEDmg, TargetingUtil.DmgType.PHYSICAL);
+                }
+                shadowFinalLoc.getWorld().spawnParticle(Particle.FLASH, shadowFinalLoc, 2);
                 }
             }.runTaskLater(LolPlugin.getInstance(),60L);
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 1f, 0.7f);

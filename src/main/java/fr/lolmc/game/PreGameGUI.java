@@ -137,4 +137,10 @@ public class PreGameGUI implements Listener {
         }
         return item;
     }
+
+    /** Lance la séquence complète : ban → pick → démarrage. */
+    public void startFullSequence() {
+        var csm = LolPlugin.getInstance().getChampSelectManager();
+        csm.startBanPhase();
+    }
 }
