@@ -129,6 +129,8 @@ public class LobbyBridge implements PluginMessageListener {
         sb.append("\"spell1\":\"").append(runes.getOrDefault("spell1","FLASH")).append("\",");
         sb.append("\"spell2\":\"").append(runes.getOrDefault("spell2","IGNITE")).append("\",");
         // Party
+        String role = plugin.getRoleManager().getRole(player.getUniqueId());
+        sb.append("\"role\":\"").append(role).append("\",");
         sb.append("\"party\":\"");
         sb.append(String.join(",", party.stream().map(UUID::toString).toList()));
         sb.append("\"");

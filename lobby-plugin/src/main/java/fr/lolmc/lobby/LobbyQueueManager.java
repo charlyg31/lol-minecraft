@@ -76,6 +76,7 @@ public class LobbyQueueManager {
         broadcastQueueStatus();
     }
 
-    public int getQueueSize() { return queue.size(); }
+    public int getQueueSize()     { return queue.size(); }
+    public int getPlayersNeeded() { return playersNeeded; }
     public boolean isInQueue(UUID uuid) { return queue.contains(uuid); }
 }
