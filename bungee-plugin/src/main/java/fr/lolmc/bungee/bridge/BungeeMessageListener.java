@@ -108,8 +108,9 @@ public class BungeeMessageListener implements Listener {
         if (p == null) return;
         String role = d.get("role");
         if (role != null) {
-            plugin.getRoleManager().setRole(p.getUniqueId(), role);
-            p.sendMessage(new TextComponent("§a✔ Rôle : §l" + role));
+            var roles = java.util.List.of(role.split(","));
+            plugin.getRoleManager().setRoles(p.getUniqueId(), roles);
+            p.sendMessage(new TextComponent("§a✔ Rôles : §l" + role));
         }
     }
 

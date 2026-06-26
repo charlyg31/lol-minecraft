@@ -6,6 +6,7 @@ import net.md_5.bungee.config.ConfigurationProvider;
 import net.md_5.bungee.config.YamlConfiguration;
 
 import java.io.File;
+import java.util.List;
 import java.io.IOException;
 import java.util.UUID;
 
@@ -40,12 +41,15 @@ public class BungeeRoleManager {
         }
     }
 
-    public String getRole(UUID uuid) {
-        return data.getString("players." + uuid + ".role", "FILL");
+    /** Retourne les rôles souhaités (liste, ex: ["TOP","ADC"]). */
+    public List<String> getRoles(UUID uuid) {
+        String raw = data.getString("players." + uuid + ".roles", "");
+        if (raw.isEmpty()) return List.of("TOP","JUNGLE","MID","ADC","SUPPORT"); // FILL
+        return List.of(raw.split(","));
     }
 
-    public void setRole(UUID uuid, String role) {
-        data.set("players." + uuid + ".role", role);
+    public void setRoles(UUID uuid, List<String> roles) {
+        data.set("players." + uuid + ".roles", String.join(",", roles));
         save();
     }
 }
