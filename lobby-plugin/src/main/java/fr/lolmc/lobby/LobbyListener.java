@@ -15,12 +15,7 @@ public class LobbyListener implements Listener {
     public LobbyListener(LobbyPlugin p) { this.plugin = p; }
 
     @EventHandler
-    public void onJoin(PlayerJoinEvent e) {
-        var p = e.getPlayer();
-        p.sendMessage(net.kyori.adventure.text.Component.text(
-            "⚔ Bienvenue dans le lobby LoL! Tape §e/lol §rpour jouer.",
-            net.kyori.adventure.text.format.NamedTextColor.GOLD));
-    }
+    public void onJoin(PlayerJoinEvent e) {}
 
     @EventHandler
     public void onQuit(PlayerQuitEvent e) {
