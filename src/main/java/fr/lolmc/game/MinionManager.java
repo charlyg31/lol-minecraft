@@ -164,9 +164,13 @@ public class MinionManager {
             z.setAdult(); // CORRECTION : Remplace le setBaby(false) déprécié
             z.setShouldBurnInDay(false);
             // Barre de vie initiale
-            fr.lolmc.util.HealthBar.apply(z,
-                minionStats.hp, minionStats.hp,
-                team == Team.BLUE ? "🔵" : "🔴");
+            // Barre de vie initiale
+            double initHp = switch (type) {
+                case CANNON -> 100.0 + waveCount * 3;
+                case SUPER  -> 1500.0;
+                default     -> type == MinionType.MELEE ? 60.0 + waveCount * 2 : 40.0 + waveCount;
+            };
+            fr.lolmc.util.HealthBar.apply(z, initHp, initHp, team == Team.BLUE ? "🔵" : "🔴");
             // Empêcher le zombie de cibler les joueurs tout seul (IA vanilla)
             z.setTarget(null);
             z.getAttribute(Compat.maxHealth()).setBaseValue(MINION_HP);

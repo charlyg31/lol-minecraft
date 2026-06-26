@@ -451,7 +451,7 @@ public class HotbarManager {
         if (remaining > 0) {
             // Griser l'item visuellement via le nom
             meta.displayName(net.kyori.adventure.text.Component.text(
-                ability.getDisplayName() + " ⏱ " + String.format("%.1f", remaining) + "s",
+                ability.getName() + " ⏱ " + String.format("%.1f", remaining) + "s",
                 net.kyori.adventure.text.format.NamedTextColor.GRAY)
                 .decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
             lore.add(net.kyori.adventure.text.Component.text(
@@ -460,7 +460,7 @@ public class HotbarManager {
                 .decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
         } else {
             meta.displayName(net.kyori.adventure.text.Component.text(
-                ability.getDisplayName(),
+                ability.getName(),
                 net.kyori.adventure.text.format.NamedTextColor.WHITE)
                 .decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
             lore.add(net.kyori.adventure.text.Component.text(

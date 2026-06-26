@@ -103,6 +103,8 @@ public class StructureDamageListener implements Listener {
     private void onStructureDestroyed(GameStructure structure, Player destroyer) {
         String name = structureName(structure);
         Team enemyTeam = structure.getTeam();
+        Player player = destroyer;
+        Team playerTeam = LolPlugin.getInstance().getTeamManager().getTeam(destroyer);
 
         // Inhibiteur détruit → super-sbires sur cette lane pour l'équipe adverse
         if (structure.getType() == Type.TURRET) {
@@ -163,7 +165,7 @@ public class StructureDamageListener implements Listener {
         var mm  = LolPlugin.getInstance().getMatchmakingManager();
         var im  = LolPlugin.getInstance().getInstanceManager();
         // Trouver l'instance du joueur qui a détruit le Nexus
-        var winnerInstance = (player != null) ? im.getInstanceOf(player) : null;
+        var winnerInstance = (destroyer != null) ? im.getInstanceOf(destroyer) : null;
         new org.bukkit.scheduler.BukkitRunnable() {
             int countdown = 30;
             @Override public void run() {

@@ -46,6 +46,17 @@ public class ChampSelectManager {
     /**
      * Lance la phase de sélection avec les joueurs donnés (ex: les 10 de la file).
      */
+    /** Alias utilisé par MatchmakingManager et PreGameGUI — lance la sélection. */
+    public void startBanPhase() {
+        var gm = LolPlugin.getInstance().getGameManager();
+        if (gm != null) startSelection(gm.getParticipants());
+    }
+
+    /** Appelé depuis ChampSelectGUI quand un joueur clique sur un champion en phase de ban. */
+    public void onBanClick(org.bukkit.entity.Player player, String championId) {
+        fr.lolmc.game.ChampSelectGUI.banChampion(championId);
+    }
+
     public void startSelection(Collection<UUID> players) {
         if (phase != Phase.IDLE && phase != Phase.LOBBY) return;
         phase = Phase.SELECTING;

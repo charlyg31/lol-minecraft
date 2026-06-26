@@ -2,6 +2,7 @@ package fr.lolmc.instance;
 
 import fr.lolmc.LolPlugin;
 import fr.lolmc.game.*;
+import fr.lolmc.item.PassiveManager;
 import org.bukkit.entity.Player;
 
 /**

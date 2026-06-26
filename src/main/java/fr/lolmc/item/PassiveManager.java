@@ -15,6 +15,7 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Location;
 import org.bukkit.Particle;
+import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
@@ -375,13 +376,14 @@ public class PassiveManager {
         }
 
         // ── Morgana Siphon de l'Âme : soin sur sorts (20% dégâts) ──
-        if (cm.hasChampion(caster) && "morgana".equals(cm.getChampion(caster).getId())) {
+        { var __cm = LolPlugin.getInstance().getChampionManager();
+        if (__cm.hasChampion(caster) && "morgana".equals(__cm.getChampion(caster).getId())) {
             boolean isChampOrMonster = (victim instanceof Player)
                 || fr.lolmc.game.JungleManager.isJungleMonster(victim);
             if (isChampOrMonster) {
-                cm.getChampion(caster).getHPSystem().heal(rawDamage * 0.20);
+                __cm.getChampion(caster).getHPSystem().heal(rawDamage * 0.20);
             }
-        }
+        }}
 
         // ── Taste of Blood : soin sur dégâts à champion (CD 20s) ──
         if (LolPlugin.getInstance().getRuneManager() != null) {
