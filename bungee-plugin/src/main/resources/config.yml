@@ -1,0 +1,13 @@
+# ── Serveurs BungeeCord ────────────────────────────────────────────────
+# Nom EXACT du serveur de jeu LoL dans ta config BungeeCord (config.yml du proxy)
+game-server: "lolmc-01"
+
+# Serveur où renvoyer le joueur si son serveur d'origine est inconnu
+fallback-server: "survie"
+
+# ── File d'attente ─────────────────────────────────────────────────────
+# Nombre de joueurs nécessaires pour lancer une partie
+players-per-game: 10
+
+# ── Groupes ────────────────────────────────────────────────────────────
+max-party-size: 5
