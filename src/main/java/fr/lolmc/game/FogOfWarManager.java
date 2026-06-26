@@ -39,6 +39,28 @@ public class FogOfWarManager {
     }
 
     /**
+     * Vérifie si un ennemi est visible par les tourelles alliées
+     * (tourelles non détruites révèlent un rayon de 10 blocs).
+     */
+    private boolean revealedByAllyTurret(Player viewer, Player target) {
+        var tm = LolPlugin.getInstance().getTeamManager();
+        var team = tm.getTeam(viewer);
+        if (team == null) return false;
+        var mapMgr = LolPlugin.getInstance().getMapManager();
+        if (mapMgr == null) return false;
+        for (var s : mapMgr.getStructuresForTeam(team)) {
+            if (s.isDestroyed()) continue;
+            if (s.getType() != fr.lolmc.game.GameStructure.Type.TURRET) continue;
+            try {
+                if (s.getCenter().getWorld().equals(target.getWorld())
+                        && s.getCenter().distance(target.getLocation()) <= 10.0)
+                    return true;
+            } catch (Exception ignored) {}
+        }
+        return false;
+    }
+
+    /**
      * Vérifie si un ennemi est visible par les sbires alliés
      * (un sbire allié à portée révèle les ennemis proches).
      */
@@ -74,8 +96,9 @@ public class FogOfWarManager {
 
                 // Alliés toujours visibles
                 // Un allié est toujours visible; un ennemi révélé par sbire allié aussi
-                boolean revealedByMinion = revealedByAllyMinion(viewer, target);
-                if (!teamManager.areEnemies(viewer, target) || revealedByMinion) {
+                boolean revealedByMinion  = revealedByAllyMinion(viewer, target);
+                boolean revealedByTurret  = revealedByAllyTurret(viewer, target);
+                if (!teamManager.areEnemies(viewer, target) || revealedByMinion || revealedByTurret) {
                     viewer.showPlayer(LolPlugin.getInstance(), target);
                     continue;
                 }
