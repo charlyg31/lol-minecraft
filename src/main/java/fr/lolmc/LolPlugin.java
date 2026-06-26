@@ -103,6 +103,7 @@ public class LolPlugin extends JavaPlugin {
     private AbilityListener abilityListener;
     private fr.lolmc.bridge.BridgeManager bridgeManager;
     private fr.lolmc.ability.AbilityPreview abilityPreview;
+    private fr.lolmc.instance.InstanceManager instanceManager;
 
     @Override
     public void onEnable() {
@@ -115,7 +116,8 @@ public class LolPlugin extends JavaPlugin {
         initManagersAndListeners();
         registerCommands();
 
-        this.abilityPreview = new fr.lolmc.ability.AbilityPreview();
+        this.abilityPreview   = new fr.lolmc.ability.AbilityPreview();
+        this.instanceManager  = new fr.lolmc.instance.InstanceManager(this);
         // Bridge cross-serveur (BungeeCord)
         this.bridgeManager = new fr.lolmc.bridge.BridgeManager(this);
 
@@ -273,6 +275,7 @@ public class LolPlugin extends JavaPlugin {
         if (chunkLoaderManager != null) chunkLoaderManager.clearAllForcedChunks();
         if (apiServer != null) apiServer.stop();
         if (databaseManager != null) databaseManager.close();
+        if (instanceManager != null) instanceManager.shutdownAll();
         if (abilityPreview != null) abilityPreview.stopAll();
         if (bridgeManager != null) bridgeManager.disable();
         fr.lolmc.util.DebugLogger.close();
@@ -329,4 +332,5 @@ public class LolPlugin extends JavaPlugin {
     public fr.lolmc.bridge.BridgeManager getBridgeManager() { return bridgeManager; }
 
     public fr.lolmc.ability.AbilityPreview getAbilityPreview() { return abilityPreview; }
+    public fr.lolmc.instance.InstanceManager getInstanceManager() { return instanceManager; }
 }

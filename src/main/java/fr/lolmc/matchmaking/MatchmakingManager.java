@@ -220,37 +220,49 @@ public class MatchmakingManager {
             allPlayers.addAll(red);
             bridge.notifyGameStart(allPlayers);
         }
-        // Assigner les équipes
-        var tm = LolPlugin.getInstance().getTeamManager();
-        for (UUID id : blue) tm.setTeam(Bukkit.getPlayer(id), fr.lolmc.team.TeamManager.Team.BLUE);
-        for (UUID id : red)  tm.setTeam(Bukkit.getPlayer(id), fr.lolmc.team.TeamManager.Team.RED);
-        // Téléporter dans le monde de jeu
-        var gameWorld = fr.lolmc.util.WorldContext.getGameWorld();
-        var mapMgr = LolPlugin.getInstance().getMapManager();
-        if (gameWorld != null && mapMgr != null) {
-            for (UUID id : blue) {
+        // Sauvegarder les positions avant la partie
+        for (UUID id : blue) { Player p = Bukkit.getPlayer(id); if (p != null) preGameLocations.put(id, p.getLocation().clone()); }
+        for (UUID id : red)  { Player p = Bukkit.getPlayer(id); if (p != null) preGameLocations.put(id, p.getLocation().clone()); }
+
+        // Créer une instance isolée (copie du monde template)
+        final List<UUID> blueF = blue, redF = red;
+        LolPlugin.getInstance().getInstanceManager().createInstance(blue, red, instance -> {
+            if (instance == null) {
+                LolPlugin.getInstance().getLogger().severe("[Match] Impossible de créer l'instance!");
+                // Notifier les joueurs
+                for (UUID id : blueF) { Player p = Bukkit.getPlayer(id); if (p != null) p.sendMessage("§cErreur: impossible de créer la partie. Réessaie."); }
+                for (UUID id : redF)  { Player p = Bukkit.getPlayer(id); if (p != null) p.sendMessage("§cErreur: impossible de créer la partie. Réessaie."); }
+                return;
+            }
+            // Téléporter les joueurs dans l'instance
+            var mapMgr = instance.getMapManager();
+            for (UUID id : blueF) {
                 Player p = Bukkit.getPlayer(id);
                 if (p != null) {
-                    preGameLocations.put(id, p.getLocation().clone()); // sauvegarder
                     org.bukkit.Location spawn = mapMgr.getSpawn(fr.lolmc.team.TeamManager.Team.BLUE, 0);
                     if (spawn != null) p.teleport(spawn);
+                    p.sendMessage(net.kyori.adventure.text.Component.text(
+                        "⚔ Instance #" + instance.getId() + " — Partie trouvée!",
+                        net.kyori.adventure.text.format.NamedTextColor.GOLD));
                 }
             }
-            for (UUID id : red) {
+            for (UUID id : redF) {
                 Player p = Bukkit.getPlayer(id);
                 if (p != null) {
-                    preGameLocations.put(id, p.getLocation().clone()); // sauvegarder
                     org.bukkit.Location spawn = mapMgr.getSpawn(fr.lolmc.team.TeamManager.Team.RED, 0);
                     if (spawn != null) p.teleport(spawn);
+                    p.sendMessage(net.kyori.adventure.text.Component.text(
+                        "⚔ Instance #" + instance.getId() + " — Partie trouvée!",
+                        net.kyori.adventure.text.format.NamedTextColor.GOLD));
                 }
             }
-        }
-        // Phase de ban → pick → démarrage
-        new org.bukkit.scheduler.BukkitRunnable() {
-            @Override public void run() {
-                LolPlugin.getInstance().getChampSelectManager().startBanPhase();
-            }
-        }.runTaskLater(LolPlugin.getInstance(), 60L); // 3s après téléportation
+            // Phase de ban → pick → démarrage (3s après téléportation)
+            new org.bukkit.scheduler.BukkitRunnable() {
+                @Override public void run() {
+                    LolPlugin.getInstance().getChampSelectManager().startBanPhase();
+                }
+            }.runTaskLater(LolPlugin.getInstance(), 60L);
+        });
     }
 
     /** Renvoie un joueur à sa position d'avant la partie (appelé à la fin). */

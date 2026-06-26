@@ -180,3 +180,5 @@ permissions:
   lolmc.champion.missfortune: {description: Jouer Miss Fortune, default: true}
 
 bungeecord: true
+
+soft-depend: [Multiverse-Core]
