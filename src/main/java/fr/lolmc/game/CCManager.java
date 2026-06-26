@@ -80,6 +80,24 @@ public class CCManager {
         target.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, ticks, amplifier, false, true));
     }
 
+    // ── Airborne (knockup) ────────────────────────────────────────────
+    private final java.util.Map<UUID, Long> airborneUntil
+        = new java.util.concurrent.ConcurrentHashMap<>();
+
+    public void setAirborne(org.bukkit.entity.LivingEntity target, int ticks) {
+        ticks = withTenacity(target, ticks);
+        long until = now() + ticks * 50L;
+        airborneUntil.merge(target.getUniqueId(), until, Math::max);
+        target.setVelocity(new org.bukkit.util.Vector(0, 0.7, 0));
+        if (target instanceof org.bukkit.entity.Player p)
+            p.sendActionBar(net.kyori.adventure.text.Component.text(
+                "💨 Propulsé!", net.kyori.adventure.text.format.NamedTextColor.GRAY));
+    }
+
+    public boolean isAirborne(UUID id) {
+        return now() < airborneUntil.getOrDefault(id, 0L);
+    }
+
     // ── État ──
 
     public boolean isStunned(UUID id)  { return now() < stunUntil.getOrDefault(id, 0L); }
@@ -95,5 +113,6 @@ public class CCManager {
         stunUntil.remove(id);
         rootUntil.remove(id);
         silenceUntil.remove(id);
+        airborneUntil.remove(id);
     }
 }

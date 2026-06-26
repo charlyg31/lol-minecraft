@@ -21,6 +21,8 @@ import java.util.UUID;
  * et le système de ping (alertes envoyées à l'équipe).
  */
 public class AnnouncementManager {
+
+    public AnnouncementManager() {}
     private static final java.util.Map<java.util.UUID, Integer> spreeStreak = new java.util.HashMap<>();
 
     private boolean firstBloodDone = false;
