@@ -169,6 +169,12 @@ public class JungleManager {
         return type.name().toLowerCase() + "_" + (team != null ? team.name().toLowerCase() : "neutral");
     }
 
+    /** Constructeur instance : scoped à un World précis. */
+    public JungleManager(org.bukkit.World world) {
+        this();
+        this.scopedWorld = world;
+    }
+
     // ══════════════════════════════════════════════════════════════
     // SPAWN / RESPAWN
     // ══════════════════════════════════════════════════════════════
