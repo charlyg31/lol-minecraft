@@ -32,6 +32,59 @@ public class GameManager {
     // Temps de respawn figé au moment de la mort (bug bossbar)
     private final java.util.Map<java.util.UUID, Integer> respawnTotalSecondsMap
         = new java.util.concurrent.ConcurrentHashMap<>();
+    // ── Snapshots joueurs pour reconnexion ───────────────────────────────
+    // Sauvegarde l'état complet (HP, level, or, items) à la déconnexion
+    private final java.util.Map<java.util.UUID, PlayerSnapshot> playerSnapshots
+        = new java.util.concurrent.ConcurrentHashMap<>();
+
+    public record PlayerSnapshot(
+        double hp, double maxHp, double resource, int level, int gold,
+        java.util.UUID teamId, long respawnAt
+    ) {}
+
+    /** Appelé depuis AbilityListener.onQuit quand un joueur quitte en pleine partie. */
+    public void onPlayerLeave(org.bukkit.entity.Player player) {
+        if (!gameRunning || !participants.contains(player.getUniqueId())) return;
+        var cm = LolPlugin.getInstance().getChampionManager();
+        if (!cm.hasChampion(player)) return;
+        var champ = cm.getChampion(player);
+        int gold = LolPlugin.getInstance().getGoldManager().getGold(player.getUniqueId());
+        long respawn = respawnAt.getOrDefault(player.getUniqueId(), 0L);
+        playerSnapshots.put(player.getUniqueId(), new PlayerSnapshot(
+            champ.getHPSystem().getCurrentHP(),
+            champ.getHPSystem().getMaxHP(),
+            champ.getResourceSystem().getCurrent(),
+            champ.getLevelSystem().getLevel(),
+            gold, player.getUniqueId(), respawn
+        ));
+        LolPlugin.getInstance().getLogger().info("[GameManager] Snapshot sauvegardé pour "
+            + player.getName() + " (level=" + champ.getLevelSystem().getLevel()
+            + " hp=" + (int)champ.getHPSystem().getCurrentHP() + ")");
+    }
+
+    /** Appelé depuis AbilityListener.onJoin quand un joueur revient en partie. */
+    public void onPlayerRejoin(org.bukkit.entity.Player player) {
+        if (!gameRunning) return;
+        PlayerSnapshot snap = playerSnapshots.remove(player.getUniqueId());
+        if (snap == null) return;
+        var cm = LolPlugin.getInstance().getChampionManager();
+        if (!cm.hasChampion(player)) return;
+        var champ = cm.getChampion(player);
+        // Restaurer HP, level, or
+        champ.getHPSystem().setCurrentHP(snap.hp());
+        champ.getLevelSystem().setLevel(snap.level());
+        LolPlugin.getInstance().getGoldManager().setGold(player.getUniqueId(), snap.gold());
+        champ.getResourceSystem().setCurrent(snap.resource());
+        // Restaurer le respawn si applicable
+        if (snap.respawnAt() > System.currentTimeMillis())
+            respawnAt.put(player.getUniqueId(), snap.respawnAt());
+        player.sendMessage(net.kyori.adventure.text.Component.text(
+            "✔ Reconnecté! Ton état a été restauré (level " + snap.level() + ", "
+            + (int)snap.hp() + " HP, " + snap.gold() + " or).",
+            net.kyori.adventure.text.format.NamedTextColor.GREEN));
+        LolPlugin.getInstance().getLogger().info("[GameManager] Snapshot restauré pour " + player.getName());
+    }
+
     // Inhibiteurs détruits avec leur timestamp de respawn (5 min = 300s)
     private final java.util.Map<String, Long> inhibitorRespawnAt = new java.util.concurrent.ConcurrentHashMap<>();
     private static final long INHIBITOR_RESPAWN_MS = 300_000L; // 5 minutes
@@ -114,6 +167,7 @@ public class GameManager {
         participants.clear();
         participantTeam.clear();
         goldAccumulator.clear();
+        playerSnapshots.clear();
         // Remettre les joueurs dans un état normal (SURVIVAL, etc.)
         for (org.bukkit.entity.Player p : fr.lolmc.util.WorldContext.getGamePlayers()) {
             if (p.getGameMode() == org.bukkit.GameMode.SPECTATOR)

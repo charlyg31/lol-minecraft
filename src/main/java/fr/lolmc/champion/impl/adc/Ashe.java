@@ -84,9 +84,46 @@ public class Ashe extends BaseChampion {
             new double[]{5,4,3,2,1},60,0,DamageType.TRUE);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            c.sendActionBar(Component.text("🦅 Faucon envoyé! Zone révélée.",NamedTextColor.YELLOW));
+            // Faucon qui voyage 40 blocs dans la direction du regard
+            // Révèle les ennemis dans un rayon de 8 blocs autour de son trajet
+            org.bukkit.Location start = c.getEyeLocation();
+            org.bukkit.util.Vector dir = start.getDirection().normalize();
+            int maxSteps = 80; // 40 blocs à 0.5 bloc/tick
+            var tm = LolPlugin.getInstance().getTeamManager();
+            var fogMgr = LolPlugin.getInstance().getFogOfWarManager();
+            new org.bukkit.scheduler.BukkitRunnable() {
+                int step = 0;
+                org.bukkit.Location pos = start.clone();
+                @Override public void run() {
+                    if (step >= maxSteps || !c.isOnline()) { cancel(); return; }
+                    pos.add(dir.clone().multiply(0.5));
+                    // Particule faucon (END_ROD jaune-doré)
+                    pos.getWorld().spawnParticle(org.bukkit.Particle.END_ROD,
+                        pos, 1, 0.05, 0.05, 0.05, 0);
+                    // Révéler les ennemis dans un rayon de 8 blocs
+                    for (var nearby : pos.getWorld().getNearbyEntities(pos, 8, 4, 8)) {
+                        if (nearby instanceof Player enemy
+                                && !enemy.equals(c)
+                                && tm.areEnemies(c, enemy)) {
+                            // Rendre temporairement visible via GLOWING
+                            enemy.addPotionEffect(new org.bukkit.potion.PotionEffect(
+                                org.bukkit.potion.PotionEffectType.GLOWING, 60, 0, false, false));
+                            c.sendActionBar(Component.text(
+                                "🦅 Faucon: " + enemy.getName() + " détecté!",
+                                NamedTextColor.YELLOW));
+                        }
+                    }
+                    step++;
+                    // S'arrêter sur un bloc solide
+                    if (pos.getBlock().getType().isSolid()) { cancel(); }
+                }
+            }.runTaskTimer(LolPlugin.getInstance(), 0L, 1L);
+            c.sendActionBar(Component.text("🦅 Faucon envoyé!", NamedTextColor.YELLOW));
+            c.getWorld().playSound(c.getLocation(), org.bukkit.Sound.ENTITY_PARROT_FLY, 0.8f, 1.5f);
         }
-        @Override public String getDynamicDescription(ChampionStats s){return "Envoie un faucon révélant une zone de la carte.";}
+        @Override public String getDynamicDescription(ChampionStats s){
+            return "Envoie un faucon 40 blocs: révèle ennemis dans son trajet (GLOWING 3s).";
+        }
     }
 
     static class R extends BaseAbility {

@@ -401,6 +401,11 @@ public class AbilityListener implements Listener {
     public void onJoinBridge(org.bukkit.event.player.PlayerJoinEvent e) {
         var bridge = LolPlugin.getInstance().getBridgeManager();
         if (bridge != null && bridge.isEnabled()) bridge.onPlayerJoin(e.getPlayer());
+        // Restaurer l'état si reconnexion en pleine partie
+        var gm = LolPlugin.getInstance().getGameManager();
+        if (gm != null && gm.isRunning())
+            org.bukkit.Bukkit.getScheduler().runTaskLater(LolPlugin.getInstance(),
+                () -> gm.onPlayerRejoin(e.getPlayer()), 40L);
     }
 
     @EventHandler
