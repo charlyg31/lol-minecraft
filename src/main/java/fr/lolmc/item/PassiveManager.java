@@ -374,6 +374,15 @@ public class PassiveManager {
             // Les boucliers ne sont pas implémentés comme HP séparés → skip
         }
 
+        // ── Morgana Siphon de l'Âme : soin sur sorts (20% dégâts) ──
+        if (cm.hasChampion(caster) && "morgana".equals(cm.getChampion(caster).getId())) {
+            boolean isChampOrMonster = (victim instanceof Player)
+                || fr.lolmc.game.JungleManager.isJungleMonster(victim);
+            if (isChampOrMonster) {
+                cm.getChampion(caster).getHPSystem().heal(rawDamage * 0.20);
+            }
+        }
+
         // ── Taste of Blood : soin sur dégâts à champion (CD 20s) ──
         if (LolPlugin.getInstance().getRuneManager() != null) {
             var pageToB = LolPlugin.getInstance().getRuneManager().getPage(caster.getUniqueId());
@@ -587,25 +596,56 @@ public class PassiveManager {
                     sendCDMessage(player, "Galeforce", state.lastGaleforce, 90000L); return;
                 }
                 state.lastGaleforce = System.currentTimeMillis();
-                // Dash dans la direction du regard
-                Location dest = (player.getTargetBlockExact(10) != null ? player.getTargetBlockExact(10).getLocation() : player.getLocation().add(player.getLocation().getDirection().multiply(10)));
-                if (dest != null) {
-                    Location safe = safeLocation(player.getLocation(), dest);
-                    player.teleport(safe);
-                }
-                // 3 projectiles sur ennemis proches
                 ChampionStats stats = champ.getStats();
                 double projDmg = stats.calcPhysicalDamage(200 + stats.getFinalAD() * 0.60, null);
-                player.getWorld().getNearbyEntities(player.getLocation(), 8, 2, 8).stream()
-                    .filter(e -> e instanceof Player && !e.equals(player))
-                    .limit(3)
-                    .forEach(e -> {
-                        if (championManager.hasChampion((Player)e)) {
-                            championManager.getChampion((Player)e).getHPSystem().takeDamage(projDmg);
-                            player.getWorld().spawnParticle(Particle.CRIT, e.getLocation().add(0,1,0), 8);
+                // Animation dash : traînée de particules
+                Location dashStart = player.getLocation().clone();
+                Location dashDest = player.getTargetBlockExact(10) != null
+                    ? player.getTargetBlockExact(10).getLocation()
+                    : player.getLocation().add(player.getLocation().getDirection().multiply(10));
+                Location dashSafe = safeLocation(dashStart, dashDest);
+                // Traînée avant téléportation
+                double dashDist = dashStart.distance(dashSafe);
+                int dashSteps = Math.max(3, (int)(dashDist / 0.4));
+                org.bukkit.util.Vector dashStep = dashSafe.toVector()
+                    .subtract(dashStart.toVector()).normalize().multiply(dashDist / dashSteps);
+                org.bukkit.Location cur = dashStart.clone();
+                for (int si = 0; si < dashSteps; si++) {
+                    cur.add(dashStep);
+                    player.getWorld().spawnParticle(Particle.END_ROD, cur.clone(), 2, 0.1, 0.1, 0.1, 0);
+                    player.getWorld().spawnParticle(Particle.CRIT, cur.clone(), 1, 0.05, 0.05, 0.05, 0);
+                }
+                player.teleport(dashSafe);
+                player.getWorld().playSound(dashSafe, Sound.ENTITY_PHANTOM_FLAP, 1f, 1.5f);
+                // 3 projectiles animés vers les 3 ennemis les plus proches
+                final var enemies = player.getWorld().getNearbyEntities(player.getLocation(), 8, 2, 8).stream()
+                    .filter(e -> e instanceof Player ep && !ep.equals(player)
+                        && championManager.hasChampion((Player)e)
+                        && LolPlugin.getInstance().getTeamManager().areEnemies(player, (Player)e))
+                    .limit(3).toList();
+                for (var enemy : enemies) {
+                    final var fe = enemy;
+                    Location projStart = player.getLocation().clone().add(0,1,0);
+                    Location projEnd = fe.getLocation().clone().add(0,1,0);
+                    double pd = projStart.distance(projEnd);
+                    int ps = Math.max(3,(int)(pd/0.5));
+                    org.bukkit.util.Vector pv = projEnd.toVector().subtract(projStart.toVector()).normalize().multiply(pd/ps);
+                    new org.bukkit.scheduler.BukkitRunnable(){
+                        int pi=0; Location pc = projStart.clone();
+                        @Override public void run(){
+                            if(pi>=ps){cancel();
+                                if(championManager.hasChampion((Player)fe))
+                                    championManager.getChampion((Player)fe).getHPSystem().takeDamage(projDmg);
+                                fe.getLocation().getWorld().spawnParticle(Particle.FLASH,fe.getLocation().add(0,1,0),1);
+                                fe.getLocation().getWorld().playSound(fe.getLocation(), Sound.ENTITY_ARROW_HIT, 0.8f, 1.3f);
+                                return;}
+                            pc.add(pv);
+                            pc.getWorld().spawnParticle(Particle.CRIT,pc,2,0.05,0.05,0.05,0);
+                            pi++;
                         }
-                    });
-                player.sendActionBar(Component.text("⚡ Galeforce!", NamedTextColor.YELLOW));
+                    }.runTaskTimer(LolPlugin.getInstance(),0L,1L);
+                }
+                player.sendActionBar(Component.text("⚡ Galeforce! " + enemies.size() + " projectiles", NamedTextColor.YELLOW));
                 }
     private void activateShurelyas(Player player, BaseChampion champ, ItemState state) {
                 if (state.isOnCooldown(state.lastShurelyas, 120000L)) {

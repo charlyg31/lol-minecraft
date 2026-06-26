@@ -36,4 +36,10 @@ public class GoldManager {
     public void removePlayer(UUID uuid) {
         gold.remove(uuid);
     }
+
+
+    /** Définit l'or d'un joueur à une valeur exacte (utilisé pour la reconnexion). */
+    public void setGold(java.util.UUID uuid, int amount) {
+        golds.put(uuid, Math.max(0, amount));
+    }
 }
