@@ -159,6 +159,34 @@ public class StructureDamageListener implements Listener {
         LolPlugin.getInstance().getMinionManager().stopWaves();
         LolPlugin.getInstance().getJungleManager().stopJungle();
         LolPlugin.getInstance().getGameManager().stopGame();
+        // Retour au lobby après 30s
+        var bridge = LolPlugin.getInstance().getBridgeManager();
+        new org.bukkit.scheduler.BukkitRunnable() {
+            int countdown = 30;
+            @Override public void run() {
+                if (countdown <= 0) {
+                    // Envoyer tous les joueurs au lobby
+                    for (Player p : fr.lolmc.util.WorldContext.getGamePlayers()) {
+                        if (bridge != null && bridge.isEnabled()) {
+                            bridge.sendPlayerToLobby(p);
+                        } else {
+                            // Pas de BungeeCord : téléporter au spawn du monde
+                            p.teleport(p.getWorld().getSpawnLocation());
+                        }
+                    }
+                    cancel();
+                    return;
+                }
+                if (countdown <= 10 || countdown % 10 == 0) {
+                    for (Player p : fr.lolmc.util.WorldContext.getGamePlayers()) {
+                        p.sendActionBar(net.kyori.adventure.text.Component.text(
+                            "🏠 Retour au lobby dans " + countdown + "s",
+                            net.kyori.adventure.text.format.NamedTextColor.YELLOW));
+                    }
+                }
+                countdown--;
+            }
+        }.runTaskTimer(LolPlugin.getInstance(), 20L, 20L);
     }
 
     private String structureName(GameStructure s) {

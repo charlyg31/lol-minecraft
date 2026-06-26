@@ -48,6 +48,19 @@ public class Jinx extends BaseChampion {
 
     static class AA extends BasicAttackAbility {
         AA(){super("jinx",Material.CROSSBOW,6.0f,DamageType.PHYSICAL);}
+        @Override protected void onHit(Player c, ChampionStats s, org.bukkit.entity.LivingEntity tgt, double dmg) {
+            // Mode Fishbones : AoE autour de la cible principale (107% AD total réparti)
+            if (fishbonesMode.getOrDefault(c.getUniqueId(), false)) {
+                var tm = LolPlugin.getInstance().getTeamManager();
+                for (var nearby : fr.lolmc.util.TargetingUtil.enemiesAround(c, 2.5)) {
+                    if (nearby.equals(tgt)) continue; // cible principale déjà touchée
+                    fr.lolmc.util.TargetingUtil.dealDamage(c, nearby,
+                        dmg * 0.87, fr.lolmc.util.TargetingUtil.DmgType.PHYSICAL);
+                }
+                tgt.getWorld().spawnParticle(org.bukkit.Particle.EXPLOSION,
+                    tgt.getLocation().add(0,0.5,0), 3, 0.5,0.2,0.5);
+            }
+        }
     }
 
     static class Q extends BaseAbility {
