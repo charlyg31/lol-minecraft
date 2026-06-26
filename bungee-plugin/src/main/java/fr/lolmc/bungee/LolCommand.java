@@ -88,10 +88,17 @@ public class LolCommand extends Command implements TabExecutor {
             }
             if (!roles.contains(r.toUpperCase())) roles.add(r.toUpperCase());
         }
-        if (roles.size() < 2) {
-            player.sendMessage(new TextComponent("§cMinimum 2 rôles requis."));
-            player.sendMessage(new TextComponent(
-                "§7Exemple : §a/lol top adc §7| §a/lol mid jungle §7| §a/lol all"));
+        // Groupe de 5 → 1 rôle suffit, sinon minimum 2
+        int partySize = plugin.getPartyManager().getPartyMembers(player.getUniqueId()).size();
+        int minRoles  = (partySize >= 5) ? 1 : 2;
+        if (roles.size() < minRoles) {
+            if (minRoles == 1)
+                player.sendMessage(new TextComponent("§cChoisis au moins un rôle."));
+            else {
+                player.sendMessage(new TextComponent("§cMinimum 2 rôles requis."));
+                player.sendMessage(new TextComponent(
+                    "§7Exemple : §a/lol top adc §7| §a/lol mid jungle §7| §a/lol all"));
+            }
             return;
         }
         handleQueue(player, roles);
