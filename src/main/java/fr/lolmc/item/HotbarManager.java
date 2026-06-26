@@ -323,7 +323,43 @@ public class HotbarManager {
      * Ne fait rien si le joueur n'est pas sur la page 1.
      */
     public void refreshAbilitySlot(Player player, BaseChampion champ, int slot) {
-
+        if (!fr.lolmc.util.WorldContext.isInGameWorld(player)) return;
+        if (slot < 0 || slot > 4) return;
+        var ability = champ.getAbility(slot);
+        if (ability == null) return;
+        org.bukkit.inventory.ItemStack stack = player.getInventory().getItem(slot);
+        if (stack == null || stack.getType() == org.bukkit.Material.AIR) return;
+        org.bukkit.inventory.meta.ItemMeta meta = stack.getItemMeta();
+        if (meta == null) return;
+        double remaining = ability.getRemainingCooldown(player);
+        java.util.List<net.kyori.adventure.text.Component> lore = new java.util.ArrayList<>();
+        if (remaining > 0) {
+            meta.displayName(net.kyori.adventure.text.Component.text(
+                ability.getName() + " ⏱ " + String.format("%.1f", remaining) + "s",
+                net.kyori.adventure.text.format.NamedTextColor.GRAY)
+                .decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
+            lore.add(net.kyori.adventure.text.Component.text(
+                "CD: " + String.format("%.1f", remaining) + "s",
+                net.kyori.adventure.text.format.NamedTextColor.RED)
+                .decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
+        } else {
+            meta.displayName(net.kyori.adventure.text.Component.text(
+                ability.getName(),
+                net.kyori.adventure.text.format.NamedTextColor.WHITE)
+                .decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
+            lore.add(net.kyori.adventure.text.Component.text(
+                "✔ Prêt!",
+                net.kyori.adventure.text.format.NamedTextColor.GREEN)
+                .decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
+        }
+        String desc = ability.getDynamicDescription(champ.getStats());
+        if (desc != null && !desc.isEmpty())
+            lore.add(net.kyori.adventure.text.Component.text(desc,
+                net.kyori.adventure.text.format.NamedTextColor.GRAY)
+                .decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
+        meta.lore(lore);
+        stack.setItemMeta(meta);
+    }
 
     public static String getType(ItemStack stack) {
         if (stack == null) return null;
@@ -422,19 +458,5 @@ public class HotbarManager {
     }
 
     /**
-     * Met à jour le lore d'un item de sort dans la hotbar pour afficher
-     * le cooldown restant (CD: X.Xs) ou "Prêt!" si disponible.
-     * Appelé depuis HUDManager toutes les 5s, et immédiatement après un cast.
-     */
-
-        // Ajouter description dynamique
-        String desc = ability.getDynamicDescription(champ.getStats());
-        if (desc != null && !desc.isEmpty()) {
-            lore.add(net.kyori.adventure.text.Component.text(desc,
-                net.kyori.adventure.text.format.NamedTextColor.GRAY)
-                .decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
-        }
-        meta.lore(lore);
-        stack.setItemMeta(meta);
-    }
 }
+
