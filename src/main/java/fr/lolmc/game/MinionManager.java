@@ -163,7 +163,10 @@ public class MinionManager {
         Zombie minion = loc.getWorld().spawn(loc, Husk.class, z -> {
             z.setAdult(); // CORRECTION : Remplace le setBaby(false) déprécié
             z.setShouldBurnInDay(false);
-            z.setCustomNameVisible(false);
+            // Barre de vie initiale
+            fr.lolmc.util.HealthBar.apply(z,
+                minionStats.hp, minionStats.hp,
+                team == Team.BLUE ? "🔵" : "🔴");
             // Empêcher le zombie de cibler les joueurs tout seul (IA vanilla)
             z.setTarget(null);
             z.getAttribute(Compat.maxHealth()).setBaseValue(MINION_HP);
