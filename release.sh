@@ -77,12 +77,13 @@ echo "✅ Tag $TAG poussé"
 
 echo "🚀 Création de la release GitHub..."
 
-# Lire le token depuis la config git
-GITHUB_TOKEN=$(git config --get github.token 2>/dev/null || echo "")
+# Token GitHub : variable d'env GITHUB_TOKEN, ou git config, ou argument $3
+GITHUB_TOKEN=${GITHUB_TOKEN:-$(git config --get github.token 2>/dev/null || echo "")}
+GITHUB_TOKEN=${GITHUB_TOKEN:-${3:-""}}
 if [ -z "$GITHUB_TOKEN" ]; then
     echo "❌ Token GitHub manquant."
-    echo "   Configure-le avec : git config --global github.token TON_TOKEN"
-    echo "   Puis relance le script."
+    echo "   Option 1 : GITHUB_TOKEN=ton_token ./release.sh $VERSION ..."
+    echo "   Option 2 : git config --global github.token ton_token"
     rm -f "LolMC-$VERSION.jar" "LolMC-Bungee-$VERSION.jar"
     exit 1
 fi
