@@ -22,6 +22,10 @@ public class FogOfWarManager {
     private double visionRange;
     private boolean enabled;
 
+    // World filtré (null = tous les mondes, mode legacy)
+    private org.bukkit.World scopedWorld = null;
+    private org.bukkit.scheduler.BukkitTask fogTask = null;
+
     public FogOfWarManager(TeamManager teamManager) {
         this.teamManager = teamManager;
         var config = LolPlugin.getInstance().getConfig();
@@ -30,12 +34,30 @@ public class FogOfWarManager {
         if (enabled) startFogTask();
     }
 
+    /** Constructeur pour les instances : scoped à un World précis. */
+    public FogOfWarManager(TeamManager teamManager, org.bukkit.World world) {
+        this.teamManager  = teamManager;
+        this.scopedWorld  = world;
+        var config = LolPlugin.getInstance().getConfig();
+        this.enabled = config.getBoolean("fog.enabled", true);
+        this.visionRange = config.getDouble("fog.vision-range", 30.0);
+        // Ne pas démarrer ici — démarré par GameInstance.start()
+    }
+
+    /** Démarre la tâche de brouillard (pour les instances). */
+    public void startTask() { if (enabled && fogTask == null) startFogTask(); }
+
+    /** Arrête la tâche de brouillard. */
+    public void stopTask() {
+        if (fogTask != null) { fogTask.cancel(); fogTask = null; }
+    }
+
     private void startFogTask() {
-        new BukkitRunnable() {
+        fogTask = new BukkitRunnable() {
             @Override public void run() {
                 updateVision();
             }
-        }.runTaskTimer(LolPlugin.getInstance(), 0L, 10L); // 2x/seconde
+        }.runTaskTimer(LolPlugin.getInstance(), 0L, 10L);
     }
 
     /**
@@ -82,6 +104,10 @@ public class FogOfWarManager {
 
     private void updateVision() {
         var cm = LolPlugin.getInstance().getChampionManager();
+        // Filtrer par monde si scoped (mode instance)
+        java.util.Collection<org.bukkit.entity.Player> playerList =
+            (scopedWorld != null) ? scopedWorld.getPlayers()
+            : fr.lolmc.util.WorldContext.getGamePlayers();
         var wardMgr = LolPlugin.getInstance().getWardManager();
         var bushMgr = LolPlugin.getInstance().getBushManager();
 
