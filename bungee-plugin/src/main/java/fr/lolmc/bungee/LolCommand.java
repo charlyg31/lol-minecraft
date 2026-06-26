@@ -1,7 +1,8 @@
 package fr.lolmc.bungee;
 
-import fr.lolmc.bungee.LolBungeePlugin;
+import fr.lolmc.bungee.party.BungeePartyManager;
 import net.md_5.bungee.api.CommandSender;
+import net.md_5.bungee.api.ProxyServer;
 import net.md_5.bungee.api.chat.TextComponent;
 import net.md_5.bungee.api.connection.ProxiedPlayer;
 import net.md_5.bungee.api.plugin.Command;
@@ -10,22 +11,34 @@ import net.md_5.bungee.api.plugin.TabExecutor;
 import java.util.*;
 
 /**
- * /lol <rôle1> [rôle2] ... — rejoindre la file avec les rôles souhaités.
+ * Commande /lol — accessible depuis n'importe quel serveur du réseau.
  *
- * Exemples :
- *   /lol top adc        → file en acceptant top OU adc
- *   /lol mid jungle     → file en acceptant mid OU jungle
- *   /lol top mid adc    → file en acceptant top, mid ou adc
- *   /lol all            → file en acceptant n'importe quel rôle (= FILL)
- *   /lol leave          → quitter la file
+ * Sous-commandes :
  *
- * Rôles valides : top, jungle, mid, adc, support, all
- * Minimum 1 rôle requis.
+ *   /lol <rôle1> <rôle2> ...   Rejoindre la file avec les rôles souhaités
+ *   /lol all                    Rejoindre la file FILL (tous les rôles)
+ *   /lol leave                  Quitter la file
+ *   /lol runes                  Voir ses runes actuelles
+ *
+ *   /lol party invite <joueur>  Inviter un joueur (le chef est celui qui invite en 1er)
+ *   /lol party accept           Accepter une invitation
+ *   /lol party decline          Refuser une invitation
+ *   /lol party leave            Quitter le groupe
+ *   /lol party kick <joueur>    Exclure un membre (chef seulement)
+ *   /lol party disband          Dissoudre le groupe (chef seulement)
+ *   /lol party promote <joueur> Transférer le chef (chef seulement)
+ *   /lol party info             Voir le statut du groupe
+ *
+ * Règles de rôles en groupe :
+ *   - Minimum 2 rôles (ou "all")
+ *   - Pas de doublon
+ *   - Postes distincts couverts >= taille du groupe
+ *   - La file se lance automatiquement quand tout le groupe est prêt
  */
 public class LolCommand extends Command implements TabExecutor {
 
-    private static final List<String> ROLES = List.of("top","jungle","mid","adc","support");
-    private static final Set<String> VALID_ROLES = new HashSet<>(ROLES);
+    private static final List<String> ROLES      = List.of("top","jungle","mid","adc","support");
+    private static final Set<String>  VALID_ROLES = new HashSet<>(ROLES);
 
     private final LolBungeePlugin plugin;
 
@@ -37,159 +50,197 @@ public class LolCommand extends Command implements TabExecutor {
     @Override
     public void execute(CommandSender sender, String[] args) {
         if (!(sender instanceof ProxiedPlayer player)) {
-            sender.sendMessage(new TextComponent("§cCommande réservée aux joueurs."));
+            sender.sendMessage(new TextComponent("§cRéservé aux joueurs."));
             return;
         }
 
-        // /lol sans argument → aide
-        if (args.length == 0) {
-            sendHelp(player);
-            return;
+        if (args.length == 0) { sendHelp(player); return; }
+
+        switch (args[0].toLowerCase()) {
+            case "party", "p"        -> handleParty(player, args);
+            case "leave", "quitter"  -> handleLeave(player);
+            case "runes"             -> handleRunes(player);
+            case "all"               -> handleQueue(player, List.of("TOP","JUNGLE","MID","ADC","SUPPORT"));
+            default                  -> handleQueueArgs(player, args);
         }
+    }
 
-        String first = args[0].toLowerCase();
+    // ── /lol leave ───────────────────────────────────────────────────────
 
-        // /lol leave — quitter la file
-        if (first.equals("leave") || first.equals("quitter") || first.equals("quit")) {
-            if (plugin.getQueueManager().isInQueue(player.getUniqueId())) {
-                plugin.getQueueManager().leave(player);
-                player.sendMessage(new TextComponent("§7Tu as quitté la file."));
-            } else {
-                player.sendMessage(new TextComponent("§7Tu n'es pas en file."));
-            }
-            return;
+    private void handleLeave(ProxiedPlayer player) {
+        if (plugin.getQueueManager().isInQueue(player.getUniqueId())) {
+            plugin.getQueueManager().leave(player);
+            player.sendMessage(new TextComponent("§7Tu as quitté la file."));
+        } else {
+            player.sendMessage(new TextComponent("§7Tu n'es pas en file."));
         }
+    }
 
-        // /lol party invite/accept/leave — gestion du groupe
-        if (first.equals("party") || first.equals("p")) {
-            handleParty(player, args);
-            return;
-        }
+    // ── /lol runes ───────────────────────────────────────────────────────
 
-        // /lol runes — afficher les runes actuelles
-        if (first.equals("runes")) {
-            var runes = plugin.getRuneManager().getPage(player.getUniqueId());
-            player.sendMessage(new TextComponent(
-                "§5Runes : §f" + runes.get("keystone")
-                + " §7| Sorts : §e" + runes.get("spell1") + " §7+ §e" + runes.get("spell2")));
-            return;
-        }
+    private void handleRunes(ProxiedPlayer player) {
+        var runes = plugin.getRuneManager().getPage(player.getUniqueId());
+        player.sendMessage(new TextComponent(
+            "§5Keystone : §f" + runes.get("keystone")
+            + " §7| Sorts : §e" + runes.get("spell1") + " + " + runes.get("spell2")));
+    }
 
-        // /lol all — tous les rôles
-        if (args.length == 1 && args[0].equalsIgnoreCase("all")) {
-            List<String> allRoles = List.of("TOP","JUNGLE","MID","ADC","SUPPORT");
-            plugin.getRoleManager().setRoles(player.getUniqueId(), allRoles);
-            plugin.getQueueManager().join(player);
-            return;
-        }
+    // ── /lol <rôles...> ──────────────────────────────────────────────────
 
-        // /lol <rôles...> — minimum 2 rôles
+    private void handleQueueArgs(ProxiedPlayer player, String[] args) {
         List<String> roles = new ArrayList<>();
         for (String arg : args) {
             String r = arg.toLowerCase();
             if (!VALID_ROLES.contains(r)) {
+                player.sendMessage(new TextComponent("§cRôle invalide : §f" + arg));
                 player.sendMessage(new TextComponent(
-                    "§cRôle invalide : §f" + arg + "§c."));
-                player.sendMessage(new TextComponent(
-                    "§7Rôles valides : §ftop §7| §fjungle §7| §fmid §7| §fadc §7| §fsupport §7| §fall"));
+                    "§7Valides : §ftop §7| §fjungle §7| §fmid §7| §fadc §7| §fsupport §7| §fall"));
                 return;
             }
             if (!roles.contains(r.toUpperCase())) roles.add(r.toUpperCase());
         }
-
         if (roles.size() < 2) {
             player.sendMessage(new TextComponent("§cMinimum 2 rôles requis."));
             player.sendMessage(new TextComponent(
                 "§7Exemple : §a/lol top adc §7| §a/lol mid jungle §7| §a/lol all"));
             return;
         }
-
-        // Sauvegarder les rôles souhaités puis rejoindre la file
-        plugin.getRoleManager().setRoles(player.getUniqueId(), roles);
-        plugin.getQueueManager().join(player);
+        handleQueue(player, roles);
     }
+
+    /**
+     * Traite le choix de rôles d'un joueur.
+     * Si le joueur est dans un groupe : attend que tout le monde soit prêt.
+     * Sinon : rejoint directement la file.
+     */
+    private void handleQueue(ProxiedPlayer player, List<String> roles) {
+        BungeePartyManager pm = plugin.getPartyManager();
+
+        if (pm.inParty(player.getUniqueId())) {
+            // Mode groupe : signaler qu'on est prêt et vérifier les conflits
+            boolean launchQueue = pm.setRolesAndCheckReady(player, roles);
+            if (launchQueue) {
+                // Tout le groupe est prêt et sans conflit → rejoindre la file
+                for (UUID uid : pm.getPartyMembers(player.getUniqueId())) {
+                    ProxiedPlayer member = ProxyServer.getInstance().getPlayer(uid);
+                    if (member != null) plugin.getQueueManager().join(member);
+                }
+            }
+        } else {
+            // Joueur solo : rejoindre directement la file
+            plugin.getRoleManager().setRoles(player.getUniqueId(), roles);
+            plugin.getQueueManager().join(player);
+        }
+    }
+
+    // ── /lol party <sous-commande> ───────────────────────────────────────
 
     private void handleParty(ProxiedPlayer player, String[] args) {
-        if (args.length < 2) {
-            player.sendMessage(new TextComponent(
-                "§7Usage : §e/lol party <invite|accept|leave> [joueur]"));
-            return;
-        }
+        if (args.length < 2) { sendPartyHelp(player); return; }
+        BungeePartyManager pm = plugin.getPartyManager();
+
         switch (args[1].toLowerCase()) {
-            case "invite" -> {
-                if (args.length < 3) {
-                    player.sendMessage(new TextComponent("§7Usage : §e/lol party invite <joueur>"));
-                    return;
-                }
-                ProxiedPlayer target = net.md_5.bungee.api.ProxyServer.getInstance()
-                    .getPlayer(args[2]);
-                if (target == null) {
-                    player.sendMessage(new TextComponent("§cJoueur introuvable : " + args[2]));
-                    return;
-                }
-                plugin.getPartyManager().invite(player, target);
+
+            case "invite", "inv" -> {
+                if (args.length < 3) { player.sendMessage(new TextComponent("§7Usage : §e/lol party invite <joueur>")); return; }
+                ProxiedPlayer target = ProxyServer.getInstance().getPlayer(args[2]);
+                if (target == null) { player.sendMessage(new TextComponent("§cJoueur introuvable : §f" + args[2])); return; }
+                if (target.equals(player)) { player.sendMessage(new TextComponent("§cTu ne peux pas t'inviter toi-même.")); return; }
+                pm.invite(player, target);
             }
-            case "accept" -> plugin.getPartyManager().accept(player);
-            case "leave"  -> plugin.getPartyManager().leave(player);
-            default -> player.sendMessage(new TextComponent(
-                "§7Usage : §e/lol party <invite|accept|leave> [joueur]"));
+
+            case "accept", "oui", "yes" -> pm.accept(player);
+
+            case "decline", "non", "no", "refuse" -> pm.decline(player);
+
+            case "leave", "quitter", "quit" -> pm.leave(player);
+
+            case "kick", "exclure", "exclude" -> {
+                if (args.length < 3) { player.sendMessage(new TextComponent("§7Usage : §e/lol party kick <joueur>")); return; }
+                pm.kick(player, args[2]);
+            }
+
+            case "disband", "dissoudre" -> pm.disband(player);
+
+            case "promote", "chef", "transfer" -> {
+                if (args.length < 3) { player.sendMessage(new TextComponent("§7Usage : §e/lol party promote <joueur>")); return; }
+                pm.transferLeader(player, args[2]);
+            }
+
+            case "info", "status", "statut", "list" -> pm.sendPartyInfo(player);
+
+            default -> sendPartyHelp(player);
         }
     }
 
-    private void sendHelp(ProxiedPlayer player) {
-        player.sendMessage(new TextComponent("§6§l⚔ LoL — File d'attente"));
-        player.sendMessage(new TextComponent("§7Rejoins la file en choisissant §eminimum 2 rôles§7 :"));
-        player.sendMessage(new TextComponent("  §a/lol top adc"));
-        player.sendMessage(new TextComponent("  §a/lol mid jungle support"));
-        player.sendMessage(new TextComponent("  §a/lol top adc mid jungle support"));
-        player.sendMessage(new TextComponent("  §a/lol all §7(tous les rôles)"));
-        player.sendMessage(new TextComponent("§7Rôles : §ftop §7| §fjungle §7| §fmid §7| §fadc §7| §fsupport"));
-        player.sendMessage(new TextComponent(""));
-        player.sendMessage(new TextComponent("§e/lol leave §7— Quitter la file"));
-        player.sendMessage(new TextComponent("§e/lol party invite <joueur> §7— Inviter"));
-        player.sendMessage(new TextComponent("§e/lol party accept §7— Accepter une invitation"));
-        player.sendMessage(new TextComponent("§e/lol party leave §7— Quitter le groupe"));
-        player.sendMessage(new TextComponent("§e/lol runes §7— Voir tes runes actuelles"));
+    // ── Aide ─────────────────────────────────────────────────────────────
+
+    private void sendHelp(ProxiedPlayer p) {
+        p.sendMessage(new TextComponent("§6§l⚔ LoL — Aide"));
+        p.sendMessage(new TextComponent("§7Rejoins la file avec §eminimum 2 rôles§7 :"));
+        p.sendMessage(new TextComponent("  §a/lol top adc"));
+        p.sendMessage(new TextComponent("  §a/lol mid jungle support"));
+        p.sendMessage(new TextComponent("  §a/lol all §7(tous les rôles)"));
+        p.sendMessage(new TextComponent("§7Rôles : §ftop §8| §fjungle §8| §fmid §8| §fadc §8| §fsupport"));
+        p.sendMessage(new TextComponent("§e/lol leave §8— §7Quitter la file"));
+        p.sendMessage(new TextComponent("§e/lol runes §8— §7Tes runes actuelles"));
+        p.sendMessage(new TextComponent("§e/lol party §8— §7Gestion du groupe"));
     }
+
+    private void sendPartyHelp(ProxiedPlayer p) {
+        p.sendMessage(new TextComponent("§6§l⚔ LoL — Groupe"));
+        p.sendMessage(new TextComponent("§e/lol party invite <joueur>  §8— §7Inviter (crée le groupe si besoin)"));
+        p.sendMessage(new TextComponent("§e/lol party accept           §8— §7Accepter une invitation"));
+        p.sendMessage(new TextComponent("§e/lol party decline          §8— §7Refuser une invitation"));
+        p.sendMessage(new TextComponent("§e/lol party leave            §8— §7Quitter le groupe"));
+        p.sendMessage(new TextComponent("§e/lol party kick <joueur>    §8— §7Exclure (chef)"));
+        p.sendMessage(new TextComponent("§e/lol party promote <joueur> §8— §7Donner le chef (chef)"));
+        p.sendMessage(new TextComponent("§e/lol party disband          §8— §7Dissoudre le groupe (chef)"));
+        p.sendMessage(new TextComponent("§e/lol party info             §8— §7Voir le statut du groupe"));
+        p.sendMessage(new TextComponent("§7Une fois prêts, chaque membre fait §e/lol <rôles>§7."));
+        p.sendMessage(new TextComponent("§7La file se lance automatiquement quand tout le monde est prêt."));
+    }
+
+    // ── Tab-completion ────────────────────────────────────────────────────
 
     @Override
     public Iterable<String> onTabComplete(CommandSender sender, String[] args) {
-        if (args.length == 0) return List.of();
-        String cur = args[args.length - 1].toLowerCase();
+        if (!(sender instanceof ProxiedPlayer)) return List.of();
+        String cur = args.length > 0 ? args[args.length - 1].toLowerCase() : "";
 
-        // Premier argument
         if (args.length == 1) {
-            return List.of("top","jungle","mid","adc","support","all","leave","party","runes")
-                .stream().filter(s -> s.startsWith(cur)).toList();
-        }
-        // Si all ou leave ou party déjà saisi → pas d'autre complétion de rôle
-        if (Set.of("all","leave","party","runes").contains(args[0].toLowerCase())) {            // géré plus bas
+            return filter(List.of("top","jungle","mid","adc","support","all",
+                "leave","party","runes"), cur);
         }
 
-        // Rôles suivants (si pas encore "all" ou "leave" ou "party")
-        String first = args[0].toLowerCase();
-        if (!first.equals("all") && !first.equals("leave")
-            && !first.equals("party") && !first.equals("runes")) {
-            Set<String> already = new HashSet<>(Arrays.asList(args).subList(0, args.length - 1));
-            return List.of("top","jungle","mid","adc","support")
-                .stream()
-                .filter(s -> s.startsWith(cur) && !already.contains(s))
+        String sub = args[0].toLowerCase();
+
+        // Rôles supplémentaires
+        if (VALID_ROLES.contains(sub)) {
+            Set<String> already = new HashSet<>();
+            for (int i = 0; i < args.length - 1; i++) already.add(args[i].toLowerCase());
+            return filter(ROLES.stream().filter(r -> !already.contains(r)).toList(), cur);
+        }
+
+        // Party sous-commandes
+        if ((sub.equals("party") || sub.equals("p")) && args.length == 2) {
+            return filter(List.of("invite","accept","decline","leave",
+                "kick","promote","disband","info"), cur);
+        }
+
+        // Party invite/kick/promote → noms des joueurs en ligne
+        if ((sub.equals("party") || sub.equals("p")) && args.length == 3
+            && List.of("invite","kick","promote").contains(args[1].toLowerCase())) {
+            return ProxyServer.getInstance().getPlayers().stream()
+                .map(ProxiedPlayer::getName)
+                .filter(n -> n.toLowerCase().startsWith(cur))
                 .toList();
         }
 
-        // /lol party <sous-commande>
-        if (first.equals("party") && args.length == 2) {
-            return List.of("invite","accept","leave")
-                .stream().filter(s -> s.startsWith(cur)).toList();
-        }
-
-        // /lol party invite <nom>
-        if (first.equals("party") && args.length == 3 && "invite".equals(args[1])) {
-            return net.md_5.bungee.api.ProxyServer.getInstance().getPlayers()
-                .stream().map(p -> p.getName())
-                .filter(n -> n.toLowerCase().startsWith(cur)).toList();
-        }
-
         return List.of();
+    }
+
+    private List<String> filter(List<String> list, String prefix) {
+        return list.stream().filter(s -> s.startsWith(prefix)).toList();
     }
 }
