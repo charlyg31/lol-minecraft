@@ -1,29 +1,46 @@
 #!/bin/bash
 # ══════════════════════════════════════════════════════════════════════
 # LolMC — Script de release GitHub
-# Usage : ./release.sh <version>
-# Exemple : ./release.sh 1.2.0
+# Usage : ./release.sh <version> [chemin/vers/BungeeCord.jar]
+# Exemple : ./release.sh 1.0.0 /opt/proxy/BungeeCord.jar
 #
-# Ce script :
-#   1. Compile LolMC.jar (plugin de jeu) et LolMC-Bungee.jar (proxy)
-#   2. Crée un tag git v<version>
-#   3. Pousse le tag sur GitHub
-#   4. Crée une release GitHub avec les 2 JARs en pièces jointes
-#
-# Prérequis :
-#   - Maven (mvn) installé
-#   - GitHub CLI (gh) installé et authentifié
-#   - Token GitHub avec droits "contents:write"
+# Si BungeeCord.jar n'est pas fourni, le script le cherche automatiquement
+# dans les emplacements courants.
 # ══════════════════════════════════════════════════════════════════════
 
 set -e
 
 VERSION=${1:-""}
+BUNGEE_PATH=${2:-""}
+
 if [ -z "$VERSION" ]; then
-    echo "❌ Usage : ./release.sh <version>"
-    echo "   Exemple : ./release.sh 1.2.0"
+    echo "❌ Usage : ./release.sh <version> [chemin/BungeeCord.jar]"
+    echo "   Exemple : ./release.sh 1.0.0 /opt/proxy/BungeeCord.jar"
     exit 1
 fi
+
+# Chercher BungeeCord.jar automatiquement si non fourni
+if [ -z "$BUNGEE_PATH" ]; then
+    for candidate in \
+        "/opt/proxy/BungeeCord.jar" \
+        "/root/proxy/BungeeCord.jar" \
+        "/home/proxy/BungeeCord.jar" \
+        "$(find / -name "BungeeCord.jar" -maxdepth 6 2>/dev/null | head -1)"
+    do
+        if [ -f "$candidate" ]; then
+            BUNGEE_PATH="$candidate"
+            break
+        fi
+    done
+fi
+
+if [ -z "$BUNGEE_PATH" ] || [ ! -f "$BUNGEE_PATH" ]; then
+    echo "❌ BungeeCord.jar introuvable."
+    echo "   Précise le chemin : ./release.sh $VERSION /chemin/vers/BungeeCord.jar"
+    exit 1
+fi
+
+echo "📦 BungeeCord.jar : $BUNGEE_PATH"
 
 TAG="v$VERSION"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -41,7 +58,7 @@ echo "✅ LolMC-$VERSION.jar"
 
 echo "🔨 Compilation de LolMC-Bungee.jar..."
 cd bungee-plugin
-mvn package -q -DskipTests
+mvn package -q -DskipTests -Dbungee.jar.path="$BUNGEE_PATH"
 BUNGEE_JAR=$(find target -name "LolMC-Bungee-*.jar" ! -name "*-original*" | head -1)
 if [ -z "$BUNGEE_JAR" ]; then
     echo "❌ LolMC-Bungee.jar introuvable dans bungee-plugin/target/"
@@ -70,9 +87,6 @@ gh release create "$TAG" \
 Voir le [README](README.md) pour la configuration complète."
 
 echo ""
-echo "✅ Release $TAG publiée avec succès !"
-echo "   LolMC-$VERSION.jar"
-echo "   LolMC-Bungee-$VERSION.jar"
+echo "✅ Release $TAG publiée !"
 
-# Nettoyage des JARs locaux
 rm -f "LolMC-$VERSION.jar" "LolMC-Bungee-$VERSION.jar"
