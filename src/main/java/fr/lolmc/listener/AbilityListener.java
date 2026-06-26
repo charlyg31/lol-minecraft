@@ -408,6 +408,26 @@ public class AbilityListener implements Listener {
                 () -> gm.onPlayerRejoin(e.getPlayer()), 40L);
     }
 
+    /**
+     * Démarre la prévisualisation quand le joueur tient un sort (slot 1-4).
+     * Arrête quand il change de slot.
+     */
+    @EventHandler
+    public void onItemHeld(PlayerItemHeldEvent e) {
+        Player player = e.getPlayer();
+        if (!manager.hasChampion(player)) return;
+        if (!fr.lolmc.util.WorldContext.isInGameWorld(player)) return;
+        var preview = LolPlugin.getInstance().getAbilityPreview();
+        if (preview == null) return;
+        int newSlot = e.getNewSlot();
+        // Toujours arrêter la preview de l'ancien slot
+        preview.stop(player);
+        // Démarrer si c'est un slot de sort (1-4)
+        if (newSlot >= 1 && newSlot <= 4) {
+            preview.start(player, newSlot);
+        }
+    }
+
     @EventHandler
     public void onQuit(PlayerQuitEvent e) {
         Player p = e.getPlayer();

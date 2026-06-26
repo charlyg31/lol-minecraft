@@ -38,6 +38,8 @@ public class Zed extends BaseChampion {
     private static final Map<UUID, Long> wCooldowns = new java.util.concurrent.ConcurrentHashMap<>();
 
     public static void resetState(UUID id){ shadows.remove(id); wCooldowns.remove(id); }
+    /** Retourne la position de l'ombre active (pour AbilityPreview). */
+    public static org.bukkit.Location getShadowLocation(UUID id) { return shadows.get(id); }
     public static void resetAllState(){ shadows.clear(); wCooldowns.clear(); }
 
     static class AA extends BasicAttackAbility {
