@@ -130,7 +130,7 @@ public class BaseManager {
     // ANNEAU DE SOIN (régénération à la base)
     // ══════════════════════════════════════════════════════════════
 
-    private void startHealRingTask() {
+    public void startHealRingTask() {
         new BukkitRunnable() {
             @Override public void run() {
                 var cm = LolPlugin.getInstance().getChampionManager();

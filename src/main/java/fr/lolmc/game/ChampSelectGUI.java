@@ -224,4 +224,22 @@ public class ChampSelectGUI implements Listener {
     public static boolean isBanned(String championId) { return bannedChampions.contains(championId); }
 
     public static void resetBans() { bannedChampions.clear(); banRound = 0; }
+
+
+    private org.bukkit.inventory.ItemStack buildChampionIcon(String championId) {
+        org.bukkit.Material mat = org.bukkit.Material.PLAYER_HEAD;
+        org.bukkit.inventory.ItemStack is = new org.bukkit.inventory.ItemStack(mat);
+        org.bukkit.inventory.meta.ItemMeta meta = is.getItemMeta();
+        if (meta != null) {
+            boolean banned = isBanned(championId);
+            meta.displayName(net.kyori.adventure.text.Component.text(
+                (banned ? "§c✗ " : "§f") + championId,
+                net.kyori.adventure.text.format.NamedTextColor.WHITE)
+                .decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
+            if (banned) meta.addEnchant(
+                org.bukkit.enchantments.Enchantment.UNBREAKING, 1, true);
+            is.setItemMeta(meta);
+        }
+        return is;
+    }
 }

@@ -83,6 +83,8 @@ public class ResourceSystem {
     public double getRegenPer5s()       { return regenPer5s; }
     public boolean hasResource()        { return type != ResourceType.NONE; }
     public void setCurrent(double v)    { currentResource = Math.max(0, Math.min(maxResource, v)); }
+    public void addCurrent(double v)    { setCurrent(currentResource + v); }
+    public void addCurrent(int v)       { setCurrent(currentResource + v); }
     public void fill()                  { currentResource = maxResource; }
     /** Augmente/réduit le max (achat/vente d'item avec +mana) */
     public void addMaxResource(double v) {

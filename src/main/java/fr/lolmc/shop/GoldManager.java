@@ -40,6 +40,6 @@ public class GoldManager {
 
     /** Définit l'or d'un joueur à une valeur exacte (utilisé pour la reconnexion). */
     public void setGold(java.util.UUID uuid, int amount) {
-        golds.put(uuid, Math.max(0, amount));
+        gold.put(uuid, Math.max(0, amount));
     }
 }
