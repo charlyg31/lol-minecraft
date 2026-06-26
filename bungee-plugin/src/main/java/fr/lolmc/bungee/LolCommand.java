@@ -18,7 +18,6 @@ import java.util.*;
  *   /lol <rôle1> <rôle2> ...   Rejoindre la file avec les rôles souhaités
  *   /lol all                    Rejoindre la file FILL (tous les rôles)
  *   /lol leave                  Quitter la file
- *   /lol runes                  Voir ses runes actuelles
  *
  *   /lol party invite <joueur>  Inviter un joueur (le chef est celui qui invite en 1er)
  *   /lol party accept           Accepter une invitation
@@ -59,7 +58,6 @@ public class LolCommand extends Command implements TabExecutor {
         switch (args[0].toLowerCase()) {
             case "party", "p"        -> handleParty(player, args);
             case "leave", "quitter"  -> handleLeave(player);
-            case "runes"             -> handleRunes(player);
             case "all"               -> handleQueue(player, List.of("TOP","JUNGLE","MID","ADC","SUPPORT"));
             default                  -> handleQueueArgs(player, args);
         }
@@ -74,15 +72,6 @@ public class LolCommand extends Command implements TabExecutor {
         } else {
             player.sendMessage(new TextComponent("§7Tu n'es pas en file."));
         }
-    }
-
-    // ── /lol runes ───────────────────────────────────────────────────────
-
-    private void handleRunes(ProxiedPlayer player) {
-        var runes = plugin.getRuneManager().getPage(player.getUniqueId());
-        player.sendMessage(new TextComponent(
-            "§5Keystone : §f" + runes.get("keystone")
-            + " §7| Sorts : §e" + runes.get("spell1") + " + " + runes.get("spell2")));
     }
 
     // ── /lol <rôles...> ──────────────────────────────────────────────────
@@ -183,7 +172,6 @@ public class LolCommand extends Command implements TabExecutor {
         p.sendMessage(new TextComponent("  §a/lol all §7(tous les rôles)"));
         p.sendMessage(new TextComponent("§7Rôles : §ftop §8| §fjungle §8| §fmid §8| §fadc §8| §fsupport"));
         p.sendMessage(new TextComponent("§e/lol leave §8— §7Quitter la file"));
-        p.sendMessage(new TextComponent("§e/lol runes §8— §7Tes runes actuelles"));
         p.sendMessage(new TextComponent("§e/lol party §8— §7Gestion du groupe"));
     }
 
@@ -210,7 +198,7 @@ public class LolCommand extends Command implements TabExecutor {
 
         if (args.length == 1) {
             return filter(List.of("top","jungle","mid","adc","support","all",
-                "leave","party","runes"), cur);
+                "leave","party"), cur);
         }
 
         String sub = args[0].toLowerCase();

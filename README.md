@@ -51,10 +51,9 @@ max-party-size: 5          # taille maximale d'un groupe
 - Validation intelligente des rôles en groupe : algorithme de matching bipartite qui vérifie qu'une assignation valide existe (1 rôle unique par joueur)
 - La file se lance automatiquement quand tout le groupe est prêt
 
-**Runes et sorts persistants**
-- Keystone + sorts d'invocateur sauvegardés par joueur dans `runes_data.yml`
-- Rôles sauvegardés dans `roles_data.yml`
-- Accessibles et modifiables depuis n'importe quel serveur
+**Rôles persistants**
+- Rôles souhaités sauvegardés par joueur dans `roles_data.yml` sur le proxy
+- Les runes et sorts d'invocateur sont configurés sur le serveur de jeu
 
 **Retour au serveur d'origine**
 - À la fin de la partie, chaque joueur retourne exactement sur le serveur d'où il venait

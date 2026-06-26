@@ -4,7 +4,6 @@ import fr.lolmc.bungee.bridge.BungeeMessageListener;
 import fr.lolmc.bungee.party.BungeePartyManager;
 import fr.lolmc.bungee.queue.BungeeQueueManager;
 import fr.lolmc.bungee.role.BungeeRoleManager;
-import fr.lolmc.bungee.rune.BungeeRuneManager;
 import net.md_5.bungee.api.plugin.Plugin;
 
 /**
@@ -31,7 +30,6 @@ public class LolBungeePlugin extends Plugin {
 
     private BungeeQueueManager  queueManager;
     private BungeePartyManager  partyManager;
-    private BungeeRuneManager   runeManager;
     private BungeeRoleManager   roleManager;
     private OriginTracker       originTracker;
 
@@ -42,10 +40,9 @@ public class LolBungeePlugin extends Plugin {
         saveDefaultConfig();
 
         // Init managers
-        this.runeManager   = new BungeeRuneManager(this);
         this.roleManager   = new BungeeRoleManager(this);
         this.partyManager  = new BungeePartyManager(this);
-        this.queueManager  = new BungeeQueueManager(this, partyManager, runeManager, roleManager);
+        this.queueManager  = new BungeeQueueManager(this, partyManager, roleManager);
         this.originTracker = new OriginTracker(this);
 
         // Commandes
@@ -58,7 +55,7 @@ public class LolBungeePlugin extends Plugin {
         // Canaux PluginMessage
         getProxy().registerChannel("lolmc:bridge");
 
-        getLogger().info("LolMC-Bungee activé — file, groupes, runes gérés depuis le proxy.");
+        getLogger().info("LolMC-Bungee activé — file et groupes gérés depuis le proxy.");
     }
 
     @Override
@@ -71,7 +68,6 @@ public class LolBungeePlugin extends Plugin {
 
     public BungeeQueueManager  getQueueManager()  { return queueManager; }
     public BungeePartyManager  getPartyManager()  { return partyManager; }
-    public BungeeRuneManager   getRuneManager()   { return runeManager; }
     public BungeeRoleManager   getRoleManager()   { return roleManager; }
     public OriginTracker       getOriginTracker() { return originTracker; }
 }

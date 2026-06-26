@@ -26,8 +26,6 @@ import java.util.*;
  *   QUEUE_JOIN   — joueur veut rejoindre la file
  *   QUEUE_LEAVE  — joueur veut quitter la file
  *   SET_ROLE     — joueur change de rôle
- *   SET_RUNE     — joueur change le keystone
- *   SET_SPELL    — joueur change un sort d'invocateur
  *   PARTY_INVITE — joueur invite quelqu'un
  *   PARTY_ACCEPT — joueur accepte une invitation
  *   PARTY_LEAVE  — joueur quitte le groupe
@@ -62,8 +60,6 @@ public class BungeeMessageListener implements Listener {
             case "QUEUE_JOIN"   -> handleQueueJoin(data);
             case "QUEUE_LEAVE"  -> handleQueueLeave(data);
             case "SET_ROLE"     -> handleSetRole(data);
-            case "SET_RUNE"     -> handleSetRune(data);
-            case "SET_SPELL"    -> handleSetSpell(data);
             case "PARTY_INVITE" -> handlePartyInvite(data);
             case "PARTY_ACCEPT" -> handlePartyAccept(data);
             case "PARTY_LEAVE"  -> handlePartyLeave(data);
@@ -112,28 +108,6 @@ public class BungeeMessageListener implements Listener {
             plugin.getRoleManager().setRoles(p.getUniqueId(), roles);
             p.sendMessage(new TextComponent("§a✔ Rôles : §l" + role));
         }
-    }
-
-    private void handleSetRune(Map<String, String> d) {
-        ProxiedPlayer p = getPlayer(d);
-        if (p == null) return;
-        var runes = plugin.getRuneManager().getPage(p.getUniqueId());
-        String keystone = d.getOrDefault("keystone", runes.get("keystone"));
-        String minors   = d.getOrDefault("minors",   runes.get("minors"));
-        plugin.getRuneManager().savePage(p.getUniqueId(), keystone, minors,
-            runes.get("spell1"), runes.get("spell2"));
-        p.sendMessage(new TextComponent("§d✔ Keystone : §l" + keystone));
-    }
-
-    private void handleSetSpell(Map<String, String> d) {
-        ProxiedPlayer p = getPlayer(d);
-        if (p == null) return;
-        var runes = plugin.getRuneManager().getPage(p.getUniqueId());
-        String spell1 = d.getOrDefault("spell1", runes.get("spell1"));
-        String spell2 = d.getOrDefault("spell2", runes.get("spell2"));
-        plugin.getRuneManager().savePage(p.getUniqueId(), runes.get("keystone"),
-            runes.get("minors"), spell1, spell2);
-        p.sendMessage(new TextComponent("§b✔ Sorts : §l" + spell1 + " + " + spell2));
     }
 
     private void handlePartyInvite(Map<String, String> d) {
