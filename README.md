@@ -1,31 +1,162 @@
 # LolMC — League of Legends dans Minecraft
 
-Un plugin Paper qui recrée un MOBA façon **League of Legends** directement dans Minecraft, sans mod : 20 champions fidèles, runes, items, jungle, tourelles, nexus, file d'attente par rôles et sélection de champions.
+Plugin Paper qui recrée un MOBA complet fidèle à **League of Legends** directement dans Minecraft, sans mod client. 20 champions jouables, système d'instances multi-parties simultanées, intégration BungeeCord complète.
 
-> **Version cible :** Paper / Minecraft **26.1.2** · **Java 25** · FAWE requis pour les schématiques
-
----
-
-## 📖 Présentation
-
-LolMC transforme un serveur Minecraft en arène MOBA. Deux équipes (Bleue et Rouge) s'affrontent sur une carte à 3 voies avec jungle, l'objectif étant de détruire le Nexus adverse.
-
-Le plugin reproduit les mécaniques clés de LoL :
-
-- **20 champions** avec leurs vraies statistiques de base, courbes de croissance par niveau (1-18) et sorts (Q/W/E/R) aux valeurs fidèles qui montent en puissance par rang.
-- **Système de runes complet** : 5 voies (Précision, Domination, Sorcellerie, Détermination, Inspiration), keystones, runes mineures et fragments de stats, avec un éditeur en jeu et sauvegarde des pages.
-- **Items** inspirés de la boutique LoL, achetés via un PNJ boutique avec de l'or gagné en jeu.
-- **Sbires (minions)** qui partent en vagues, suivent leur voie, attaquent les ennemis puis les tourelles, avec super-sbires après destruction d'un inhibiteur.
-- **Jungle** : monstres neutres, buffs (rouge/bleu), et objectifs épiques (Héraut, Baron, Dragons).
-- **Tourelles, inhibiteurs et nexus** avec dégâts, ciblage et destruction par phases.
-- **Brouillard de guerre**, bushes (buissons), wards (balises de vision).
-- **File d'attente par rôles** (Top/Jungle/Mid/ADC/Support) et **sélection de champions** avant la partie.
-- **Sorts d'invocateur** (Flash, Ignite, Heal, Barrier, Exhaust, Teleport, Smite, Cleanse, Ghost).
-- **Parties classées et normales** avec système d'Elo et statistiques persistantes.
+> **Stack :** Paper 26.1.2 · Java 25 · BungeeCord (optionnel)
 
 ---
 
-## 🎮 Champions
+## Architecture — 2 plugins
+
+```
+Proxy BungeeCord
+└── LolMC-Bungee.jar   → file d'attente, groupes, runes, retour serveur d'origine
+
+Serveur de jeu (dédié)
+└── LolMC.jar          → la partie complète
+```
+
+Les joueurs tapent `/lol <rôles>` depuis **n'importe quel serveur** du réseau (survie, skyblock, créatif…). Le proxy gère la file. Quand 10 joueurs sont prêts, ils sont envoyés sur le serveur de jeu. À la fin de la partie, chaque joueur retourne automatiquement sur le serveur et à la position exacte d'où il venait.
+
+Sans BungeeCord, le plugin fonctionne aussi en serveur autonome.
+
+---
+
+## LolMC-Bungee.jar — Plugin proxy
+
+### Installation
+
+Placer dans le dossier `/plugins/` du **proxy BungeeCord uniquement**.
+
+### Configuration (`config.yml`)
+
+```yaml
+game-server: "lolmc-01"   # nom exact dans la config BungeeCord
+fallback-server: "survie"  # serveur de repli si origine inconnue
+players-per-game: 10       # joueurs nécessaires pour lancer une partie
+max-party-size: 5          # taille maximale d'un groupe
+```
+
+### Fonctionnalités
+
+**File d'attente cross-serveur**
+- Le joueur choisit ses rôles via `/lol <rôle1> <rôle2>...` depuis n'importe quel serveur
+- Minimum 2 rôles obligatoires (ou `/lol all` pour accepter tous les rôles)
+- Quand 10 joueurs sont en file, ils sont automatiquement envoyés sur `game-server`
+- Les données (runes, rôles, sorts) sont transmises au serveur de jeu avant la connexion
+
+**Groupes cross-serveur**
+- Les membres peuvent être sur des serveurs différents
+- Le premier joueur qui invite devient automatiquement chef
+- Validation intelligente des rôles en groupe : algorithme de matching bipartite qui vérifie qu'une assignation valide existe (1 rôle unique par joueur)
+- La file se lance automatiquement quand tout le groupe est prêt
+
+**Runes et sorts persistants**
+- Keystone + sorts d'invocateur sauvegardés par joueur dans `runes_data.yml`
+- Rôles sauvegardés dans `roles_data.yml`
+- Accessibles et modifiables depuis n'importe quel serveur
+
+**Retour au serveur d'origine**
+- À la fin de la partie, chaque joueur retourne exactement sur le serveur d'où il venait
+- Capture automatique via `ServerConnectedEvent` côté proxy
+- Fallback configurable si le serveur d'origine est inconnu
+
+### Commandes `/lol`
+
+**File d'attente**
+| Commande | Description |
+|----------|-------------|
+| `/lol <rôle1> <rôle2> ...` | Rejoindre la file avec les rôles souhaités (min. 2) |
+| `/lol all` | Rejoindre la file en acceptant tous les rôles |
+| `/lol leave` | Quitter la file |
+| `/lol runes` | Voir son keystone et ses sorts actuels |
+
+Rôles valides : `top` · `jungle` · `mid` · `adc` · `support`
+
+**Groupes**
+| Commande | Description |
+|----------|-------------|
+| `/lol party invite <joueur>` | Inviter un joueur (crée le groupe si besoin) |
+| `/lol party accept` | Accepter une invitation |
+| `/lol party decline` | Refuser une invitation |
+| `/lol party leave` | Quitter le groupe |
+| `/lol party kick <joueur>` | Exclure un membre (chef) |
+| `/lol party promote <joueur>` | Transférer le chef (chef) |
+| `/lol party disband` | Dissoudre le groupe (chef) |
+| `/lol party liste` | Voir les membres et leur statut |
+
+Aliases : `/lol party` → `/lol p` · `/lol leave` → `/lol quitter` · `/ll` · `/jouer`
+
+---
+
+## LolMC.jar — Plugin de jeu
+
+### Installation
+
+Placer dans le dossier `/plugins/` du **serveur de jeu uniquement**.
+
+Dépendance optionnelle : **Multiverse-Core** pour le chargement des mondes d'instances (fonctionne sans via WorldCreator natif Paper).
+
+### Configuration (`config.yml`)
+
+```yaml
+world:
+  template: "lolmc_template"    # monde configuré une fois, jamais utilisé en jeu
+  instance-prefix: "lolmc_game_" # préfixe des mondes d'instances
+  max-instances: 5               # parties simultanées maximum
+
+bridge:
+  enabled: false                 # true si BungeeCord utilisé
+  game-server: "lolmc-01"
+  lobby-server: "lobby"          # inutilisé (architecture sans lobby)
+
+turrets:
+  attack-radius: 8
+  detection-height: 6
+  base-damage: 150
+
+fog:
+  enabled: true
+  vision-range: 30
+
+database:
+  type: sqlite                   # sqlite | mysql
+  mysql:
+    host: localhost
+    port: 3306
+    database: lolmc
+    user: root
+    password: ""
+
+heads:                           # textures base64 des têtes de champions
+  garen: "PASTE_VALUE_HERE"      # https://minecraft-heads.com
+  # ...
+```
+
+---
+
+## Système d'instances
+
+Chaque partie se déroule dans son propre monde Minecraft, totalement isolé.
+
+**Convention de nommage :**
+- Template : `lolmc_template` (configuré une fois avec `/lol set`, jamais joué)
+- Instances : `lolmc_game_1`, `lolmc_game_2`, … (compteur atomique)
+
+**Cycle de vie d'une instance :**
+1. Copie asynchrone du dossier `lolmc_template` → `lolmc_game_N` (I/O async)
+2. Chargement du monde via Multiverse ou WorldCreator natif (sync)
+3. Téléportation des joueurs dans l'instance
+4. Phase de ban → sélection de champions → démarrage
+5. Fin de partie → compte à rebours 30s → retour serveur d'origine → suppression du monde
+
+**Isolation complète :** chaque instance a ses propres `GameManager`, `MinionManager`, `JungleManager`, `TurretManager`, `FogOfWarManager`, `PassiveManager`, `RewardManager`. Plusieurs parties simultanées ne peuvent pas s'interférer.
+
+---
+
+## Gameplay — Mécaniques fidèles à LoL
+
+### 20 Champions
 
 | Rôle | Champions |
 |------|-----------|
@@ -35,121 +166,129 @@ Le plugin reproduit les mécaniques clés de LoL :
 | **Support** | Morgana, Leona, Blitzcrank, Janna |
 | **ADC** | Ashe, Sivir, Jinx, Miss Fortune |
 
----
+Chaque champion possède :
+- Q / W / E / R aux valeurs officielles LoL avec scaling AP/AD par rang
+- Passif implémenté (Hémorragie Darius, Détermination Garen, Flurry Lee Sin, Get Excited Jinx, Instinct de Chasse Warwick, Double Frappe Master Yi, Lumière du Soleil Leona, Siphon de l'Âme Morgana, Malfaisance Veigar, Volonté de Bataille Sivir…)
+- Prévisualisation directionnelle des sorts (visible uniquement par le lanceur) : ligne pour les skillshots, cercle pour les sorts de zone
+- Indicateurs de cooldown dans la hotbar (nom grisé + temps restant)
 
-## ⌨️ Commandes
+### Systèmes de jeu
 
-### Commandes joueur
+**Dégâts**
+- Formule complète : résistances, pénétration flat/%, boucliers, Grievous Wounds (40% items, 60% Ignite), vrai dégât
+- Critiques, omnivamp, vol de vie
+
+**Contrôles de foule (CCManager)**
+- Stun, root, silence, slow, airborne (knockup réel avec vélocité)
+- Tenacité, clear() propre à la mort
+
+**Sbires**
+- Vague toutes les 30s, 1ère à 1:05
+- 3 mêlée + 3 casters, sbire canon dynamique (<15min 1/3, 15-25min 1/2, >25min chaque)
+- Super-sbires après destruction d'inhibiteur
+- XP partagée dans un rayon de 14 blocs
+
+**Jungle**
+- Tous les camps, buffs Rouge/Bleu
+- Baron Nashor, Héraut de la Faille, Dragons (Infernal/Océan/Montagne/Foudre/Chimtech)
+- Dragon Soul au 4e dragon, Dragon Ancestral au 5e (exécution sous 20% HP)
+
+**Structures**
+- Tourelles : priorité aggro LoL exacte (sbires → champion attaquant un allié → plus proche)
+- Turret Plating avant 14min (+160 or/plaque)
+- Inhibiteurs : respawn 5min, active les super-sbires, or distribué (50 global)
+- Tourelles : 150 or global + 100 au dernier coup
+- Vision des tourelles : révèle les ennemis dans un rayon de 10 blocs
+
+**Économie**
+- Or passif, or sbires croissant (+1/90s)
+- Bounty (100-500 or selon série), killing spree annoncé
+- Assists (fenêtre 10s), distribution de l'or sur structures
+
+**Runes (14 keystones + runes mineures)**
+
+Keystones : Conqueror, Electrocute, Press the Attack, Dark Harvest, Arcane Comet, Phase Rush, Grasp of the Undying, Fleet Footwork, Lethal Tempo, Hail of Blades, Summon Aery, First Strike, Predator, Glacial Augment
+
+Mineures : Legend Bloodline (+6% omnivamp), Relentless Hunter (+MS), Bone Plating (bouclier), Gathering Storm (+AD/AP toutes les 10min), Second Wind, Sudden Impact, Taste of Blood…
+
+**Items**
+- ~230 items aux stats officielles, recettes, upgrades
+- 47 passifs uniques (Spellblade, Kraken Slayer, BotRK, Liandry, Sterak, Black Cleaver, Thornmail, Titanic Hydra…)
+- 14 items actifs (Zhonya, Galeforce avec animation dash + projectiles, Redemption, Locket, BotRK actif…)
+- Élixirs disponibles à partir du niveau 9
+
+**Sorts d'invocateur**
+Flash, Ignite (GW60), Heal, Barrier, Exhaust, Téléport (vers tourelle alliée), Smite, Cleanse, Ghost
+
+**Phase de sélection**
+- 10 bans alternés Bleue/Rouge (30s par ban), timeout automatique
+- Pick des champions, validation anti-doublon
+- ChampSelect GUI complet
+
+**Qualité de vie**
+- Chat d'équipe `/t`
+- Brouillard de guerre, wards (stealth/vision/lointaine), vision buissons
+- Spectateur pendant le respawn
+- Reconnexion avec état sauvegardé (HP, level, or, items)
+- `/lol ff` — surrender vote (80% de l'équipe, CD 5min)
+- Scoreboard en temps réel, écran de fin de partie
+- CS (Creep Score) tracké
+
+### Commandes admin (`/lol`)
+
+**Configuration de la carte**
 
 | Commande | Description |
 |----------|-------------|
-| `/lobby` (ou `/play`, `/roles`) | Ouvre le menu de préparation (rôles, runes, sorts) |
-| `/queue` (ou `/file`, `/q`) | Rejoindre la file d'attente par rôles |
-| `/champion <pick\|list\|info>` (ou `/champ`) | Gérer et consulter les champions |
-| `/shop` (ou `/boutique`, `/b`) | Ouvrir la boutique d'items |
-| `/team <bleu\|rouge\|auto>` (ou `/equipe`) | Rejoindre une équipe |
-| `/party <invite\|accept\|leave\|info>` (ou `/groupe`, `/p`) | Gérer son groupe |
-| `/pick` | Choisir un champion en sélection |
-| `/runes` | Ouvrir l'éditeur de runes |
-| `/spell <sort1> <sort2>` | Choisir ses 2 sorts d'invocateur |
-| `/lock` | Verrouiller sa sélection |
-| `/recall` | Retour à la base (canalisation) |
-| `/ping <danger\|omw\|miss\|assist\|enemy>` | Envoyer un ping à l'équipe |
-
-### Commandes admin — `/lol`
-
-Toutes les sous-commandes de `/lol` requièrent la permission `lolmc.admin` (op par défaut).
-
-**Configuration de la carte :**
-
-| Commande | Description |
-|----------|-------------|
-| `/lol set <turret\|inhibitor\|nexus\|basenexus> <blue\|red>` | Définir une structure à ta position |
-| `/lol position <blue\|red>` | Définir un point de spawn d'équipe |
-| `/lol lane <blue\|red>` | Configurer une voie |
+| `/lol set <turret\|inhibitor\|nexus> <blue\|red>` | Définir une structure à ta position |
+| `/lol position <blue\|red>` | Point de spawn d'équipe |
 | `/lol road <top\|mid\|bot\|end>` | Peindre la route des sbires |
 | `/lol jungle <camp>` | Placer un camp de jungle |
 | `/lol shopnpc <blue\|red>` | Placer un PNJ boutique |
-| `/lol mode <ranked\|normal>` | Définir le mode de partie |
 
-**Lancement et tests en solo :**
+**Tests**
 
 | Commande | Description |
 |----------|-------------|
-| `/lol solo <champion>` | **Mode test solo** : t'assigne l'équipe bleue + un champion + tes runes, lance la partie complète et te téléporte au spawn |
-| `/lol testgame` | Lance la map (structures + sbires + jungle + timer) sans toucher à ton perso |
-| `/lol give <champion>` | Change ton champion à la volée |
-| `/lol level <1-18>` | Met ton champion au niveau voulu |
-| `/lol gold <montant>` | Te donne de l'or |
-| `/lol team <blue\|red>` | Change d'équipe |
-| `/lol select` | Démarre une sélection de champions |
-| `/lol start` | Lance une partie |
-| `/lol stop` | Arrête la partie en cours |
-
-> 💡 **Pour tester seul :** `/lol solo garen` lance une partie complète où tu peux jouer immédiatement, sans attendre d'autres joueurs.
+| `/lol testgame` | Lancer la map complète (sbires + jungle + timer) |
+| `/lol spawn <champion>` | Spawner un champion de test |
+| `/lol buff <stat> <valeur>` | Modifier une stat en live |
+| `/lol resetcd` | Remettre tous les cooldowns à zéro |
+| `/lol hp <valeur>` | Modifier ses HP |
+| `/lol wave` | Forcer une vague de sbires |
+| `/lol help` | Liste des commandes admin |
 
 ---
 
-## 🔐 Permissions
+## Configurer la carte
+
+1. Créer un monde nommé `lolmc_template` (via Multiverse ou manuellement)
+2. Construire la carte LoL dans ce monde
+3. Utiliser `/lol set`, `/lol position`, `/lol road`, `/lol jungle` pour enregistrer les positions
+4. Tester avec `/lol testgame`
+5. Le monde template sera copié automatiquement pour chaque partie
+
+---
+
+## Permissions
 
 | Permission | Description | Défaut |
 |------------|-------------|--------|
-| `lolmc.admin` | Toutes les commandes admin | op |
-| `lolmc.admin.config` | Configuration de la carte | op |
-| `lolmc.admin.test` | Commandes de test (solo, give, level…) | op |
-| `lolmc.player.*` | Commandes joueur (shop, team, queue, recall…) | true |
-| `lolmc.champion.use` | Jouer les champions | true |
-| `lolmc.champion.<nom>` | Jouer un champion précis (ex. `lolmc.champion.garen`) | true |
-
-Chaque commande et chaque champion possède sa propre permission, ce qui permet par exemple de réserver certains champions à des grades VIP.
+| `lolmc.admin` | Toutes les commandes admin `/lol` | op |
+| `lolmc.play` | Commande `/lol` (file + groupe) | true |
+| `lolmc.menu` | Menu de sélection de champion | true |
 
 ---
 
-## 🛠️ Installation
+## Stack technique
 
-1. Télécharge ou compile le `.jar` (voir ci-dessous).
-2. Place `lol-minecraft-1.0.0.jar` dans le dossier `plugins/` de ton serveur Paper **26.1.2**.
-3. Installe **FAWE** (FastAsyncWorldEdit) dans `plugins/` — requis pour coller les schématiques de structures.
-4. Démarre le serveur une première fois pour générer la configuration.
-5. Configure la carte avec les commandes `/lol set`, `/lol position`, `/lol road`, etc.
+| Composant | Version |
+|-----------|---------|
+| Paper API | 26.1.2 |
+| Java | 25 |
+| BungeeCord API | 1.21 (optionnel) |
+| Multiverse-Core | 4.3.12 (optionnel, soft-depend) |
+| Adventure | inclus dans Paper |
+| HikariCP | inclus (SQLite/MySQL) |
 
----
-
-## 🔧 Compilation
-
-Le projet se compile avec **Maven** et **Java 25**.
-
-```bash
-git clone https://github.com/charlyg31/lol-minecraft.git
-cd lol-minecraft
-mvn clean package
-```
-
-Le `.jar` final est généré dans `target/lol-minecraft-1.0.0.jar` (avec toutes les dépendances incluses : drivers de base de données HikariCP, MySQL, SQLite).
-
-> ⚠️ Le projet cible Java 25. Vérifie ta version avec `java -version` et adapte si besoin.
-
----
-
-## ⚙️ Configuration (`config.yml`)
-
-| Section | Contenu |
-|---------|---------|
-| `heads` | Textures base64 des têtes de champions |
-| `bushes` | Blocs considérés comme buissons |
-| `turrets` | Portée, hauteur de détection, dégâts des tourelles |
-| `database` | Type de base (`sqlite`, `mysql`, `mongodb`) et identifiants |
-| `api` | Serveur HTTP optionnel pour les statistiques (désactivé par défaut) |
-| `fog` | Brouillard de guerre, portée de vision |
-
----
-
-## 📦 Stack technique
-
-- **Paper API** 26.1.2 (`api-version: '26.1'`)
-- **Java** 25
-- **FAWE** pour les schématiques
-- **Adventure** pour les composants de texte et sons
-- Bases de données : **SQLite** / **MySQL** / **MongoDB** (HikariCP)
-
----
+Le projet compile avec Maven. Le JAR final inclut toutes les dépendances.
