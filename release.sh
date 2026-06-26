@@ -69,22 +69,67 @@ cd ..
 echo "✅ LolMC-Bungee-$VERSION.jar"
 
 echo "🏷️  Création du tag $TAG..."
+git tag -d "$TAG" 2>/dev/null || true
+git push origin --delete "$TAG" 2>/dev/null || true
 git tag -a "$TAG" -m "Release $TAG"
 git push origin "$TAG"
 echo "✅ Tag $TAG poussé"
 
 echo "🚀 Création de la release GitHub..."
-gh release create "$TAG" \
-    "LolMC-$VERSION.jar#LolMC-$VERSION.jar (serveur de jeu)" \
-    "LolMC-Bungee-$VERSION.jar#LolMC-Bungee-$VERSION.jar (proxy BungeeCord)" \
-    --title "LolMC $TAG" \
-    --notes "## LolMC $TAG
 
-### Installation
-- **LolMC-$VERSION.jar** → \`/plugins/\` du serveur de jeu
-- **LolMC-Bungee-$VERSION.jar** → \`/plugins/\` du proxy BungeeCord
+# Lire le token depuis la config git
+GITHUB_TOKEN=$(git config --get github.token 2>/dev/null || echo "")
+if [ -z "$GITHUB_TOKEN" ]; then
+    echo "❌ Token GitHub manquant."
+    echo "   Configure-le avec : git config --global github.token TON_TOKEN"
+    echo "   Puis relance le script."
+    rm -f "LolMC-$VERSION.jar" "LolMC-Bungee-$VERSION.jar"
+    exit 1
+fi
 
-Voir le [README](README.md) pour la configuration complète."
+REPO="charlyg31/lol-minecraft"
+
+# Supprimer l'ancienne release si elle existe
+RELEASE_ID=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+    "https://api.github.com/repos/$REPO/releases/tags/$TAG" \
+    | grep '"id"' | head -1 | grep -o '[0-9]*')
+if [ -n "$RELEASE_ID" ]; then
+    curl -s -X DELETE -H "Authorization: token $GITHUB_TOKEN" \
+        "https://api.github.com/repos/$REPO/releases/$RELEASE_ID" > /dev/null
+fi
+
+# Créer la release
+RELEASE_RESPONSE=$(curl -s -X POST \
+    -H "Authorization: token $GITHUB_TOKEN" \
+    -H "Content-Type: application/json" \
+    -d "{\"tag_name\":\"$TAG\",\"name\":\"LolMC $TAG\",\"body\":\"## LolMC $TAG\n\n### Installation\n- **LolMC-$VERSION.jar** → \`/plugins/\` du serveur de jeu\n- **LolMC-Bungee-$VERSION.jar** → \`/plugins/\` du proxy BungeeCord\n\nVoir le README pour la configuration complète.\"}" \
+    "https://api.github.com/repos/$REPO/releases")
+
+UPLOAD_URL=$(echo "$RELEASE_RESPONSE" | grep '"upload_url"' | sed 's/.*"upload_url": "\(.*\){.*/\1/')
+
+if [ -z "$UPLOAD_URL" ]; then
+    echo "❌ Erreur création release : $RELEASE_RESPONSE"
+    rm -f "LolMC-$VERSION.jar" "LolMC-Bungee-$VERSION.jar"
+    exit 1
+fi
+
+# Upload LolMC.jar
+echo "📤 Upload LolMC-$VERSION.jar..."
+curl -s -X POST \
+    -H "Authorization: token $GITHUB_TOKEN" \
+    -H "Content-Type: application/java-archive" \
+    --data-binary @"LolMC-$VERSION.jar" \
+    "${UPLOAD_URL}?name=LolMC-$VERSION.jar" > /dev/null
+echo "✅ LolMC-$VERSION.jar uploadé"
+
+# Upload LolMC-Bungee.jar
+echo "📤 Upload LolMC-Bungee-$VERSION.jar..."
+curl -s -X POST \
+    -H "Authorization: token $GITHUB_TOKEN" \
+    -H "Content-Type: application/java-archive" \
+    --data-binary @"LolMC-Bungee-$VERSION.jar" \
+    "${UPLOAD_URL}?name=LolMC-Bungee-$VERSION.jar" > /dev/null
+echo "✅ LolMC-Bungee-$VERSION.jar uploadé"
 
 echo ""
 echo "✅ Release $TAG publiée !"
