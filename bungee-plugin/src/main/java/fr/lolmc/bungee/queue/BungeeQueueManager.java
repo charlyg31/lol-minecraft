@@ -146,11 +146,6 @@ public class BungeeQueueManager {
     private void tryProposeFill(List<UUID> gamePlayers, String missingRole, Set<UUID> excluded) {
         Set<UUID> gameSet = new HashSet<>(gamePlayers);
 
-        // Deux passes : d'abord les solos qui cherchent déjà ce rôle,
-        // ensuite tous les autres solos
-        List<UUID> priority = new ArrayList<>();
-        List<UUID> fallback = new ArrayList<>();
-
         for (UUID uid : new ArrayList<>(queue)) {
             if (gameSet.contains(uid) || excluded.contains(uid)) continue;
             if (partyManager.inParty(uid)) continue;
@@ -160,15 +155,21 @@ public class BungeeQueueManager {
             List<String> roles = roleManager.getRoles(uid);
             boolean wantsRole = roles.contains(missingRole)
                 || roles.containsAll(List.of("TOP","JUNGLE","MID","ADC","SUPPORT"));
-            if (wantsRole) priority.add(uid);
-            else           fallback.add(uid);
+
+            if (wantsRole) {
+                // Cherche déjà ce rôle → ajout direct sans proposition
+                queue.remove(uid);
+                solo.sendMessage(new TextComponent(
+                    "§a✔ Tu rejoins une partie en tant que §l" + formatRole(missingRole) + "§a !"));
+                launchGame(gamePlayers, uid, missingRole);
+                return;
+            }
         }
 
-        // Fusionner : priorité d'abord
-        List<UUID> ordered = new ArrayList<>(priority);
-        ordered.addAll(fallback);
-
-        for (UUID uid : ordered) {
+        // Aucun solo ne cherche ce rôle → proposer au premier solo disponible
+        for (UUID uid : new ArrayList<>(queue)) {
+            if (gameSet.contains(uid) || excluded.contains(uid)) continue;
+            if (partyManager.inParty(uid)) continue;
             ProxiedPlayer solo = ProxyServer.getInstance().getPlayer(uid);
             if (solo == null) continue;
 
