@@ -32,6 +32,14 @@ public class Garen extends BaseChampion {
         initSystems(620, 8.0, ResourceSystem.ResourceType.NONE, 0, 0.0);
     }
 
+    // Passif Détermination : regen 1.5% HP max/s hors combat (>5s sans dégâts)
+    public static void tickGarenPassive(Player p, fr.lolmc.champion.base.BaseChampion champ) {
+        if (!champ.getHPSystem().isInCombat()) {
+            double regen = champ.getHPSystem().getMaxHP() * 0.015; // 1.5%/s
+            champ.getHPSystem().heal(regen);
+        }
+    }
+
     static class AA extends BasicAttackAbility {
         AA(){super("garen",Material.IRON_SWORD,2.5f,DamageType.PHYSICAL);}
     }

@@ -33,19 +33,43 @@ public class LeeSin extends BaseChampion {
         initSystems(570, 8.0, ResourceSystem.ResourceType.ENERGY, 200, 50.0);
     }
 
+    // Passif Flurry : après chaque sort, les 2 prochaines AA restituent 15 énergie
+    private static final java.util.Map<java.util.UUID, Integer> flurryCharges
+        = new java.util.concurrent.ConcurrentHashMap<>();
+
+    public static void onSpellCast(java.util.UUID id) {
+        flurryCharges.put(id, 2); // 2 charges d'énergie
+    }
+
     static class AA extends BasicAttackAbility {
         AA(){super("leesin",Material.IRON_SWORD,2.0f,DamageType.PHYSICAL);}
+        @Override protected void onHit(Player c, ChampionStats s, org.bukkit.entity.LivingEntity tgt, double dmg) {
+            int charges = flurryCharges.getOrDefault(c.getUniqueId(), 0);
+            if (charges > 0) {
+                flurryCharges.put(c.getUniqueId(), charges - 1);
+                var cm = LolPlugin.getInstance().getChampionManager();
+                if (cm.hasChampion(c)) {
+                    cm.getChampion(c).getResourceSystem().addCurrent(15);
+                    c.sendActionBar(net.kyori.adventure.text.Component.text(
+                        "⚡ Flurry! +15 énergie (" + (charges-1) + " charge restante)",
+                        net.kyori.adventure.text.format.NamedTextColor.YELLOW));
+                }
+            }
+        }
     }
 
     private static final Map<UUID,UUID> sonicTarget=new java.util.concurrent.ConcurrentHashMap<>();
-    public static void resetState(UUID id){ sonicTarget.remove(id); }
-    public static void resetAllState(){ sonicTarget.clear(); }
+    public static void resetState(UUID id){ sonicTarget.remove(id); flurryCharges.remove(id); }
+    public static void resetAllState(){ sonicTarget.clear(); flurryCharges.clear(); }
 
     static class Q extends BaseAbility {
+        // onSpellCast appelé dans cast() pour activer Flurry
         Q(){super("q_leesin","Onde Sonique",Material.ECHO_SHARD,AbilitySlot.Q,
                 new double[]{9,8,7,6,5},15,0,DamageType.PHYSICAL);
             resourceCost = 50;}
         @Override public void cast(Player c,ChampionStats s,Player t){
+            fr.lolmc.champion.impl.jungle.LeeSin.onSpellCast(c.getUniqueId()); // Flurry
+
             UUID marked=sonicTarget.get(c.getUniqueId());
             if(marked!=null){
                 org.bukkit.entity.LivingEntity tgt=null;
@@ -90,6 +114,8 @@ public class LeeSin extends BaseChampion {
                 new double[]{14,13,12,11,10},15,0,DamageType.TRUE);
             resourceCost = 50;}
         @Override public void cast(Player c,ChampionStats s,Player t){
+            fr.lolmc.champion.impl.jungle.LeeSin.onSpellCast(c.getUniqueId()); // Flurry
+
             Player dest = (t!=null) ? t : c;
             dest.addPotionEffect(new PotionEffect(PotionEffectType.ABSORPTION,40,1,false,true));
             if(t!=null && !t.equals(c)){
@@ -109,6 +135,8 @@ public class LeeSin extends BaseChampion {
                 new double[]{10,9,8,7,6},5,4,DamageType.PHYSICAL);
             resourceCost = 50;}
         @Override public void cast(Player c,ChampionStats s,Player t){
+            fr.lolmc.champion.impl.jungle.LeeSin.onSpellCast(c.getUniqueId()); // Flurry
+
             double[] base=fr.lolmc.util.Balance.base("e_leesin",new double[]{35,60,85,110,135});double dmg=base[getLevel()-1]+s.getFinalAD()*fr.lolmc.util.Balance.ratio("e_leesin","ad",0.9);
             for(var __t : TargetingUtil.enemiesAround(c, 4.0)){
                 TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);

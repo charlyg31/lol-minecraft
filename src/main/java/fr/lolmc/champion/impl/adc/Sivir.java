@@ -104,8 +104,27 @@ public class Sivir extends BaseChampion {
         @Override public void cast(Player c,ChampionStats s,Player t){
             c.addPotionEffect(new PotionEffect(PotionEffectType.SPEED,80,2,false,true));
             c.addPotionEffect(new PotionEffect(PotionEffectType.HASTE,80,2,false,true));
-            c.sendActionBar(Component.text("⚡ Appel des Flèches 4s!",NamedTextColor.GOLD));
+            c.sendActionBar(Component.text("⚡ Appel des Flèches 4s! Toucher reset Surrégime",NamedTextColor.GOLD));
+            c.getWorld().playSound(c.getLocation(), org.bukkit.Sound.ENTITY_FIREWORK_ROCKET_BLAST, 1f, 1f);
+            // Passif Volonté de Bataille : chaque ennemi touché par une AA pendant R
+            // reset le CD de Surrégime (W)
+            new org.bukkit.scheduler.BukkitRunnable() {
+                @Override public void run() {
+                    // Vérifier si Surrégime est en CD et le reset
+                    var cm = LolPlugin.getInstance().getChampionManager();
+                    if (!cm.hasChampion(c)) { cancel(); return; }
+                    var w = cm.getChampion(c).getAbility(2);
+                    if (w != null && w.getRemainingCooldown(c) > 0) {
+                        w.setDynamicCooldown(0.001); w.triggerCooldown(c);
+                        new org.bukkit.scheduler.BukkitRunnable() {
+                            @Override public void run() { w.setDynamicCooldown(-1); }
+                        }.runTaskLater(LolPlugin.getInstance(), 1L);
+                        c.sendActionBar(Component.text("⚡ Volonté de Bataille — Surrégime reset!", NamedTextColor.GOLD));
+                        cancel();
+                    }
+                }
+            }.runTaskTimer(LolPlugin.getInstance(), 0L, 5L);
         }
-        @Override public String getDynamicDescription(ChampionStats s){return "+30%% vitesse et haste pendant 4s.";}
+        @Override public String getDynamicDescription(ChampionStats s){return "+30%% vitesse et haste 4s. Touch = reset Surrégime (Volonté de Bataille)";}
     }
 }

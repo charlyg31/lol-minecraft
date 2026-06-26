@@ -55,6 +55,8 @@ public class EntityDeathListener implements Listener {
                 }
             }
             if (killer != null && championManager.hasChampion(killer)) {
+                // CS (Creep Score)
+                LolPlugin.getInstance().getMatchScoreboard().addCS(killer);
                 // Or/XP selon le type de sbire
                 String minionType = fr.lolmc.game.MinionManager.getMinionTypeTag(dead);
                 int gold = "caster".equals(minionType) ? RewardManager.GOLD_MINION_CASTER
@@ -102,6 +104,9 @@ public class EntityDeathListener implements Listener {
             // Veigar passif Malfaisance
             if ("veigar".equals(killerChamp.getId()))
                 fr.lolmc.champion.impl.mid.Veigar.onTakedown(killer.getUniqueId());
+            // Jinx passif Get Excited
+            if ("jinx".equals(killerChamp.getId()))
+                fr.lolmc.champion.impl.adc.Jinx.getExcited(killer);
             // Scoreboard de partie
             LolPlugin.getInstance().getMatchScoreboard().addKill(killer);
             LolPlugin.getInstance().getMatchScoreboard().addDeath(victim);

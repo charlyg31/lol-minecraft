@@ -26,6 +26,16 @@ public class Jinx extends BaseChampion {
                 new ChampionStats(630,59,0,26,30,0.625,0,325,5.25,3.8));
         getStats().setGrowthStats(100.0,3.4,4.7,1.30,0.01360,0.50);
     }
+    // Passif Get Excited : kill/assist → +175% vitesse 6s (décroît après 3s)
+    public static void getExcited(Player jinx) {
+        jinx.addPotionEffect(new org.bukkit.potion.PotionEffect(
+            org.bukkit.potion.PotionEffectType.SPEED, 120, 4, false, true)); // 6s vitesse
+        jinx.getWorld().spawnParticle(org.bukkit.Particle.FIREWORK,
+            jinx.getLocation().add(0,1,0), 15, 0.5,0.5,0.5);
+        jinx.sendActionBar(net.kyori.adventure.text.Component.text(
+            "🎉 GET EXCITED! +175% vitesse 6s!", net.kyori.adventure.text.format.NamedTextColor.RED));
+    }
+
     private static final java.util.Map<java.util.UUID, Boolean> fishbonesMode
         = new java.util.concurrent.ConcurrentHashMap<>();
 

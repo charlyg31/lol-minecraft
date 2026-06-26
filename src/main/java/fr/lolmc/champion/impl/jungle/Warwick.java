@@ -27,6 +27,33 @@ public class Warwick extends BaseChampion {
         getStats().setGrowthStats(99.0,3.0,4.6,2.05,0.02300,0.80);
         setAutoAttackRange(2.0);
     }
+    // Passif Instinct de Chasse : révèle les ennemis sous 50% HP dans un rayon de 25 blocs
+    // Bonus de vitesse vers eux, fureur au combat contre eux
+    public static void tickWarwickPassive(Player ww, fr.lolmc.champion.base.BaseChampion champ) {
+        var tm = LolPlugin.getInstance().getTeamManager();
+        for (Player nearby : ww.getWorld().getPlayers()) {
+            if (nearby.equals(ww)) continue;
+            if (!tm.areEnemies(ww, nearby)) continue;
+            if (ww.getLocation().distance(nearby.getLocation()) > 25) continue;
+            var cm = LolPlugin.getInstance().getChampionManager();
+            if (!cm.hasChampion(nearby)) continue;
+            double hpRatio = cm.getChampion(nearby).getHPSystem().getHPRatio();
+            if (hpRatio < 0.50) {
+                // Révéler via GLOWING
+                nearby.addPotionEffect(new org.bukkit.potion.PotionEffect(
+                    org.bukkit.potion.PotionEffectType.GLOWING, 25, 0, false, false));
+                // Vitesse bonus vers la cible blessée
+                if (ww.getLocation().distance(nearby.getLocation()) < 12) {
+                    ww.addPotionEffect(new org.bukkit.potion.PotionEffect(
+                        org.bukkit.potion.PotionEffectType.SPEED, 25, 1, false, false));
+                }
+                ww.sendActionBar(net.kyori.adventure.text.Component.text(
+                    "🐺 Instinct de Chasse! " + nearby.getName() + " (" + (int)(hpRatio*100) + "% HP)",
+                    net.kyori.adventure.text.format.NamedTextColor.DARK_RED));
+            }
+        }
+    }
+
     @Override protected void registerAbilities() {
         setAbility(0,new AA()); setAbility(1,new Q());
         setAbility(2,new W()); setAbility(3,new E()); setAbility(4,new R());
@@ -36,6 +63,8 @@ public class Warwick extends BaseChampion {
     static class AA extends BasicAttackAbility {
         AA(){super("warwick",Material.IRON_SWORD,2.0f,DamageType.PHYSICAL);}
         @Override protected void onHit(Player c, ChampionStats s, org.bukkit.entity.LivingEntity tgt, double dmg){
+            // Aussi vérifier l'Instinct de Chasse (passif géré dans tickWarwickPassive)
+
             // CORRECTION : Utilisation de l'attribut GENERIC_MAX_HEALTH pour les PV de Warwick
             var cMaxHealthAttr = c.getAttribute(fr.lolmc.util.Compat.maxHealth());
             double cMaxHealth = cMaxHealthAttr != null ? cMaxHealthAttr.getValue() : 20.0;

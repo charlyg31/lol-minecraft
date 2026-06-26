@@ -32,8 +32,51 @@ public class Darius extends BaseChampion {
         initSystems(582, 8.0, ResourceSystem.ResourceType.NONE, 0, 0.0);
     }
 
+    // Passif Hémorragie : AA et sorts appliquent 1 stack de saignement (max 5)
+    // À 5 stacks = Noxian Might (+bonus AD + vrais dégâts 9-27/s pendant 5s)
+    private static final java.util.Map<java.util.UUID, Integer> bleedStacks
+        = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final java.util.Map<java.util.UUID, Long> bleedExpire
+        = new java.util.concurrent.ConcurrentHashMap<>();
+    public static void resetState(java.util.UUID id) { bleedStacks.remove(id); bleedExpire.remove(id); }
+    public static void resetAllState() { bleedStacks.clear(); bleedExpire.clear(); }
+
+    public static void applyBleed(Player darius, org.bukkit.entity.LivingEntity victim, ChampionStats s) {
+        java.util.UUID vid = victim.getUniqueId();
+        int stacks = Math.min(5, bleedStacks.merge(vid, 1, Integer::sum));
+        bleedExpire.put(vid, System.currentTimeMillis() + 5000L);
+        // Afficher les stacks sur la cible
+        if (victim instanceof Player vp)
+            vp.sendActionBar(net.kyori.adventure.text.Component.text(
+                "🩸 Hémorragie " + stacks + "/5", net.kyori.adventure.text.format.NamedTextColor.DARK_RED));
+        if (stacks >= 5) {
+            // Noxian Might : vrais dégâts pendant 5s
+            int lvl = LolPlugin.getInstance().getChampionManager().hasChampion(darius)
+                ? LolPlugin.getInstance().getChampionManager().getChampion(darius).getLevelSystem().getLevel() : 1;
+            double dotDmg = 9 + (lvl - 1) * 1.0; // 9-27 vrais dégâts/s
+            new org.bukkit.scheduler.BukkitRunnable() {
+                int ticks = 0;
+                @Override public void run() {
+                    if (ticks >= 5 || victim.isDead() || !darius.isOnline()) { cancel(); return; }
+                    Long exp = bleedExpire.get(vid);
+                    if (exp == null || System.currentTimeMillis() > exp) { cancel(); return; }
+                    fr.lolmc.util.DamageUtil.trueDamageEntity(darius, victim, dotDmg);
+                    victim.getWorld().spawnParticle(org.bukkit.Particle.DAMAGE_INDICATOR,
+                        victim.getLocation().add(0,1.5,0), 3, 0.3,0.3,0.3);
+                    ticks++;
+                }
+            }.runTaskTimer(LolPlugin.getInstance(), 20L, 20L);
+            darius.sendActionBar(net.kyori.adventure.text.Component.text(
+                "💪 NOXIAN MIGHT! 5 stacks!", net.kyori.adventure.text.format.NamedTextColor.DARK_RED));
+            bleedStacks.put(vid, 0); // reset stacks après déclenchement
+        }
+    }
+
     static class AA extends BasicAttackAbility {
         AA(){super("darius",Material.IRON_AXE,2.5f,DamageType.PHYSICAL);}
+        @Override protected void onHit(Player c, ChampionStats s, org.bukkit.entity.LivingEntity tgt, double dmg) {
+            applyBleed(c, tgt, s);
+        }
     }
 
     static class Q extends BaseAbility {
