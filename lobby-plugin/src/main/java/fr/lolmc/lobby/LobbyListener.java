@@ -16,12 +16,8 @@ public class LobbyListener implements Listener {
 
     @EventHandler
     public void onJoin(PlayerJoinEvent e) {
-        // Demander à BungeeCord le nom du serveur d'origine du joueur
-        // (réponse async, stockée dans LobbyBridge.playerOriginServer)
-        org.bukkit.Bukkit.getScheduler().runTaskLater(plugin, () -> {
-            var bridge = plugin.getBridge();
-            if (bridge != null) bridge.requestCurrentServer(e.getPlayer());
-        }, 5L);
+        // Le serveur d'origine est transmis automatiquement par LolMC-Bungee
+        // via PLAYER_ORIGIN avant que le joueur arrive ici.
     }
 
     @EventHandler

@@ -70,10 +70,26 @@ public class LobbyBridge implements PluginMessageListener {
         String type = data.getOrDefault("type", "");
 
         switch (type) {
-            case "QUEUE_STATUS" -> handleQueueStatus(data);
-            case "GAME_START"   -> handleGameStart(data);
-            case "GAME_END"     -> handleGameEnd(data);
+            case "QUEUE_STATUS"  -> handleQueueStatus(data);
+            case "GAME_START"    -> handleGameStart(data);
+            case "GAME_END"      -> handleGameEnd(data);
+            case "PLAYER_ORIGIN" -> handlePlayerOrigin(data);
         }
+    }
+
+    /**
+     * Reçu depuis le plugin proxy BungeeCord.
+     * Stocke le serveur d'origine du joueur pour l'inclure dans sendPlayerToGame().
+     */
+    private void handlePlayerOrigin(Map<String, String> d) {
+        try {
+            UUID uuid  = UUID.fromString(d.get("uuid"));
+            String srv = d.get("server");
+            if (srv != null && !srv.isEmpty()) {
+                playerOriginServer.put(uuid, srv);
+                log.info("[Bridge] Origine enregistrée : " + srv + " pour " + uuid);
+            }
+        } catch (Exception ignored) {}
     }
 
     private void handleQueueStatus(Map<String, String> d) {
@@ -170,20 +186,6 @@ public class LobbyBridge implements PluginMessageListener {
             player.sendPluginMessage(plugin, CHANNEL_BUNGEE, baos.toByteArray());
         } catch (IOException e) {
             log.warning("[Bridge] Erreur connexion serveur: " + e.getMessage());
-        }
-    }
-
-    /**
-     * Demande à BungeeCord le nom du serveur actuel du joueur.
-     * La réponse arrive dans onPluginMessageReceived (sous-canal GetServer).
-     */
-    public void requestCurrentServer(Player player) {
-        try (java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
-             java.io.DataOutputStream out = new java.io.DataOutputStream(baos)) {
-            out.writeUTF("GetServer");
-            player.sendPluginMessage(plugin, CHANNEL_BUNGEE, baos.toByteArray());
-        } catch (Exception e) {
-            log.warning("[Bridge] Erreur GetServer: " + e.getMessage());
         }
     }
 
