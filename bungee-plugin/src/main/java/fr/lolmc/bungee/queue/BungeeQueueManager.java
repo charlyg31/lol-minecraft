@@ -3,7 +3,6 @@ package fr.lolmc.bungee.queue;
 import fr.lolmc.bungee.LolBungeePlugin;
 import fr.lolmc.bungee.party.BungeePartyManager;
 import fr.lolmc.bungee.role.BungeeRoleManager;
-import fr.lolmc.bungee.rune.BungeeRuneManager;
 import net.md_5.bungee.api.ProxyServer;
 import net.md_5.bungee.api.chat.TextComponent;
 import net.md_5.bungee.api.config.ServerInfo;
@@ -28,7 +27,6 @@ public class BungeeQueueManager {
 
     private final LolBungeePlugin plugin;
     private final BungeePartyManager partyManager;
-    private final BungeeRuneManager  runeManager;
     private final BungeeRoleManager  roleManager;
 
     private final Deque<UUID> queue = new ConcurrentLinkedDeque<>();
@@ -36,10 +34,9 @@ public class BungeeQueueManager {
     private final String gameServer;
 
     public BungeeQueueManager(LolBungeePlugin plugin, BungeePartyManager pm,
-                               BungeeRuneManager rm, BungeeRoleManager rlm) {
+                               BungeeRoleManager rlm) {
         this.plugin        = plugin;
         this.partyManager  = pm;
-        this.runeManager   = rm;
         this.roleManager   = rlm;
         this.playersNeeded = plugin.getConfig().getInt("players-per-game", 10);
         this.gameServer    = plugin.getConfig().getString("game-server", "lolmc-01");
@@ -103,7 +100,7 @@ public class BungeeQueueManager {
 
     /** Envoie les données d'un joueur au serveur de jeu via PluginMessage. */
     private void sendPlayerData(ProxiedPlayer carrier, ProxiedPlayer player, List<UUID> allPlayers) {
-        Map<String, String> runes = runeManager.getPage(player.getUniqueId());
+        // Runes : gérées sur le serveur de jeu, pas transmises par le proxy
         // Si le joueur est dans un groupe, utiliser les rôles choisis dans le groupe
         List<String> roles;
         var pm2 = plugin.getPartyManager();
@@ -120,10 +117,6 @@ public class BungeeQueueManager {
         sb.append("\"type\":\"QUEUE_JOIN\",");
         sb.append("\"uuid\":\"").append(player.getUniqueId()).append("\",");
         sb.append("\"name\":\"").append(player.getName()).append("\",");
-        sb.append("\"keystone\":\"").append(runes.get("keystone")).append("\",");
-        sb.append("\"minors\":\"").append(runes.get("minors")).append("\",");
-        sb.append("\"spell1\":\"").append(runes.get("spell1")).append("\",");
-        sb.append("\"spell2\":\"").append(runes.get("spell2")).append("\",");
         sb.append("\"role\":\"").append(role).append("\",");
         if (origin != null) sb.append("\"origin_server\":\"").append(origin).append("\",");
         sb.append("\"party\":\"");
