@@ -17,17 +17,20 @@
 
     <repositories>
         <repository>
-            <id>papermc</id>
-            <url>https://repo.papermc.io/repository/maven-public/</url>
+            <id>md-5-snapshots</id>
+            <url>https://repo.md-5.net/content/repositories/snapshots/</url>
         </repository>
     </repositories>
 
     <dependencies>
+        <!-- BungeeCord API — pointe vers le JAR du proxy sur le serveur -->
+        <!-- Remplacer le chemin par celui de ton BungeeCord.jar réel      -->
         <dependency>
             <groupId>net.md-5</groupId>
             <artifactId>bungeecord-api</artifactId>
             <version>1.21-R0.1-SNAPSHOT</version>
-            <scope>provided</scope>
+            <scope>system</scope>
+            <systemPath>${bungee.jar.path}</systemPath>
         </dependency>
     </dependencies>
 
