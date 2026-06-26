@@ -58,6 +58,8 @@ public class LolCommand extends Command implements TabExecutor {
         switch (args[0].toLowerCase()) {
             case "party", "p"        -> handleParty(player, args);
             case "leave", "quitter"  -> handleLeave(player);
+            case "accepte", "accept", "oui", "yes" -> plugin.getQueueManager().acceptFill(player);
+            case "refuse", "refuser", "non", "no"  -> plugin.getQueueManager().refuseFill(player);
             case "all"               -> handleQueue(player, List.of("TOP","JUNGLE","MID","ADC","SUPPORT"));
             default                  -> handleQueueArgs(player, args);
         }
@@ -178,7 +180,9 @@ public class LolCommand extends Command implements TabExecutor {
         p.sendMessage(new TextComponent("  §a/lol mid jungle support"));
         p.sendMessage(new TextComponent("  §a/lol all §7(tous les rôles)"));
         p.sendMessage(new TextComponent("§7Rôles : §ftop §8| §fjungle §8| §fmid §8| §fadc §8| §fsupport"));
-        p.sendMessage(new TextComponent("§e/lol leave §8— §7Quitter la file"));
+        p.sendMessage(new TextComponent("§e/lol leave   §8— §7Quitter la file"));
+        p.sendMessage(new TextComponent("§e/lol accepte §8— §7Accepter une proposition de fill"));
+        p.sendMessage(new TextComponent("§e/lol refuse  §8— §7Refuser une proposition de fill"));
         p.sendMessage(new TextComponent("§e/lol party §8— §7Gestion du groupe"));
     }
 
@@ -205,7 +209,7 @@ public class LolCommand extends Command implements TabExecutor {
 
         if (args.length == 1) {
             return filter(List.of("top","jungle","mid","adc","support","all",
-                "leave","party"), cur);
+                "leave","party","accepte","refuse"), cur);
         }
 
         String sub = args[0].toLowerCase();
