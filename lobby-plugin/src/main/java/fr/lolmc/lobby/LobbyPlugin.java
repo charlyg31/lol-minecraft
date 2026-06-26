@@ -41,8 +41,7 @@ public class LobbyPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new LobbyGUIListener(this), this);
 
         // Commandes
-        registerCmd("lollobby", new LobbyCommand(this));
-        registerCmd("runes",    new LobbyCommand(this));
+        registerCmd("lol",   new LobbyCommand(this));
         registerCmd("party",    new LobbyPartyCommand(this, partyManager));
         registerCmd("queue",    new LobbyQueueCommand(this, queueManager));
 

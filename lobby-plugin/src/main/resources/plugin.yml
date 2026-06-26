@@ -2,23 +2,23 @@ name: LolMC-Lobby
 version: 1.0.0
 main: fr.lolmc.lobby.LobbyPlugin
 api-version: '1.21'
-description: Plugin lobby pour LolMC - gestion des runes, groupes et file cross-serveur
+description: Plugin lobby pour LolMC - runes, groupe, file d'attente
 
 commands:
-  lollobby:
-    description: Menu principal LoL Lobby
-    aliases: [ll, lol]
-    permission: lolmc.lobby
-  runes:
-    description: Configurer ses runes
+  lol:
+    description: Ouvre le menu pré-game LoL
+    aliases: [ll, lollobby, jouer]
+    usage: /lol
     permission: lolmc.lobby
   party:
     description: Gérer son groupe
     aliases: [p]
+    usage: /party <invite|accept|leave|info>
     permission: lolmc.lobby
   queue:
-    description: Rejoindre la file d'attente
-    aliases: [q, jouer]
+    description: Rejoindre/quitter la file
+    aliases: [q, file]
+    usage: /queue [leave]
     permission: lolmc.lobby
 
 permissions:
