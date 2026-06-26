@@ -89,7 +89,17 @@ public class MasterYi extends BaseChampion {
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             c.addPotionEffect(new PotionEffect(PotionEffectType.STRENGTH,100,1,false,true));
-            c.sendActionBar(Component.text("⚔ Wuju actif 5s!",NamedTextColor.YELLOW));
+            c.sendActionBar(Component.text("⚔ Wuju actif 5s! (vol de vie désactivé)",NamedTextColor.YELLOW));
+            // Désactiver le vol de vie pendant Wuju (comportement LoL)
+            double prevOmnivamp = s.getFinalOmnivamp();
+            s.addBonusOmnivamp(-prevOmnivamp);
+            new org.bukkit.scheduler.BukkitRunnable(){
+                @Override public void run(){
+                    if (LolPlugin.getInstance().getChampionManager().hasChampion(c))
+                        LolPlugin.getInstance().getChampionManager().getChampion(c)
+                            .getStats().addBonusOmnivamp(prevOmnivamp); // remettre
+                }
+            }.runTaskLater(LolPlugin.getInstance(), 100L); // 5s
         }
         @Override public String getDynamicDescription(ChampionStats s){
             return String.format("5s: +%.0f dégâts vrais par AA (10+10%%AD).",10+s.getFinalAD()*fr.lolmc.util.Balance.ratio("e_masteryi","ad",0.1));

@@ -84,10 +84,15 @@ public class Leona extends BaseChampion {
             new double[]{14,13.5,13,12.5,12},0,3,DamageType.MAGICAL);
             resourceCost = 60;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            // LoL : réduction de dégâts + armure/RM 3s, puis explosion de zone 80-240 + 40% AP
+            // LoL : +20 armure, +20 RM pendant 3s puis explosion
             c.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE,60,2,false,true));
             c.addPotionEffect(new PotionEffect(PotionEffectType.ABSORPTION,60,0,false,true));
-            c.sendActionBar(Component.text("🛡 Éclipse! Défenses + explosion dans 3s",NamedTextColor.GOLD));
+            var __cm = LolPlugin.getInstance().getChampionManager();
+            if (__cm.hasChampion(c)) {
+                __cm.getChampion(c).getStats().addBonusArmor(20);
+                __cm.getChampion(c).getStats().addBonusMR(20);
+            }
+            c.sendActionBar(Component.text("🛡 Éclipse! +20 Armure/RM + explosion dans 3s",NamedTextColor.GOLD));
             c.getWorld().playSound(c.getLocation(), Sound.BLOCK_BEACON_ACTIVATE, 0.8f, 0.8f);
             double[] base=fr.lolmc.util.Balance.base("w_leona",new double[]{80,120,160,200,240});double dmg=base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("w_leona","ap",0.4);
             new BukkitRunnable(){
@@ -103,7 +108,22 @@ public class Leona extends BaseChampion {
                     if(hit){
                         c.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE,60,2,false,true));
                         c.addPotionEffect(new PotionEffect(PotionEffectType.ABSORPTION,60,0,false,true));
+                    } else {
+                        // Retirer les bonus si pas d'ennemi touché
+                        if (__cm.hasChampion(c)) {
+                            __cm.getChampion(c).getStats().addBonusArmor(-20);
+                            __cm.getChampion(c).getStats().addBonusMR(-20);
+                        }
                     }
+                    // Toujours retirer après 6s (3s init + 3s bonus)
+                    new BukkitRunnable() {
+                        @Override public void run() {
+                            if (__cm.hasChampion(c)) {
+                                __cm.getChampion(c).getStats().addBonusArmor(-20);
+                                __cm.getChampion(c).getStats().addBonusMR(-20);
+                            }
+                        }
+                    }.runTaskLater(LolPlugin.getInstance(), 60L);
                     c.getWorld().playSound(c.getLocation(), Sound.ENTITY_GENERIC_EXPLODE, 1f, 1.2f);
                 }
             }.runTaskLater(LolPlugin.getInstance(),60L); // explosion après 3s
