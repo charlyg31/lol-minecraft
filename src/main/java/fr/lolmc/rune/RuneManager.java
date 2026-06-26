@@ -134,16 +134,16 @@ public class RuneManager {
             // ── PRÉCISION ──
             case "legend_alacrity" -> s.multiplyAS(1.10);        // +10% vitesse d'attaque
             case "legend_haste" -> s.addBonusAbilityHaste(10);   // +hâte
-            case "legend_bloodline" -> { /* vol de vie géré on-hit */ }
+            case "legend_bloodline" -> s.addBonusOmnivamp(0.06); // +6% omnivamp
             // ── DOMINATION ──
             case "eyeball_collection" -> s.addBonusAD(6);        // force adaptative par takedowns (simplifié: flat)
             case "ravenous_hunter" -> { /* omnivamp géré on-damage */ }
             case "ultimate_hunter" -> s.addBonusAbilityHaste(6); // hâte de l'ultime
-            case "relentless_hunter" -> { /* vitesse hors combat, géré dynamiquement */ }
+            case "relentless_hunter" -> s.addBonusMoveSpeed(5); // +5 MS de base, croît avec kills
             // ── SORCELLERIE ──
             case "transcendence" -> s.addBonusAbilityHaste(5);
             case "absolute_focus" -> s.addBonusAD(3);
-            case "gathering_storm" -> { /* croissance gérée dans tickRunes() */ }
+            case "gathering_storm" -> { /* bonus appliqué dans tickGatheringStorm() */ }
             case "manaflow_band" -> s.addBonusHP(250); // simule le bonus de mana converti
             case "scorch" -> { /* dégâts à implémenter dans onAbilityDamage */ }
             // ── DÉTERMINATION ──
@@ -151,7 +151,7 @@ public class RuneManager {
             case "overgrowth" -> s.addBonusHP(100); // bonus de base
             case "second_wind" -> { /* géré dans onDamageTaken */ }
             case "bone_plating" -> { /* géré dans onDamageTaken via state */ }
-            case "font_life" -> { /* soin de zone */ }
+            case "font_life" -> { /* soin alliés déclenché dans CCManager.stun/root */ }
             // ── INSPIRATION ──
             case "cosmic_insight" -> s.addBonusAbilityHaste(18); // +hâte invocateur/objets (approx)
             case "absolute_focus_alt" -> {}
@@ -165,6 +165,22 @@ public class RuneManager {
      */
     public void onDamageTaken(Player victim, double amount) {
         RunePage page = getPage(victim.getUniqueId());
+        // Bone Plating : réduit les dégâts des 3 prochaines attaques ennemies de 30-60
+        if (page.has("bone_plating")) {
+            var cm3 = LolPlugin.getInstance().getChampionManager();
+            if (cm3.hasChampion(victim)) {
+                int lvl3 = cm3.getChampion(victim).getLevelSystem().getLevel();
+                // Simulé par une réduction de 30 + 2*lvl dégâts absorbés via bouclier temporaire
+                double bpShield = Math.min(amount, 30 + lvl3 * 2.0);
+                cm3.getChampion(victim).getStats().addShield(bpShield);
+                new org.bukkit.scheduler.BukkitRunnable() {
+                    @Override public void run() {
+                        if (cm3.hasChampion(victim)) cm3.getChampion(victim).getStats().clearShields();
+                    }
+                }.runTaskLater(LolPlugin.getInstance(), 20L);
+            }
+        }
+
         // Second Wind : soin 6 + 4% PV manquants pendant 10s après avoir pris des dégâts
         if (page.has("second_wind")) {
             var cm = LolPlugin.getInstance().getChampionManager();

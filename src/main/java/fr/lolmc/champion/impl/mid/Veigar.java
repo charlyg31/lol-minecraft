@@ -38,6 +38,20 @@ public class Veigar extends BaseChampion {
     public static void resetState(UUID id){ apStacks.remove(id); }
     public static void resetAllState(){ apStacks.clear(); }
 
+    /** Passif Malfaisance : +AP permanent sur kill/assist de champion. */
+    public static void onTakedown(java.util.UUID id) {
+        int stacks = apStacks.merge(id, 1, Integer::sum);
+        var player = org.bukkit.Bukkit.getPlayer(id);
+        if (player == null) return;
+        var cm = LolPlugin.getInstance().getChampionManager();
+        if (cm.hasChampion(player)) {
+            cm.getChampion(player).getStats().addBonusAP(1.0); // +1 AP par takedown
+            player.sendActionBar(net.kyori.adventure.text.Component.text(
+                "📈 Malfaisance! +" + stacks + " AP total",
+                net.kyori.adventure.text.format.NamedTextColor.DARK_PURPLE));
+        }
+    }
+
     static class AA extends BasicAttackAbility {
         AA(){super("veigar",Material.PURPLE_DYE,5.5f,DamageType.MAGICAL);}
     }

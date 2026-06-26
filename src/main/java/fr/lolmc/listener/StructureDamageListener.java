@@ -105,14 +105,16 @@ public class StructureDamageListener implements Listener {
         Team enemyTeam = structure.getTeam();
 
         // Inhibiteur détruit → super-sbires sur cette lane pour l'équipe adverse
-        if (structure.getType() == Type.INHIBITOR) {
+        if (structure.getType() == Type.TURRET) {
+            LolPlugin.getInstance().getRewardManager().onTurretDestroyed(player, playerTeam);
+        } else if (structure.getType() == Type.INHIBITOR) {
             LolPlugin.getInstance().getMinionManager()
                     .enableSuperMinions(enemyTeam, structure.getLane());
-            // Déclencher le timer de respawn (5 min)
             String inhKey = structure.getType().name() + "_" + enemyTeam.name() + "_" + structure.getLane();
             LolPlugin.getInstance().getGameManager().onInhibitorDestroyed(inhKey);
             LolPlugin.getInstance().getAnnouncementManager().announceInhibitorDestroyed(
                     structure.getLane(), enemyTeam.name());
+            LolPlugin.getInstance().getRewardManager().onInhibitorDestroyed(playerTeam);
         }
 
         // Annonce

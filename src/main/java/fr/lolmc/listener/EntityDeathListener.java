@@ -95,6 +95,13 @@ public class EntityDeathListener implements Listener {
             // Annonce (Premier Sang, multi-kills)
             LolPlugin.getInstance().getAnnouncementManager().announceKill(killer, victim);
             LolPlugin.getInstance().getAnnouncementManager().onPlayerDeath(victim);
+            // MasterYi Highlander reset sur kill
+            var killerChamp = championManager.getChampion(killer);
+            if ("masteryi".equals(killerChamp.getId()))
+                fr.lolmc.champion.impl.jungle.MasterYi.onKillDuringHighlander(killer);
+            // Veigar passif Malfaisance
+            if ("veigar".equals(killerChamp.getId()))
+                fr.lolmc.champion.impl.mid.Veigar.onTakedown(killer.getUniqueId());
             // Scoreboard de partie
             LolPlugin.getInstance().getMatchScoreboard().addKill(killer);
             LolPlugin.getInstance().getMatchScoreboard().addDeath(victim);

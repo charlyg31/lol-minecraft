@@ -140,6 +140,7 @@ public class GameManager {
     public fr.lolmc.team.TeamManager.Team getParticipantTeam(UUID id) { return participantTeam.get(id); }
 
     public boolean isRunning() { return gameRunning; }
+    public java.util.Set<java.util.UUID> getParticipants() { return participants; }
 
     public long getElapsedSeconds() {
         if (!gameRunning) return 0;
