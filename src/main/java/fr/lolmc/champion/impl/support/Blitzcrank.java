@@ -64,16 +64,37 @@ public class Blitzcrank extends BaseChampion {
             if(hits.isEmpty()){c.sendActionBar(Component.text("🪝 Grappin manqué!",NamedTextColor.GRAY));return;}
             var tgt=hits.get(0);
             double[] base=fr.lolmc.util.Balance.base("q_blitzcrank",new double[]{110,160,210,260,310});double dmg=base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("q_blitzcrank","ap",1.2);
-            TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.MAGICAL);
-            // Tire la cible vers Blitzcrank
-            Vector pull=c.getLocation().toVector().subtract(tgt.getLocation().toVector()).normalize().multiply(2.0);
-            pull.setY(0.3); tgt.setVelocity(pull);
-            if(tgt instanceof Player __p){
-                __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,15,10,false,true)); // stun bref
-                __p.sendActionBar(Component.text("🪝 ATTRAPÉ! Grappin Fusée",NamedTextColor.YELLOW));
-            }
-            c.getWorld().spawnParticle(Particle.CRIT,tgt.getLocation().add(0,1,0),8,0.3,0.3,0.3);
+            // Animation : chaîne qui voyage vers la cible
+            org.bukkit.Location hookStart = c.getEyeLocation();
+            org.bukkit.Location hookEnd = tgt.getLocation().add(0,1,0);
+            double hookDist = hookStart.distance(hookEnd);
+            int hookSteps = Math.max(3,(int)(hookDist/0.6));
+            org.bukkit.util.Vector hookStep = hookEnd.toVector().subtract(hookStart.toVector()).normalize().multiply(hookDist/hookSteps);
+            new org.bukkit.scheduler.BukkitRunnable(){
+                int si=0; org.bukkit.Location cur = hookStart.clone();
+                @Override public void run(){
+                    if(si>=hookSteps){cancel();return;}
+                    cur.add(hookStep);
+                    cur.getWorld().spawnParticle(org.bukkit.Particle.CRIT,cur,1,0,0,0,0);
+                    si++;
+                }
+            }.runTaskTimer(LolPlugin.getInstance(),0L,1L);
             c.getWorld().playSound(c.getLocation(), Sound.BLOCK_PISTON_EXTEND, 1f, 0.8f);
+            // Dégâts et attraction après le voyage
+            final var finalTgt = tgt;
+            new org.bukkit.scheduler.BukkitRunnable(){
+                @Override public void run(){
+                    TargetingUtil.dealDamage(c, finalTgt, dmg, TargetingUtil.DmgType.MAGICAL);
+                    Vector pull=c.getLocation().toVector().subtract(finalTgt.getLocation().toVector()).normalize().multiply(2.0);
+                    pull.setY(0.3); finalTgt.setVelocity(pull);
+                    if(finalTgt instanceof Player __p){
+                        __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,15,10,false,true));
+                        __p.sendActionBar(Component.text("🪝 ATTRAPÉ! Grappin Fusée",NamedTextColor.YELLOW));
+                    }
+                    finalTgt.getWorld().spawnParticle(Particle.ELECTRIC_SPARK,finalTgt.getLocation().add(0,1,0),12,0.4,0.4,0.4);
+                    finalTgt.getWorld().playSound(finalTgt.getLocation(), Sound.ENTITY_GENERIC_EXPLODE, 0.5f, 1.8f);
+                }
+            }.runTaskLater(LolPlugin.getInstance(), (long)hookSteps);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] base=fr.lolmc.util.Balance.base("q_blitzcrank",new double[]{110,160,210,260,310});

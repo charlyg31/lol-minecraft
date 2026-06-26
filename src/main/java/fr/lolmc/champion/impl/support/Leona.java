@@ -32,8 +32,28 @@ public class Leona extends BaseChampion {
         initSystems(576, 7.0, ResourceSystem.ResourceType.MANA, 420, 9.0);
     }
 
+    // Passif Lumière du Soleil : les sorts de Leona marquent les ennemis.
+    // Un allié qui frappe un ennemi marqué inflige 35-80 dégâts magiques bonus.
+    static final java.util.Map<java.util.UUID, Long> sunlightMark
+        = new java.util.concurrent.ConcurrentHashMap<>();
+    public static void applyMark(org.bukkit.entity.LivingEntity target) {
+        sunlightMark.put(target.getUniqueId(), System.currentTimeMillis() + 3500L);
+        target.getWorld().spawnParticle(org.bukkit.Particle.END_ROD,
+            target.getLocation().add(0,2,0), 3, 0.2,0.2,0.2);
+    }
+    public static boolean consumeMark(org.bukkit.entity.LivingEntity target) {
+        Long exp = sunlightMark.get(target.getUniqueId());
+        if (exp == null || System.currentTimeMillis() > exp) return false;
+        sunlightMark.remove(target.getUniqueId());
+        return true;
+    }
+
     static class AA extends BasicAttackAbility {
         AA(){super("leona",Material.IRON_SWORD,2.0f,DamageType.PHYSICAL);}
+        @Override protected void onHit(Player c, ChampionStats s, org.bukkit.entity.LivingEntity tgt, double dmg) {
+            // Appliquer la marque sur chaque AA de Leona
+            applyMark(tgt);
+        }
     }
 
     static class Q extends BaseAbility {
@@ -49,6 +69,7 @@ public class Leona extends BaseChampion {
                 __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,20,10,false,true)); // stun 1s
                 __p.sendActionBar(Component.text("☀ STUN 1s — Bouclier de l'Aube!",NamedTextColor.YELLOW));
             }
+            applyMark(tgt); // marque Lumière du Soleil
             c.getWorld().spawnParticle(Particle.END_ROD,tgt.getLocation().add(0,1,0),8,0.3,0.3,0.3);
             c.getWorld().playSound(c.getLocation(), Sound.ITEM_SHIELD_BLOCK, 1f, 0.8f);
         }

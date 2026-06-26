@@ -263,6 +263,16 @@ public class PassiveManager {
             // Implémenté comme bonus CD reducé dans getCurrentCooldown()
         }
 
+        // ── Leona Lumière du Soleil : allié frappe cible marquée ──
+        if (fr.lolmc.champion.impl.support.Leona.consumeMark(victim)) {
+            var cm2 = LolPlugin.getInstance().getChampionManager();
+            int lvl2 = cm2.hasChampion(attacker) ? cm2.getChampion(attacker).getLevelSystem().getLevel() : 1;
+            double sunDmg = 35 + lvl2 * 2.6; // 35-80 selon le niveau
+            fr.lolmc.util.TargetingUtil.dealDamage(attacker, victim, sunDmg, fr.lolmc.util.TargetingUtil.DmgType.MAGICAL);
+            attacker.sendActionBar(net.kyori.adventure.text.Component.text(
+                "☀ Lumière du Soleil! +" + (int)sunDmg, net.kyori.adventure.text.format.NamedTextColor.YELLOW));
+        }
+
         // ── Frostfire Gauntlet: zone de glace ralentissante sur AA ──
         if (hasAnyItem(attacker,"frostfire_gauntlet","frostfire")) {
             victim.getWorld().spawnParticle(org.bukkit.Particle.SNOWFLAKE,

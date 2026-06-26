@@ -32,6 +32,14 @@ public class ChampSelectGUI implements Listener {
     private static final Component RUNE_TITLE = Component.text("Choisis tes Runes", NamedTextColor.DARK_PURPLE)
             .decoration(TextDecoration.ITALIC, false);
 
+    private static final Component BAN_TITLE = Component.text("Bannissez un Champion", NamedTextColor.RED)
+            .decoration(TextDecoration.ITALIC, false);
+
+    // Bans actifs (empêchés d'être sélectionnés)
+    private static final java.util.Set<String> bannedChampions
+        = java.util.Collections.synchronizedSet(new java.util.HashSet<>());
+    private static int banRound = 0; // 0 = pas en ban, 1-10 = tour de ban
+
     // Les 20 champions disponibles (id → matériau d'icône)
     private static final String[] CHAMPIONS = {
             "garen", "darius", "malphite", "nasus",            // top
@@ -193,4 +201,27 @@ public class ChampSelectGUI implements Listener {
     private String capitalize(String s) {
         return s.substring(0, 1).toUpperCase() + s.substring(1);
     }
+
+    /** Ouvre le menu de ban pour un joueur. */
+    public void openBanMenu(Player player) {
+        Inventory inv = Bukkit.createInventory(null, 27, BAN_TITLE);
+        for (int i = 0; i < CHAMPIONS.length && i < 27; i++) {
+            if (!bannedChampions.contains(CHAMPIONS[i]))
+                inv.setItem(i, buildChampionIcon(CHAMPIONS[i]));
+        }
+        player.openInventory(inv);
+    }
+
+    /** Bannit un champion (appelé depuis ChampSelectManager). */
+    public static void banChampion(String championId) {
+        bannedChampions.add(championId);
+        banRound++;
+        Bukkit.broadcast(Component.text(
+            "🚫 " + championId + " est banni! (ban " + banRound + "/10)",
+            NamedTextColor.RED));
+    }
+
+    public static boolean isBanned(String championId) { return bannedChampions.contains(championId); }
+
+    public static void resetBans() { bannedChampions.clear(); banRound = 0; }
 }

@@ -99,6 +99,17 @@ public class DamageUtil {
         if ("amumu".equals(vc.getId()) && attacker != null) {
             fr.lolmc.champion.impl.jungle.Amumu.onHitByEnemy(victim, vc, attacker);
         }
+        // Dragon Elder : exécution si la cible tombe sous 20% HP
+        if (attacker != null) {
+            var ac = LolPlugin.getInstance().getChampionManager().getChampion(attacker);
+            // Vérifier si l'attaquant a le buff dragon_elder
+            if (attacker.hasPotionEffect(org.bukkit.potion.PotionEffectType.STRENGTH)
+                    && vc.getHPSystem().getHPRatio() < 0.20) {
+                // +vrai dégâts supplémentaires proportionnels aux HP manquants
+                double elderDmg = vc.getHPSystem().getMaxHP() * 0.10;
+                vc.getHPSystem().takeDamage(elderDmg);
+            }
+        }
         // Révéler la victime si elle est dans un bush (combat = visible)
         var bushMgr = LolPlugin.getInstance().getBushManager();
         if (bushMgr != null) bushMgr.revealOnDamage(victim);

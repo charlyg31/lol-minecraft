@@ -32,8 +32,17 @@ public class Morgana extends BaseChampion {
         setAutoAttackRange(5.5);
     }
 
+    // Passif Siphon de l'Âme : les dégâts infligés aux champions et gros monstres
+    // soignent Morgana (20% des dégâts infligés)
     static class AA extends BasicAttackAbility {
         AA(){super("morgana",Material.PURPLE_DYE,5.5f,DamageType.MAGICAL);}
+        @Override protected void onHit(Player c, ChampionStats s, org.bukkit.entity.LivingEntity tgt, double dmg) {
+            // Siphon de l'Âme : 20% vol de vie sur AA contre champions
+            var cm = LolPlugin.getInstance().getChampionManager();
+            if (tgt instanceof Player || fr.lolmc.game.JungleManager.isJungleMonster(tgt)) {
+                if (cm.hasChampion(c)) cm.getChampion(c).getHPSystem().heal(dmg * 0.20);
+            }
+        }
     }
 
     static class Q extends BaseAbility {

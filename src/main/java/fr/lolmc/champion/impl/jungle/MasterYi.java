@@ -26,14 +26,32 @@ public class MasterYi extends BaseChampion {
         getStats().setGrowthStats(100.0,3.3,4.3,2.05,0.02000,0.65);
         setAutoAttackRange(2.0);
     }
+    public static void resetState(java.util.UUID id) { aaCount.remove(id); }
+    public static void resetAllState() { aaCount.clear(); }
+
     @Override protected void registerAbilities() {
         setAbility(0,new AA()); setAbility(1,new Q());
         setAbility(2,new W()); setAbility(3,new E()); setAbility(4,new R());
         initSystems(559, 7.0, ResourceSystem.ResourceType.NONE, 0, 0.0);
     }
 
+    // Passif Double Frappe : toutes les 3 AA, la prochaine frappe 2 fois
+    private static final java.util.Map<java.util.UUID, Integer> aaCount
+        = new java.util.concurrent.ConcurrentHashMap<>();
+
     static class AA extends BasicAttackAbility {
         AA(){super("masteryi",Material.IRON_SWORD,6.0f,DamageType.PHYSICAL);}
+        @Override protected void onHit(Player c, ChampionStats s, org.bukkit.entity.LivingEntity tgt, double dmg) {
+            int count = aaCount.merge(c.getUniqueId(), 1, Integer::sum);
+            if (count >= 3) {
+                aaCount.put(c.getUniqueId(), 0);
+                // Double Frappe : 2e coup = 50% AD vrai dégâts
+                DamageUtil.trueDamageEntity(c, tgt, s.getFinalAD() * 0.50);
+                c.getWorld().spawnParticle(org.bukkit.Particle.CRIT,
+                    tgt.getLocation().add(0,1.5,0), 8, 0.3,0.3,0.3);
+                c.sendActionBar(Component.text("⚔⚔ Double Frappe!", NamedTextColor.YELLOW));
+            }
+        }
     }
 
     static class Q extends BaseAbility {
@@ -88,5 +106,20 @@ public class MasterYi extends BaseChampion {
             c.sendActionBar(Component.text("⚡ HIGHLANDER 7s!",NamedTextColor.GOLD));
         }
         @Override public String getDynamicDescription(ChampionStats s){return "+35%% vitesse, +55%% haste, immunité ralentissements 7s. Kills reset CD.";}
+    }
+
+    /** Appelé par EntityDeathListener sur kill ou assist de MasterYi pendant Highlander. */
+    public static void onKillDuringHighlander(Player yi) {
+        // Reset Q, E (pas W) quand Highlander est actif
+        var cm = LolPlugin.getInstance().getChampionManager();
+        if (!cm.hasChampion(yi)) return;
+        var champ = cm.getChampion(yi);
+        if (yi.hasPotionEffect(org.bukkit.potion.PotionEffectType.SPEED)
+                && yi.hasPotionEffect(org.bukkit.potion.PotionEffectType.HASTE)) {
+            var q = champ.getAbility(1); var e = champ.getAbility(3);
+            if (q != null) { q.setDynamicCooldown(0.001); q.triggerCooldown(yi); q.setDynamicCooldown(-1); }
+            if (e != null) { e.setDynamicCooldown(0.001); e.triggerCooldown(yi); e.setDynamicCooldown(-1); }
+            yi.sendActionBar(Component.text("⚡ HIGHLANDER — Reset Q/E!", NamedTextColor.GOLD));
+        }
     }
 }

@@ -6,6 +6,7 @@ import fr.lolmc.champion.impl.mid.Veigar;
 import fr.lolmc.champion.impl.mid.Yasuo;
 import fr.lolmc.champion.impl.mid.Zed;
 import fr.lolmc.champion.impl.jungle.LeeSin;
+import fr.lolmc.champion.impl.jungle.MasterYi;
 import fr.lolmc.champion.impl.adc.MissFortune;
 
 import java.util.UUID;
@@ -31,6 +32,7 @@ public final class ChampionStateReset {
         Yasuo.resetState(id);
         Zed.resetState(id);
         LeeSin.resetState(id);
+        MasterYi.resetState(id);
         MissFortune.resetState(id);
     }
 
@@ -42,6 +44,7 @@ public final class ChampionStateReset {
         Yasuo.resetAllState();
         Zed.resetAllState();
         LeeSin.resetAllState();
+        MasterYi.resetAllState();
         MissFortune.resetAllState();
     }
 }
