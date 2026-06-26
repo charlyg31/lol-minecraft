@@ -26,6 +26,9 @@ public class LobbyBridge implements PluginMessageListener {
     private final LobbyRuneManager runeManager;
     private final String gameServer;
     private final Logger log;
+    // Serveur BungeeCord d'origine de chaque joueur (pour le retour après partie)
+    private final java.util.Map<java.util.UUID, String> playerOriginServer
+        = new java.util.concurrent.ConcurrentHashMap<>();
 
     public LobbyBridge(LobbyPlugin plugin, LobbyPartyManager pm,
                        LobbyQueueManager qm, LobbyRuneManager rm) {
@@ -37,6 +40,7 @@ public class LobbyBridge implements PluginMessageListener {
         this.log          = plugin.getLogger();
 
         plugin.getServer().getMessenger().registerIncomingPluginChannel(plugin, CHANNEL_LOLMC, this);
+        plugin.getServer().getMessenger().registerIncomingPluginChannel(plugin, CHANNEL_BUNGEE, this);
         plugin.getServer().getMessenger().registerOutgoingPluginChannel(plugin, CHANNEL_BUNGEE);
         plugin.getServer().getMessenger().registerOutgoingPluginChannel(plugin, CHANNEL_LOLMC);
     }
@@ -47,6 +51,19 @@ public class LobbyBridge implements PluginMessageListener {
 
     @Override
     public void onPluginMessageReceived(String channel, Player unused, byte[] bytes) {
+        // Canal BungeeCord → réponse GetServer
+        if (channel.equals(CHANNEL_BUNGEE)) {
+            try (java.io.DataInputStream in = new java.io.DataInputStream(
+                    new java.io.ByteArrayInputStream(bytes))) {
+                String subChannel = in.readUTF();
+                if ("GetServer".equals(subChannel)) {
+                    String serverName = in.readUTF();
+                    if (unused != null)
+                        playerOriginServer.put(unused.getUniqueId(), serverName);
+                }
+            } catch (Exception ignored) {}
+            return;
+        }
         if (!channel.equals(CHANNEL_LOLMC)) return;
         String json = new String(bytes, StandardCharsets.UTF_8);
         Map<String, String> data = parseJson(json);
@@ -131,6 +148,10 @@ public class LobbyBridge implements PluginMessageListener {
         // Party
         String role = plugin.getRoleManager().getRole(player.getUniqueId());
         sb.append("\"role\":\"").append(role).append("\",");
+        // Serveur d'origine (pour retour après partie)
+        String originServer = playerOriginServer.getOrDefault(player.getUniqueId(), null);
+        if (originServer != null)
+            sb.append("\"origin_server\":\"").append(originServer).append("\",");
         sb.append("\"party\":\"");
         sb.append(String.join(",", party.stream().map(UUID::toString).toList()));
         sb.append("\"");
@@ -150,6 +171,28 @@ public class LobbyBridge implements PluginMessageListener {
         } catch (IOException e) {
             log.warning("[Bridge] Erreur connexion serveur: " + e.getMessage());
         }
+    }
+
+    /**
+     * Demande à BungeeCord le nom du serveur actuel du joueur.
+     * La réponse arrive dans onPluginMessageReceived (sous-canal GetServer).
+     */
+    public void requestCurrentServer(Player player) {
+        try (java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
+             java.io.DataOutputStream out = new java.io.DataOutputStream(baos)) {
+            out.writeUTF("GetServer");
+            player.sendPluginMessage(plugin, CHANNEL_BUNGEE, baos.toByteArray());
+        } catch (Exception e) {
+            log.warning("[Bridge] Erreur GetServer: " + e.getMessage());
+        }
+    }
+
+    public String getOriginServer(java.util.UUID uuid) {
+        return playerOriginServer.getOrDefault(uuid, null);
+    }
+
+    public void clearOriginServer(java.util.UUID uuid) {
+        playerOriginServer.remove(uuid);
     }
 
     /** Forward un message JSON vers un serveur cible via BungeeCord. */
@@ -201,6 +244,7 @@ public class LobbyBridge implements PluginMessageListener {
     public void disable() {
         try {
             plugin.getServer().getMessenger().unregisterIncomingPluginChannel(plugin, CHANNEL_LOLMC);
+            plugin.getServer().getMessenger().unregisterIncomingPluginChannel(plugin, CHANNEL_BUNGEE);
         } catch (Exception ignored) {}
     }
 }

@@ -52,6 +52,8 @@ public class BridgeManager implements PluginMessageListener {
     // Données reçues du lobby en attente de connexion du joueur
     // uuid → données JSON brutes
     private final Map<UUID, Map<String, String>> pendingPlayerData = new java.util.concurrent.ConcurrentHashMap<>();
+    // Serveur BungeeCord d'origine de chaque joueur (pour le retour après partie)
+    private final Map<UUID, String> originServers = new java.util.concurrent.ConcurrentHashMap<>();
 
     public BridgeManager(LolPlugin plugin) {
         this.plugin = plugin;
@@ -133,6 +135,12 @@ public class BridgeManager implements PluginMessageListener {
     }
 
     private void applyPlayerData(Player player, Map<String, String> data) {
+        // ── Serveur d'origine ──
+        String originServer = data.getOrDefault("origin_server", null);
+        if (originServer != null && !originServer.isEmpty()) {
+            originServers.put(player.getUniqueId(), originServer);
+        }
+
         // ── Runes ──
         String keystone = data.getOrDefault("keystone", "");
         if (!keystone.isEmpty()) {
@@ -310,5 +318,31 @@ public class BridgeManager implements PluginMessageListener {
         try {
             plugin.getServer().getMessenger().unregisterIncomingPluginChannel(plugin, CHANNEL_IN);
         } catch (Exception ignored) {}
+    }
+
+
+    /**
+     * Retourne le serveur BungeeCord d'origine d'un joueur.
+     * Null si le joueur n'est pas passé par le lobby ou si pas de BungeeCord.
+     */
+    public String getOriginServer(UUID uuid) {
+        return originServers.get(uuid);
+    }
+
+    /**
+     * Renvoie un joueur vers son serveur d'origine (après la partie).
+     * Si pas de serveur connu, ne fait rien (le retour de position locale suffit).
+     */
+    public void sendPlayerToOrigin(org.bukkit.entity.Player player) {
+        if (!enabled) return;
+        String server = originServers.remove(player.getUniqueId());
+        if (server == null || server.isEmpty()) return;
+        sendPluginMessage(player, "Connect", server, null, null);
+        log.info("[Bridge] " + player.getName() + " → retour sur " + server);
+    }
+
+    public void cleanupPlayer(UUID uuid) {
+        pendingPlayerData.remove(uuid);
+        originServers.remove(uuid);
     }
 }
