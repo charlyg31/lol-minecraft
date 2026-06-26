@@ -27,6 +27,7 @@ import net.md_5.bungee.api.plugin.Plugin;
 public class LolBungeePlugin extends Plugin {
 
     private static LolBungeePlugin instance;
+    private net.md_5.bungee.config.Configuration config;
 
     private BungeeQueueManager  queueManager;
     private BungeePartyManager  partyManager;
@@ -37,7 +38,7 @@ public class LolBungeePlugin extends Plugin {
     public void onEnable() {
         instance = this;
         getDataFolder().mkdirs();
-        saveDefaultConfig();
+        loadConfig();
 
         // Init managers
         this.roleManager   = new BungeeRoleManager(this);
@@ -65,6 +66,33 @@ public class LolBungeePlugin extends Plugin {
     }
 
     public static LolBungeePlugin getInstance() { return instance; }
+
+    private void loadConfig() {
+        java.io.File configFile = new java.io.File(getDataFolder(), "config.yml");
+        if (!configFile.exists()) {
+            try (java.io.InputStream in = getResourceAsStream("config.yml")) {
+                if (in != null) {
+                    java.nio.file.Files.copy(in, configFile.toPath());
+                } else {
+                    configFile.createNewFile();
+                }
+            } catch (java.io.IOException e) {
+                getLogger().warning("Erreur création config.yml: " + e.getMessage());
+            }
+        }
+        try {
+            config = net.md_5.bungee.config.ConfigurationProvider
+                .getProvider(net.md_5.bungee.config.YamlConfiguration.class)
+                .load(configFile);
+        } catch (java.io.IOException e) {
+            getLogger().warning("Erreur chargement config.yml: " + e.getMessage());
+            config = net.md_5.bungee.config.ConfigurationProvider
+                .getProvider(net.md_5.bungee.config.YamlConfiguration.class)
+                .load(new java.io.StringReader(""));
+        }
+    }
+
+    public net.md_5.bungee.config.Configuration getConfig() { return config; }
 
     public BungeeQueueManager  getQueueManager()  { return queueManager; }
     public BungeePartyManager  getPartyManager()  { return partyManager; }

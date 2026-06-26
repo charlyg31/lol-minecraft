@@ -24,9 +24,13 @@ public class ServerSwitchListener implements Listener {
 
     @EventHandler
     public void onServerConnected(ServerConnectedEvent e) {
-        String fromServer = (e.getPreviousServer() != null)
-            ? e.getPreviousServer().getInfo().getName()
-            : null;
+        // Le serveur actuel du joueur AVANT la connexion
+        // (e.getPlayer().getServer() retourne l'ancien serveur avant la complétion)
+        String fromServer = null;
+        try {
+            var current = e.getPlayer().getServer();
+            if (current != null) fromServer = current.getInfo().getName();
+        } catch (Exception ignored) {}
         String toServer = e.getServer().getInfo().getName();
 
         tracker.onServerSwitch(e.getPlayer(), fromServer, toServer);
