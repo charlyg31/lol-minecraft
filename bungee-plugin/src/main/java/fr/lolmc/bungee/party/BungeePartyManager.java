@@ -289,37 +289,73 @@ public class BungeePartyManager {
     }
 
     /**
-     * Vérifie les conflits de rôles dans le groupe.
+     * Vérifie s'il existe une assignation valide (un rôle unique par joueur).
+     * Utilise un algorithme de matching bipartite (augmenting path / DFS).
      *
-     * Règle : le nombre de postes distincts couverts doit être >= taille du groupe.
-     * Si groupe = 5 : les 5 postes doivent être couverts.
-     * Si groupe = 3 : au moins 3 postes distincts couverts.
+     * Exemple :
+     *   Toi   → [top, adc]
+     *   Steve → [mid, jungle]
+     *   Alex  → [mid, top]
+     *   → Assignation possible : toi=adc, Steve=jungle, Alex=mid → OK
      *
-     * @return message d'erreur, ou null si pas de conflit
+     * @return message d'erreur si aucune assignation possible, null sinon
      */
     private String checkRoleConflict(UUID lid, List<UUID> members) {
-        Set<String> allRoles = new LinkedHashSet<>();
-        Map<String, List<String>> byMember = new LinkedHashMap<>();
-
+        // Construire la liste de rôles par joueur
+        List<List<String>> playerRoles = new ArrayList<>();
+        List<String> names = new ArrayList<>();
         for (UUID uid : members) {
-            List<String> roles = memberRoles.getOrDefault(uid, List.of());
+            playerRoles.add(memberRoles.getOrDefault(uid, List.of()));
             ProxiedPlayer p = ProxyServer.getInstance().getPlayer(uid);
-            String name = p != null ? p.getName() : uid.toString().substring(0, 8);
-            byMember.put(name, roles);
-            allRoles.addAll(roles);
+            names.add(p != null ? p.getName() : uid.toString().substring(0, 8));
         }
 
-        int groupSize = members.size();
-        int distinctRoles = allRoles.size();
+        // Collecter tous les rôles distincts pour les indexer
+        List<String> allRoles = new ArrayList<>(
+            new LinkedHashSet<>(playerRoles.stream()
+                .flatMap(List::stream)
+                .toList()));
 
-        if (distinctRoles < groupSize) {
-            // Construire le message d'erreur
-            String rolesStr = allRoles.stream().collect(Collectors.joining(", "));
-            return "§fSeulement §e" + distinctRoles + " poste(s) distinct(s) §fpour §e"
-                + groupSize + " joueurs §f(" + rolesStr + "). "
-                + "§7Vous n'occupez pas assez de postes.";
+        // Matching bipartite par DFS (algorithme hongrois simplifié)
+        // match[roleIdx] = index du joueur assigné à ce rôle (-1 si libre)
+        int[] match = new int[allRoles.size()];
+        Arrays.fill(match, -1);
+
+        int matched = 0;
+        for (int playerIdx = 0; playerIdx < playerRoles.size(); playerIdx++) {
+            boolean[] visited = new boolean[allRoles.size()];
+            if (augment(playerIdx, playerRoles, allRoles, match, visited)) matched++;
+        }
+
+        if (matched < members.size()) {
+            // Construire un message d'erreur clair
+            StringBuilder sb = new StringBuilder("Impossible d'assigner un poste unique à chaque joueur.\n");
+            for (int i = 0; i < names.size(); i++) {
+                sb.append("§7• §f").append(names.get(i)).append(" §7→ ")
+                  .append(String.join(", ", playerRoles.get(i))).append("\n");
+            }
+            sb.append("§7Modifiez vos choix pour qu'une assignation soit possible.");
+            return sb.toString();
         }
         return null;
+    }
+
+    /**
+     * DFS pour trouver un chemin augmentant (matching bipartite).
+     */
+    private boolean augment(int playerIdx, List<List<String>> playerRoles,
+                            List<String> allRoles, int[] match, boolean[] visited) {
+        for (String role : playerRoles.get(playerIdx)) {
+            int roleIdx = allRoles.indexOf(role);
+            if (roleIdx < 0 || visited[roleIdx]) continue;
+            visited[roleIdx] = true;
+            if (match[roleIdx] == -1
+                || augment(match[roleIdx], playerRoles, allRoles, match, visited)) {
+                match[roleIdx] = playerIdx;
+                return true;
+            }
+        }
+        return false;
     }
 
     /** Retourne les rôles choisis par un membre (pour la file). */
