@@ -160,13 +160,19 @@ public class StructureDamageListener implements Listener {
         LolPlugin.getInstance().getJungleManager().stopJungle();
         LolPlugin.getInstance().getGameManager().stopGame();
         // Retour au lobby après 30s
-        var mm = LolPlugin.getInstance().getMatchmakingManager();
+        var mm  = LolPlugin.getInstance().getMatchmakingManager();
+        var im  = LolPlugin.getInstance().getInstanceManager();
+        // Trouver l'instance du joueur qui a détruit le Nexus
+        var winnerInstance = (player != null) ? im.getInstanceOf(player) : null;
         new org.bukkit.scheduler.BukkitRunnable() {
             int countdown = 30;
             @Override public void run() {
                 if (countdown <= 0) {
                     // Renvoyer à la position d'avant la partie
                     if (mm != null) mm.returnAllToPreGameLocations();
+                    // Fermer l'instance (décharge + supprime le monde)
+                    if (winnerInstance != null)
+                        im.closeInstance(winnerInstance, 60L);
                     cancel();
                     return;
                 }

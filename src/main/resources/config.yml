@@ -26,8 +26,16 @@ bridge:
 # Cela permet d'avoir d'autres mondes sur le même serveur
 # sans interférence (hub, monde de build, etc.).
 world:
+  # Nom du monde TEMPLATE (configuré une fois via /lol set, jamais utilisé en jeu)
+  # Ce monde est copié pour chaque nouvelle instance de partie.
+  template: "lolmc_template"
+  # Préfixe des mondes d'instance (lolmc_game_1, lolmc_game_2…)
+  # NE PAS modifier après le premier démarrage.
+  instance-prefix: "lolmc_game_"
+  # Nombre maximum de parties simultanées
+  max-instances: 5
   # Nom exact du monde de jeu (dossier dans le répertoire serveur)
-  name: "lolmc"
+  name: "lolmc_template"
   # Monde lobby/hub (optionnel). Si renseigné, c'est ici que
   # les joueurs attendent, configurent leurs runes et forment
   # leurs groupes avant d'être envoyés dans le monde de jeu.

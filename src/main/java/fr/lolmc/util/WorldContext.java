@@ -52,12 +52,35 @@ public final class WorldContext {
 
     /**
      * Joueurs actuellement dans le monde de jeu LoL.
-     * Remplace Bukkit.getOnlinePlayers() partout dans le plugin.
+     * Si le système d'instances est actif, retourne les joueurs
+     * du monde de l'instance du joueur appelant.
+     * Sinon, retourne les joueurs du monde configuré.
      */
     public static Collection<Player> getGamePlayers() {
         World w = getGameWorld();
         if (w == null) return List.of();
         return w.getPlayers();
+    }
+
+    /**
+     * Joueurs d'une instance donnée.
+     * Utiliser dans les managers d'instance pour éviter les fuites.
+     */
+    public static Collection<Player> getInstancePlayers(
+            fr.lolmc.instance.GameInstance instance) {
+        if (instance == null || instance.getWorld() == null) return List.of();
+        return instance.getWorld().getPlayers();
+    }
+
+    /**
+     * Vrai si le joueur est dans le monde template (admin) OU dans une instance.
+     */
+    public static boolean isInGameWorld(Player player) {
+        // Vérifier le monde template (configuration admin)
+        World configured = getGameWorld();
+        if (configured != null && configured.equals(player.getWorld())) return true;
+        // Vérifier si dans une instance
+        return fr.lolmc.instance.InstanceWorldContext.isInAnyInstance(player);
     }
 
     /**

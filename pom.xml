@@ -24,6 +24,10 @@
             <id>enginehub</id>
             <url>https://maven.enginehub.org/repo/</url>
         </repository>
+        <repository>
+            <id>onarandombox</id>
+            <url>https://repo.onarandombox.com/content/groups/public/</url>
+        </repository>
     </repositories>
 
     <dependencies>
@@ -45,6 +49,14 @@
             <version>2.11.2</version>
             <scope>provided</scope>
         </dependency>
+        <!-- Multiverse-Core (optionnel, soft-depend) -->
+        <dependency>
+            <groupId>com.onarandombox.multiversecore</groupId>
+            <artifactId>Multiverse-Core</artifactId>
+            <version>4.3.12</version>
+            <scope>provided</scope>
+        </dependency>
+
         <!-- Base de données (au choix via config) -->
         <dependency>
             <groupId>com.zaxxer</groupId>
