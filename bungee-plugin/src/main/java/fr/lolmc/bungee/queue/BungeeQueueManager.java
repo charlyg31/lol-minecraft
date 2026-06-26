@@ -13,24 +13,31 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.concurrent.TimeUnit;
 
 /**
  * File d'attente cross-serveur gérée depuis le proxy.
  *
- * Quand N joueurs sont en file :
- *   1. Construire le JSON des données de chaque joueur (runes, rôle, sort, groupe)
- *   2. Envoyer le JSON au serveur de jeu via PluginMessage
- *   3. Attendre 2s (le serveur de jeu stocke les données)
- *   4. Connecter les joueurs au serveur de jeu via BungeeCord Connect
+ * Logique de remplissage :
+ *   1. checkAndStartGame() : tente de former une partie de N joueurs
+ *   2. Si N joueurs sont disponibles → lancer directement
+ *   3. Si N-1 joueurs sont disponibles via un sous-ensemble cohérent
+ *      ET qu'un joueur solo peut remplir le poste manquant →
+ *      proposer le poste au premier solo éligible (timeout 20s)
  */
 public class BungeeQueueManager {
 
-    private final LolBungeePlugin plugin;
+    private final LolBungeePlugin    plugin;
     private final BungeePartyManager partyManager;
     private final BungeeRoleManager  roleManager;
 
+    // File principale (ordre d'arrivée)
     private final Deque<UUID> queue = new ConcurrentLinkedDeque<>();
-    private final int playersNeeded;
+
+    // Propositions en attente : solo UUID → proposition
+    private final Map<UUID, FillProposal> pendingProposals = new ConcurrentHashMap<>();
+
+    private final int    playersNeeded;
     private final String gameServer;
 
     public BungeeQueueManager(LolBungeePlugin plugin, BungeePartyManager pm,
@@ -42,74 +49,312 @@ public class BungeeQueueManager {
         this.gameServer    = plugin.getConfig().getString("game-server", "lolmc-01");
     }
 
+    // ══════════════════════════════════════════════════════════════════════
+    // REJOINDRE / QUITTER
+    // ══════════════════════════════════════════════════════════════════════
+
     public void join(ProxiedPlayer player) {
         if (isInQueue(player.getUniqueId())) return;
         List<UUID> group = partyManager.getPartyMembers(player.getUniqueId());
-        if (queue.size() + group.size() > playersNeeded) return;
         for (UUID uid : group) {
             if (!queue.contains(uid)) queue.add(uid);
         }
-        // Message uniquement au joueur qui a fait la commande
         player.sendMessage(new TextComponent("§aVous êtes dans la file d'attente."));
         checkAndStartGame();
     }
 
     public void leave(ProxiedPlayer player) {
-        queue.remove(player.getUniqueId());
+        UUID uid = player.getUniqueId();
+        queue.remove(uid);
+        // Annuler une proposition en attente si le joueur quitte
+        FillProposal prop = pendingProposals.remove(uid);
+        if (prop != null) prop.cancel();
     }
 
     public boolean isInQueue(UUID uuid) { return queue.contains(uuid); }
     public int getQueueSize()           { return queue.size(); }
     public int getPlayersNeeded()       { return playersNeeded; }
 
-    private void checkAndStartGame() {
-        if (queue.size() < playersNeeded) return;
+    // ══════════════════════════════════════════════════════════════════════
+    // ACCEPTER / REFUSER UNE PROPOSITION DE FILL
+    // ══════════════════════════════════════════════════════════════════════
 
-        // Prendre les N premiers joueurs
-        List<UUID> gamePlayers = new ArrayList<>();
-        Iterator<UUID> it = queue.iterator();
-        for (int i = 0; i < playersNeeded && it.hasNext(); i++) {
-            gamePlayers.add(it.next()); it.remove();
+    public void acceptFill(ProxiedPlayer player) {
+        FillProposal prop = pendingProposals.remove(player.getUniqueId());
+        if (prop == null) {
+            player.sendMessage(new TextComponent("§7Aucune proposition en cours."));
+            return;
+        }
+        prop.cancel(); // annuler le timeout
+        player.sendMessage(new TextComponent("§a✔ Tu rejoins la partie !"));
+        launchGame(prop.gamePlayers, player.getUniqueId(), prop.filledRole);
+    }
+
+    public void refuseFill(ProxiedPlayer player) {
+        FillProposal prop = pendingProposals.remove(player.getUniqueId());
+        if (prop == null) {
+            player.sendMessage(new TextComponent("§7Aucune proposition en cours."));
+            return;
+        }
+        prop.cancel();
+        player.sendMessage(new TextComponent("§7Proposition refusée. Tu restes en file."));
+        // Proposer au prochain solo éligible
+        tryProposeFill(prop.gamePlayers, prop.filledRole, prop.excludedSolos);
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    // LOGIQUE PRINCIPALE
+    // ══════════════════════════════════════════════════════════════════════
+
+    /**
+     * Tente de former une partie complète depuis la file.
+     *
+     * Étape 1 : chercher N joueurs avec une assignation valide.
+     * Étape 2 : si N-1 joueurs forment un groupe cohérent avec 1 poste
+     *           libre, proposer ce poste aux solos éligibles dans la file.
+     */
+    private void checkAndStartGame() {
+        List<UUID> allInQueue = new ArrayList<>(queue);
+
+        // ── Étape 1 : N joueurs complets ──────────────────────────────────
+        List<UUID> full = findValidGroup(allInQueue, playersNeeded);
+        if (full != null) {
+            for (UUID uid : full) queue.remove(uid);
+            launchGame(full, null, null);
+            return;
         }
 
-        // Chercher un carrier online pour envoyer les PluginMessages
-        ProxiedPlayer carrier = findCarrier(gamePlayers);
+        // ── Étape 2 : N-1 joueurs + 1 solo fill ──────────────────────────
+        if (allInQueue.size() < playersNeeded - 1) return;
+
+        // Chercher un sous-ensemble de N-1 avec assignation valide
+        GroupAndMissingRole partial = findGroupWithOneMissing(allInQueue);
+        if (partial == null) return;
+
+        // Chercher un solo dans la file qui accepte ce rôle
+        tryProposeFill(partial.players, partial.missingRole, new HashSet<>());
+    }
+
+    /**
+     * Cherche le premier solo dans la file qui accepte le rôle manquant,
+     * et lui envoie une proposition (timeout 20s).
+     *
+     * @param gamePlayers  Les N-1 joueurs déjà sélectionnés
+     * @param missingRole  Le rôle manquant (ex: "SUPPORT")
+     * @param excluded     UUIDs déjà refusés pour cette proposition
+     */
+    private void tryProposeFill(List<UUID> gamePlayers, String missingRole, Set<UUID> excluded) {
+        Set<UUID> gameSet = new HashSet<>(gamePlayers);
+
+        for (UUID uid : new ArrayList<>(queue)) {
+            // Ignorer les joueurs déjà dans la partie ou exclus
+            if (gameSet.contains(uid) || excluded.contains(uid)) continue;
+
+            // Doit être solo (pas en groupe)
+            if (partyManager.inParty(uid)) continue;
+
+            // Doit accepter ce rôle ou /lol all
+            List<String> roles = roleManager.getRoles(uid);
+            boolean accepts = roles.containsAll(List.of("TOP","JUNGLE","MID","ADC","SUPPORT"))
+                || roles.contains(missingRole);
+            if (!accepts) continue;
+
+            // Trouver le joueur
+            ProxiedPlayer solo = ProxyServer.getInstance().getPlayer(uid);
+            if (solo == null) continue;
+
+            // Envoyer la proposition
+            solo.sendMessage(new TextComponent(
+                "§6§l⚔ Proposition de partie !"));
+            solo.sendMessage(new TextComponent(
+                "§7Un groupe cherche un §e" + formatRole(missingRole) + "§7."));
+            solo.sendMessage(new TextComponent(
+                "§aTape §l/lol accepte §r§7ou §c§l/lol refuse §r§7(§720s§7)"));
+
+            // Créer le timeout 20s
+            Set<UUID> newExcluded = new HashSet<>(excluded);
+            newExcluded.add(uid);
+
+            FillProposal proposal = new FillProposal(gamePlayers, missingRole, newExcluded);
+            pendingProposals.put(uid, proposal);
+
+            // Timeout automatique
+            var task = ProxyServer.getInstance().getScheduler().schedule(plugin, () -> {
+                FillProposal p = pendingProposals.remove(uid);
+                if (p != null) {
+                    solo.sendMessage(new TextComponent("§7Proposition expirée — tu restes en file."));
+                    // Proposer au suivant
+                    tryProposeFill(gamePlayers, missingRole, newExcluded);
+                }
+            }, 20, TimeUnit.SECONDS);
+
+            proposal.timeoutTask = task;
+            return; // Une seule proposition à la fois
+        }
+
+        // Aucun solo trouvé — on attend que quelqu'un rejoigne la file
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    // LANCEMENT DE LA PARTIE
+    // ══════════════════════════════════════════════════════════════════════
+
+    /**
+     * Lance la partie avec les joueurs sélectionnés.
+     *
+     * @param gamePlayers  Les N-1 joueurs du groupe
+     * @param fillUUID     Le solo fill (null si partie complète sans fill)
+     * @param fillRole     Le rôle assigné au fill
+     */
+    private void launchGame(List<UUID> gamePlayers, UUID fillUUID, String fillRole) {
+        List<UUID> allPlayers = new ArrayList<>(gamePlayers);
+        if (fillUUID != null) {
+            allPlayers.add(fillUUID);
+            queue.remove(fillUUID);
+        }
+
+        ProxiedPlayer carrier = findCarrier(allPlayers);
         if (carrier == null) return;
 
         ServerInfo gameServerInfo = ProxyServer.getInstance().getServerInfo(gameServer);
         if (gameServerInfo == null) {
-            plugin.getLogger().severe("Serveur de jeu '" + gameServer + "' introuvable dans BungeeCord !");
+            plugin.getLogger().severe("Serveur de jeu '" + gameServer + "' introuvable !");
             return;
         }
 
-        // Envoyer les données de chaque joueur au serveur de jeu
-        for (UUID uid : gamePlayers) {
+        // Envoyer les données de chaque joueur
+        for (UUID uid : allPlayers) {
             ProxiedPlayer p = ProxyServer.getInstance().getPlayer(uid);
             if (p == null) continue;
-            sendPlayerData(carrier, p, gamePlayers);
+            // Si c'est le fill, son rôle assigné est fillRole
+            String assignedRole = uid.equals(fillUUID) ? fillRole : null;
+            sendPlayerData(carrier, p, assignedRole);
         }
 
-        // Attendre 2s puis connecter tout le monde
+        // Connecter après 2s
         ProxyServer.getInstance().getScheduler().schedule(plugin, () -> {
-            for (UUID uid : gamePlayers) {
+            for (UUID uid : allPlayers) {
                 ProxiedPlayer p = ProxyServer.getInstance().getPlayer(uid);
                 if (p != null) p.connect(gameServerInfo);
             }
-        }, 2, java.util.concurrent.TimeUnit.SECONDS);
+        }, 2, TimeUnit.SECONDS);
     }
 
-    /** Envoie les données d'un joueur au serveur de jeu via PluginMessage. */
-    private void sendPlayerData(ProxiedPlayer carrier, ProxiedPlayer player, List<UUID> allPlayers) {
-        // Runes : gérées sur le serveur de jeu, pas transmises par le proxy
-        // Si le joueur est dans un groupe, utiliser les rôles choisis dans le groupe
-        List<String> roles;
-        var pm2 = plugin.getPartyManager();
-        if (pm2.inParty(player.getUniqueId())) {
-            roles = pm2.getMemberRoles(player.getUniqueId());
-        } else {
-            roles = roleManager.getRoles(player.getUniqueId());
+    // ══════════════════════════════════════════════════════════════════════
+    // ALGORITHME DE MATCHING
+    // ══════════════════════════════════════════════════════════════════════
+
+    /**
+     * Cherche un groupe de `size` joueurs dans la file avec une assignation
+     * de rôles valide (matching bipartite).
+     * Retourne la liste des UUIDs sélectionnés, ou null si impossible.
+     */
+    private List<UUID> findValidGroup(List<UUID> candidates, int size) {
+        if (candidates.size() < size) return null;
+        // Essayer les N premiers (ordre d'arrivée)
+        List<UUID> subset = candidates.subList(0, Math.min(size * 2, candidates.size()));
+        return findMatchingSubset(subset, size);
+    }
+
+    /**
+     * Cherche un groupe de N-1 joueurs avec assignation valide,
+     * et retourne le groupe + le rôle manquant.
+     */
+    private GroupAndMissingRole findGroupWithOneMissing(List<UUID> candidates) {
+        int target = playersNeeded - 1;
+        if (candidates.size() < target) return null;
+
+        List<UUID> subset = candidates.subList(0, Math.min(target * 2, candidates.size()));
+        List<UUID> group = findMatchingSubset(subset, target);
+        if (group == null) return null;
+
+        // Trouver le rôle manquant parmi les 5 postes
+        List<String> allRoles = List.of("TOP","JUNGLE","MID","ADC","SUPPORT");
+        List<List<String>> playerRoles = new ArrayList<>();
+        for (UUID uid : group) playerRoles.add(getRolesFor(uid));
+
+        // L'assignation actuelle — trouver le poste non couvert
+        int[] match = new int[allRoles.size()];
+        Arrays.fill(match, -1);
+        for (int i = 0; i < playerRoles.size(); i++) {
+            boolean[] visited = new boolean[allRoles.size()];
+            augment(i, playerRoles, allRoles, match, visited);
         }
-        String role = String.join(",", roles);
+        // Le poste non assigné est le rôle manquant
+        for (int ri = 0; ri < allRoles.size(); ri++) {
+            if (match[ri] == -1) {
+                return new GroupAndMissingRole(group, allRoles.get(ri));
+            }
+        }
+        return null;
+    }
+
+    /** Cherche un sous-ensemble de `size` dans candidates avec matching valide. */
+    private List<UUID> findMatchingSubset(List<UUID> candidates, int size) {
+        if (candidates.size() < size) return null;
+        // Essai simple : les `size` premiers
+        List<UUID> attempt = new ArrayList<>(candidates.subList(0, size));
+        if (hasValidMatching(attempt)) return attempt;
+
+        // Si les solos sont mélangés avec des groupes, tenter d'abord
+        // les groupes complets puis compléter avec des solos
+        // (heuristique — pas exhaustif pour garder O(n) raisonnable)
+        List<UUID> groups = new ArrayList<>();
+        List<UUID> solos  = new ArrayList<>();
+        for (UUID uid : candidates) {
+            if (partyManager.inParty(uid)) groups.add(uid);
+            else solos.add(uid);
+        }
+        List<UUID> mixed = new ArrayList<>(groups);
+        mixed.addAll(solos);
+        if (mixed.size() < size) return null;
+        List<UUID> attempt2 = new ArrayList<>(mixed.subList(0, size));
+        return hasValidMatching(attempt2) ? attempt2 : null;
+    }
+
+    /** Vérifie qu'il existe une assignation valide (matching bipartite). */
+    private boolean hasValidMatching(List<UUID> players) {
+        List<String> allRoles = List.of("TOP","JUNGLE","MID","ADC","SUPPORT");
+        List<List<String>> playerRoles = new ArrayList<>();
+        for (UUID uid : players) playerRoles.add(getRolesFor(uid));
+
+        int[] match = new int[allRoles.size()];
+        Arrays.fill(match, -1);
+        int matched = 0;
+        for (int i = 0; i < playerRoles.size(); i++) {
+            boolean[] visited = new boolean[allRoles.size()];
+            if (augment(i, playerRoles, allRoles, match, visited)) matched++;
+        }
+        return matched == players.size();
+    }
+
+    private boolean augment(int pi, List<List<String>> playerRoles,
+                            List<String> allRoles, int[] match, boolean[] visited) {
+        for (String role : playerRoles.get(pi)) {
+            int ri = allRoles.indexOf(role);
+            if (ri < 0 || visited[ri]) continue;
+            visited[ri] = true;
+            if (match[ri] == -1 || augment(match[ri], playerRoles, allRoles, match, visited)) {
+                match[ri] = pi;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private List<String> getRolesFor(UUID uid) {
+        if (partyManager.inParty(uid))
+            return partyManager.getMemberRoles(uid);
+        return roleManager.getRoles(uid);
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    // TRANSMISSION AU SERVEUR DE JEU
+    // ══════════════════════════════════════════════════════════════════════
+
+    private void sendPlayerData(ProxiedPlayer carrier, ProxiedPlayer player, String assignedRole) {
+        List<String> roles = getRolesFor(player.getUniqueId());
+        String role = assignedRole != null ? assignedRole : String.join(",", roles);
         List<UUID> party = partyManager.getPartyMembers(player.getUniqueId());
         String origin = plugin.getOriginTracker().getPreviousServer(player.getUniqueId());
 
@@ -126,7 +371,6 @@ public class BungeeQueueManager {
         sendPluginMessage(carrier, gameServer, sb.toString());
     }
 
-    /** Envoie un PluginMessage vers un serveur via BungeeCord Forward. */
     private void sendPluginMessage(ProxiedPlayer carrier, String targetServer, String json) {
         try (ByteArrayOutputStream baos = new ByteArrayOutputStream();
              DataOutputStream out = new DataOutputStream(baos)) {
@@ -149,4 +393,38 @@ public class BungeeQueueManager {
         }
         return null;
     }
+
+    private String formatRole(String role) {
+        return switch (role) {
+            case "TOP"     -> "Top";
+            case "JUNGLE"  -> "Jungle";
+            case "MID"     -> "Mid";
+            case "ADC"     -> "ADC";
+            case "SUPPORT" -> "Support";
+            default        -> role;
+        };
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    // STRUCTURES INTERNES
+    // ══════════════════════════════════════════════════════════════════════
+
+    /** Proposition de fill envoyée à un solo. */
+    private static class FillProposal {
+        final List<UUID>                       gamePlayers;
+        final String                           filledRole;
+        final Set<UUID>                        excludedSolos;
+        net.md_5.bungee.api.scheduler.ScheduledTask timeoutTask;
+
+        FillProposal(List<UUID> gamePlayers, String filledRole, Set<UUID> excludedSolos) {
+            this.gamePlayers   = gamePlayers;
+            this.filledRole    = filledRole;
+            this.excludedSolos = excludedSolos;
+        }
+
+        void cancel() { if (timeoutTask != null) timeoutTask.cancel(); }
+    }
+
+    /** Résultat de findGroupWithOneMissing. */
+    private record GroupAndMissingRole(List<UUID> players, String missingRole) {}
 }
