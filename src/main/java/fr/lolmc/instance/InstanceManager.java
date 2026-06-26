@@ -137,6 +137,9 @@ public class InstanceManager {
                 int id = instance.getId();
                 String worldName = instance.getWorldName();
 
+                // Copier la liste des participants AVANT stop() (qui vide la liste)
+                Set<UUID> participantsCopy = new HashSet<>(instance.getParticipants());
+
                 // Arrêter les systèmes de jeu
                 instance.stop();
 
@@ -144,11 +147,10 @@ public class InstanceManager {
                 World defaultWorld = Bukkit.getWorlds().get(0);
                 for (Player p : instance.getWorld().getPlayers()) {
                     p.teleport(defaultWorld.getSpawnLocation());
-                    p.sendMessage("§cPartie terminée — retour au monde principal.");
                 }
 
                 // Supprimer les mappings joueurs
-                for (UUID uid : instance.getParticipants()) playerMap.remove(uid);
+                for (UUID uid : participantsCopy) playerMap.remove(uid);
                 instances.remove(id);
 
                 // Décharger et supprimer le monde (asynchrone)

@@ -123,6 +123,8 @@ public class JungleManager {
         public boolean isAlive() { return !liveEntities.isEmpty(); }
     }
 
+    private org.bukkit.World scopedWorld = null;
+
     public JungleManager() {
         KEY_MONSTER = new NamespacedKey(LolPlugin.getInstance(), "jungle_monster");
         KEY_BUFF = new NamespacedKey(LolPlugin.getInstance(), "jungle_buff");

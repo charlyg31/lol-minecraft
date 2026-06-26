@@ -34,6 +34,9 @@ public class MapManager {
     private static final double NEXUS_HP = 5000;
     private static final double NEXUS_BASE_HP = 5500;
 
+    // World cible (null = utilise le monde de chaque Location stockée)
+    private org.bukkit.World targetWorld = null;
+
     public MapManager(SchematicManager schematics) {
         this.schematics = schematics;
         this.mapFile = new File(LolPlugin.getInstance().getDataFolder(), "map.yml");
@@ -42,6 +45,37 @@ public class MapManager {
         }
         this.config = YamlConfiguration.loadConfiguration(mapFile);
         load();
+    }
+
+    /**
+     * Constructeur pour les instances : copie la config du template
+     * mais remplace le World de toutes les Locations par instanceWorld.
+     */
+    public MapManager(SchematicManager schematics, org.bukkit.World instanceWorld) {
+        this.schematics  = schematics;
+        this.targetWorld = instanceWorld;
+        // Utiliser la même map.yml que le template
+        this.mapFile = new File(LolPlugin.getInstance().getDataFolder(), "map.yml");
+        if (!mapFile.exists()) {
+            try { mapFile.createNewFile(); } catch (Exception ignored) {}
+        }
+        this.config = YamlConfiguration.loadConfiguration(mapFile);
+        load();
+        // Remapper toutes les Locations vers le monde de l'instance
+        remapToWorld(instanceWorld);
+    }
+
+    /** Remplace le World de toutes les Locations par instanceWorld. */
+    private void remapToWorld(org.bukkit.World w) {
+        spawns.replaceAll((k, loc) -> loc == null ? null
+            : new org.bukkit.Location(w, loc.getX(), loc.getY(), loc.getZ(),
+                loc.getYaw(), loc.getPitch()));
+        for (GameStructure s : structures) {
+            if (s.getCenter() != null) {
+                org.bukkit.Location c = s.getCenter();
+                s.setCenter(new org.bukkit.Location(w, c.getX(), c.getY(), c.getZ()));
+            }
+        }
     }
 
     // ══════════════════════════════════════════════════════════════

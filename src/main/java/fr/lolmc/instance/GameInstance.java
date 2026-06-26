@@ -60,13 +60,14 @@ public class GameInstance {
         LolPlugin lp = LolPlugin.getInstance();
 
         this.mapManager          = new MapManager(schematics, world);
-        this.gameManager         = new GameManager(this);
+        this.gameManager         = new GameManager();
+        this.gameManager.setGameInstance(this); // lier à cette instance
         this.rewardManager       = new RewardManager(lp.getChampionManager(), lp.getGoldManager());
-        this.minionManager       = new MinionManager(mapManager, world);
+        this.minionManager       = new MinionManager(mapManager);
         this.turretManager       = new TurretManager(mapManager, lp.getChampionManager(), lp.getTeamManager());
         this.jungleManager       = new JungleManager(world);
         this.baseManager         = new BaseManager(world);
-        this.fogManager          = new FogOfWarManager(world);
+        this.fogManager          = new FogOfWarManager(lp.getTeamManager(), world);
         this.passiveManager      = new PassiveManager(lp.getChampionManager(), lp.getHUDManager(), lp.getShopListener());
         this.announcementManager = new AnnouncementManager();
     }

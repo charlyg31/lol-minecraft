@@ -35,8 +35,17 @@ public class BaseManager {
     private static final double FOUNTAIN_DAMAGE_PER_SEC = 10000.0;
     private static final double HEAL_RING_RADIUS = 8.0;
 
+    private org.bukkit.World scopedWorld = null;
+    private org.bukkit.scheduler.BukkitTask healTask = null;
+
     public BaseManager() {
         startHealRingTask();
+    }
+
+    /** Constructeur pour les instances : scoped à un World, tâche non démarrée. */
+    public BaseManager(org.bukkit.World world) {
+        this.scopedWorld = world;
+        // Démarrage via startHealRingTask() appelé par GameInstance.start()
     }
 
     // ══════════════════════════════════════════════════════════════

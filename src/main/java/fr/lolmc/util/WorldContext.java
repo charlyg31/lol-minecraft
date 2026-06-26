@@ -87,11 +87,7 @@ public final class WorldContext {
      * Vrai si le joueur est dans le monde de jeu.
      * Utilisé pour décider d'activer les mécaniques LoL sur lui.
      */
-    public static boolean isInGameWorld(Player player) {
-        World w = getGameWorld();
-        if (w == null) return false;
-        return w.equals(player.getWorld());
-    }
+
 
     /**
      * Vrai si le joueur est dans le monde lobby.

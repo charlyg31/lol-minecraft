@@ -23,6 +23,15 @@ import java.util.*;
  */
 public class GameManager {
 
+    // Référence à l'instance (null si mode singleton legacy)
+    private fr.lolmc.instance.GameInstance gameInstance = null;
+
+    /** Lie ce GameManager à une GameInstance (mode multi-instance). */
+    public void setGameInstance(fr.lolmc.instance.GameInstance inst) {
+        this.gameInstance = inst;
+    }
+    public fr.lolmc.instance.GameInstance getGameInstance() { return gameInstance; }
+
     private boolean gameRunning = false;
     // Tâches BukkitTask stockées pour annulation explicite
     private org.bukkit.scheduler.BukkitTask timerTask;
