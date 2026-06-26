@@ -272,11 +272,10 @@ Flash, Ignite (GW60), Heal, Barrier, Exhaust, Téléport (vers tourelle alliée)
 
 ## Permissions
 
-| Permission | Description | Défaut |
-|------------|-------------|--------|
-| `lolmc.admin` | Toutes les commandes admin `/lol` | op |
-| `lolmc.play` | Commande `/lol` (file + groupe) | true |
-| `lolmc.menu` | Menu de sélection de champion | true |
+| Permission | Plugin | Description | Défaut |
+|------------|--------|-------------|--------|
+| `lolmc.play` | LolMC-Bungee (proxy) | Commande `/lol` — file et groupe | true |
+| `lolmc.admin` | LolMC (serveur de jeu) | Commandes admin `/lol` | op |
 
 ---
 
