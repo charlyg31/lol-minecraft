@@ -304,9 +304,18 @@ public class ShopListener implements Listener {
             case "health_potion", "health_potion2"         -> cm.useHealthPotion(player);
             case "refillable_potion", "refillable_potion2"  -> cm.useRefillablePotion(player);
             case "biscuit", "biscuit_will"                  -> cm.useBiscuit(player);
-            case "elixir_wrath", "elixir_wrath2"            -> cm.useElixirWrath(player);
-            case "elixir_iron", "elixir_iron2"              -> cm.useElixirIron(player);
-            case "elixir_sorcery", "elixir_sorcery2"        -> cm.useElixirSorcery(player);
+            case "elixir_wrath", "elixir_wrath2" -> {
+                if (!checkElixirLevel(player)) break;
+                cm.useElixirWrath(player);
+            }
+            case "elixir_iron", "elixir_iron2" -> {
+                if (!checkElixirLevel(player)) break;
+                cm.useElixirIron(player);
+            }
+            case "elixir_sorcery", "elixir_sorcery2" -> {
+                if (!checkElixirLevel(player)) break;
+                cm.useElixirSorcery(player);
+            }
             case "stealth_ward", "stealth_ward2"            -> cm.placeWard(player, false);
             case "control_ward", "control_ward2"            -> cm.placeControlWard(player);
             case "farsight", "farsight2"                    -> cm.placeWard(player, true);
@@ -328,4 +337,19 @@ public class ShopListener implements Listener {
 
     public GoldManager getGoldManager() { return goldManager; }
     public Map<UUID, PlayerInventoryManager> getInventoryManagers() { return inventoryManagers; }
+
+
+    /** Les Élixirs nécessitent le niveau 9 (comme en LoL). */
+    private boolean checkElixirLevel(org.bukkit.entity.Player player) {
+        var cm = LolPlugin.getInstance().getChampionManager();
+        if (!cm.hasChampion(player)) return false;
+        int lvl = cm.getChampion(player).getLevelSystem().getLevel();
+        if (lvl < 9) {
+            player.sendMessage(net.kyori.adventure.text.Component.text(
+                "❌ Les Élixirs nécessitent le niveau 9 (tu es niveau " + lvl + ").",
+                net.kyori.adventure.text.format.NamedTextColor.RED));
+            return false;
+        }
+        return true;
+    }
 }
