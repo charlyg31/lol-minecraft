@@ -153,13 +153,7 @@ public class BungeeQueueManager {
             // Doit être solo (pas en groupe)
             if (partyManager.inParty(uid)) continue;
 
-            // Doit accepter ce rôle ou /lol all
-            List<String> roles = roleManager.getRoles(uid);
-            boolean accepts = roles.containsAll(List.of("TOP","JUNGLE","MID","ADC","SUPPORT"))
-                || roles.contains(missingRole);
-            if (!accepts) continue;
-
-            // Trouver le joueur
+            // Trouver le joueur (on propose à tout solo, peu importe ses rôles habituels)
             ProxiedPlayer solo = ProxyServer.getInstance().getPlayer(uid);
             if (solo == null) continue;
 

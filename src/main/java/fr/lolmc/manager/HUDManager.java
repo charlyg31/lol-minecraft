@@ -270,4 +270,15 @@ public class HUDManager {
         // Première update
         updateHUD(player, champ);
     }
+
+
+    private void updatePlayerHealthBar(Player player,
+            fr.lolmc.champion.base.BaseChampion champ) {
+        double cur = champ.getHPSystem().getCurrentHP();
+        double max = champ.getHPSystem().getMaxHP();
+        String label = champ.getId().substring(0,1).toUpperCase()
+                     + champ.getId().substring(1);
+        // Mettre à jour le nametag du joueur pour les autres
+        fr.lolmc.util.HealthBar.apply(player, cur, max, label);
+    }
 }
