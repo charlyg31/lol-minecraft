@@ -59,7 +59,8 @@ public class AbilityPreview {
         if (ability == null) return;
 
         PreviewType type = detectType(champ, slot);
-        if (type == PreviewType.NONE) return;
+        // Seuls les sorts au sol (cercle) ont une prévisualisation
+        if (type != PreviewType.GROUND) return;
 
         // Stopper la précédente si même slot
         Integer prev = previewSlot.get(player.getUniqueId());
@@ -81,7 +82,7 @@ public class AbilityPreview {
                     stop(player); cancel(); return;
                 }
                 switch (type) {
-                    case SKILLSHOT -> drawSkillshot(player, range, width);
+                    case SKILLSHOT -> { /* prévisualisation ligne désactivée */ }
                     case GROUND    -> drawGround(player, range);
                 }
             }
