@@ -1,140 +1,128 @@
 #!/bin/bash
-# ══════════════════════════════════════════════════════════════════════
 # LolMC — Script de release GitHub
-# Usage : ./release.sh <version> [chemin/vers/BungeeCord.jar]
-# Exemple : ./release.sh 1.0.0 /opt/proxy/BungeeCord.jar
-#
-# Si BungeeCord.jar n'est pas fourni, le script le cherche automatiquement
-# dans les emplacements courants.
-# ══════════════════════════════════════════════════════════════════════
-
-set -e
+# Usage : ./release.sh <version> [BungeeCord.jar] [github_token]
 
 VERSION=${1:-""}
 BUNGEE_PATH=${2:-""}
-# Token : variable d'env, argument $3, ou git config
-TOKEN="${GITHUB_TOKEN:-${3:-$(git config --get github.token 2>/dev/null || true)}}"
+ARG_TOKEN=${3:-""}
 
 if [ -z "$VERSION" ]; then
-    echo "❌ Usage : ./release.sh <version> [chemin/BungeeCord.jar]"
-    echo "   Exemple : ./release.sh 1.0.0 /opt/proxy/BungeeCord.jar"
+    echo "❌ Usage : ./release.sh <version> [BungeeCord.jar] [token]"
     exit 1
 fi
 
-# Chercher BungeeCord.jar automatiquement si non fourni
-if [ -z "$BUNGEE_PATH" ]; then
-    for candidate in \
-        "/opt/proxy/BungeeCord.jar" \
-        "/root/proxy/BungeeCord.jar" \
-        "/home/proxy/BungeeCord.jar" \
-        "$(find / -name "BungeeCord.jar" -maxdepth 6 2>/dev/null | head -1)"
-    do
-        if [ -f "$candidate" ]; then
-            BUNGEE_PATH="$candidate"
-            break
-        fi
+# Chercher BungeeCord.jar
+if [ -z "$BUNGEE_PATH" ] || [ ! -f "$BUNGEE_PATH" ]; then
+    for c in /sdcard/Download/BungeeCord.jar /root/proxy/BungeeCord.jar /opt/proxy/BungeeCord.jar; do
+        [ -f "$c" ] && BUNGEE_PATH="$c" && break
     done
 fi
-
-if [ -z "$BUNGEE_PATH" ] || [ ! -f "$BUNGEE_PATH" ]; then
-    echo "❌ BungeeCord.jar introuvable."
-    echo "   Précise le chemin : ./release.sh $VERSION /chemin/vers/BungeeCord.jar"
+if [ ! -f "$BUNGEE_PATH" ]; then
+    echo "❌ BungeeCord.jar introuvable. Précise le chemin en 2ème argument."
     exit 1
 fi
-
 echo "📦 BungeeCord.jar : $BUNGEE_PATH"
 
 TAG="v$VERSION"
+REPO="charlyg31/lol-minecraft"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
+# ── Compilation LolMC.jar ─────────────────────────────────────────────
 echo "🔨 Compilation de LolMC.jar..."
-mvn package -q -DskipTests
-LOLMC_JAR=$(find target -name "lol-minecraft-*.jar" ! -name "*-original*" | head -1)
-if [ -z "$LOLMC_JAR" ]; then
-    echo "❌ LolMC.jar introuvable dans target/"
+if ! mvn package -q -DskipTests 2>&1 | grep -v "WARNING"; then
+    echo "❌ Echec compilation LolMC"
     exit 1
 fi
+LOLMC_JAR=$(find target -name "lol-minecraft-*.jar" ! -name "*-original*" 2>/dev/null | head -1)
+[ -z "$LOLMC_JAR" ] && echo "❌ LolMC.jar introuvable" && exit 1
 cp "$LOLMC_JAR" "LolMC-$VERSION.jar"
 echo "✅ LolMC-$VERSION.jar"
 
+# ── Compilation LolMC-Bungee.jar ─────────────────────────────────────
 echo "🔨 Compilation de LolMC-Bungee.jar..."
 cd bungee-plugin
-mvn package -q -DskipTests -Dbungee.jar.path="$BUNGEE_PATH"
-BUNGEE_JAR=$(find target -name "LolMC-Bungee-*.jar" ! -name "*-original*" | head -1)
-if [ -z "$BUNGEE_JAR" ]; then
-    echo "❌ LolMC-Bungee.jar introuvable dans bungee-plugin/target/"
+if ! mvn package -q -DskipTests -Dbungee.jar.path="$BUNGEE_PATH" 2>&1 | grep -v "WARNING"; then
+    echo "❌ Echec compilation Bungee"
+    cd ..
     exit 1
 fi
+BUNGEE_JAR=$(find target -name "LolMC-Bungee-*.jar" ! -name "*-original*" 2>/dev/null | head -1)
+[ -z "$BUNGEE_JAR" ] && echo "❌ LolMC-Bungee.jar introuvable" && cd .. && exit 1
 cp "$BUNGEE_JAR" "../LolMC-Bungee-$VERSION.jar"
 cd ..
 echo "✅ LolMC-Bungee-$VERSION.jar"
 
-echo "🏷️  Création du tag $TAG..."
+# ── Tag Git ───────────────────────────────────────────────────────────
+echo "🏷️  Tag $TAG..."
 git tag -d "$TAG" 2>/dev/null || true
 git push origin --delete "$TAG" 2>/dev/null || true
 git tag -a "$TAG" -m "Release $TAG"
 git push origin "$TAG"
 echo "✅ Tag $TAG poussé"
 
+# ── Token GitHub ──────────────────────────────────────────────────────
+# Priorité : argument $3 > variable GITHUB_TOKEN > git config
+GH_TOKEN="$ARG_TOKEN"
+[ -z "$GH_TOKEN" ] && GH_TOKEN="$GITHUB_TOKEN"
+[ -z "$GH_TOKEN" ] && GH_TOKEN="$(git config github.token 2>/dev/null || true)"
+[ -z "$GH_TOKEN" ] && GH_TOKEN="$(git config --global github.token 2>/dev/null || true)"
+
+if [ -z "$GH_TOKEN" ]; then
+    echo ""
+    echo "⚠️  Token GitHub manquant — JARs compilés mais non uploadés."
+    echo "   Pour uploader manuellement :"
+    echo "   1. Crée la release sur https://github.com/$REPO/releases/tag/$TAG"
+    echo "   2. Uploade LolMC-$VERSION.jar et LolMC-Bungee-$VERSION.jar"
+    echo ""
+    echo "   Ou relance avec le token :"
+    echo "   ./release.sh $VERSION $BUNGEE_PATH TON_TOKEN"
+    exit 0
+fi
+
 echo "🚀 Création de la release GitHub..."
 
-# Token GitHub : variable d'env GITHUB_TOKEN, ou git config, ou argument $3
-GITHUB_TOKEN="$TOKEN"
-if [ -z "$GITHUB_TOKEN" ]; then
-    echo "❌ Token GitHub manquant."
-    echo "   Option 1 : GITHUB_TOKEN=ton_token ./release.sh $VERSION ..."
-    echo "   Option 2 : git config --global github.token ton_token"
-    rm -f "LolMC-$VERSION.jar" "LolMC-Bungee-$VERSION.jar"
-    exit 1
-fi
-echo "✅ Token GitHub trouvé"
-
-REPO="charlyg31/lol-minecraft"
-
 # Supprimer l'ancienne release si elle existe
-RELEASE_ID=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
-    "https://api.github.com/repos/$REPO/releases/tags/$TAG" \
-    | grep '"id"' | head -1 | grep -o '[0-9]*')
-if [ -n "$RELEASE_ID" ]; then
-    curl -s -X DELETE -H "Authorization: token $GITHUB_TOKEN" \
-        "https://api.github.com/repos/$REPO/releases/$RELEASE_ID" > /dev/null
-fi
+OLD_ID=$(curl -sf -H "Authorization: token $GH_TOKEN" \
+    "https://api.github.com/repos/$REPO/releases/tags/$TAG" 2>/dev/null \
+    | grep '"id"' | head -1 | grep -o '[0-9]*' || true)
+[ -n "$OLD_ID" ] && curl -sf -X DELETE \
+    -H "Authorization: token $GH_TOKEN" \
+    "https://api.github.com/repos/$REPO/releases/$OLD_ID" > /dev/null 2>&1 || true
 
 # Créer la release
-RELEASE_RESPONSE=$(curl -s -X POST \
-    -H "Authorization: token $GITHUB_TOKEN" \
+NOTES="## LolMC $TAG\n\n### Installation\n- **LolMC-$VERSION.jar** → \`/plugins/\` du serveur de jeu\n- **LolMC-Bungee-$VERSION.jar** → \`/plugins/\` du proxy BungeeCord"
+RESP=$(curl -s -X POST \
+    -H "Authorization: token $GH_TOKEN" \
     -H "Content-Type: application/json" \
-    -d "{\"tag_name\":\"$TAG\",\"name\":\"LolMC $TAG\",\"body\":\"## LolMC $TAG\n\n### Installation\n- **LolMC-$VERSION.jar** → \`/plugins/\` du serveur de jeu\n- **LolMC-Bungee-$VERSION.jar** → \`/plugins/\` du proxy BungeeCord\n\nVoir le README pour la configuration complète.\"}" \
+    -d "{\"tag_name\":\"$TAG\",\"name\":\"LolMC $TAG\",\"body\":\"$NOTES\"}" \
     "https://api.github.com/repos/$REPO/releases")
 
-UPLOAD_URL=$(echo "$RELEASE_RESPONSE" | grep '"upload_url"' | sed 's/.*"upload_url": "\(.*\){.*/\1/')
+UPLOAD_URL=$(echo "$RESP" | grep '"upload_url"' | head -1 | sed 's/.*"upload_url": "\(.*\){.*/\1/')
 
 if [ -z "$UPLOAD_URL" ]; then
-    echo "❌ Erreur création release : $RELEASE_RESPONSE"
-    rm -f "LolMC-$VERSION.jar" "LolMC-Bungee-$VERSION.jar"
+    echo "❌ Erreur API GitHub :"
+    echo "$RESP" | head -5
     exit 1
 fi
+echo "✅ Release créée"
 
-# Upload LolMC.jar
-echo "📤 Upload LolMC-$VERSION.jar..."
-curl -s -X POST \
-    -H "Authorization: token $GITHUB_TOKEN" \
-    -H "Content-Type: application/java-archive" \
-    --data-binary @"LolMC-$VERSION.jar" \
-    "${UPLOAD_URL}?name=LolMC-$VERSION.jar" > /dev/null
-echo "✅ LolMC-$VERSION.jar uploadé"
-
-# Upload LolMC-Bungee.jar
-echo "📤 Upload LolMC-Bungee-$VERSION.jar..."
-curl -s -X POST \
-    -H "Authorization: token $GITHUB_TOKEN" \
-    -H "Content-Type: application/java-archive" \
-    --data-binary @"LolMC-Bungee-$VERSION.jar" \
-    "${UPLOAD_URL}?name=LolMC-Bungee-$VERSION.jar" > /dev/null
-echo "✅ LolMC-Bungee-$VERSION.jar uploadé"
-
-echo ""
-echo "✅ Release $TAG publiée !"
+# Upload des JARs
+for JAR in "LolMC-$VERSION.jar" "LolMC-Bungee-$VERSION.jar"; do
+    echo "📤 Upload $JAR..."
+    RES=$(curl -s -X POST \
+        -H "Authorization: token $GH_TOKEN" \
+        -H "Content-Type: application/java-archive" \
+        --data-binary @"$JAR" \
+        "${UPLOAD_URL}?name=$JAR")
+    if echo "$RES" | grep -q '"state": "uploaded"'; then
+        echo "✅ $JAR uploadé"
+    else
+        echo "❌ Erreur upload $JAR :"
+        echo "$RES" | grep -E '"message"|"errors"' | head -3
+    fi
+done
 
 rm -f "LolMC-$VERSION.jar" "LolMC-Bungee-$VERSION.jar"
+echo ""
+echo "✅ Release $TAG terminée → https://github.com/$REPO/releases/tag/$TAG"
