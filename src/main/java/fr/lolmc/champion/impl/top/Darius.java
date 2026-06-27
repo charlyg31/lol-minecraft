@@ -39,6 +39,7 @@ public class Darius extends BaseChampion {
     private static final java.util.Map<java.util.UUID, Long> bleedExpire
         = new java.util.concurrent.ConcurrentHashMap<>();
     public static void resetState(java.util.UUID id) { bleedStacks.remove(id); bleedExpire.remove(id); }
+    public static int getBleedStacks(java.util.UUID vid) { return bleedStacks.getOrDefault(vid, 0); }
     public static void resetAllState() { bleedStacks.clear(); bleedExpire.clear(); }
 
     public static void applyBleed(Player darius, org.bukkit.entity.LivingEntity victim, ChampionStats s) {
@@ -85,36 +86,38 @@ public class Darius extends BaseChampion {
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : bord 14/24.5/35/45.5/56 + 35-49% AD (plein), centre (manche) = 35% des dégâts
-            double[] base=fr.lolmc.util.Balance.base("q_darius",new double[]{56,98,140,182,224}); // valeur au bord (x4 du tick pour gameplay MC)
-            double[] adR={0.35,0.385,0.42,0.455,0.49};
+            // LoL : bord 20/35/50/65/80 + 100/110/120/130/140% AD, manche = 66%
+            double[] base=fr.lolmc.util.Balance.base("q_darius",new double[]{20,35,50,65,80});
+            double[] adR={1.00,1.10,1.20,1.30,1.40};
             int rank=getLevel()-1;
             double edgeDmg=base[rank]+s.getFinalAD()*adR[rank];
-            int hitChamps=0;
-            // Délai de 0.75s (canalisation) puis frappe
+            // Windup 0.75s (15 ticks) avant la frappe — LoL
             c.sendActionBar(Component.text("🪓 Décimation...",NamedTextColor.DARK_RED));
-            for(var __t : TargetingUtil.enemiesAround(c, 4.5)){
-                double dist=__t.getLocation().distance(c.getLocation());
-                // Centre (< 2 blocs) = manche = 35%, bord = plein
-                double dmg = dist<2.0 ? edgeDmg*0.35 : edgeDmg;
-                TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.PHYSICAL);
-                if(__t instanceof Player) hitChamps++;
-            }
-            // Soin : 15% PV manquants par champion touché au bord (max 45%)
-            if(hitChamps>0){
-                var cm=LolPlugin.getInstance().getChampionManager();
-                if(cm.hasChampion(c)){
-                    var hp=cm.getChampion(c).getHPSystem();
-                    double missing=hp.getMaxHP()-hp.getCurrentHP();
-                    double healPct=Math.min(0.45, 0.15*hitChamps);
-                    hp.heal(missing*healPct);
+            new BukkitRunnable(){@Override public void run(){
+                int hitChamps=0;
+                for(var __t : TargetingUtil.enemiesAround(c, 4.5)){
+                    double dist=__t.getLocation().distance(c.getLocation());
+                    double dmg = dist<2.0 ? edgeDmg*0.66 : edgeDmg; // manche 66%
+                    TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.PHYSICAL);
+                    if(dist>=2.0 && __t instanceof Player) hitChamps++; // soin seulement au bord
                 }
-            }
-            c.getWorld().spawnParticle(Particle.SWEEP_ATTACK,c.getLocation().add(0,1,0),8,2.5,0.5,2.5);
-            c.getWorld().playSound(c.getLocation(), Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 0.7f);
+                // Soin : 17% PV manquants par champion touché au bord (max 51%)
+                if(hitChamps>0){
+                    var cm=LolPlugin.getInstance().getChampionManager();
+                    if(cm.hasChampion(c)){
+                        var hp=cm.getChampion(c).getHPSystem();
+                        double missing=hp.getMaxHP()-hp.getCurrentHP();
+                        double healPct=Math.min(0.51, 0.17*hitChamps);
+                        hp.heal(missing*healPct);
+                    }
+                }
+                c.getWorld().spawnParticle(Particle.SWEEP_ATTACK,c.getLocation().add(0,1,0),8,2.5,0.5,2.5);
+                c.getWorld().playSound(c.getLocation(), Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 0.7f);
+            }}.runTaskLater(LolPlugin.getInstance(), 15L);
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            double[] base=fr.lolmc.util.Balance.base("q_darius",new double[]{56,98,140,182,224});double[] adR={0.35,0.385,0.42,0.455,0.49};int r=getLevel()-1;
-            return String.format("Bord: %.0f dégâts. Centre: 35%%. Soigne 15%%/champion touché.",base[r]+s.getFinalAD()*adR[r]);
+            double[] base=fr.lolmc.util.Balance.base("q_darius",new double[]{20,35,50,65,80});double[] adR={1.00,1.10,1.20,1.30,1.40};int r=getLevel()-1;
+            return String.format("Bord: %.0f dégâts (windup 0.75s). Manche: 66%%. Soigne 17%%/champion.",base[r]+s.getFinalAD()*adR[r]);
         }
     }
 
@@ -125,27 +128,37 @@ public class Darius extends BaseChampion {
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : prochaine attaque renforcée, dégâts bonus + ralentit 90% 1s
             org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,2.5); if(tgt==null){c.sendActionBar(Component.text("🪓 Aucune cible",NamedTextColor.GRAY));return;}
-            // Dégâts = 40-120% AD selon rang (renforce l'attaque de base)
-            double[] adMult={0.4,0.6,0.8,1.0,1.2};
-            double dmg=s.getFinalAD()*(1.0+adMult[getLevel()-1]); // AA + bonus
+            // LoL : 140/145/150/155/160% AD physique
+            double[] adMult={1.40,1.45,1.50,1.55,1.60};
+            double dmg=s.getFinalAD()*adMult[getLevel()-1];
             TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.PHYSICAL);
-            // Ralentit 90% pendant 1s
+            applyBleed(c, tgt, s); // applique un stack d'Hémorragie
+            // Ralentit 90% pendant 1s (20 ticks)
             if(tgt instanceof Player __p){
                 __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,20,4,false,true));
-                __p.sendActionBar(Component.text("🪓 Estropié! (ralenti)",NamedTextColor.DARK_RED));
+                __p.sendActionBar(Component.text("🪓 Estropié! (ralenti 90%%)",NamedTextColor.DARK_RED));
             }
+            // Reset : CD-50%% si la cible meurt
+            final org.bukkit.entity.LivingEntity wTgt=tgt; final BaseAbility wThis=this;
+            new BukkitRunnable(){@Override public void run(){
+                boolean killed=wTgt.isDead()||wTgt.getHealth()<=0;
+                if(!killed && wTgt instanceof Player pt){var cm=LolPlugin.getInstance().getChampionManager(); if(cm.hasChampion(pt)) killed=cm.getChampion(pt).getHPSystem().isDead();}
+                if(killed){ wThis.setDynamicCooldown(0.001); wThis.triggerCooldown(c);
+                    new BukkitRunnable(){@Override public void run(){wThis.setDynamicCooldown(-1);}}.runTaskLater(LolPlugin.getInstance(),1L);
+                    c.sendActionBar(Component.text("🪓 Frappe Estropiante reset!",NamedTextColor.DARK_RED)); }
+            }}.runTaskLater(LolPlugin.getInstance(),1L);
             c.getWorld().spawnParticle(Particle.CRIT,tgt.getLocation().add(0,1,0),12);
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_PLAYER_ATTACK_CRIT, 1f, 0.8f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            double[] adMult={0.4,0.6,0.8,1.0,1.2};
-            return String.format("Attaque renforcée: %.0f dégâts + ralentit 90%% 1s.",s.getFinalAD()*(1.0+adMult[getLevel()-1]));
+            double[] adMult={1.40,1.45,1.50,1.55,1.60};
+            return String.format("Attaque renforcée: %.0f dégâts (%.0f%%AD) + slow 90%% 1s. Reset si kill.",s.getFinalAD()*adMult[getLevel()-1],adMult[getLevel()-1]*100);
         }
     }
 
     static class E extends BaseAbility {
         E(){super("e_darius","Appréhension",Material.TRIPWIRE_HOOK,AbilitySlot.E,
-            new double[]{24,21,18,15,12},5,5,DamageType.PHYSICAL);
+            new double[]{26,24,22,20,18},5,5,DamageType.PHYSICAL);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : cône devant, tire les ennemis vers Darius + ralentit 40% 1s
@@ -155,7 +168,7 @@ public class Darius extends BaseChampion {
                 Vector pull=c.getLocation().toVector().subtract(__t.getLocation().toVector()).normalize().multiply(1.2);
                 pull.setY(0.3); __t.setVelocity(pull);
                 if(__t instanceof Player __p){
-                    __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,20,1,false,true)); // 40% ~ amplifier 1
+                    __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,40,1,false,true)); // 40% slow, 2s (40 ticks)
                     __p.sendActionBar(Component.text("🪝 Appréhension!",NamedTextColor.DARK_RED));
                 }
             }
@@ -176,9 +189,12 @@ public class Darius extends BaseChampion {
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : exécution, bond sur la cible, dégâts vrais 100/200/300 + 75% AD bonus
             org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,8.0); if(tgt==null){c.sendActionBar(Component.text("☠ Aucune cible visée",NamedTextColor.GRAY));return;}
-            double[] base=fr.lolmc.util.Balance.base("r_darius",new double[]{100,200,300});
+            double[] base=fr.lolmc.util.Balance.base("r_darius",new double[]{125,250,375});
             int r=Math.min(getLevel()-1,2);
             double dmg=base[r]+s.getFinalAD()*fr.lolmc.util.Balance.ratio("r_darius","ad",0.75);
+            // +0-100%% de dégâts selon les stacks d'Hémorragie sur la cible
+            int stacks=getBleedStacks(tgt.getUniqueId());
+            dmg*=(1.0 + 0.20*stacks); // 5 stacks = +100%%
             // Bond vers la cible (téléportation proche)
             var dest=tgt.getLocation().clone().subtract(tgt.getLocation().getDirection().multiply(1.5));
             dest.setY(c.getLocation().getY());
@@ -211,8 +227,8 @@ public class Darius extends BaseChampion {
             }.runTaskLater(LolPlugin.getInstance(), 1L);
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            double[] base=fr.lolmc.util.Balance.base("r_darius",new double[]{100,200,300});int r=Math.min(getLevel()-1,2);
-            return String.format("%.0f dégâts vrais (+75%%AD). Exécution, reset si kill.",base[r]+s.getFinalAD()*fr.lolmc.util.Balance.ratio("r_darius","ad",0.75));
+            double[] base=fr.lolmc.util.Balance.base("r_darius",new double[]{125,250,375});int r=Math.min(getLevel()-1,2);
+            return String.format("%.0f dégâts vrais (+75%%AD, +20%%/stack Hémorragie). Reset si kill.",base[r]+s.getFinalAD()*fr.lolmc.util.Balance.ratio("r_darius","ad",0.75));
         }
     }
 }
