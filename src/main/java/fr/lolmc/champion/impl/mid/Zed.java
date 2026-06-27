@@ -36,11 +36,26 @@ public class Zed extends BaseChampion {
     // Gestion de l'ombre et des cooldowns manuels
     private static final Map<UUID,Location> shadows = new java.util.concurrent.ConcurrentHashMap<>();
     private static final Map<UUID, Long> wCooldowns = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final Map<UUID, UUID> shadowEntities = new java.util.concurrent.ConcurrentHashMap<>();
 
-    public static void resetState(UUID id){ shadows.remove(id); wCooldowns.remove(id); }
+    public static void resetState(UUID id) {
+        shadows.remove(id);
+        wCooldowns.remove(id);
+        UUID entityId = shadowEntities.remove(id);
+        if (entityId != null) {
+            org.bukkit.entity.Entity e = org.bukkit.Bukkit.getEntity(entityId);
+            if (e != null) e.remove();
+        }
+    }
     /** Retourne la position de l'ombre active (pour AbilityPreview). */
     public static org.bukkit.Location getShadowLocation(UUID id) { return shadows.get(id); }
-    public static void resetAllState(){ shadows.clear(); wCooldowns.clear(); }
+    public static void resetAllState() {
+        for (UUID entityId : shadowEntities.values()) {
+            org.bukkit.entity.Entity e = org.bukkit.Bukkit.getEntity(entityId);
+            if (e != null) e.remove();
+        }
+        shadows.clear(); wCooldowns.clear(); shadowEntities.clear();
+    }
 
     static class AA extends BasicAttackAbility {
         AA(){super("zed",Material.IRON_SWORD,2.5f,DamageType.PHYSICAL);}
@@ -115,7 +130,28 @@ public class Zed extends BaseChampion {
                 shadowLoc.setPitch(c.getLocation().getPitch());
 
                 shadows.put(uuid, shadowLoc);
+                // Spawner un ArmorStand visible représentant l'ombre
+                final org.bukkit.entity.ArmorStand shadowStand =
+                    shadowLoc.getWorld().spawn(shadowLoc, org.bukkit.entity.ArmorStand.class, as -> {
+                        as.setVisible(true);
+                        as.setGravity(false);
+                        as.setInvulnerable(true);
+                        as.setCustomNameVisible(true);
+                        as.customName(Component.text("👤 Ombre de Zed", NamedTextColor.DARK_GRAY));
+                        // Copier l'équipement du joueur
+                        var eq = as.getEquipment();
+                        if (eq != null) {
+                            eq.setHelmet(c.getInventory().getHelmet());
+                            eq.setChestplate(c.getInventory().getChestplate());
+                            eq.setLeggings(c.getInventory().getLeggings());
+                            eq.setBoots(c.getInventory().getBoots());
+                            eq.setItemInMainHand(c.getInventory().getItemInMainHand());
+                        }
+                        as.getScoreboardTags().add("zed_shadow");
+                    });
+                shadowEntities.put(uuid, shadowStand.getUniqueId());
                 c.getWorld().spawnParticle(Particle.SMOKE, shadowLoc, 20, 0.5, 1, 0.5);
+                c.getWorld().playSound(shadowLoc, Sound.ENTITY_ENDERMAN_TELEPORT, 0.8f, 1.5f);
                 c.sendActionBar(Component.text("👤 Ombre créée ! Re-cast pour échanger de place.", NamedTextColor.DARK_GRAY));
 
                 new BukkitRunnable(){
@@ -123,6 +159,11 @@ public class Zed extends BaseChampion {
                         if (shadows.containsKey(uuid)) {
                             shadows.remove(uuid);
                             wCooldowns.put(uuid, System.currentTimeMillis() + (long)(realCooldowns[rank] * 1000));
+                            UUID entityId = shadowEntities.remove(uuid);
+                            if (entityId != null) {
+                                org.bukkit.entity.Entity se = org.bukkit.Bukkit.getEntity(entityId);
+                                if (se != null) se.remove();
+                            }
                         }
                     }
                 }.runTaskLater(LolPlugin.getInstance(), 80L);
