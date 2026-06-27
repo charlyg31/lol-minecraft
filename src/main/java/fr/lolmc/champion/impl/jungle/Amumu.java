@@ -33,15 +33,24 @@ public class Amumu extends BaseChampion {
         initSystems(613, 8.0, ResourceSystem.ResourceType.MANA, 480, 10.0);
     }
 
-    // Passif Maudits Larmes : renvoie des dégâts magiques aux attaquants (10 + 1.5% HP max /attaque)
-    public static void onHitByEnemy(org.bukkit.entity.Player amumu, fr.lolmc.champion.base.BaseChampion champ, org.bukkit.entity.LivingEntity attacker) {
-        double dmg = 10 + champ.getStats().getFinalMaxHP() * 0.015;
-        fr.lolmc.util.TargetingUtil.dealDamage(amumu, attacker, dmg, fr.lolmc.util.TargetingUtil.DmgType.MAGICAL);
-        amumu.getWorld().spawnParticle(org.bukkit.Particle.WITCH, amumu.getLocation().add(0,1,0), 5, 0.3, 0.3, 0.3);
+    // Passif Toucher Maudit : les AA et le R appliquent la Malédiction 3s.
+    // Les cibles maudites subissent +10% de dégâts VRAIS de toute source magique.
+    private static final java.util.Map<java.util.UUID, Long> cursed = new java.util.concurrent.ConcurrentHashMap<>();
+    public static void applyCurse(org.bukkit.entity.LivingEntity tgt) { cursed.put(tgt.getUniqueId(), System.currentTimeMillis()+3000L); }
+    public static boolean isCursed(java.util.UUID id) { Long u=cursed.get(id); return u!=null && u>System.currentTimeMillis(); }
+    public static void resetAllState() { cursed.clear(); }
+    /** Bonus de dégâts vrais (10% des dégâts magiques) si la cible est maudite. */
+    public static void onMagicHit(org.bukkit.entity.Player amumu, org.bukkit.entity.LivingEntity tgt, double magicDmg) {
+        if (isCursed(tgt.getUniqueId())) {
+            fr.lolmc.util.TargetingUtil.dealDamage(amumu, tgt, magicDmg*0.10, fr.lolmc.util.TargetingUtil.DmgType.TRUE);
+        }
     }
 
     static class AA extends BasicAttackAbility {
         AA(){super("amumu",Material.IRON_SWORD,2.0f,DamageType.PHYSICAL);}
+        @Override protected void onHit(Player c, ChampionStats s, org.bukkit.entity.LivingEntity tgt, double dmg){
+            applyCurse(tgt); // Toucher Maudit
+        }
     }
 
     static class Q extends BaseAbility {
@@ -55,14 +64,15 @@ public class Amumu extends BaseChampion {
             Location dest=tgt.getLocation().clone().subtract(tgt.getLocation().getDirection().multiply(1.5));
             dest.setY(c.getLocation().getY());
             c.teleport(dest);
-            double[] base=fr.lolmc.util.Balance.base("q_amumu",new double[]{80,130,180,230,280});double dmg=base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("q_amumu","ap",0.85);
+            double[] base=fr.lolmc.util.Balance.base("q_amumu",new double[]{70,95,120,145,170});double dmg=base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("q_amumu","ap",0.85);
             TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.MAGICAL);
+            onMagicHit(c, tgt, dmg);
             fr.lolmc.LolPlugin.getInstance().getCCManager().stun(tgt, 20);
             if(tgt instanceof Player __p) __p.sendActionBar(Component.text("🧻 Lancer de Bandage! Stun 1s!",NamedTextColor.YELLOW));
             c.getWorld().playSound(c.getLocation(), Sound.BLOCK_WOOL_PLACE, 1f, 0.8f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            double[] base=fr.lolmc.util.Balance.base("q_amumu",new double[]{80,130,180,230,280});
+            double[] base=fr.lolmc.util.Balance.base("q_amumu",new double[]{70,95,120,145,170});
             return String.format("Skillshot: %.0f dégâts (+85%%AP), stun 1s + tire Amumu vers la cible.",base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("q_amumu","ap",0.85));
         }
     }
@@ -86,6 +96,7 @@ public class Amumu extends BaseChampion {
 
                         double dmg=maxHealth*pct+s.getFinalAP()*fr.lolmc.util.Balance.ratio("w_amumu","ap",0.01);
                         TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);
+                        onMagicHit(c, __t, dmg);
                     }
                     c.getWorld().spawnParticle(Particle.FALLING_WATER,c.getLocation().add(0,1,0),10,2,0.5,2);
                     ticks++;
@@ -103,13 +114,16 @@ public class Amumu extends BaseChampion {
                 new double[]{9,8,7,6,5},5,3,DamageType.MAGICAL);
             resourceCost = 35;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            double[] base=fr.lolmc.util.Balance.base("e_amumu",new double[]{75,100,125,150,175});double dmg=base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("e_amumu","ap",0.5);
-            TargetingUtil.dealDamageAll(c, TargetingUtil.entitiesInRadius(c, c.getLocation(), 3.0), dmg, TargetingUtil.DmgType.MAGICAL);
+            double[] base=fr.lolmc.util.Balance.base("e_amumu",new double[]{65,100,135,170,205});double dmg=base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("e_amumu","ap",0.5);
+            for(var __t : TargetingUtil.entitiesInRadius(c, c.getLocation(), 3.0)){
+                TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);
+                onMagicHit(c, __t, dmg);
+            }
             c.getWorld().spawnParticle(Particle.ANGRY_VILLAGER,c.getLocation().add(0,1,0),12,1.5,0.5,1.5);
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_VILLAGER_NO, 1f, 0.7f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            double[] base=fr.lolmc.util.Balance.base("e_amumu",new double[]{75,100,125,150,175});
+            double[] base=fr.lolmc.util.Balance.base("e_amumu",new double[]{65,100,135,170,205});
             return String.format("%.0f dégâts magiques autour (+50%%AP). CD réduit quand frappé.",base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("e_amumu","ap",0.5));
         }
     }
@@ -121,7 +135,9 @@ public class Amumu extends BaseChampion {
         @Override public void cast(Player c,ChampionStats s,Player t){
             double[] base=fr.lolmc.util.Balance.base("r_amumu",new double[]{200,300,400});int rr=Math.min(getLevel()-1,2);double dmg=base[rr]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("r_amumu","ap",0.8);
             for(var __t : TargetingUtil.enemiesAround(c, 5.0)){
+                applyCurse(__t); // R applique la Malédiction
                 TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);
+                onMagicHit(c, __t, dmg);
                 __t.setVelocity(new Vector(0,0.4,0));
                 fr.lolmc.LolPlugin.getInstance().getCCManager().stun(__t, 30);
                 if(__t instanceof Player __p) __p.sendActionBar(Component.text("⛓ MALÉDICTION DE LA MOMIE! Stun 1.5s",NamedTextColor.DARK_PURPLE));
