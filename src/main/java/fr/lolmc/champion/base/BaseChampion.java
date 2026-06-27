@@ -126,7 +126,7 @@ public abstract class BaseChampion {
 
         ability.setLevel(levelSystem.getAbilityRank(slot));
         ability.cast(caster, stats, target);
-        ability.triggerCooldown(caster);
+        ability.triggerCooldown(caster, stats);
         // Déclencher passifs post-sort (Spellblade, Shojin, etc.)
         var pm = LolPlugin.getInstance().getPassiveManager();
         if (pm != null) pm.onAbilityCast(caster, slot);

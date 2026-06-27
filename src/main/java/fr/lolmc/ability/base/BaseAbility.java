@@ -32,7 +32,8 @@ public abstract class BaseAbility {
 
     protected double resourceCost; // coût en mana/énergie par cast (0 = gratuit)
     protected double dynamicCooldownOverride = -1; // -1 = utiliser baseCooldown, sinon override (pour l'AA)
-    private final Map<UUID, Long> cooldowns = new HashMap<>();
+    private final Map<UUID, Long> cooldowns = new HashMap<>();       // timestamp début
+    private final Map<UUID, Long> cooldownEnds = new HashMap<>();    // timestamp fin (avec CDR appliqué)
 
     public enum AbilitySlot { AA, Q, W, E, R }
     public enum DamageType  { PHYSICAL, MAGICAL, TRUE, MIXED }
@@ -68,20 +69,32 @@ public abstract class BaseAbility {
     // ─── Cooldown ────────────────────────────────────────────────
 
     public boolean isOnCooldown(Player player) {
-        Long last = cooldowns.get(player.getUniqueId());
-        if (last == null) return false;
-        return (System.currentTimeMillis() - last) < (getCurrentCooldown(null) * 1000L);
+        Long end = cooldownEnds.get(player.getUniqueId());
+        if (end == null) return false;
+        return System.currentTimeMillis() < end;
     }
 
     public double getRemainingCooldown(Player player) {
-        Long last = cooldowns.get(player.getUniqueId());
-        if (last == null) return 0;
-        double remaining = getCurrentCooldown(null) * 1000.0 - (System.currentTimeMillis() - last);
-        return Math.max(0, remaining / 1000.0);
+        Long end = cooldownEnds.get(player.getUniqueId());
+        if (end == null) return 0;
+        double remaining = (end - System.currentTimeMillis()) / 1000.0;
+        return Math.max(0, remaining);
     }
 
+    /** Déclenche le cooldown en appliquant la réduction de CD (CDR) des stats. */
+    public void triggerCooldown(Player player, ChampionStats stats) {
+        long now = System.currentTimeMillis();
+        double cd = getCurrentCooldown(stats); // avec CDR appliqué
+        cooldowns.put(player.getUniqueId(), now);
+        cooldownEnds.put(player.getUniqueId(), now + (long)(cd * 1000));
+    }
+
+    /** Version sans stats (fallback — CD de base sans CDR). */
     public void triggerCooldown(Player player) {
-        cooldowns.put(player.getUniqueId(), System.currentTimeMillis());
+        long now = System.currentTimeMillis();
+        double cd = getCurrentCooldown(null);
+        cooldowns.put(player.getUniqueId(), now);
+        cooldownEnds.put(player.getUniqueId(), now + (long)(cd * 1000));
     }
 
     public double getCurrentCooldown(ChampionStats stats) {
