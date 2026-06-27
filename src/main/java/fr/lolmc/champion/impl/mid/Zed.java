@@ -117,10 +117,15 @@ public class Zed extends BaseChampion {
             if(shadows.containsKey(uuid)) {
                 Location shadowLoc = shadows.get(uuid);
                 if (shadowLoc != null) {
-                    c.teleport(shadowLoc);
                     shadows.remove(uuid);
-                    c.sendActionBar(Component.text("👤 Échange avec l'ombre !", NamedTextColor.DARK_GRAY));
+                    // Supprimer l'ArmorStand
+                    UUID eid = shadowEntities.remove(uuid);
+                    if (eid != null) { var se = org.bukkit.Bukkit.getEntity(eid); if (se != null) se.remove(); }
                     wCooldowns.put(uuid, now + (long)(realCooldowns[rank] * 1000));
+                    c.sendActionBar(Component.text("👤 Échange avec l'ombre !", NamedTextColor.DARK_GRAY));
+                    c.getWorld().spawnParticle(Particle.SMOKE, shadowLoc, 15, 0.5, 1, 0.5);
+                    // Téléportation async (Paper 26.1.2)
+                    c.teleportAsync(shadowLoc.clone());
                 }
             } else {
                 Vector dir = c.getLocation().getDirection().setY(0).normalize();
