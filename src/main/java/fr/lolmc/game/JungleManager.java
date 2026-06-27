@@ -80,6 +80,9 @@ public class JungleManager {
         DRAGON_CHEMTECH (EntityType.RAVAGER,   3500, 150, 25, 300, "drake_chemtech", 1, "☣ Dragon Chimtech"),
         DRAGON_ELDER    (EntityType.RAVAGER,   5000, 200, 40, 360, "drake_elder",    1, "🐲 Dragon Ancien"),
         // ── Épiques de la fosse ──
+        VOIDGRUB     (EntityType.SILVERFISH,    600,  50, 20, 120, "voidgrub", 6, "🪱 Voidgrub"),
+        VOIDGRUB     (EntityType.SILVERFISH,    350,  50, 20,  0, "voidgrub", 3, "🐛 Nuée du Néant"),
+        ATAKHAN      (EntityType.WARDEN,       9000, 250, 35,  0, "atakhan",  1, "🌺 Atakhan"),
         HERALD       (EntityType.RAVAGER,      4000, 200, 25,  0,  "none", 1, "👁 Héraut de la Faille"),
         BARON        (EntityType.WARDEN,       8500, 300, 30, 420, "baron",1, "🪱 Baron Nashor");
 
@@ -104,7 +107,7 @@ public class JungleManager {
         }
 
         public boolean isEpic() {
-            return isDragon() || this == HERALD || this == BARON;
+            return isDragon() || this == HERALD || this == BARON || this == ATAKHAN;
         }
     }
 
@@ -115,6 +118,7 @@ public class JungleManager {
         public final Location location;
         public final Set<UUID> liveEntities = new HashSet<>();  // toutes les entités du camp
         public long respawnAt = 0;        // timestamp de réapparition
+        public UUID respawnHologramId = null; // TextDisplay du compte à rebours
 
         public CampSpawn(String id, MonsterType type, Location location) {
             this.id = id; this.type = type; this.location = location;
@@ -190,6 +194,7 @@ public class JungleManager {
     public void stopJungle() {
         active = false;
         clearAllMonsters();
+        hideAllRespawnTimers();
     }
 
     private void spawnCamp(CampSpawn camp) {
@@ -341,13 +346,20 @@ public class JungleManager {
                 if (!active) return;
                 long now = System.currentTimeMillis();
                 for (CampSpawn camp : camps.values()) {
+                    if (!camp.isAlive() && camp.respawnAt > 0) {
+                        long secLeft = Math.max(0, (camp.respawnAt - now) / 1000L);
+                        if (camp.location.isChunkLoaded()) {
+                            updateRespawnHologram(camp, secLeft);
+                        }
+                    }
                     if (!camp.isAlive() && camp.respawnAt > 0 && now >= camp.respawnAt) {
+                        removeRespawnHologram(camp);
                         spawnCamp(camp);
                         camp.respawnAt = 0;
                     }
                 }
             }
-        }.runTaskTimer(LolPlugin.getInstance(), 20L, 20L); // vérifie chaque seconde
+        }.runTaskTimer(LolPlugin.getInstance(), 20L, 20L);
     }
 
     // ══════════════════════════════════════════════════════════════
@@ -671,5 +683,84 @@ public class JungleManager {
     /** Expose applyBuff() en public pour les commandes admin. */
     public void applyBuffPublic(org.bukkit.entity.Player player, String buff) {
         applyBuff(player, buff);
+    }
+
+        respawnDisplays.clear();
+    }
+
+    /** % bonus de dégâts aux structures pour une équipe (0-36%). */
+    public double getVoidgrubBonus(fr.lolmc.team.TeamManager.Team team) {
+        return voidgrubsKilled.getOrDefault(team, 0) * 0.06; // 6% par grub
+    }
+
+    // ── Hologrammes de respawn (TextDisplay) ─────────────────────────────────
+
+    private void updateRespawnHologram(CampSpawn camp, long secondsLeft) {
+        org.bukkit.World w = camp.location.getWorld();
+        if (w == null) return;
+        String txt = "§e⏱ " + camp.type.displayName + "\n§7Réapparition : §f"
+                + (secondsLeft / 60) + ":" + String.format("%02d", secondsLeft % 60);
+
+        org.bukkit.entity.TextDisplay td = null;
+        if (camp.respawnHologramId != null) {
+            org.bukkit.entity.Entity e = w.getEntity(camp.respawnHologramId);
+            if (e instanceof org.bukkit.entity.TextDisplay t) td = t;
+        }
+        if (td == null) {
+            td = w.spawn(camp.location.clone().add(0, 1.6, 0), org.bukkit.entity.TextDisplay.class, t -> {
+                t.setBillboard(org.bukkit.entity.Display.Billboard.CENTER);
+                t.setSeeThrough(true);
+                t.getScoreboardTags().add("lol_respawn_holo");
+            });
+            camp.respawnHologramId = td.getUniqueId();
+        }
+        td.text(net.kyori.adventure.text.Component.text(txt));
+    }
+
+    private void removeRespawnHologram(CampSpawn camp) {
+        if (camp.respawnHologramId == null) return;
+        org.bukkit.World w = camp.location.getWorld();
+        if (w != null) {
+            org.bukkit.entity.Entity e = w.getEntity(camp.respawnHologramId);
+            if (e != null) e.remove();
+        }
+        camp.respawnHologramId = null;
+
+    // ── Hologrammes de respawn (TextDisplay) ─────────────────────────────────
+
+    private void updateRespawnHologram(CampSpawn camp, long secondsLeft) {
+        org.bukkit.World w = camp.location.getWorld();
+        if (w == null) return;
+        String txt = "§e⏱ " + camp.type.displayName + "\n§7Réapparition : §f"
+                + (secondsLeft / 60) + ":" + String.format("%02d", secondsLeft % 60);
+        org.bukkit.entity.TextDisplay td = null;
+        if (camp.respawnHologramId != null) {
+            org.bukkit.entity.Entity e = w.getEntity(camp.respawnHologramId);
+            if (e instanceof org.bukkit.entity.TextDisplay t) td = t;
+        }
+        if (td == null) {
+            td = w.spawn(camp.location.clone().add(0, 1.6, 0),
+                    org.bukkit.entity.TextDisplay.class, t -> {
+                        t.setBillboard(org.bukkit.entity.Display.Billboard.CENTER);
+                        t.setSeeThrough(true);
+                        t.getScoreboardTags().add("lol_respawn_holo");
+                    });
+            camp.respawnHologramId = td.getUniqueId();
+        }
+        td.text(net.kyori.adventure.text.Component.text(txt));
+    }
+
+    private void removeRespawnHologram(CampSpawn camp) {
+        if (camp.respawnHologramId == null) return;
+        org.bukkit.World w = camp.location.getWorld();
+        if (w != null) {
+            org.bukkit.entity.Entity e = w.getEntity(camp.respawnHologramId);
+            if (e != null) e.remove();
+        }
+        camp.respawnHologramId = null;
+    }
+
+    private void hideAllRespawnTimers() {
+        for (CampSpawn camp : camps.values()) removeRespawnHologram(camp);
     }
 }

@@ -104,6 +104,9 @@ public class LolPlugin extends JavaPlugin {
     private fr.lolmc.bridge.BridgeManager bridgeManager;
     private fr.lolmc.ability.AbilityPreview abilityPreview;
     private fr.lolmc.instance.InstanceManager instanceManager;
+    private fr.lolmc.game.PlantManager plantManager;
+    private fr.lolmc.game.MinimapManager minimapManager;
+    private fr.lolmc.manager.SkinManager skinManager;
 
     @Override
     public void onEnable() {
@@ -118,6 +121,9 @@ public class LolPlugin extends JavaPlugin {
 
         this.abilityPreview   = new fr.lolmc.ability.AbilityPreview();
         this.instanceManager  = new fr.lolmc.instance.InstanceManager(this);
+        this.plantManager     = new fr.lolmc.game.PlantManager();
+        this.minimapManager   = new fr.lolmc.game.MinimapManager();
+        this.skinManager      = new fr.lolmc.manager.SkinManager();
         // Bridge cross-serveur (BungeeCord)
         this.bridgeManager = new fr.lolmc.bridge.BridgeManager(this);
 
@@ -333,4 +339,7 @@ public class LolPlugin extends JavaPlugin {
 
     public fr.lolmc.ability.AbilityPreview getAbilityPreview() { return abilityPreview; }
     public fr.lolmc.instance.InstanceManager getInstanceManager() { return instanceManager; }
+    public fr.lolmc.game.PlantManager getPlantManager()           { return plantManager; }
+    public fr.lolmc.game.MinimapManager getMinimapManager()       { return minimapManager; }
+    public fr.lolmc.manager.SkinManager getSkinManager()          { return skinManager; }
 }
