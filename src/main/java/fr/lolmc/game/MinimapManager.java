@@ -162,7 +162,7 @@ public class MinimapManager implements Listener {
             int px = worldToCursor(loc.getBlockX(), centerX);
             int pz = worldToCursor(loc.getBlockZ(), centerZ);
             if (px < -128 || px > 127 || pz < -128 || pz > 127) return; // hors carte
-            cursors.addCursor(new MapCursor((byte) px, (byte) pz, dir, type, true, null));
+            cursors.addCursor(new MapCursor((byte) px, (byte) pz, dir, type, true, (net.kyori.adventure.text.Component) null));
         }
 
         /** Convertit une coordonnée monde en coordonnée curseur (-128..127). */
