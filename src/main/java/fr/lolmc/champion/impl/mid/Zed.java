@@ -65,7 +65,11 @@ public class Zed extends BaseChampion {
             double maxHealth = maxHealthAttr != null ? maxHealthAttr.getValue() : 20.0;
 
             if(tgt.getHealth() < maxHealth * 0.5){
-                double bonus = maxHealth * 0.08;
+                // 5/7.5/10% PV max selon niveau (1/7/17) — LoL
+                var cm=LolPlugin.getInstance().getChampionManager();
+                int lvl=cm.hasChampion(c)?cm.getChampion(c).getLevelSystem().getLevel():1;
+                double pct = lvl>=17 ? 0.10 : (lvl>=7 ? 0.075 : 0.05);
+                double bonus = maxHealth * pct;
                 TargetingUtil.dealDamage(c, tgt, bonus, TargetingUtil.DmgType.MAGICAL);
                 tgt.getWorld().spawnParticle(Particle.SMOKE,tgt.getLocation().add(0,1,0),8,0.3,0.5,0.3);
             }
@@ -195,10 +199,25 @@ public class Zed extends BaseChampion {
             double[] base=fr.lolmc.util.Balance.base("e_zed",new double[]{70,92.5,115,137.5,160});
             double dmg=base[getLevel()-1]+s.getFinalAD()*fr.lolmc.util.Balance.ratio("e_zed","ad",0.7);
             int rank=getLevel()-1;
+            int champsHit=0;
             for(var __t : TargetingUtil.enemiesAround(c, 4.0)){
                 TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.PHYSICAL);
-                if(__t instanceof Player __p)
+                if(__t instanceof Player __p){
                     __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,30,rank,false,true));
+                    champsHit++;
+                }
+            }
+            // Réduit le CD du W de 2s par champion touché (LoL)
+            if(champsHit>0){
+                var cm=LolPlugin.getInstance().getChampionManager();
+                if(cm.hasChampion(c)){
+                    var wAbil=cm.getChampion(c).getAbility(2);
+                    if(wAbil!=null){
+                        double rem=wAbil.getRemainingCooldown(c)-2.0*champsHit;
+                        if(rem<0) rem=0;
+                        wAbil.setDynamicCooldown(Math.max(0.1, rem));
+                    }
+                }
             }
             c.getWorld().spawnParticle(Particle.SWEEP_ATTACK,c.getLocation().add(0,1,0),6,2,0.5,2);
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 0.9f);
@@ -226,7 +245,7 @@ public class Zed extends BaseChampion {
 
     static class R extends BaseAbility {
         R(){super("r_zed","Marque de Mort",Material.WITHER_ROSE,AbilitySlot.R,
-                new double[]{120,100,80},20,0,DamageType.TRUE);
+                new double[]{120,90,60},20,0,DamageType.TRUE);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,8.0); if(tgt==null){c.sendActionBar(Component.text("💀 Aucune cible visée",NamedTextColor.GRAY));return;}
