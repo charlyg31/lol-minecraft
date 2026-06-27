@@ -131,3 +131,8 @@ fog:
   enabled: true
   # Distance de vision en blocs (les ennemis au-delà sont invisibles)
   vision-range: 30
+
+minimap:
+  center-x: 0      # centre X de ta carte LoL (bloc)
+  center-z: 0      # centre Z
+  scale: FARTHEST   # CLOSEST=128b CLOSE=256 NORMAL=512 FAR=1024 FARTHEST=2048

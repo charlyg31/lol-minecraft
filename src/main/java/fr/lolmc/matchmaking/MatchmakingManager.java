@@ -241,6 +241,7 @@ public class MatchmakingManager {
                 if (p != null) {
                     org.bukkit.Location spawn = mapMgr.getSpawn(fr.lolmc.team.TeamManager.Team.BLUE, 0);
                     if (spawn != null) p.teleport(spawn);
+                    LolPlugin.getInstance().getMinimapManager().giveMinimap(p);
                     p.sendMessage(net.kyori.adventure.text.Component.text(
                         "⚔ Instance #" + instance.getId() + " — Partie trouvée!",
                         net.kyori.adventure.text.format.NamedTextColor.GOLD));
@@ -251,6 +252,7 @@ public class MatchmakingManager {
                 if (p != null) {
                     org.bukkit.Location spawn = mapMgr.getSpawn(fr.lolmc.team.TeamManager.Team.RED, 0);
                     if (spawn != null) p.teleport(spawn);
+                    LolPlugin.getInstance().getMinimapManager().giveMinimap(p);
                     p.sendMessage(net.kyori.adventure.text.Component.text(
                         "⚔ Instance #" + instance.getId() + " — Partie trouvée!",
                         net.kyori.adventure.text.format.NamedTextColor.GOLD));
