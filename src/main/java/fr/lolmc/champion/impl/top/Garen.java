@@ -52,21 +52,21 @@ public class Garen extends BaseChampion {
         @Override public void cast(Player c,ChampionStats s,Player t){
             org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,2.5); if(tgt==null){c.sendActionBar(Component.text("⚔ Aucune cible à portée",NamedTextColor.GRAY));return;}
             // LoL : 30/55/80/105/130 + 50% AD bonus, silence 1.5s, boost vitesse
-            double[] base=fr.lolmc.util.Balance.base("q_garen",new double[]{30,55,80,105,130});
+            double[] base=fr.lolmc.util.Balance.base("q_garen",new double[]{30,65,100,135,170});
             double dmg=base[getLevel()-1]+s.getFinalAD()*fr.lolmc.util.Balance.ratio("q_garen","ad",0.5);
             TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.PHYSICAL);
-            // Silence 1.5s via CCManager
+            // Silence 1.5s (30 ticks) via CCManager
             var cc = LolPlugin.getInstance().getCCManager();
             if (cc != null) cc.silence(tgt, 30);
-            tgt.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,10,0,false,true));
-            c.addPotionEffect(new PotionEffect(PotionEffectType.SPEED,30,1,false,true));
+            // +35% vitesse pendant 4s (80 ticks) — LoL
+            c.addPotionEffect(new PotionEffect(PotionEffectType.SPEED,80,1,false,true));
             if(tgt instanceof Player _tp)_tp.sendActionBar(Component.text("⚠ Silence — Garen Q",NamedTextColor.RED));
             c.getWorld().spawnParticle(Particle.SWEEP_ATTACK,tgt.getLocation().add(0,1,0),3);
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_PLAYER_ATTACK_CRIT, 1f, 1f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            double[] base=fr.lolmc.util.Balance.base("q_garen",new double[]{30,55,80,105,130});
-            return String.format("%.0f dégâts physiques (+50%%AD). Silence 1.5s + boost vitesse.",base[getLevel()-1]+s.getFinalAD()*fr.lolmc.util.Balance.ratio("q_garen","ad",0.5));
+            double[] base=fr.lolmc.util.Balance.base("q_garen",new double[]{30,65,100,135,170});
+            return String.format("%.0f dégâts physiques (+50%%AD). Silence 1.5s + 35%% vitesse 4s.",base[getLevel()-1]+s.getFinalAD()*fr.lolmc.util.Balance.ratio("q_garen","ad",0.5));
         }
     }
 
@@ -100,31 +100,30 @@ public class Garen extends BaseChampion {
             c.sendActionBar(Component.text("⚔ Jugement!",NamedTextColor.GOLD));
             // LoL : dégâts par tick = base[rang] + ratio AD, 7 frappes réparties sur 3s (~tous les 8.5 ticks)
             double[] baseTick={14,18,22,26,30};
-            double[] adRatio={0.34,0.35,0.36,0.37,0.38};
+            double[] adRatio={0.36,0.37,0.38,0.39,0.40};
             int rank=getLevel()-1;
             double perTick=baseTick[rank]+s.getFinalAD()*adRatio[rank];
             new BukkitRunnable(){
                 int hits=0;
                 @Override public void run(){
                     if(hits>=7){cancel();return;}
-                    // Trouver l'ennemi le plus proche pour le bonus +25%
-                    var nearest=TargetingUtil.getNearestEnemy(c, 4.0);
-                    for(var __t : TargetingUtil.enemiesAround(c, 4.0)){
+                    var around=TargetingUtil.enemiesAround(c, 4.0);
+                    boolean single = around.size()==1; // +33%% si une seule cible (LoL)
+                    for(var __t : around){
                         double dmg=perTick;
-                        if(__t.equals(nearest)) dmg*=1.25; // le plus proche prend +25%
+                        if(single) dmg*=1.33;
                         TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.PHYSICAL);
                     }
-                    // Animation de tournoiement
                     c.getWorld().spawnParticle(Particle.SWEEP_ATTACK,c.getLocation().add(0,1,0),3,1.5,0.3,1.5);
                     c.getWorld().playSound(c.getLocation(), Sound.ENTITY_PLAYER_ATTACK_SWEEP, 0.5f, 1.2f);
                     hits++;
                 }
-            }.runTaskTimer(LolPlugin.getInstance(),0L,8L); // 7 frappes × 8 ticks ≈ 3s
+            }.runTaskTimer(LolPlugin.getInstance(),0L,9L); // 7 frappes × 9 ticks ≈ 3.15s (LoL: 3s)
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            double[] baseTick={14,18,22,26,30};double[] adRatio={0.34,0.35,0.36,0.37,0.38};int r=getLevel()-1;
+            double[] baseTick={14,18,22,26,30};double[] adRatio={0.36,0.37,0.38,0.39,0.40};int r=getLevel()-1;
             double total=(baseTick[r]+s.getFinalAD()*adRatio[r])*7;
-            return String.format("7 frappes sur 3s, total %.0f dégâts (rayon 4). Plus proche: +25%%.",total);
+            return String.format("7 frappes sur 3s, total %.0f dégâts (rayon 4). Cible unique: +33%%.",total);
         }
     }
 
@@ -136,20 +135,27 @@ public class Garen extends BaseChampion {
         @Override public void cast(Player c,ChampionStats s,Player t){
             // Justice Démacienne : porté plus loin (sort à distance moyenne), cible visée
             org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,8.0); if(tgt==null){c.sendActionBar(Component.text("☠ Aucune cible visée",NamedTextColor.GRAY));return;}
-            double[] base=fr.lolmc.util.Balance.base("r_garen",new double[]{150,300,450});
+            double[] base=fr.lolmc.util.Balance.base("r_garen",new double[]{150,250,350});
             int r=Math.min(getLevel()-1,2);
-            // Dégâts vrais : base + 25% PV manquants de la cible (formule LoL)
-            var cm=LolPlugin.getInstance().getChampionManager();
-            double missingHP=0;
-            if((tgt instanceof Player && cm.hasChampion((Player)tgt))){var hp=cm.getChampion((Player)tgt).getHPSystem();missingHP=hp.getMaxHP()-hp.getCurrentHP();}
-            double dmg=base[r]+missingHP*0.25;
-            tgt.getWorld().strikeLightningEffect(tgt.getLocation());
-            tgt.getWorld().spawnParticle(Particle.FLASH,tgt.getLocation().add(0,1,0),3);
-            TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.TRUE);
-            if(tgt instanceof Player _tp)_tp.sendMessage(Component.text("☠ DEMACIA! Exécution de Garen!",NamedTextColor.DARK_RED));
+            // Reveal de la cible pendant 1s (20 ticks) au début du cast
+            tgt.addPotionEffect(new PotionEffect(PotionEffectType.GLOWING,20,0,false,false));
+            c.sendActionBar(Component.text("☠ Justice Démacienne en préparation...",NamedTextColor.DARK_RED));
+            final org.bukkit.entity.LivingEntity ftgt=tgt; final int fr_=r;
+            // Délai de cast 0.5s (10 ticks) — LoL
+            new BukkitRunnable(){@Override public void run(){
+                if(ftgt.isDead()||!ftgt.isValid()){return;}
+                var cm=LolPlugin.getInstance().getChampionManager();
+                double missingHP=0;
+                if((ftgt instanceof Player && cm.hasChampion((Player)ftgt))){var hp=cm.getChampion((Player)ftgt).getHPSystem();missingHP=hp.getMaxHP()-hp.getCurrentHP();}
+                double dmg=base[fr_]+missingHP*0.25;
+                ftgt.getWorld().strikeLightningEffect(ftgt.getLocation());
+                ftgt.getWorld().spawnParticle(Particle.FLASH,ftgt.getLocation().add(0,1,0),3);
+                TargetingUtil.dealDamage(c, ftgt, dmg, TargetingUtil.DmgType.TRUE);
+                if(ftgt instanceof Player _tp)_tp.sendMessage(Component.text("☠ DEMACIA! Exécution de Garen!",NamedTextColor.DARK_RED));
+            }}.runTaskLater(LolPlugin.getInstance(), 10L);
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            double[] base=fr.lolmc.util.Balance.base("r_garen",new double[]{150,300,450});int r=Math.min(getLevel()-1,2);return String.format("%.0f dégâts vrais + 25%% PV manquants.",base[r]);
+            double[] base=fr.lolmc.util.Balance.base("r_garen",new double[]{150,250,350});int r=Math.min(getLevel()-1,2);return String.format("%.0f dégâts vrais + 25%% PV manquants (cast 0.5s).",base[r]);
         }
     }
 }
