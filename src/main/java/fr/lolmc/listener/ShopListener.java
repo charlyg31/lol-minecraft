@@ -46,13 +46,12 @@ public class ShopListener implements Listener {
     // ── Initialiser l'inventaire d'un joueur ──────────────────────
     public PlayerInventoryManager getOrCreate(Player player) {
         return inventoryManagers.computeIfAbsent(
-            player.getUniqueId(), k -> new PlayerInventoryManager());
+                player.getUniqueId(), k -> new PlayerInventoryManager());
     }
 
     public void initPlayer(Player player) {
         getOrCreate(player);
         goldManager.initPlayer(player.getUniqueId());
-        // Le HotbarManager.initPlayer est appelé par GUIListener après pick champion
     }
 
     public void cleanup(java.util.UUID uuid) {
@@ -74,8 +73,9 @@ public class ShopListener implements Listener {
         if (ShopGUI.isShopInventory(title)) {
             // Annuler TOUT clic (y compris shift-clic, double-clic, nombre)
             event.setCancelled(true);
-            // Seuls les clics dans le menu haut (slots 0-53) déclenchent un achat
-            int raw = event.getSlot();
+
+            // CORRECTION : Utiliser getRawSlot() pour ne valider que la grille supérieure (0-53)
+            int raw = event.getRawSlot();
             if (raw >= 0 && raw < event.getView().getTopInventory().getSize()) {
                 handleShopClick(player, raw);
             }
@@ -146,109 +146,130 @@ public class ShopListener implements Listener {
         if (itemId != null) { shopGUI.openDetail(player, itemId); } // ouvre la fiche/recette
     }
 
-    /** Achète un item (vérifie or + place). Retourne true si l'achat a réussi. */
+    /** Achète un item (vérifie la recette, l'or dynamique et la place). Retourne true si l'achat a réussi. */
     private boolean purchase(Player player, LolItem item) {
         if (item == null) return false;
 
-        int gold = goldManager.getGold(player.getUniqueId());
-        if (gold < item.getGoldCost()) {
-            player.sendMessage(Component.text(
-                String.format("❌ Or insuffisant! Tu as %d or, il en faut %d.", gold, item.getGoldCost()),
-                NamedTextColor.RED));
+        BaseChampion champ = championManager.getChampion(player);
+        PlayerInventoryManager inv = getOrCreate(player);
+        ConsumableManager cm = LolPlugin.getInstance().getConsumableManager();
+        var hb = LolPlugin.getInstance().getHotbarManager();
+
+        // ── GESTION DES CONSOMMABLES ──
+        if (item.getCategory() == ItemCategory.CONSUMABLE && cm != null) {
+            int gold = goldManager.getGold(player.getUniqueId());
+            if (gold < item.getGoldCost()) {
+                player.sendMessage(Component.text(
+                        String.format("❌ Or insuffisant! Tu as %d or, il en faut %d.", gold, item.getGoldCost()),
+                        NamedTextColor.RED));
+                player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 1f, 1f);
+                return false;
+            }
+            if (!goldManager.spendGold(player.getUniqueId(), item.getGoldCost())) return false;
+            hb.addConsumable(player, item.getId());
+            hb.renderPage(player, champ);
+            player.sendActionBar(Component.text("🧪 " + item.getDisplayName() + " ajouté (page 2)", NamedTextColor.GREEN));
+            player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1f, 1.3f);
+            return true;
+        }
+
+        // ── GESTION DES ITEMS NORMAUX (Avec Arbre de Recette Dynamique) ──
+
+        // 1. Trouver TOUS les composants requis déjà possédés dans l'inventaire
+        java.util.List<Integer> slotsToConsume = new java.util.ArrayList<>();
+        int totalDiscount = 0;
+
+        if (item.getBuildsFrom() != null) {
+            for (String componentId : item.getBuildsFrom()) {
+                for (int i = 0; i < 6; i++) {
+                    LolItem owned = inv.getItem(i);
+                    // Si on possède le composant et qu'on ne l'a pas déjà marqué pour destruction
+                    if (owned != null && owned.getId().equals(componentId) && !slotsToConsume.contains(i)) {
+                        slotsToConsume.add(i);
+                        totalDiscount += owned.getGoldCost();
+                        break; // On passe au composant requis suivant de la liste
+                    }
+                }
+            }
+        }
+
+        // 2. Calcul du coût effectif (Prix total - Réduction accumulée des composants possédés)
+        int effectiveCost = Math.max(0, item.getGoldCost() - totalDiscount);
+        int currentGold = goldManager.getGold(player.getUniqueId());
+
+        if (currentGold < effectiveCost) {
+            if (totalDiscount > 0) {
+                player.sendMessage(Component.text(
+                        String.format("❌ Or insuffisant pour upgrader! Il te faut %d or (différence avec tes composants).", effectiveCost),
+                        NamedTextColor.RED));
+            } else {
+                player.sendMessage(Component.text(
+                        String.format("❌ Or insuffisant! Tu as %d or, il en faut %d.", currentGold, item.getGoldCost()),
+                        NamedTextColor.RED));
+            }
             player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 1f, 1f);
             return false;
         }
 
-        PlayerInventoryManager inv = getOrCreate(player);
-        BaseChampion champ = championManager.getChampion(player);
+        // 3. Vérification de la place réelle (Taille actuelle - composants détruits + 1 nouvel item)
+        int currentItemCount = 0;
+        for (int i = 0; i < 6; i++) {
+            if (inv.getItem(i) != null) currentItemCount++;
+        }
 
-        ConsumableManager cm = LolPlugin.getInstance().getConsumableManager();
-        var hb = LolPlugin.getInstance().getHotbarManager();
+        if (currentItemCount - slotsToConsume.size() + 1 > 6) {
+            player.sendMessage(Component.text("❌ Inventaire plein (6/6 items)!", NamedTextColor.RED));
+            player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 1f, 1f);
+            return false;
+        }
 
-        if (item.getCategory() == ItemCategory.CONSUMABLE && cm != null) {
-            // Consommables : pas de limite de 6 slots
-            if (!goldManager.spendGold(player.getUniqueId(), item.getGoldCost())) return false;
-            hb.addConsumable(player, item.getId());
-            hb.renderPage(player, champ);
+        // 4. Retrait de l'or
+        if (!goldManager.spendGold(player.getUniqueId(), effectiveCost)) return false;
+
+        // 5. Retrait des composants (sans remboursement d'or, transférés dans l'upgrade)
+        // On stocke temporairement les items pour un éventuel rollback en cas d'erreur inattendue
+        java.util.Map<Integer, LolItem> removedComponents = new java.util.HashMap<>();
+        for (int slot : slotsToConsume) {
+            LolItem component = inv.getItem(slot);
+            removedComponents.put(slot, component);
+
+            inv.removeItemNoRefund(champ, slot);
+            hb.removeItem(player, component.getId());
+        }
+
+        // 6. Équipement de l'item final
+        if (!inv.equipItem(player, champ, item)) {
+            // ROLLBACK en cas d'échec d'équipement
+            goldManager.addGold(player.getUniqueId(), effectiveCost);
+            for (java.util.Map.Entry<Integer, LolItem> entry : removedComponents.entrySet()) {
+                LolItem comp = entry.getValue();
+                comp.applyStats(champ.getStats(), champ.getHPSystem(), champ.getResourceSystem());
+                inv.equipItem(player, champ, comp);
+                hb.addItem(player, comp.getId());
+            }
+            player.sendMessage(Component.text("❌ Impossible d'équiper l'item.", NamedTextColor.RED));
+            return false;
+        }
+
+        // 7. Finalisation visuelle et sonore
+        hb.addItem(player, item.getId());
+        hb.renderPage(player, champ);
+        hudManager.updateHUD(player, champ);
+
+        if (!slotsToConsume.isEmpty()) {
             player.sendActionBar(Component.text(
-                "🧪 " + item.getDisplayName() + " ajouté (page 2)", NamedTextColor.GREEN));
-        } else {
-            // Items normaux : si inventaire plein, chercher un composant upgradeable
-            if (inv.isFull()) {
-                int upgradeSlot = findUpgradeSlot(inv, item);
-                if (upgradeSlot == -1) {
-                    player.sendMessage(Component.text("❌ Inventaire plein (6/6 items)!", NamedTextColor.RED));
-                    return false;
-                }
-                // Upgrade LoL : on paie la DIFFÉRENCE de prix (prix_final - prix_composant),
-                // pas un remboursement à 70%. Le composant est retiré sans rembourser.
-                LolItem component = inv.getItem(upgradeSlot);
-                int effectiveCost = Math.max(0, item.getGoldCost() - component.getGoldCost());
-                if (gold < effectiveCost) {
-                    player.sendMessage(Component.text(
-                        String.format("❌ Or insuffisant pour upgrader! Il te faut %d or (différence %s → %s).",
-                            effectiveCost, component.getDisplayName(), item.getDisplayName()),
-                        NamedTextColor.RED));
-                    return false;
-                }
-                if (!goldManager.spendGold(player.getUniqueId(), effectiveCost)) return false;
-                // Retirer le composant (stats + slot, sans remboursement)
-                inv.removeItemNoRefund(champ, upgradeSlot);
-                hb.removeItem(player, component.getId());
-                // Équiper l'item final
-                if (!inv.equipItem(player, champ, item)) {
-                    // Rollback complet
-                    goldManager.addGold(player.getUniqueId(), effectiveCost);
-                    component.applyStats(champ.getStats(), champ.getHPSystem(), champ.getResourceSystem());
-                    inv.equipItem(player, champ, component);
-                    hb.addItem(player, component.getId());
-                    player.sendMessage(Component.text("❌ Impossible d'équiper l'item.", NamedTextColor.RED));
-                    return false;
-                }
-                hb.addItem(player, item.getId());
-                hb.renderPage(player, champ);
-                hudManager.updateHUD(player, champ);
-                player.sendActionBar(Component.text(
-                    String.format("⬆ Upgrade! %s → %s (coût: %d) | Or: %d",
-                        component.getDisplayName(), item.getDisplayName(),
-                        effectiveCost, goldManager.getGold(player.getUniqueId())),
+                    String.format("⬆ Upgrade! %s acheté (coût effectif : %d) | Or: %d",
+                            item.getDisplayName(), effectiveCost, goldManager.getGold(player.getUniqueId())),
                     NamedTextColor.GREEN));
-                player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 1f, 1.3f);
-                return true;
-            }
-            // Inventaire non plein : achat normal
-            if (!goldManager.spendGold(player.getUniqueId(), item.getGoldCost())) return false;
-            if (!inv.equipItem(player, champ, item)) {
-                goldManager.addGold(player.getUniqueId(), item.getGoldCost());
-                player.sendMessage(Component.text("❌ Impossible d'équiper l'item.", NamedTextColor.RED));
-                return false;
-            }
-            hb.addItem(player, item.getId());
-            hb.renderPage(player, champ);
-            hudManager.updateHUD(player, champ);
+            player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 1f, 1.3f);
+        } else {
+            player.sendActionBar(Component.text(
+                    String.format("💰 Or: %d | %s acheté!", goldManager.getGold(player.getUniqueId()),
+                            item.getDisplayName()), NamedTextColor.GOLD));
+            player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1f, 1.3f);
         }
 
-        player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1f, 1.3f);
-        player.sendActionBar(Component.text(
-            String.format("💰 Or: %d | %s acheté!", goldManager.getGold(player.getUniqueId()),
-                item.getDisplayName()), NamedTextColor.GOLD));
         return true;
-    }
-
-    /**
-     * Cherche dans l'inventaire un composant qui est un ingrédient direct de l'item cible.
-     * @return l'index de slot (0-5) du composant trouvé, ou -1 si aucun.
-     */
-    private int findUpgradeSlot(PlayerInventoryManager inv, LolItem targetItem) {
-        for (String componentId : targetItem.getBuildsFrom()) {
-            for (int i = 0; i < 6; i++) {
-                LolItem owned = inv.getItem(i);
-                if (owned != null && owned.getId().equals(componentId)) {
-                    return i;
-                }
-            }
-        }
-        return -1;
     }
 
     private void trySellItem(Player player, int mcSlot) {
@@ -270,17 +291,24 @@ public class ShopListener implements Listener {
         goldManager.addGold(player.getUniqueId(), refund);
         hudManager.updateHUD(player, champ);
         player.sendActionBar(Component.text(
-            "💰 Or: " + goldManager.getGold(player.getUniqueId()),
-            NamedTextColor.GOLD));
+                "💰 Or: " + goldManager.getGold(player.getUniqueId()),
+                NamedTextColor.GOLD));
     }
 
     // ── Fermeture boutique ────────────────────────────────────────
     @EventHandler
     public void onClose(InventoryCloseEvent event) {
         if (!(event.getPlayer() instanceof Player p)) return;
-        if (ShopGUI.isShopInventory(event.getView().title())) {
-            shopGUI.cleanup(p);
-        }
+
+        // CORRECTION : Attendre 1 tick pour s'assurer qu'on ne change pas juste d'onglet/vue dans la boutique
+        org.bukkit.Bukkit.getScheduler().runTask(LolPlugin.getInstance(), () -> {
+            if (!p.isOnline()) return;
+
+            // Si le nouvel inventaire ouvert par le joueur n'est plus la boutique LoL, on clean
+            if (!ShopGUI.isShopInventory(p.getOpenInventory().title())) {
+                shopGUI.cleanup(p);
+            }
+        });
     }
 
     // ── Empêcher de dropper les items LoL ────────────────────────
@@ -320,7 +348,7 @@ public class ShopListener implements Listener {
             case "control_ward", "control_ward2"            -> cm.placeControlWard(player);
             case "farsight", "farsight2"                    -> cm.placeWard(player, true);
             default -> player.sendActionBar(net.kyori.adventure.text.Component.text(
-                "Consommable: " + id, net.kyori.adventure.text.format.NamedTextColor.GRAY));
+                    "Consommable: " + id, net.kyori.adventure.text.format.NamedTextColor.GRAY));
         }
     }
 
@@ -328,16 +356,13 @@ public class ShopListener implements Listener {
 
     /** Vrai si le slot correspond à un emplacement d'item LoL (hotbar ou inventaire). */
     private boolean isLolItemSlot(int slot) {
-        // Anciens slots hotbar (compatibilité)
         for (int s : PlayerInventoryManager.ITEM_SLOTS) if (s == slot) return true;
-        // Slots inventaire LoL (9-14)
         for (int s : fr.lolmc.item.HotbarManager.INV_ITEM_SLOTS) if (s == slot) return true;
         return false;
     }
 
     public GoldManager getGoldManager() { return goldManager; }
     public Map<UUID, PlayerInventoryManager> getInventoryManagers() { return inventoryManagers; }
-
 
     /** Les Élixirs nécessitent le niveau 9 (comme en LoL). */
     private boolean checkElixirLevel(org.bukkit.entity.Player player) {
@@ -346,8 +371,8 @@ public class ShopListener implements Listener {
         int lvl = cm.getChampion(player).getLevelSystem().getLevel();
         if (lvl < 9) {
             player.sendMessage(net.kyori.adventure.text.Component.text(
-                "❌ Les Élixirs nécessitent le niveau 9 (tu es niveau " + lvl + ").",
-                net.kyori.adventure.text.format.NamedTextColor.RED));
+                    "❌ Les Élixirs nécessitent le niveau 9 (tu es niveau " + lvl + ").",
+                    net.kyori.adventure.text.format.NamedTextColor.RED));
             return false;
         }
         return true;

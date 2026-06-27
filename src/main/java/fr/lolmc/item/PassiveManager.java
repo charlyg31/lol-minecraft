@@ -73,13 +73,13 @@ public class PassiveManager {
         // ── Sudden Impact : +12 létalité/+9 pén. magique pendant 5s (une seule instance active) ──
         var runePageSI = LolPlugin.getInstance().getRuneManager();
         long __siExpire = getState(caster).antihealTargets.getOrDefault(
-            new java.util.UUID(0L, caster.getUniqueId().getLeastSignificantBits()), 0L);
+                new java.util.UUID(0L, caster.getUniqueId().getLeastSignificantBits()), 0L);
         boolean __siActive = System.currentTimeMillis() < __siExpire;
         if (!__siActive && runePageSI != null && runePageSI.getPage(caster.getUniqueId()).has("sudden_impact")) {
             // Marquer actif (5s) via une clé dédiée dans antihealTargets
             getState(caster).antihealTargets.put(
-                new java.util.UUID(0L, caster.getUniqueId().getLeastSignificantBits()),
-                System.currentTimeMillis() + 5000L);
+                    new java.util.UUID(0L, caster.getUniqueId().getLeastSignificantBits()),
+                    System.currentTimeMillis() + 5000L);
             champ.getStats().addBonusLethality(12);
             champ.getStats().addBonusFlatMagicPen(9);
             new org.bukkit.scheduler.BukkitRunnable() { @Override public void run() {
@@ -177,9 +177,9 @@ public class PassiveManager {
             if (state.statikkStacks >= 3) {
                 double shivDmg = as.calcMagicalDamage(60 + as.getFinalAD() * 0.5, vs);
                 attacker.getWorld().getNearbyEntities(victim.getLocation(), 4, 2, 4).stream()
-                    .filter(e -> e instanceof Player)
-                    .forEach(e -> championManager.getChampion((Player)e).getHPSystem()
-                        .takeDamage(shivDmg));
+                        .filter(e -> e instanceof Player)
+                        .forEach(e -> championManager.getChampion((Player)e).getHPSystem()
+                                .takeDamage(shivDmg));
                 state.statikkStacks = 0;
                 victim.getWorld().strikeLightningEffect(victim.getLocation());
             }
@@ -189,15 +189,15 @@ public class PassiveManager {
         if (hasAnyItem(attacker,"runaans_hurricane")) {
             double boltDmg = as.calcPhysicalDamage(aaDmg * 0.40, vs);
             attacker.getWorld().getNearbyEntities(victim.getLocation(), 5, 2, 5).stream()
-                .filter(e -> e instanceof Player && !e.equals(victim) && !e.equals(attacker))
-                .limit(2)
-                .forEach(e -> {
-                    Player extraTarget = (Player) e;
-                    if (championManager.hasChampion(extraTarget))
-                        championManager.getChampion(extraTarget).getHPSystem().takeDamage(boltDmg);
-                    attacker.getWorld().spawnParticle(Particle.CRIT,
-                        extraTarget.getLocation().add(0,1,0), 5);
-                });
+                    .filter(e -> e instanceof Player && !e.equals(victim) && !e.equals(attacker))
+                    .limit(2)
+                    .forEach(e -> {
+                        Player extraTarget = (Player) e;
+                        if (championManager.hasChampion(extraTarget))
+                            championManager.getChampion(extraTarget).getHPSystem().takeDamage(boltDmg);
+                        attacker.getWorld().spawnParticle(Particle.CRIT,
+                                extraTarget.getLocation().add(0,1,0), 5);
+                    });
         }
 
         // ── Guinsoo's Rageblade: crits → 2x effets on-hit ──
@@ -255,7 +255,7 @@ public class PassiveManager {
             state.antihealTargets.put(vid, System.currentTimeMillis() + 3000L);
             if (victim.isOnline())
                 victim.sendActionBar(net.kyori.adventure.text.Component.text(
-                    "🩹 Blessures Graves! (-40% soins)", net.kyori.adventure.text.format.NamedTextColor.DARK_RED));
+                        "🩹 Blessures Graves! (-40% soins)", net.kyori.adventure.text.format.NamedTextColor.DARK_RED));
         }
 
         // ── Navori Quickblades: si crit → -15% CD sorts ──
@@ -271,13 +271,13 @@ public class PassiveManager {
             double sunDmg = 35 + lvl2 * 2.6; // 35-80 selon le niveau
             fr.lolmc.util.TargetingUtil.dealDamage(attacker, victim, sunDmg, fr.lolmc.util.TargetingUtil.DmgType.MAGICAL);
             attacker.sendActionBar(net.kyori.adventure.text.Component.text(
-                "☀ Lumière du Soleil! +" + (int)sunDmg, net.kyori.adventure.text.format.NamedTextColor.YELLOW));
+                    "☀ Lumière du Soleil! +" + (int)sunDmg, net.kyori.adventure.text.format.NamedTextColor.YELLOW));
         }
 
         // ── Frostfire Gauntlet: zone de glace ralentissante sur AA ──
         if (hasAnyItem(attacker,"frostfire_gauntlet","frostfire")) {
             victim.getWorld().spawnParticle(org.bukkit.Particle.SNOWFLAKE,
-                victim.getLocation().add(0,0.5,0), 12, 1.0, 0.3, 1.0);
+                    victim.getLocation().add(0,0.5,0), 12, 1.0, 0.3, 1.0);
             LolPlugin.getInstance().getCCManager().slow(victim, 15, 40);
         }
 
@@ -286,13 +286,13 @@ public class PassiveManager {
             double titanicDmg = as.calcPhysicalDamage(5 + vhp.getMaxHP() * 0.01, vs);
             var __tmTH = LolPlugin.getInstance().getTeamManager();
             attacker.getWorld().getNearbyEntities(victim.getLocation(), 3, 2, 3).stream()
-                .filter(e -> e instanceof Player pe
-                    && !pe.equals(victim) && !pe.equals(attacker)
-                    && championManager.hasChampion(pe)
-                    && __tmTH.areEnemies(attacker, pe))
-                .forEach(e -> {
-                    championManager.getChampion((Player)e).getHPSystem().takeDamage(titanicDmg);
-                });
+                    .filter(e -> e instanceof Player pe
+                            && !pe.equals(victim) && !pe.equals(attacker)
+                            && championManager.hasChampion(pe)
+                            && __tmTH.areEnemies(attacker, pe))
+                    .forEach(e -> {
+                        championManager.getChampion((Player)e).getHPSystem().takeDamage(titanicDmg);
+                    });
         }
 
         // ── Rapidfire Cannon: prochaine AA bonus si hors portée normale ──
@@ -302,9 +302,9 @@ public class PassiveManager {
                 state.voltaicStacks = 0;
                 // Bonus dégâts électriques sur la prochaine AA
                 DamageUtil.damage(attacker, victim,
-                    as.getFinalAD() * 0.60, false, DamageUtil.Type.MAGICAL);
+                        as.getFinalAD() * 0.60, false, DamageUtil.Type.MAGICAL);
                 victim.getWorld().spawnParticle(org.bukkit.Particle.ELECTRIC_SPARK,
-                    victim.getLocation().add(0,1,0), 10, 0.5,0.5,0.5);
+                        victim.getLocation().add(0,1,0), 10, 0.5,0.5,0.5);
             }
         }
 
@@ -377,13 +377,13 @@ public class PassiveManager {
 
         // ── Morgana Siphon de l'Âme : soin sur sorts (20% dégâts) ──
         { var __cm = LolPlugin.getInstance().getChampionManager();
-        if (__cm.hasChampion(caster) && "morgana".equals(__cm.getChampion(caster).getId())) {
-            boolean isChampOrMonster = (victim instanceof Player)
-                || fr.lolmc.game.JungleManager.isJungleMonster(victim);
-            if (isChampOrMonster) {
-                __cm.getChampion(caster).getHPSystem().heal(rawDamage * 0.20);
-            }
-        }}
+            if (__cm.hasChampion(caster) && "morgana".equals(__cm.getChampion(caster).getId())) {
+                boolean isChampOrMonster = (victim instanceof Player)
+                        || fr.lolmc.game.JungleManager.isJungleMonster(victim);
+                if (isChampOrMonster) {
+                    __cm.getChampion(caster).getHPSystem().heal(rawDamage * 0.20);
+                }
+            }}
 
         // ── Taste of Blood : soin sur dégâts à champion (CD 20s) ──
         if (LolPlugin.getInstance().getRuneManager() != null) {
@@ -441,7 +441,7 @@ public class PassiveManager {
             state.sterakActive = true;
             state.sterakCooldown = System.currentTimeMillis();
             victim.sendActionBar(Component.text(
-                String.format("🛡 Sterak's Gage! +%.0f", shield), NamedTextColor.GREEN));
+                    String.format("🛡 Sterak's Gage! +%.0f", shield), NamedTextColor.GREEN));
             new BukkitRunnable() {
                 @Override public void run() { state.sterakActive = false; }
             }.runTaskLater(LolPlugin.getInstance(), 80L);
@@ -454,7 +454,7 @@ public class PassiveManager {
             double shield = 150 + stats.getBonusAD() * 0.20;
             stats.addMagicShield(shield);
             victim.sendActionBar(Component.text(
-                String.format("⚔ Maw Lifeline! +%.0f bouclier magique", shield), NamedTextColor.RED));
+                    String.format("⚔ Maw Lifeline! +%.0f bouclier magique", shield), NamedTextColor.RED));
         }
 
         // ── Edge of Night: bouclier sorts (1 fois) ──
@@ -471,24 +471,24 @@ public class PassiveManager {
             state.gaCooldown = System.currentTimeMillis();
             hp.setCurrentHP(1);
             victim.showTitle(net.kyori.adventure.title.Title.title(
-                net.kyori.adventure.text.Component.text("☠"),
-                net.kyori.adventure.text.Component.text("Guardian Angel — Résurrection 4s..."),
-                net.kyori.adventure.title.Title.Times.times(
-                    java.time.Duration.ofMillis(250),
-                    java.time.Duration.ofMillis(3000),
-                    java.time.Duration.ofMillis(500))));
+                    net.kyori.adventure.text.Component.text("☠"),
+                    net.kyori.adventure.text.Component.text("Guardian Angel — Résurrection 4s..."),
+                    net.kyori.adventure.title.Title.Times.times(
+                            java.time.Duration.ofMillis(250),
+                            java.time.Duration.ofMillis(3000),
+                            java.time.Duration.ofMillis(500))));
             new BukkitRunnable() {
                 @Override public void run() {
                     if (!victim.isOnline()) { state.gaActive = false; return; }
                     hp.setCurrentHP(hp.getMaxHP() * 0.50);
                     state.gaActive = false;
                     victim.showTitle(net.kyori.adventure.title.Title.title(
-                        net.kyori.adventure.text.Component.empty(),
-                        net.kyori.adventure.text.Component.text("✅ Ressuscité!"),
-                        net.kyori.adventure.title.Title.Times.times(
-                            java.time.Duration.ofMillis(250),
-                            java.time.Duration.ofMillis(1500),
-                            java.time.Duration.ofMillis(500))));
+                            net.kyori.adventure.text.Component.empty(),
+                            net.kyori.adventure.text.Component.text("✅ Ressuscité!"),
+                            net.kyori.adventure.title.Title.Times.times(
+                                    java.time.Duration.ofMillis(250),
+                                    java.time.Duration.ofMillis(1500),
+                                    java.time.Duration.ofMillis(500))));
                     hudManager.updateHUD(victim, champ);
                 }
             }.runTaskLater(LolPlugin.getInstance(), 80L);
@@ -518,7 +518,7 @@ public class PassiveManager {
             var ult = champ.getAbility(4);
             if (ult != null && ult.isOnCooldown(killer)) {
                 ult.triggerCooldown(killer); // Remet le CD à 0 (simplification)
-                killer.sendActionBar(Component.text("🔷 Axiom Arc: ultime rechargé à 50%%!", NamedTextColor.AQUA));
+                killer.sendActionBar(Component.text("🔷 Axiom Arc: ultime rechargé à 50%!", NamedTextColor.AQUA));
             }
         }
 
@@ -543,7 +543,7 @@ public class PassiveManager {
             champ.getHPSystem().addBonusHP(5);
             if (state.heartsteelHP % 50 == 0) {
                 killer.sendActionBar(Component.text(
-                    "❤ Heartsteel: +" + state.heartsteelHP + " HP!", NamedTextColor.RED));
+                        "❤ Heartsteel: +" + state.heartsteelHP + " HP!", NamedTextColor.RED));
             }
         }
 
@@ -576,191 +576,191 @@ public class PassiveManager {
     // TÂCHES RÉPÉTÉES (auras, DoT, stacks passifs)
     // ════════════════════════════════════════════════════════
     private void activateZhonyasHourglass(Player player, BaseChampion champ, ItemState state) {
-                if (state.isOnCooldown(state.lastZhonyas, 120000L)) {
-                    sendCDMessage(player, "Zhonya's", state.lastZhonyas, 120000L); return;
-                }
-                state.lastZhonyas = System.currentTimeMillis();
-                state.zhonyasActive = true;
-                player.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, 50, 255, false, false));
-                player.setInvulnerable(true);
-                player.sendActionBar(Component.text("⏱ Zhonya's actif! 2.5s", NamedTextColor.GOLD));
-                player.getWorld().spawnParticle(Particle.END_ROD, player.getLocation(), 20, 0.5, 1, 0.5);
-                new BukkitRunnable() {
-                    @Override public void run() {
-                        state.zhonyasActive = false;
-                        player.setInvulnerable(false);
-                        player.removePotionEffect(PotionEffectType.RESISTANCE);
-                    }
-                }.runTaskLater(LolPlugin.getInstance(), 50L);
-                }
+        if (state.isOnCooldown(state.lastZhonyas, 120000L)) {
+            sendCDMessage(player, "Zhonya's", state.lastZhonyas, 120000L); return;
+        }
+        state.lastZhonyas = System.currentTimeMillis();
+        state.zhonyasActive = true;
+        player.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, 50, 255, false, false));
+        player.setInvulnerable(true);
+        player.sendActionBar(Component.text("⏱ Zhonya's actif! 2.5s", NamedTextColor.GOLD));
+        player.getWorld().spawnParticle(Particle.END_ROD, player.getLocation(), 20, 0.5, 1, 0.5);
+        new BukkitRunnable() {
+            @Override public void run() {
+                state.zhonyasActive = false;
+                player.setInvulnerable(false);
+                player.removePotionEffect(PotionEffectType.RESISTANCE);
+            }
+        }.runTaskLater(LolPlugin.getInstance(), 50L);
+    }
     private void activateGaleforce(Player player, BaseChampion champ, ItemState state) {
-                if (state.isOnCooldown(state.lastGaleforce, 90000L)) {
-                    sendCDMessage(player, "Galeforce", state.lastGaleforce, 90000L); return;
-                }
-                state.lastGaleforce = System.currentTimeMillis();
-                ChampionStats stats = champ.getStats();
-                double projDmg = stats.calcPhysicalDamage(200 + stats.getFinalAD() * 0.60, null);
-                // Animation dash : traînée de particules
-                Location dashStart = player.getLocation().clone();
-                Location dashDest = player.getTargetBlockExact(10) != null
-                    ? player.getTargetBlockExact(10).getLocation()
-                    : player.getLocation().add(player.getLocation().getDirection().multiply(10));
-                Location dashSafe = safeLocation(dashStart, dashDest);
-                // Traînée avant téléportation
-                double dashDist = dashStart.distance(dashSafe);
-                int dashSteps = Math.max(3, (int)(dashDist / 0.4));
-                org.bukkit.util.Vector dashStep = dashSafe.toVector()
-                    .subtract(dashStart.toVector()).normalize().multiply(dashDist / dashSteps);
-                org.bukkit.Location cur = dashStart.clone();
-                for (int si = 0; si < dashSteps; si++) {
-                    cur.add(dashStep);
-                    player.getWorld().spawnParticle(Particle.END_ROD, cur.clone(), 2, 0.1, 0.1, 0.1, 0);
-                    player.getWorld().spawnParticle(Particle.CRIT, cur.clone(), 1, 0.05, 0.05, 0.05, 0);
-                }
-                player.teleport(dashSafe);
-                player.getWorld().playSound(dashSafe, Sound.ENTITY_PHANTOM_FLAP, 1f, 1.5f);
-                // 3 projectiles animés vers les 3 ennemis les plus proches
-                final var enemies = player.getWorld().getNearbyEntities(player.getLocation(), 8, 2, 8).stream()
-                    .filter(e -> e instanceof Player ep && !ep.equals(player)
+        if (state.isOnCooldown(state.lastGaleforce, 90000L)) {
+            sendCDMessage(player, "Galeforce", state.lastGaleforce, 90000L); return;
+        }
+        state.lastGaleforce = System.currentTimeMillis();
+        ChampionStats stats = champ.getStats();
+        double projDmg = stats.calcPhysicalDamage(200 + stats.getFinalAD() * 0.60, null);
+        // Animation dash : traînée de particules
+        Location dashStart = player.getLocation().clone();
+        Location dashDest = player.getTargetBlockExact(10) != null
+                ? player.getTargetBlockExact(10).getLocation()
+                : player.getLocation().add(player.getLocation().getDirection().multiply(10));
+        Location dashSafe = safeLocation(dashStart, dashDest);
+        // Traînée avant téléportation
+        double dashDist = dashStart.distance(dashSafe);
+        int dashSteps = Math.max(3, (int)(dashDist / 0.4));
+        org.bukkit.util.Vector dashStep = dashSafe.toVector()
+                .subtract(dashStart.toVector()).normalize().multiply(dashDist / dashSteps);
+        org.bukkit.Location cur = dashStart.clone();
+        for (int si = 0; si < dashSteps; si++) {
+            cur.add(dashStep);
+            player.getWorld().spawnParticle(Particle.END_ROD, cur.clone(), 2, 0.1, 0.1, 0.1, 0);
+            player.getWorld().spawnParticle(Particle.CRIT, cur.clone(), 1, 0.05, 0.05, 0.05, 0);
+        }
+        player.teleport(dashSafe);
+        player.getWorld().playSound(dashSafe, Sound.ENTITY_PHANTOM_FLAP, 1f, 1.5f);
+        // 3 projectiles animés vers les 3 ennemis les plus proches
+        final var enemies = player.getWorld().getNearbyEntities(player.getLocation(), 8, 2, 8).stream()
+                .filter(e -> e instanceof Player ep && !ep.equals(player)
                         && championManager.hasChampion((Player)e)
                         && LolPlugin.getInstance().getTeamManager().areEnemies(player, (Player)e))
-                    .limit(3).toList();
-                for (var enemy : enemies) {
-                    final var fe = enemy;
-                    Location projStart = player.getLocation().clone().add(0,1,0);
-                    Location projEnd = fe.getLocation().clone().add(0,1,0);
-                    double pd = projStart.distance(projEnd);
-                    int ps = Math.max(3,(int)(pd/0.5));
-                    org.bukkit.util.Vector pv = projEnd.toVector().subtract(projStart.toVector()).normalize().multiply(pd/ps);
-                    new org.bukkit.scheduler.BukkitRunnable(){
-                        int pi=0; Location pc = projStart.clone();
-                        @Override public void run(){
-                            if(pi>=ps){cancel();
-                                if(championManager.hasChampion((Player)fe))
-                                    championManager.getChampion((Player)fe).getHPSystem().takeDamage(projDmg);
-                                fe.getLocation().getWorld().spawnParticle(Particle.FLASH,fe.getLocation().add(0,1,0),1);
-                                fe.getLocation().getWorld().playSound(fe.getLocation(), Sound.ENTITY_ARROW_HIT, 0.8f, 1.3f);
-                                return;}
-                            pc.add(pv);
-                            pc.getWorld().spawnParticle(Particle.CRIT,pc,2,0.05,0.05,0.05,0);
-                            pi++;
-                        }
-                    }.runTaskTimer(LolPlugin.getInstance(),0L,1L);
+                .limit(3).toList();
+        for (var enemy : enemies) {
+            final var fe = enemy;
+            Location projStart = player.getLocation().clone().add(0,1,0);
+            Location projEnd = fe.getLocation().clone().add(0,1,0);
+            double pd = projStart.distance(projEnd);
+            int ps = Math.max(3,(int)(pd/0.5));
+            org.bukkit.util.Vector pv = projEnd.toVector().subtract(projStart.toVector()).normalize().multiply(pd/ps);
+            new org.bukkit.scheduler.BukkitRunnable(){
+                int pi=0; Location pc = projStart.clone();
+                @Override public void run(){
+                    if(pi>=ps){cancel();
+                        if(championManager.hasChampion((Player)fe))
+                            championManager.getChampion((Player)fe).getHPSystem().takeDamage(projDmg);
+                        fe.getLocation().getWorld().spawnParticle(Particle.FLASH,fe.getLocation().add(0,1,0),1);
+                        fe.getLocation().getWorld().playSound(fe.getLocation(), Sound.ENTITY_ARROW_HIT, 0.8f, 1.3f);
+                        return;}
+                    pc.add(pv);
+                    pc.getWorld().spawnParticle(Particle.CRIT,pc,2,0.05,0.05,0.05,0);
+                    pi++;
                 }
-                player.sendActionBar(Component.text("⚡ Galeforce! " + enemies.size() + " projectiles", NamedTextColor.YELLOW));
-                }
+            }.runTaskTimer(LolPlugin.getInstance(),0L,1L);
+        }
+        player.sendActionBar(Component.text("⚡ Galeforce! " + enemies.size() + " projectiles", NamedTextColor.YELLOW));
+    }
     private void activateShurelyas(Player player, BaseChampion champ, ItemState state) {
-                if (state.isOnCooldown(state.lastShurelyas, 120000L)) {
-                    sendCDMessage(player, "Shurelya's", state.lastShurelyas, 120000L); return;
-                }
-                state.lastShurelyas = System.currentTimeMillis();
-                player.getWorld().getNearbyEntities(player.getLocation(), 8, 2, 8).stream()
-                    .filter(e -> e instanceof Player)
-                    .forEach(e -> ((Player)e).addPotionEffect(
+        if (state.isOnCooldown(state.lastShurelyas, 120000L)) {
+            sendCDMessage(player, "Shurelya's", state.lastShurelyas, 120000L); return;
+        }
+        state.lastShurelyas = System.currentTimeMillis();
+        player.getWorld().getNearbyEntities(player.getLocation(), 8, 2, 8).stream()
+                .filter(e -> e instanceof Player)
+                .forEach(e -> ((Player)e).addPotionEffect(
                         new PotionEffect(PotionEffectType.SPEED, 80, 3, false, true)));
-                player.sendActionBar(Component.text("💨 Shurelya's! +60%% vitesse 4s alliés", NamedTextColor.AQUA));
-                }
+        player.sendActionBar(Component.text("💨 Shurelya's! +60% vitesse 4s alliés", NamedTextColor.AQUA));
+    }
     private void activateRedemption(Player player, BaseChampion champ, ItemState state) {
-                if (state.isOnCooldown(state.lastRedemption, 120000L)) {
-                    sendCDMessage(player, "Redemption", state.lastRedemption, 120000L); return;
-                }
-                state.lastRedemption = System.currentTimeMillis();
-                Location target = (player.getTargetBlockExact(30) != null ? player.getTargetBlockExact(30).getLocation() : player.getLocation().add(player.getLocation().getDirection().multiply(30)));
-                if (target == null) target = player.getLocation();
-                final Location healLoc = target;
-                player.sendActionBar(Component.text("💫 Redemption lancé! (2.5s)", NamedTextColor.WHITE));
-                new BukkitRunnable() {
-                    @Override public void run() {
-                        healLoc.getWorld().spawnParticle(Particle.END_ROD, healLoc, 30, 3, 1, 3);
-                        healLoc.getWorld().getNearbyEntities(healLoc, 5, 2, 5).stream()
-                            .filter(e -> e instanceof Player)
-                            .forEach(e -> {
-                                Player ally = (Player) e;
-                                if (championManager.hasChampion(ally)) {
-                                    double heal = 250 + champ.getStats().getFinalAP() * 0.04;
-                                    championManager.getChampion(ally).getHPSystem().heal(heal);
-                                    hudManager.updateHUD(ally, championManager.getChampion(ally));
-                                    ally.getWorld().spawnParticle(Particle.HEART, ally.getLocation().add(0,2,0), 5);
-                                }
-                            });
-                    }
-                }.runTaskLater(LolPlugin.getInstance(), 50L);
-                }
+        if (state.isOnCooldown(state.lastRedemption, 120000L)) {
+            sendCDMessage(player, "Redemption", state.lastRedemption, 120000L); return;
+        }
+        state.lastRedemption = System.currentTimeMillis();
+        Location target = (player.getTargetBlockExact(30) != null ? player.getTargetBlockExact(30).getLocation() : player.getLocation().add(player.getLocation().getDirection().multiply(30)));
+        if (target == null) target = player.getLocation();
+        final Location healLoc = target;
+        player.sendActionBar(Component.text("💫 Redemption lancé! (2.5s)", NamedTextColor.WHITE));
+        new BukkitRunnable() {
+            @Override public void run() {
+                healLoc.getWorld().spawnParticle(Particle.END_ROD, healLoc, 30, 3, 1, 3);
+                healLoc.getWorld().getNearbyEntities(healLoc, 5, 2, 5).stream()
+                        .filter(e -> e instanceof Player)
+                        .forEach(e -> {
+                            Player ally = (Player) e;
+                            if (championManager.hasChampion(ally)) {
+                                double heal = 250 + champ.getStats().getFinalAP() * 0.04;
+                                championManager.getChampion(ally).getHPSystem().heal(heal);
+                                hudManager.updateHUD(ally, championManager.getChampion(ally));
+                                ally.getWorld().spawnParticle(Particle.HEART, ally.getLocation().add(0,2,0), 5);
+                            }
+                        });
+            }
+        }.runTaskLater(LolPlugin.getInstance(), 50L);
+    }
     private void activateLocket(Player player, BaseChampion champ, ItemState state) {
-                if (state.isOnCooldown(state.lastLocket, 90000L)) {
-                    sendCDMessage(player, "Locket", state.lastLocket, 90000L); return;
-                }
-                state.lastLocket = System.currentTimeMillis();
-                double shieldAmt = 150 + champ.getStats().getFinalMaxHP() * 0.10;
-                player.getWorld().getNearbyEntities(player.getLocation(), 6, 2, 6).stream()
-                    .filter(e -> e instanceof Player)
-                    .forEach(e -> {
-                        Player ally = (Player) e;
-                        if (championManager.hasChampion(ally)) {
-                            championManager.getChampion(ally).getStats().addShield(shieldAmt);
-                            hudManager.updateHUD(ally, championManager.getChampion(ally));
-                        }
-                    });
-                player.sendActionBar(Component.text(
-                    String.format("🛡 Locket! +%.0f bouclier alliés proches", shieldAmt), NamedTextColor.GOLD));
-                }
+        if (state.isOnCooldown(state.lastLocket, 90000L)) {
+            sendCDMessage(player, "Locket", state.lastLocket, 90000L); return;
+        }
+        state.lastLocket = System.currentTimeMillis();
+        double shieldAmt = 150 + champ.getStats().getFinalMaxHP() * 0.10;
+        player.getWorld().getNearbyEntities(player.getLocation(), 6, 2, 6).stream()
+                .filter(e -> e instanceof Player)
+                .forEach(e -> {
+                    Player ally = (Player) e;
+                    if (championManager.hasChampion(ally)) {
+                        championManager.getChampion(ally).getStats().addShield(shieldAmt);
+                        hudManager.updateHUD(ally, championManager.getChampion(ally));
+                    }
+                });
+        player.sendActionBar(Component.text(
+                String.format("🛡 Locket! +%.0f bouclier alliés proches", shieldAmt), NamedTextColor.GOLD));
+    }
     private void activateMikaels(Player player, BaseChampion champ, ItemState state) {
-                if (state.isOnCooldown(state.lastMikaels, 90000L)) {
-                    sendCDMessage(player, "Mikael's", state.lastMikaels, 90000L); return;
-                }
-                state.lastMikaels = System.currentTimeMillis();
-                // Cibler l'allié le plus proche en difficulté
-                Player target2 = (Player) player.getWorld().getNearbyEntities(player.getLocation(), 10, 2, 10).stream()
-                    .filter(e -> e instanceof Player && !e.equals(player))
-                    .findFirst().orElse(player);
-                if (championManager.hasChampion(target2)) {
-                    double heal2 = 100 + champ.getStats().getFinalAP() * 0.15;
-                    championManager.getChampion(target2).getHPSystem().heal(heal2);
-                    target2.removePotionEffect(PotionEffectType.SLOWNESS);
-                    target2.removePotionEffect(PotionEffectType.BLINDNESS);
-                    hudManager.updateHUD(target2, championManager.getChampion(target2));
-                    player.sendActionBar(Component.text("💧 Mikael's: cleanse + soin allié!", NamedTextColor.BLUE));
-                }
-                }
+        if (state.isOnCooldown(state.lastMikaels, 90000L)) {
+            sendCDMessage(player, "Mikael's", state.lastMikaels, 90000L); return;
+        }
+        state.lastMikaels = System.currentTimeMillis();
+        // Cibler l'allié le plus proche en difficulté
+        Player target2 = (Player) player.getWorld().getNearbyEntities(player.getLocation(), 10, 2, 10).stream()
+                .filter(e -> e instanceof Player && !e.equals(player))
+                .findFirst().orElse(player);
+        if (championManager.hasChampion(target2)) {
+            double heal2 = 100 + champ.getStats().getFinalAP() * 0.15;
+            championManager.getChampion(target2).getHPSystem().heal(heal2);
+            target2.removePotionEffect(PotionEffectType.SLOWNESS);
+            target2.removePotionEffect(PotionEffectType.BLINDNESS);
+            hudManager.updateHUD(target2, championManager.getChampion(target2));
+            player.sendActionBar(Component.text("💧 Mikael's: cleanse + soin allié!", NamedTextColor.BLUE));
+        }
+    }
     private void activateRocketbelt(Player player, BaseChampion champ, ItemState state) {
-                if (state.isOnCooldown(state.lastHextechRocket, 90000L)) {
-                    sendCDMessage(player, "Rocketbelt", state.lastHextechRocket, 90000L); return;
-                }
-                state.lastHextechRocket = System.currentTimeMillis();
-                Location dst = (player.getTargetBlockExact(5) != null ? player.getTargetBlockExact(5).getLocation() : player.getLocation().add(player.getLocation().getDirection().multiply(5)));
-                if (dst != null) player.teleport(safeLocation(player.getLocation(), dst));
-                double missileDmg = champ.getStats().calcMagicalDamage(75 + champ.getStats().getFinalAP() * 0.15, null);
-                player.getWorld().getNearbyEntities(player.getLocation(), 6, 2, 6).stream()
-                    .filter(e -> e instanceof Player && !e.equals(player))
-                    .limit(3)
-                    .forEach(e -> {
-                        if (championManager.hasChampion((Player)e)) {
-                            championManager.getChampion((Player)e).getHPSystem().takeDamage(missileDmg);
-                            player.getWorld().spawnParticle(Particle.FIREWORK, e.getLocation().add(0,1,0), 10);
-                        }
-                    });
-                player.sendActionBar(Component.text("🚀 Rocketbelt!", NamedTextColor.RED));
-                }
+        if (state.isOnCooldown(state.lastHextechRocket, 90000L)) {
+            sendCDMessage(player, "Rocketbelt", state.lastHextechRocket, 90000L); return;
+        }
+        state.lastHextechRocket = System.currentTimeMillis();
+        Location dst = (player.getTargetBlockExact(5) != null ? player.getTargetBlockExact(5).getLocation() : player.getLocation().add(player.getLocation().getDirection().multiply(5)));
+        if (dst != null) player.teleport(safeLocation(player.getLocation(), dst));
+        double missileDmg = champ.getStats().calcMagicalDamage(75 + champ.getStats().getFinalAP() * 0.15, null);
+        player.getWorld().getNearbyEntities(player.getLocation(), 6, 2, 6).stream()
+                .filter(e -> e instanceof Player && !e.equals(player))
+                .limit(3)
+                .forEach(e -> {
+                    if (championManager.hasChampion((Player)e)) {
+                        championManager.getChampion((Player)e).getHPSystem().takeDamage(missileDmg);
+                        player.getWorld().spawnParticle(Particle.FIREWORK, e.getLocation().add(0,1,0), 10);
+                    }
+                });
+        player.sendActionBar(Component.text("🚀 Rocketbelt!", NamedTextColor.RED));
+    }
     private void activateBotrk(Player player, BaseChampion champ, ItemState state) {
-                if (state.isOnCooldown(state.lastBotrkActive, 60000L)) {
-                    sendCDMessage(player, "BotRK", state.lastBotrkActive, 60000L); return;
-                }
-                state.lastBotrkActive = System.currentTimeMillis();
-                player.getWorld().getNearbyEntities(player.getLocation(), 5, 2, 5).stream()
-                    .filter(e -> e instanceof Player && !e.equals(player))
-                    .findFirst()
-                    .ifPresent(e -> {
-                        Player target3 = (Player) e;
-                        if (championManager.hasChampion(target3)) {
-                            double drainDmg = championManager.getChampion(target3).getHPSystem().getCurrentHP() * 0.10;
-                            championManager.getChampion(target3).getHPSystem().takeDamage(drainDmg);
-                            champ.getHPSystem().heal(drainDmg);
-                            target3.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 40, 1, false, true));
-                            hudManager.updateHUD(target3, championManager.getChampion(target3));
-                        }
-                    });
-                player.sendActionBar(Component.text("🗡 BotRK actif! Drain + ralentit", NamedTextColor.RED));
-                }
+        if (state.isOnCooldown(state.lastBotrkActive, 60000L)) {
+            sendCDMessage(player, "BotRK", state.lastBotrkActive, 60000L); return;
+        }
+        state.lastBotrkActive = System.currentTimeMillis();
+        player.getWorld().getNearbyEntities(player.getLocation(), 5, 2, 5).stream()
+                .filter(e -> e instanceof Player && !e.equals(player))
+                .findFirst()
+                .ifPresent(e -> {
+                    Player target3 = (Player) e;
+                    if (championManager.hasChampion(target3)) {
+                        double drainDmg = championManager.getChampion(target3).getHPSystem().getCurrentHP() * 0.10;
+                        championManager.getChampion(target3).getHPSystem().takeDamage(drainDmg);
+                        champ.getHPSystem().heal(drainDmg);
+                        target3.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 40, 1, false, true));
+                        hudManager.updateHUD(target3, championManager.getChampion(target3));
+                    }
+                });
+        player.sendActionBar(Component.text("🗡 BotRK actif! Drain + ralentit", NamedTextColor.RED));
+    }
 
     private void doStartTasks() {
         // ── Tâche principale 1s ──
@@ -785,15 +785,15 @@ public class PassiveManager {
                     ItemState state = getState(p);
                     double dmg = (12 + state.sunfireStacks * 1.44) * (2.0 / 20.0);
                     p.getWorld().getNearbyEntities(p.getLocation(), 3, 2, 3).stream()
-                        .filter(e -> e instanceof Player && !e.equals(p))
-                        .forEach(e -> {
-                            Player victim = (Player) e;
-                            if (championManager.hasChampion(victim)) {
-                                BaseChampion vc = championManager.getChampion(victim);
-                                vc.getHPSystem().takeDamage(ac.getStats().calcMagicalDamage(dmg, vc.getStats()));
-                                if (state.sunfireStacks < 6) state.sunfireStacks++;
-                            }
-                        });
+                            .filter(e -> e instanceof Player && !e.equals(p))
+                            .forEach(e -> {
+                                Player victim = (Player) e;
+                                if (championManager.hasChampion(victim)) {
+                                    BaseChampion vc = championManager.getChampion(victim);
+                                    vc.getHPSystem().takeDamage(ac.getStats().calcMagicalDamage(dmg, vc.getStats()));
+                                    if (state.sunfireStacks < 6) state.sunfireStacks++;
+                                }
+                            });
                 }
             }
         }.runTaskTimer(LolPlugin.getInstance(), 0L, 2L));
@@ -846,14 +846,14 @@ public class PassiveManager {
                     if (!championManager.hasChampion(p)) continue;
                     if (!hasAnyItem(p,"abyssal_mask")) continue;
                     p.getWorld().getNearbyEntities(p.getLocation(), 5, 2, 5).stream()
-                        .filter(e -> e instanceof Player && !e.equals(p))
-                        .forEach(e -> {
-                            Player enemy = (Player) e;
-                            if (championManager.hasChampion(enemy)) {
-                                // Appliquer -15% MR temporairement (reset chaque tick)
-                                // Implémenté via un debuff dans ChampionStats
-                            }
-                        });
+                            .filter(e -> e instanceof Player && !e.equals(p))
+                            .forEach(e -> {
+                                Player enemy = (Player) e;
+                                if (championManager.hasChampion(enemy)) {
+                                    // Appliquer -15% MR temporairement (reset chaque tick)
+                                    // Implémenté via un debuff dans ChampionStats
+                                }
+                            });
                 }
             }
         }.runTaskTimer(LolPlugin.getInstance(), 0L, 10L));
@@ -881,15 +881,15 @@ public class PassiveManager {
         if (hasAnyItem(p,"heartsteel","ravenous_hydra2") && hp.isInCombat()) {
             double heartsteelDmg = 100 + stats.getBonusHP() * 0.09;
             p.getWorld().getNearbyEntities(p.getLocation(), 5, 2, 5).stream()
-                .filter(e -> e instanceof Player && !e.equals(p))
-                .findFirst()
-                .ifPresent(e -> {
-                    if (championManager.hasChampion((Player)e)) {
-                        championManager.getChampion((Player)e).getHPSystem().takeDamage(heartsteelDmg);
-                        champ.getHPSystem().heal(heartsteelDmg);
-                        state.heartsteelHP = Math.min(state.heartsteelHP + 5, 3000);
-                    }
-                });
+                    .filter(e -> e instanceof Player && !e.equals(p))
+                    .findFirst()
+                    .ifPresent(e -> {
+                        if (championManager.hasChampion((Player)e)) {
+                            championManager.getChampion((Player)e).getHPSystem().takeDamage(heartsteelDmg);
+                            champ.getHPSystem().heal(heartsteelDmg);
+                            state.heartsteelHP = Math.min(state.heartsteelHP + 5, 3000);
+                        }
+                    });
         }
 
         // ── Force of Nature: stacks MR → appliquer ──
@@ -941,8 +941,8 @@ public class PassiveManager {
     private void sendCDMessage(Player p, String item, long lastUse, long cdMs) {
         double remaining = (cdMs - (System.currentTimeMillis() - lastUse)) / 1000.0;
         p.sendActionBar(Component.text(
-            String.format("⏱ %s en recharge — %.1fs", item, remaining),
-            NamedTextColor.RED));
+                String.format("⏱ %s en recharge — %.1fs", item, remaining),
+                NamedTextColor.RED));
     }
 
     public boolean hasAnyItem(Player player, String... ids) {

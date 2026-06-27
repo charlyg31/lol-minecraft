@@ -86,7 +86,7 @@ public class InstanceManager {
             } catch (Exception e) {
                 log.severe("[InstanceManager] Erreur copie: " + e.getMessage());
                 Bukkit.getScheduler().runTask(plugin, () ->
-                    callback.accept(null)); // signaler l'échec
+                        callback.accept(null)); // signaler l'échec
                 return;
             }
 
@@ -195,6 +195,7 @@ public class InstanceManager {
      * Charge un monde par son nom.
      * Utilise Multiverse si disponible, WorldCreator sinon.
      */
+    @SuppressWarnings("deprecation") // CORRECTION : Supprime proprement le warning lié à getWorldType() pour la cross-compatibilité
     private World loadWorld(String name) {
         // Essayer Multiverse d'abord
         var mvPlugin = Bukkit.getPluginManager().getPlugin("Multiverse-Core");
@@ -220,7 +221,7 @@ public class InstanceManager {
         if (template != null) {
             creator.environment(template.getEnvironment());
             creator.type(template.getWorldType() != null
-                ? template.getWorldType() : org.bukkit.WorldType.FLAT);
+                    ? template.getWorldType() : org.bukkit.WorldType.FLAT);
         }
         World world = creator.createWorld();
         if (world != null) {
@@ -266,7 +267,7 @@ public class InstanceManager {
 
         if (!Files.exists(srcPath)) {
             throw new IOException("Monde template introuvable : " + source
-                + " (chemin : " + srcPath.toAbsolutePath() + ")");
+                    + " (chemin : " + srcPath.toAbsolutePath() + ")");
         }
 
         // Copier récursivement
@@ -288,7 +289,7 @@ public class InstanceManager {
                     return FileVisitResult.CONTINUE;
                 Path relative = srcPath.relativize(file);
                 Files.copy(file, destPath.resolve(relative),
-                    StandardCopyOption.REPLACE_EXISTING);
+                        StandardCopyOption.REPLACE_EXISTING);
                 return FileVisitResult.CONTINUE;
             }
         });
