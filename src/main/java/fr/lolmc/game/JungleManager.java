@@ -685,14 +685,6 @@ public class JungleManager {
         applyBuff(player, buff);
     }
 
-        respawnDisplays.clear();
-    }
-
-    /** % bonus de dégâts aux structures pour une équipe (0-36%). */
-    public double getVoidgrubBonus(fr.lolmc.team.TeamManager.Team team) {
-        return voidgrubsKilled.getOrDefault(team, 0) * 0.06; // 6% par grub
-    }
-
     // ── Hologrammes de respawn (TextDisplay) ─────────────────────────────────
 
     private void updateRespawnHologram(CampSpawn camp, long secondsLeft) {
@@ -712,39 +704,6 @@ public class JungleManager {
                 t.setSeeThrough(true);
                 t.getScoreboardTags().add("lol_respawn_holo");
             });
-            camp.respawnHologramId = td.getUniqueId();
-        }
-        td.text(net.kyori.adventure.text.Component.text(txt));
-    }
-
-    private void removeRespawnHologram(CampSpawn camp) {
-        if (camp.respawnHologramId == null) return;
-        org.bukkit.World w = camp.location.getWorld();
-        if (w != null) {
-            org.bukkit.entity.Entity e = w.getEntity(camp.respawnHologramId);
-            if (e != null) e.remove();
-        }
-        camp.respawnHologramId = null;
-
-    // ── Hologrammes de respawn (TextDisplay) ─────────────────────────────────
-
-    private void updateRespawnHologram(CampSpawn camp, long secondsLeft) {
-        org.bukkit.World w = camp.location.getWorld();
-        if (w == null) return;
-        String txt = "§e⏱ " + camp.type.displayName + "\n§7Réapparition : §f"
-                + (secondsLeft / 60) + ":" + String.format("%02d", secondsLeft % 60);
-        org.bukkit.entity.TextDisplay td = null;
-        if (camp.respawnHologramId != null) {
-            org.bukkit.entity.Entity e = w.getEntity(camp.respawnHologramId);
-            if (e instanceof org.bukkit.entity.TextDisplay t) td = t;
-        }
-        if (td == null) {
-            td = w.spawn(camp.location.clone().add(0, 1.6, 0),
-                    org.bukkit.entity.TextDisplay.class, t -> {
-                        t.setBillboard(org.bukkit.entity.Display.Billboard.CENTER);
-                        t.setSeeThrough(true);
-                        t.getScoreboardTags().add("lol_respawn_holo");
-                    });
             camp.respawnHologramId = td.getUniqueId();
         }
         td.text(net.kyori.adventure.text.Component.text(txt));
