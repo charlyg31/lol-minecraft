@@ -138,14 +138,13 @@ public class Zed extends BaseChampion {
                         as.setInvulnerable(true);
                         as.setCustomNameVisible(true);
                         as.customName(Component.text("👤 Ombre de Zed", NamedTextColor.DARK_GRAY));
-                        // Copier l'équipement du joueur
+                        // Armure en cuir noir
                         var eq = as.getEquipment();
                         if (eq != null) {
-                            eq.setHelmet(c.getInventory().getHelmet());
-                            eq.setChestplate(c.getInventory().getChestplate());
-                            eq.setLeggings(c.getInventory().getLeggings());
-                            eq.setBoots(c.getInventory().getBoots());
-                            eq.setItemInMainHand(c.getInventory().getItemInMainHand());
+                            eq.setHelmet(blackLeather(org.bukkit.Material.LEATHER_HELMET));
+                            eq.setChestplate(blackLeather(org.bukkit.Material.LEATHER_CHESTPLATE));
+                            eq.setLeggings(blackLeather(org.bukkit.Material.LEATHER_LEGGINGS));
+                            eq.setBoots(blackLeather(org.bukkit.Material.LEATHER_BOOTS));
                         }
                         as.getScoreboardTags().add("zed_shadow");
                     });
@@ -260,5 +259,15 @@ public class Zed extends BaseChampion {
             double[] ampPct={25,40,55};int r=Math.min(getLevel()-1,2);
             return String.format("Dash + marque 3s. Détonation: 65%%AD + %.0f%% des dégâts infligés.",ampPct[r]);
         }
+    }
+
+    private static org.bukkit.inventory.ItemStack blackLeather(org.bukkit.Material mat) {
+        var is = new org.bukkit.inventory.ItemStack(mat);
+        var meta = (org.bukkit.inventory.meta.LeatherArmorMeta) is.getItemMeta();
+        if (meta != null) {
+            meta.setColor(org.bukkit.Color.fromRGB(20, 20, 20));
+            is.setItemMeta(meta);
+        }
+        return is;
     }
 }
