@@ -307,6 +307,36 @@ public class AbilityListener implements Listener {
         }
     }
 
+    // ── Dégâts des sbires sur les joueurs ──
+    @EventHandler
+    public void onMinionAttackPlayer(EntityDamageByEntityEvent e) {
+        if (!(e.getEntity() instanceof Player victim)) return;
+        var damager = e.getDamager();
+        if (!fr.lolmc.game.MinionManager.isMinion(damager)) return;
+        e.setCancelled(true); // annuler le dégât vanilla
+        // Vérifier que le sbire attaque un ennemi
+        var tm = LolPlugin.getInstance().getTeamManager();
+        fr.lolmc.team.TeamManager.Team minionTeam =
+            fr.lolmc.game.MinionManager.getMinionTeam((org.bukkit.entity.LivingEntity) damager);
+        fr.lolmc.team.TeamManager.Team victimTeam = tm.getTeam(victim);
+        if (minionTeam == null || minionTeam == victimTeam) return;
+        // Dégâts du sbire selon son type
+        String typeTag = fr.lolmc.game.MinionManager.getMinionTypeTag(
+            (org.bukkit.entity.LivingEntity) damager);
+        double dmg = switch (typeTag != null ? typeTag : "melee") {
+            case "cannon" -> 60.0;
+            case "super"  -> 90.0;
+            case "caster" -> 22.0;
+            default       -> 35.0; // melee
+        };
+        // Appliquer via le système LoL (armure, bouclier, etc.)
+        if (manager.hasChampion(victim)) {
+            manager.getChampion(victim).getHPSystem().damage(dmg);
+            var hud = LolPlugin.getInstance().getHUDManager();
+            if (hud != null) hud.updateHUD(victim, manager.getChampion(victim));
+        }
+    }
+
     // ── Clic gauche sur entité → AA (slot 0) ──
     @EventHandler
     public void onDamage(EntityDamageByEntityEvent e) {
