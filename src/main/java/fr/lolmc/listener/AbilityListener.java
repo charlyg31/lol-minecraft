@@ -331,8 +331,9 @@ public class AbilityListener implements Listener {
         // Appliquer via le système LoL (avec réduction d'armure)
         if (manager.hasChampion(victim)) {
             var champ = manager.getChampion(victim);
-            double armor = champ.getStats().getTotalArmor();
-            double dmgReduced = fr.lolmc.util.DamageUtil.mitigatePhysical(rawDmg, armor);
+            double armor = champ.getStats().getFinalArmor();
+            // Formule LoL : dégâts × 100/(100+armure)
+            double dmgReduced = rawDmg * (100.0 / (100.0 + Math.max(0, armor)));
             champ.getHPSystem().takeDamage(dmgReduced);
             var hud = LolPlugin.getInstance().getHUDManager();
             if (hud != null) hud.updateHUD(victim, champ);
