@@ -43,6 +43,8 @@ public class Annie extends BaseChampion {
         if (stacks >= 4) pyroStacks.put(id, 0); // reset au 4e (qui aura le stun)
     }
     public static boolean hasPyromancyStun(UUID id) { return pyroStacks.getOrDefault(id, 0) == 0 && pyroStacks.containsKey(id); }
+    /** Durée du stun Pyromanie en ticks selon le niveau (1.25/1.5/1.75s). */
+    public static int pyroStunTicks(int level) { return level >= 13 ? 35 : (level >= 7 ? 30 : 25); }
 
 
     public static void resetState(UUID id) {
@@ -69,15 +71,30 @@ public class Annie extends BaseChampion {
         @Override public void cast(Player c,ChampionStats s,Player t){
             var target = TargetingUtil.getTargetedEnemy(c, 6.5);
             if(target==null){ c.sendActionBar(Component.text("Aucune cible",NamedTextColor.GRAY)); return; }
-            double[] base=fr.lolmc.util.Balance.base("q_annie",new double[]{80,130,180,230,280});
-            double dmg=base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("q_annie","ap",0.85);
+            double[] base=fr.lolmc.util.Balance.base("q_annie",new double[]{80,125,170,215,260});
+            double dmg=base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("q_annie","ap",0.80);
+            boolean kills = target.getHealth()-dmg<=0;
+            if(target instanceof Player __tp){var cm=LolPlugin.getInstance().getChampionManager(); if(cm.hasChampion(__tp)) kills=cm.getChampion(__tp).getHPSystem().getCurrentHP()-dmg<=0;}
+            // Stun Pyromanie si chargé
+            if(hasPyromancyStun(c.getUniqueId())){
+                var cc=LolPlugin.getInstance().getCCManager();
+                int lvl=LolPlugin.getInstance().getChampionManager().hasChampion(c)?LolPlugin.getInstance().getChampionManager().getChampion(c).getLevelSystem().getLevel():1;
+                if(cc!=null) cc.stun(target, pyroStunTicks(lvl));
+            }
             TargetingUtil.dealDamage(c, target, dmg, TargetingUtil.DmgType.MAGICAL);
+            // Refund : CD-50%% + mana si la cible meurt
+            if(kills){
+                triggerCooldown(c, s);
+                setDynamicCooldown(getCurrentCooldown(s)*0.5);
+                var cm=LolPlugin.getInstance().getChampionManager();
+                if(cm.hasChampion(c) && cm.getChampion(c).getResourceSystem()!=null) cm.getChampion(c).getResourceSystem().addCurrent(60);
+            }
             target.getWorld().spawnParticle(Particle.FLAME,target.getLocation().add(0,1,0),20,0.5,0.5,0.5,0.1);
             target.getWorld().spawnParticle(Particle.SMALL_FLAME,target.getLocation().add(0,1,0),15,0.3,0.5,0.3,0.05);
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            double[] base=fr.lolmc.util.Balance.base("q_annie",new double[]{80,130,180,230,280});
-            return String.format("%.0f dégâts magiques (%.0f+85%%AP).",base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("q_annie","ap",0.85),base[getLevel()-1]);
+            double[] base=fr.lolmc.util.Balance.base("q_annie",new double[]{80,125,170,215,260});
+            return String.format("%.0f dégâts magiques (%.0f+80%%AP). Refund si kill.",base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("q_annie","ap",0.80),base[getLevel()-1]);
         }
     }
 
@@ -86,9 +103,15 @@ public class Annie extends BaseChampion {
                 new double[]{8,7,6,5,4},6,4,DamageType.MAGICAL);
             resourceCost = 70;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            double[] base=fr.lolmc.util.Balance.base("w_annie",new double[]{70,115,160,205,250});
-            double dmg=base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("w_annie","ap",0.75);
+            double[] base=fr.lolmc.util.Balance.base("w_annie",new double[]{70,110,150,190,230});
+            double dmg=base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("w_annie","ap",0.80);
             var targets = TargetingUtil.enemiesInCone(c, 6.0, 50);
+            // Stun Pyromanie sur tous les ennemis du cône si chargé
+            if(hasPyromancyStun(c.getUniqueId())){
+                var cc=LolPlugin.getInstance().getCCManager();
+                int lvl=LolPlugin.getInstance().getChampionManager().hasChampion(c)?LolPlugin.getInstance().getChampionManager().getChampion(c).getLevelSystem().getLevel():1;
+                if(cc!=null) for(var __e:targets) cc.stun(__e, pyroStunTicks(lvl));
+            }
             TargetingUtil.dealDamageAll(c, targets, dmg, TargetingUtil.DmgType.MAGICAL);
             var dir = c.getEyeLocation().getDirection().normalize();
             for(double d=1; d<=6; d+=0.5){
@@ -97,8 +120,8 @@ public class Annie extends BaseChampion {
             }
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            double[] base=fr.lolmc.util.Balance.base("w_annie",new double[]{70,115,160,205,250});
-            return String.format("Cône de feu: %.0f dégâts (%.0f+75%%AP) dans 4 blocs.",base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("w_annie","ap",0.75),base[getLevel()-1]);
+            double[] base=fr.lolmc.util.Balance.base("w_annie",new double[]{70,110,150,190,230});
+            return String.format("Cône de feu: %.0f dégâts (%.0f+80%%AP) dans 4 blocs.",base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("w_annie","ap",0.80),base[getLevel()-1]);
         }
     }
 
@@ -108,11 +131,23 @@ public class Annie extends BaseChampion {
             resourceCost = 40;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             Player dest=t!=null?t:c;
-            dest.addPotionEffect(new PotionEffect(PotionEffectType.ABSORPTION,100,0,false,true));
-            dest.addPotionEffect(new PotionEffect(PotionEffectType.FIRE_RESISTANCE,100,0,false,true));
-            dest.sendActionBar(Component.text("🔥 Molten Shield 5s!",NamedTextColor.GOLD));
+            double[] shieldBase={60,95,130,165,200};
+            double shield=shieldBase[getLevel()-1]+s.getFinalAP()*0.40;
+            var cm=LolPlugin.getInstance().getChampionManager();
+            if(cm.hasChampion(dest)) cm.getChampion(dest).getStats().addShield(shield);
+            // Vitesse décroissante 1.5s (30 ticks)
+            dest.addPotionEffect(new PotionEffect(PotionEffectType.SPEED,30,1,false,true));
+            dest.sendActionBar(Component.text(String.format("🔥 Bouclier Ardent %.0f (3s)!",shield),NamedTextColor.GOLD));
+            // Bouclier disparaît après 3s
+            final Player fd=dest; final double fsh=shield;
+            new BukkitRunnable(){@Override public void run(){
+                if(cm.hasChampion(fd)) cm.getChampion(fd).getStats().addShield(-fsh);
+            }}.runTaskLater(LolPlugin.getInstance(), 60L);
         }
-        @Override public String getDynamicDescription(ChampionStats s){return "Bouclier 5s + immunité feu. Dégâts en retour aux attaquants.";}
+        @Override public String getDynamicDescription(ChampionStats s){
+            double[] shieldBase={60,95,130,165,200};
+            return String.format("Bouclier %.0f (+40%%AP) 3s + vitesse. Dégâts retour aux attaquants.",shieldBase[getLevel()-1]+s.getFinalAP()*0.40);
+        }
     }
 
     static class R extends BaseAbility {
@@ -125,7 +160,7 @@ public class Annie extends BaseChampion {
         @Override public void cast(Player c,ChampionStats s,Player t){
             UUID uuid = c.getUniqueId();
             long now = System.currentTimeMillis();
-            double[] realCooldowns = {100, 80, 60};
+            double[] realCooldowns = {120, 100, 80};
             int r = Math.min(getLevel() - 1, 2);
             R thisAbility = this;
 
@@ -156,7 +191,7 @@ public class Annie extends BaseChampion {
             }
 
             // 3. PREMIER CAST : Explosion de zone + Invocation
-            double[] base = fr.lolmc.util.Balance.base("r_annie", new double[]{175, 300, 425});
+            double[] base = fr.lolmc.util.Balance.base("r_annie", new double[]{150, 275, 400});
             double dmg = base[r] + s.getFinalAP() * fr.lolmc.util.Balance.ratio("r_annie", "ap", 0.75);
             var ground = TargetingUtil.getAimedGroundLocation(c, 7.0);
             if (ground == null) ground = c.getLocation();
@@ -223,7 +258,7 @@ public class Annie extends BaseChampion {
         }
 
         @Override public String getDynamicDescription(ChampionStats s){
-            double[] base=fr.lolmc.util.Balance.base("r_annie",new double[]{175,300,425});
+            double[] base=fr.lolmc.util.Balance.base("r_annie",new double[]{150,275,400});
             int r=Math.min(getLevel()-1,2);
             return String.format("%.0f dégâts AoE + Invoque Tibbers (45s). Re-cast R pour ordonner d'attaquer.",base[r]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("r_annie", "ap", 0.75));
         }
