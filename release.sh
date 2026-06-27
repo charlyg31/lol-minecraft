@@ -12,6 +12,8 @@ set -e
 
 VERSION=${1:-""}
 BUNGEE_PATH=${2:-""}
+# Token : variable d'env, argument $3, ou git config
+TOKEN="${GITHUB_TOKEN:-${3:-$(git config --get github.token 2>/dev/null || true)}}"
 
 if [ -z "$VERSION" ]; then
     echo "❌ Usage : ./release.sh <version> [chemin/BungeeCord.jar]"
@@ -78,8 +80,7 @@ echo "✅ Tag $TAG poussé"
 echo "🚀 Création de la release GitHub..."
 
 # Token GitHub : variable d'env GITHUB_TOKEN, ou git config, ou argument $3
-GITHUB_TOKEN=${GITHUB_TOKEN:-$(git config --get github.token 2>/dev/null || echo "")}
-GITHUB_TOKEN=${GITHUB_TOKEN:-${3:-""}}
+GITHUB_TOKEN="$TOKEN"
 if [ -z "$GITHUB_TOKEN" ]; then
     echo "❌ Token GitHub manquant."
     echo "   Option 1 : GITHUB_TOKEN=ton_token ./release.sh $VERSION ..."
@@ -87,6 +88,7 @@ if [ -z "$GITHUB_TOKEN" ]; then
     rm -f "LolMC-$VERSION.jar" "LolMC-Bungee-$VERSION.jar"
     exit 1
 fi
+echo "✅ Token GitHub trouvé"
 
 REPO="charlyg31/lol-minecraft"
 
