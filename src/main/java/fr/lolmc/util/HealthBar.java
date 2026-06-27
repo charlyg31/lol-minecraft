@@ -52,18 +52,19 @@ public final class HealthBar {
         int cur = (int) Math.max(0, current);
         int mx  = (int) max;
 
-        return Component.text()
-            .append(Component.text(label + " ", NamedTextColor.WHITE)
-                .decoration(TextDecoration.ITALIC, false))
-            .append(Component.text("[", NamedTextColor.DARK_GRAY)
-                .decoration(TextDecoration.ITALIC, false))
-            .append(Component.text(bar, barColor)
-                .decoration(TextDecoration.ITALIC, false))
-            .append(Component.text("] ", NamedTextColor.DARK_GRAY)
-                .decoration(TextDecoration.ITALIC, false))
-            .append(Component.text(cur + "/" + mx, NamedTextColor.GRAY)
-                .decoration(TextDecoration.ITALIC, false))
-            .build();
+        return Component.join(
+            net.kyori.adventure.text.JoinConfiguration.noSeparators(),
+            Component.text(label + " ", NamedTextColor.WHITE)
+                .decoration(TextDecoration.ITALIC, false),
+            Component.text("[", NamedTextColor.DARK_GRAY)
+                .decoration(TextDecoration.ITALIC, false),
+            Component.text(bar, barColor)
+                .decoration(TextDecoration.ITALIC, false),
+            Component.text("] ", NamedTextColor.DARK_GRAY)
+                .decoration(TextDecoration.ITALIC, false),
+            Component.text(cur + "/" + mx, NamedTextColor.GRAY)
+                .decoration(TextDecoration.ITALIC, false)
+        );
     }
 
     /**
