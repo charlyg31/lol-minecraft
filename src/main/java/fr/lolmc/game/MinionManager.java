@@ -163,14 +163,6 @@ public class MinionManager {
         Zombie minion = loc.getWorld().spawn(loc, Husk.class, z -> {
             z.setAdult(); // CORRECTION : Remplace le setBaby(false) déprécié
             z.setShouldBurnInDay(false);
-            // Barre de vie initiale
-            // Barre de vie initiale
-            double initHp = switch (type) {
-                case CANNON -> 100.0 + waveCount * 3;
-                case SUPER  -> 1500.0;
-                default     -> type == MinionType.MELEE ? 60.0 + waveCount * 2 : 40.0 + waveCount;
-            };
-            fr.lolmc.util.HealthBar.apply(z, initHp, initHp, team == Team.BLUE ? "🔵" : "🔴");
             // Empêcher le zombie de cibler les joueurs tout seul (IA vanilla)
             z.setTarget(null);
             z.getAttribute(Compat.maxHealth()).setBaseValue(MINION_HP);
@@ -180,8 +172,24 @@ public class MinionManager {
             z.getPersistentDataContainer().set(KEY_MINION, PersistentDataType.BYTE, (byte) 1);
             z.getPersistentDataContainer().set(KEY_TEAM, PersistentDataType.STRING, team.name());
             z.getPersistentDataContainer().set(KEY_LANE, PersistentDataType.STRING, lane);
-            z.customName(Component.text(team == Team.BLUE ? "🔵 Sbire" : "🔴 Sbire",
-                    team == Team.BLUE ? NamedTextColor.BLUE : NamedTextColor.RED));
+            // Supprimer l'équipement vanilla (armes, armures)
+            var eq = z.getEquipment();
+            if (eq != null) {
+                eq.setItemInMainHand(null);
+                eq.setItemInOffHand(null);
+                eq.setHelmet(null);
+                eq.setChestplate(null);
+                eq.setLeggings(null);
+                eq.setBoots(null);
+            }
+            // Barre de vie
+            double initHp = switch (type) {
+                case CANNON -> 100.0 + waveCount * 3;
+                case SUPER  -> 1500.0;
+                default     -> type == MinionType.MELEE ? 60.0 + waveCount * 2 : 40.0 + waveCount;
+            };
+            String label = team == Team.BLUE ? "🔵 Sbire" : "🔴 Sbire";
+            fr.lolmc.util.HealthBar.apply(z, initHp, initHp, label);
         });
         applyMinionModel(minion, type, team, type == MinionType.CASTER ? 0.7f : (type == MinionType.CANNON ? 1.0f : 0.8f));
             // HP du cannon plus élevé
