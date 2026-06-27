@@ -151,16 +151,11 @@ public class HUDManager {
     }
 
     private void updateExpBar(Player player, ResourceSystem res) {
-        if (!res.hasResource()) {
-            // Pas de ressource → barre vide et niveau 0
-            player.setExp(0f);
-            player.setLevel(0);
-            return;
-        }
-        // Niveau = valeur entière de la ressource
-        player.setLevel((int) res.getCurrent());
-        // Remplissage = ratio
-        player.setExp(res.getRatio());
+        // Barre EXP = niveau du champion (pas la ressource)
+        // La ressource est affichée dans l'ActionBar uniquement
+        // On n'utilise plus setLevel/setExp pour la ressource car
+        // ça interfère avec l'affichage visuel de la barre en jeu
+        // → niveau du champion géré dans LevelSystem directement
     }
 
     private void updateActionBar(Player player, BaseChampion champ,
@@ -187,8 +182,11 @@ public class HUDManager {
             int resCur = (int) res.getCurrent();
             int resMax = (int) res.getMax();
             String symbol = res.getSymbol();
+            // Mini barre de ressource (10 segments)
+            int resFilled = (int) Math.round(res.getRatio() * 10);
+            String resBar = "█".repeat(resFilled) + "░".repeat(10 - resFilled);
             resourceComp = Component.text(
-                String.format("  %s %d/%d", symbol, resCur, resMax),
+                String.format("  %s [%s] %d/%d", symbol, resBar, resCur, resMax),
                 res.getColor()
             ).decoration(TextDecoration.ITALIC, false);
         } else {
