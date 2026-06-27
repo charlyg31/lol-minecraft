@@ -311,12 +311,10 @@ public class AbilityListener implements Listener {
     @EventHandler
     public void onMinionAttackPlayer(EntityDamageByEntityEvent e) {
         if (!(e.getEntity() instanceof Player victim)) return;
-        var damager = e.getDamager();
-        if (!fr.lolmc.game.MinionManager.isMinion(damager)) return;
-        e.setCancelled(true); // annuler le dégât vanilla
-        // Vérifier que le sbire attaque un ennemi
+        if (!(e.getDamager() instanceof org.bukkit.entity.LivingEntity damagerLe)) return;
+        if (!fr.lolmc.game.MinionManager.isMinion(damagerLe)) return;
+        e.setCancelled(true);
         var tm = LolPlugin.getInstance().getTeamManager();
-        if (!(damager instanceof org.bukkit.entity.LivingEntity damagerLe)) return;
         fr.lolmc.team.TeamManager.Team minionTeam =
             fr.lolmc.game.MinionManager.getMinionTeam(damagerLe);
         fr.lolmc.team.TeamManager.Team victimTeam = tm.getTeam(victim);
