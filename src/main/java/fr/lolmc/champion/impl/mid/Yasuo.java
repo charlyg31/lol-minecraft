@@ -66,7 +66,7 @@ public class Yasuo extends BaseChampion {
         @Override public void cast(Player c,ChampionStats s,Player t){
             int casts=qCasts.merge(c.getUniqueId(),1,Integer::sum);
             // LoL : coup d'estoc en ligne. 20/45/70/95/120 + 100% AD (peut critiquer)
-            double[] base=fr.lolmc.util.Balance.base("q_yasuo",new double[]{20,45,70,95,120});double dmg=base[getLevel()-1]+s.getFinalAD()*fr.lolmc.util.Balance.ratio("q_yasuo","ad",1.0);
+            double[] base=fr.lolmc.util.Balance.base("q_yasuo",new double[]{20,45,70,95,120});double dmg=base[getLevel()-1]+s.getFinalAD()*fr.lolmc.util.Balance.ratio("q_yasuo","ad",1.05);
             boolean tornado = casts>=3; // 2 stacks accumulés -> 3e cast = tornade
             if(tornado){
                 // Tornade : skillshot plus long qui projette en l'air
@@ -93,7 +93,7 @@ public class Yasuo extends BaseChampion {
 
     static class W extends BaseAbility {
         W(){super("w_yasuo","Mur du Vent",Material.WHITE_WOOL,AbilitySlot.W,
-            new double[]{26,24,22,20,18},0,6,DamageType.TRUE);
+            new double[]{25,23,21,19,17},0,6,DamageType.TRUE);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             c.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE,80,0,false,true));
@@ -113,8 +113,8 @@ public class Yasuo extends BaseChampion {
             // LoL : dash à travers la cible, dégâts magiques + 25% par stack (max 4 = +100%)
             org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,5.0); if(tgt==null){c.sendActionBar(Component.text("🍃 Aucune cible",NamedTextColor.GRAY));return;}
             int stacks=Math.min(eStacks.getOrDefault(c.getUniqueId(),0),4);
-            double[] base=fr.lolmc.util.Balance.base("e_yasuo",new double[]{60,70,80,90,100});
-            double dmg=(base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("e_yasuo","ap",0.6))*(1.0+0.25*stacks);
+            double[] base=fr.lolmc.util.Balance.base("e_yasuo",new double[]{70,85,100,115,130});
+            double dmg=(base[getLevel()-1]+s.getFinalAD()*0.20+s.getFinalAP()*0.60)*(1.0+0.25*stacks);
             // Dash à travers/derrière la cible
             var dest=tgt.getLocation().clone().add(tgt.getLocation().getDirection().multiply(1.5));
             dest.setY(c.getLocation().getY());
@@ -127,14 +127,14 @@ public class Yasuo extends BaseChampion {
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 1.4f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            double[] base=fr.lolmc.util.Balance.base("e_yasuo",new double[]{60,70,80,90,100});
-            return String.format("Dash à travers la cible: %.0f dégâts magiques (+25%%/stack, max +100%%).",base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("e_yasuo","ap",0.6));
+            double[] base=fr.lolmc.util.Balance.base("e_yasuo",new double[]{70,85,100,115,130});
+            return String.format("Dash à travers la cible: %.0f dégâts (+20%%AD+60%%AP, +25%%/stack max +100%%).",base[getLevel()-1]+s.getFinalAD()*0.20+s.getFinalAP()*0.60);
         }
     }
 
     static class R extends BaseAbility {
         R(){super("r_yasuo","Dernier Souffle",Material.ELYTRA,AbilitySlot.R,
-            new double[]{200,180,160},5,4,DamageType.PHYSICAL);
+            new double[]{70,50,30},5,4,DamageType.PHYSICAL);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : se TP sur un ennemi (idéalement aérien), dégâts + maintient en l'air
@@ -155,6 +155,15 @@ public class Yasuo extends BaseChampion {
                     __p.sendActionBar(Component.text("⚔ DERNIER SOUFFLE! Propulsé!",NamedTextColor.DARK_GRAY));
             }
 
+            // Flow max + crits ignorent 60% armure pendant 15s (LoL)
+            var cm=LolPlugin.getInstance().getChampionManager();
+            if(cm.hasChampion(c)){
+                var champ=cm.getChampion(c);
+                if(champ.getResourceSystem()!=null) champ.getResourceSystem().setCurrent(champ.getResourceSystem().getMax());
+                champ.getStats().addBonusArmorPenPercent(0.60);
+                final var fstats=champ.getStats();
+                new BukkitRunnable(){@Override public void run(){ fstats.addBonusArmorPenPercent(-0.60); }}.runTaskLater(LolPlugin.getInstance(), 300L);
+            }
             c.getWorld().spawnParticle(Particle.SWEEP_ATTACK,c.getLocation().add(0,1,0),10,2,2,2);
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_PLAYER_ATTACK_CRIT, 1.5f, 0.7f);
         }
