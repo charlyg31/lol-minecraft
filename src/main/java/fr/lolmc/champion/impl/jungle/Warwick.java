@@ -81,7 +81,7 @@ public class Warwick extends BaseChampion {
 
     static class Q extends BaseAbility {
         Q(){super("q_warwick","Crocs de la Bête",Material.BONE,AbilitySlot.Q,
-                new double[]{8,7.5,7,6.5,6},20,0,DamageType.MAGICAL);
+                new double[]{6,6,6,6,6},20,0,DamageType.MAGICAL);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : bond + morsure, 100% AD + 6-10% PV max de la cible, soigne 100% des dégâts post-mitigation
@@ -98,9 +98,9 @@ public class Warwick extends BaseChampion {
 
             double dmg=s.getFinalAD()*fr.lolmc.util.Balance.ratio("q_warwick","ad",1.0)+tgtMaxHealth*pct[getLevel()-1];
             TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.MAGICAL);
-            // Soin 100% des dégâts
+            // Soin 90% des dégâts (LoL)
             var cm=LolPlugin.getInstance().getChampionManager();
-            if(cm.hasChampion(c)) cm.getChampion(c).getHPSystem().heal(dmg);
+            if(cm.hasChampion(c)) cm.getChampion(c).getHPSystem().heal(dmg*0.90);
             c.getWorld().spawnParticle(Particle.HEART,c.getLocation().add(0,1,0),5,0.5,0.5,0.5);
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_WOLF_GROWL, 1f, 0.7f);
         }
@@ -155,21 +155,24 @@ public class Warwick extends BaseChampion {
             var dest=tgt.getLocation().clone().subtract(tgt.getLocation().getDirection().multiply(0.5));
             dest.setY(c.getLocation().getY());
             c.teleport(dest);
-            double[] base=fr.lolmc.util.Balance.base("r_warwick",new double[]{175,300,425});int r=Math.min(getLevel()-1,2);
+            double[] base=fr.lolmc.util.Balance.base("r_warwick",new double[]{175,350,525});int r=Math.min(getLevel()-1,2);
             double dmg=base[r]+s.getFinalAD()*fr.lolmc.util.Balance.ratio("r_warwick","ad",1.675);
             TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.MAGICAL);
             var cm=LolPlugin.getInstance().getChampionManager();
-            if(cm.hasChampion(c)) cm.getChampion(c).getHPSystem().heal(dmg);
+            if(cm.hasChampion(c)) cm.getChampion(c).getHPSystem().heal(dmg); // soin 100% au R
+            // Suppression 1.5s (30 ticks) — vrai CC verrouillant (stun)
+            var cc=LolPlugin.getInstance().getCCManager();
+            if(cc!=null) cc.stun(tgt, 30);
             if(tgt instanceof Player __p){
                 __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,30,20,false,true));
-                __p.sendActionBar(Component.text("🐺 EMPRISE INFINIE! Supprimé!",NamedTextColor.DARK_RED));
+                __p.sendActionBar(Component.text("🐺 EMPRISE INFINIE! Supprimé 1.5s!",NamedTextColor.DARK_RED));
             }
             tgt.setVelocity(new Vector(0,0.2,0));
             c.getWorld().spawnParticle(Particle.HEART,c.getLocation().add(0,1,0),10,1,1,1);
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_WOLF_GROWL, 1.5f, 0.5f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            double[] base=fr.lolmc.util.Balance.base("r_warwick",new double[]{175,300,425});int r=Math.min(getLevel()-1,2);
+            double[] base=fr.lolmc.util.Balance.base("r_warwick",new double[]{175,350,525});int r=Math.min(getLevel()-1,2);
             return String.format("Bond: supprime la cible 1.5s, %.0f dégâts (+167%%AD), soigne 100%%.",base[r]+s.getFinalAD()*fr.lolmc.util.Balance.ratio("r_warwick","ad",1.675));
         }
     }
