@@ -165,8 +165,9 @@ public class MinionManager {
             z.setShouldBurnInDay(false);
             // Empêcher le zombie de cibler les joueurs tout seul (IA vanilla)
             z.setTarget(null);
-            z.getAttribute(Compat.maxHealth()).setBaseValue(MINION_HP);
-            z.setHealth(MINION_HP);
+            double safeHp = Math.min(MINION_HP, 1024.0);
+            z.getAttribute(Compat.maxHealth()).setBaseValue(safeHp);
+            z.setHealth(safeHp);
             z.getAttribute(Compat.movementSpeed()).setBaseValue(MINION_SPEED);
             // Tag PDC
             z.getPersistentDataContainer().set(KEY_MINION, PersistentDataType.BYTE, (byte) 1);
@@ -195,7 +196,8 @@ public class MinionManager {
             // HP du cannon plus élevé
             if (type == MinionType.CANNON) {
                 var hpAttr = minion.getAttribute(fr.lolmc.util.Compat.maxHealth());
-                if (hpAttr != null) { hpAttr.setBaseValue(CANNON_HP); minion.setHealth(CANNON_HP); }
+                double safeCannonHp = Math.min(CANNON_HP, 1024.0);
+                if (hpAttr != null) { hpAttr.setBaseValue(safeCannonHp); minion.setHealth(safeCannonHp); }
             }
     }
 
@@ -216,8 +218,9 @@ public class MinionManager {
             h.setAdult(); // SÉCURITÉ : On s'assure également qu'il s'agit d'un adulte via l'API moderne
             h.setShouldBurnInDay(false);
             h.setCustomNameVisible(true);
-            h.getAttribute(Compat.maxHealth()).setBaseValue(MINION_HP * 3);
-            h.setHealth(MINION_HP * 3);
+            double superHp = Math.min(MINION_HP * 3, 1000.0); // cap Paper 26.1.2 = 1024
+            h.getAttribute(Compat.maxHealth()).setBaseValue(superHp);
+            h.setHealth(superHp);
             h.getAttribute(Compat.movementSpeed()).setBaseValue(MINION_SPEED);
             h.getPersistentDataContainer().set(KEY_MINION, PersistentDataType.BYTE, (byte) 1);
             h.getPersistentDataContainer().set(KEY_TEAM, PersistentDataType.STRING, team.name());
