@@ -105,7 +105,7 @@ public class AbilityListener implements Listener {
     private boolean canCast(Player p) {
         long now = System.currentTimeMillis();
         Long last = lastCastTime.get(p.getUniqueId());
-        if (last != null && (now - last) < 150) return false;
+        if (last != null && (now - last) < 200) return false;
         lastCastTime.put(p.getUniqueId(), now);
         return true;
     }
@@ -140,6 +140,10 @@ public class AbilityListener implements Listener {
             + manager.hasChampion(caster) + ")");
         if (!manager.hasChampion(caster)) return;
         if (!fr.lolmc.util.WorldContext.isInGameWorld(caster)) return;
+
+        // Ignorer l'animation de la main secondaire (Paper envoie ARM_SWING
+        // ET OFF_ARM_SWING pour un seul clic → double déclenchement des sorts)
+        if (e.getAnimationType() != org.bukkit.event.player.PlayerAnimationType.ARM_SWING) return;
 
         fr.lolmc.util.DebugLogger.log("ArmSwing", caster.getName()
             + " animation=" + e.getAnimationType());
@@ -390,7 +394,8 @@ public class AbilityListener implements Listener {
         if (slot == 0) {
             LolPlugin.getInstance().getAutoAttackManager().tryAutoAttack(caster, target);
         } else if (slot >= 1 && slot <= 4) {
-            if (canCast(caster)) manager.getChampion(caster).tryUseAbility(caster, slot, target);
+            // Le débounce est déjà appliqué en amont (onArmSwing / onLeftClick)
+            manager.getChampion(caster).tryUseAbility(caster, slot, target);
         }
     }
 
