@@ -95,10 +95,8 @@ public class DamageUtil {
             var rw = LolPlugin.getInstance().getRewardManager();
             if (rw != null) rw.recordDamage(attacker.getUniqueId(), victim.getUniqueId());
         }
-        // Passif Amumu Maudits Larmes : renvoie des degats aux attaquants
-        if ("amumu".equals(vc.getId()) && attacker != null) {
-            fr.lolmc.champion.impl.jungle.Amumu.onHitByEnemy(victim, vc, attacker);
-        }
+        // Passif Amumu : désormais géré via Toucher Maudit (applyCurse/onMagicHit)
+        // dans Amumu.java — plus de renvoi de dégâts ici.
         // Dragon Elder : exécution si la cible tombe sous 20% HP
         if (attacker != null) {
             var ac = LolPlugin.getInstance().getChampionManager().getChampion(attacker);
