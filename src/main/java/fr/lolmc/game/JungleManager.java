@@ -553,6 +553,15 @@ public class JungleManager {
                     .box(Material.PRISMARINE,     0.55f, 0.05f, 0.3f, 0.25f, 0.2f, 0.3f, -30f); // pince D
 
             // 👁 Héraut de la Faille : corps violet avec gros œil
+            case VOIDGRUB -> new MobModel()
+                    .cube(Material.PURPLE_CONCRETE,  0f, 0.0f, 0f, 0.4f)
+                    .cube(Material.BLACK_CONCRETE,   0f, 0.4f, 0f, 0.2f);
+
+            case ATAKHAN -> new MobModel()
+                    .box(Material.RED_CONCRETE,    0f, 0.0f, 0f, 2.0f, 2.5f, 1.8f)
+                    .cube(Material.ORANGE_CONCRETE, 0f, 2.4f, 0f, 0.7f)
+                    .cube(Material.YELLOW_CONCRETE, 0f, 2.6f, 0.5f, 0.3f);
+
             case HERALD -> new MobModel()
                     .box(Material.PURPLE_CONCRETE,  0f, 0.1f, 0.0f, 0.9f, 1.1f, 0.9f)   // corps
                     .box(Material.MAGENTA_CONCRETE, 0f, 1.0f, 0.0f, 0.6f, 0.5f, 0.6f)   // tête
@@ -616,6 +625,8 @@ public class JungleManager {
                  DRAGON_CLOUD, DRAGON_CHEMTECH, DRAGON_ELDER -> 0.85f; // ravager -> modele plus fin
             case HERALD       -> 0.85f;
             case BARON        -> 0.9f;
+            case VOIDGRUB     -> 0.8f;
+            case ATAKHAN      -> 1.0f;
         };
     }
 
