@@ -7,8 +7,7 @@ import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
-
-import java.util.*;
+import org.bukkit.persistence.PersistentDataType;
 
 /**
  * Gère les 6 slots d'items LoL pour un joueur.
@@ -28,15 +27,10 @@ import java.util.*;
  */
 public class PlayerInventoryManager {
 
-    // Slots Minecraft pour les 6 items LoL
     public static final int[] ITEM_SLOTS = {5, 6, 7, 8, 18, 19};
-    // Tag identifiant un item LoL dans le lore (sans séquence de couleur legacy)
-    public static final String LOL_ITEM_TAG = "LOL_ITEM:";
 
     // Items équipés par joueur [0..5]
     private final LolItem[] equippedItems = new LolItem[6];
-
-    // ── Équiper un item ───────────────────────────────────────────
 
     /**
      * Équipe un item dans le premier slot libre.
@@ -50,63 +44,41 @@ public class PlayerInventoryManager {
         }
         equippedItems[freeSlot] = item;
         item.applyStats(champ.getStats(), champ.getHPSystem(), champ.getResourceSystem());
-        // L'affichage hotbar est géré par HotbarManager (pas ici)
         return true;
     }
 
     /**
      * Vend l'item du slot donné (remboursement 70%).
-     * Après removeStats, on clamp les HP au nouveau max pour éviter currentHP > maxHP.
      */
     public int sellItem(Player player, BaseChampion champ, int slotIndex) {
         if (slotIndex < 0 || slotIndex >= 6 || equippedItems[slotIndex] == null) return 0;
         LolItem item = equippedItems[slotIndex];
         item.removeStats(champ.getStats(), champ.getHPSystem(), champ.getResourceSystem());
-        // Clamp HP au nouveau max (evite currentHP > maxHP apres retrait d'un item de vie)
+
         var hp = champ.getHPSystem();
         if (hp.getCurrentHP() > hp.getMaxHP()) hp.setCurrentHP(hp.getMaxHP());
+
         equippedItems[slotIndex] = null;
-        int refund = (int)(item.getGoldCost() * 0.70);
-        return refund;
+        return (int)(item.getGoldCost() * 0.70);
     }
 
     /**
-     * Retire un item du slot sans rembourser l'or (utilisé pour les upgrades :
-     * le joueur paie seulement la différence prix_final - prix_composant).
+     * Retire un item du slot sans rembourser l'or.
      */
     public void removeItemNoRefund(BaseChampion champ, int slotIndex) {
         if (slotIndex < 0 || slotIndex >= 6 || equippedItems[slotIndex] == null) return;
         LolItem item = equippedItems[slotIndex];
         item.removeStats(champ.getStats(), champ.getHPSystem(), champ.getResourceSystem());
+
         var hp = champ.getHPSystem();
         if (hp.getCurrentHP() > hp.getMaxHP()) hp.setCurrentHP(hp.getMaxHP());
+
         equippedItems[slotIndex] = null;
     }
 
-    /**
-     * Recharge tous les items dans l'inventaire (ex: après respawn).
-     */
     public void refreshAll(Player player) {
-        // Affichage géré par HotbarManager désormais
+        // L'affichage est délégué à HotbarManager
     }
-
-
-
-    /**
-     * Crée un item "slot vide" affiché dans l'inventaire.
-     */
-    private ItemStack emptySlot(int number) {
-        ItemStack empty = new ItemStack(Material.GRAY_STAINED_GLASS_PANE);
-        ItemMeta meta = empty.getItemMeta();
-        if (meta != null) {
-            meta.displayName(Component.text("Slot item " + number, NamedTextColor.DARK_GRAY)
-                    .decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
-            empty.setItemMeta(meta);
-        }
-        return empty;
-    }
-
-    // ── Getters ───────────────────────────────────────────────────
 
     public LolItem getItem(int slotIndex) {
         if (slotIndex < 0 || slotIndex >= 6) return null;
@@ -128,10 +100,6 @@ public class PlayerInventoryManager {
         return count;
     }
 
-    /**
-     * Retrouve l'index de slot LoL depuis un slot Minecraft.
-     * @return -1 si pas un slot item
-     */
     public static int getLolSlotIndex(int mcSlot) {
         for (int i = 0; i < ITEM_SLOTS.length; i++) {
             if (ITEM_SLOTS[i] == mcSlot) return i;
@@ -140,20 +108,12 @@ public class PlayerInventoryManager {
     }
 
     /**
-     * Extrait l'item ID depuis le lore d'un ItemStack.
+     * Extrait l'item ID depuis le PersistentDataContainer de l'ItemStack.
      */
     public static String getItemId(ItemStack stack) {
         if (stack == null) return null;
         ItemMeta meta = stack.getItemMeta();
-        if (meta == null || !meta.hasLore()) return null;
-        var lore = meta.lore();
-        if (lore == null) return null;
-        for (Component line : lore) {
-            String plain = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(line);
-            if (plain.startsWith(LOL_ITEM_TAG)) {
-                return plain.substring(LOL_ITEM_TAG.length());
-            }
-        }
-        return null;
+        if (meta == null) return null;
+        return meta.getPersistentDataContainer().get(HotbarManager.KEY_ID, PersistentDataType.STRING);
     }
 }

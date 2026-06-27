@@ -188,15 +188,15 @@ public class HotbarManager {
         var meta = item.getItemMeta();
         if (meta != null) {
             meta.displayName(net.kyori.adventure.text.Component.text("🌀 Recall",
-                    net.kyori.adventure.text.format.NamedTextColor.AQUA)
+                            net.kyori.adventure.text.format.NamedTextColor.AQUA)
                     .decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
             meta.lore(java.util.List.of(
-                net.kyori.adventure.text.Component.text("Clic droit : retour à la base (8s)",
-                    net.kyori.adventure.text.format.NamedTextColor.GRAY)
-                    .decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false),
-                net.kyori.adventure.text.Component.text("Interrompu par les dégâts ou le mouvement",
-                    net.kyori.adventure.text.format.NamedTextColor.DARK_GRAY)
-                    .decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false)));
+                    net.kyori.adventure.text.Component.text("Clic droit : retour à la base (8s)",
+                                    net.kyori.adventure.text.format.NamedTextColor.GRAY)
+                            .decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false),
+                    net.kyori.adventure.text.Component.text("Interrompu par les dégâts ou le mouvement",
+                                    net.kyori.adventure.text.format.NamedTextColor.DARK_GRAY)
+                            .decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false)));
             meta.getPersistentDataContainer().set(KEY_RECALL, PersistentDataType.BYTE, (byte) 1);
             // Marquer AUSSI avec KEY_TYPE pour passer le filtre isLolItem dans onInteract
             meta.getPersistentDataContainer().set(KEY_TYPE, PersistentDataType.STRING, "recall");
@@ -221,8 +221,8 @@ public class HotbarManager {
         currentPage.put(player.getUniqueId(), page == 1 ? 2 : 1);
         renderPage(player, champ);
         player.sendActionBar(Component.text(
-            page == 1 ? "📖 Page 2 — Utilitaire" : "⚔ Page 1 — Combat",
-            NamedTextColor.YELLOW));
+                page == 1 ? "📖 Page 2 — Utilitaire" : "⚔ Page 1 — Combat",
+                NamedTextColor.YELLOW));
     }
 
     public int getPage(Player player) {
@@ -280,8 +280,8 @@ public class HotbarManager {
         ItemMeta meta = btn.getItemMeta();
         if (meta != null) {
             meta.displayName(Component.text(
-                    targetPage == 2 ? "→ Page Utilitaire" : "← Page Combat",
-                    NamedTextColor.YELLOW)
+                            targetPage == 2 ? "→ Page Utilitaire" : "← Page Combat",
+                            NamedTextColor.YELLOW)
                     .decoration(TextDecoration.ITALIC, false).decoration(TextDecoration.BOLD, true));
             meta.lore(List.of(Component.text("Clic pour changer de page", NamedTextColor.GRAY)
                     .decoration(TextDecoration.ITALIC, false)));
@@ -335,28 +335,28 @@ public class HotbarManager {
         java.util.List<net.kyori.adventure.text.Component> lore = new java.util.ArrayList<>();
         if (remaining > 0) {
             meta.displayName(net.kyori.adventure.text.Component.text(
-                ability.getName() + " ⏱ " + String.format("%.1f", remaining) + "s",
-                net.kyori.adventure.text.format.NamedTextColor.GRAY)
-                .decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
+                            ability.getName() + " ⏱ " + String.format("%.1f", remaining) + "s",
+                            net.kyori.adventure.text.format.NamedTextColor.GRAY)
+                    .decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
             lore.add(net.kyori.adventure.text.Component.text(
-                "CD: " + String.format("%.1f", remaining) + "s",
-                net.kyori.adventure.text.format.NamedTextColor.RED)
-                .decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
+                            "CD: " + String.format("%.1f", remaining) + "s",
+                            net.kyori.adventure.text.format.NamedTextColor.RED)
+                    .decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
         } else {
             meta.displayName(net.kyori.adventure.text.Component.text(
-                ability.getName(),
-                net.kyori.adventure.text.format.NamedTextColor.WHITE)
-                .decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
+                            ability.getName(),
+                            net.kyori.adventure.text.format.NamedTextColor.WHITE)
+                    .decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
             lore.add(net.kyori.adventure.text.Component.text(
-                "✔ Prêt!",
-                net.kyori.adventure.text.format.NamedTextColor.GREEN)
-                .decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
+                            "✔ Prêt!",
+                            net.kyori.adventure.text.format.NamedTextColor.GREEN)
+                    .decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
         }
         String desc = ability.getDynamicDescription(champ.getStats());
         if (desc != null && !desc.isEmpty())
             lore.add(net.kyori.adventure.text.Component.text(desc,
-                net.kyori.adventure.text.format.NamedTextColor.GRAY)
-                .decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
+                            net.kyori.adventure.text.format.NamedTextColor.GRAY)
+                    .decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
         meta.lore(lore);
         stack.setItemMeta(meta);
     }
@@ -443,7 +443,7 @@ public class HotbarManager {
         ItemMeta meta = empty.getItemMeta();
         if (meta != null) {
             meta.displayName(Component.text("Slot item " + number, NamedTextColor.DARK_GRAY)
-                .decoration(TextDecoration.ITALIC, false));
+                    .decoration(TextDecoration.ITALIC, false));
             tag(empty, "inv_empty", "", -1);
             empty.setItemMeta(meta);
         }

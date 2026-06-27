@@ -10,27 +10,26 @@
     <packaging>jar</packaging>
 
     <properties>
-        <maven.compiler.source>17</maven.compiler.source>
-        <maven.compiler.target>17</maven.compiler.target>
+        <!-- Remplacement des anciennes balises par la directive release globale -->
+        <maven.compiler.release>17</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 
     <repositories>
+        <!-- Dépôt officiel SpigotMC (contient l'API BungeeCord complète) -->
         <repository>
-            <id>md-5-snapshots</id>
-            <url>https://repo.md-5.net/content/repositories/snapshots/</url>
+            <id>spigotmc-repo</id>
+            <url>https://hub.spigotmc.org/nexus/content/groups/public/</url>
         </repository>
     </repositories>
 
     <dependencies>
-        <!-- BungeeCord API — pointe vers le JAR du proxy sur le serveur -->
-        <!-- Remplacer le chemin par celui de ton BungeeCord.jar réel      -->
+        <!-- BungeeCord API — Téléchargée proprement depuis le Nexus de Spigot -->
         <dependency>
             <groupId>net.md-5</groupId>
             <artifactId>bungeecord-api</artifactId>
             <version>1.21-R0.1-SNAPSHOT</version>
-            <scope>system</scope>
-            <systemPath>${bungee.jar.path}</systemPath>
+            <scope>provided</scope>
         </dependency>
     </dependencies>
 

@@ -1,10 +1,11 @@
 package fr.lolmc.listener;
 
 import fr.lolmc.LolPlugin;
+import io.papermc.paper.event.player.AsyncChatEvent; // MODIFICATION : Nouvel événement moderne de Paper
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer; // AJOUT : Pour convertir le Component en String
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
-import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.entity.Player;
 
 /**
@@ -15,9 +16,11 @@ import org.bukkit.entity.Player;
 public class ChatListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST)
-    public void onChat(AsyncPlayerChatEvent e) {
+    public void onChat(AsyncChatEvent e) { // MODIFICATION : Utilisation de l'API moderne
         Player p = e.getPlayer();
-        String msg = e.getMessage();
+
+        // MODIFICATION : Extraction du texte brut à partir du composant de chat moderne
+        String msg = PlainTextComponentSerializer.plainText().serialize(e.message());
 
         if (msg.startsWith("/t ") || msg.startsWith("/team chat ")) {
             e.setCancelled(true);
