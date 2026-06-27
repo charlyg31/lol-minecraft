@@ -183,16 +183,16 @@ public class MinionManager {
                 eq.setLeggings(null);
                 eq.setBoots(null);
             }
-            // Barre de vie
-            double initHp = switch (type) {
-                case CANNON -> 100.0 + waveCount * 3;
-                case SUPER  -> 1500.0;
-                default     -> type == MinionType.MELEE ? 60.0 + waveCount * 2 : 40.0 + waveCount;
-            };
-            String label = team == Team.BLUE ? "🔵 Sbire" : "🔴 Sbire";
-            fr.lolmc.util.HealthBar.apply(z, initHp, initHp, label);
         });
         applyMinionModel(minion, type, team, type == MinionType.CASTER ? 0.7f : (type == MinionType.CANNON ? 1.0f : 0.8f));
+        // Barre de vie APRÈS le modèle (customName n'est pas écrasé par makeInvisible)
+        double initHp = switch (type) {
+            case CANNON -> 100.0 + waveCount * 3;
+            case SUPER  -> 1500.0;
+            default     -> type == MinionType.MELEE ? 60.0 + waveCount * 2 : 40.0 + waveCount;
+        };
+        String label = team == Team.BLUE ? "🔵 Sbire" : "🔴 Sbire";
+        fr.lolmc.util.HealthBar.apply(minion, initHp, initHp, label);
             // HP du cannon plus élevé
             if (type == MinionType.CANNON) {
                 var hpAttr = minion.getAttribute(fr.lolmc.util.Compat.maxHealth());

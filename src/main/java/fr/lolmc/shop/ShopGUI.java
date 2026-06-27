@@ -260,7 +260,13 @@ public class ShopGUI {
     // ══════════════════════════════════════════════════════════════
 
     public boolean isDetailView(Player player) {
-        return detailItem.containsKey(player.getUniqueId());
+        if (!detailItem.containsKey(player.getUniqueId())) return false;
+        // Vérifier que la vue détail est bien ouverte (titre commence par DETAIL_PREFIX)
+        var view = player.getOpenInventory();
+        if (view == null) return false;
+        String title = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
+            .plainText().serialize(view.title());
+        return title.startsWith(DETAIL_PREFIX);
     }
 
     /** Item dont la fiche est ouverte (pour l'achat). */

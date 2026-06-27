@@ -242,8 +242,68 @@ public class HUDManager {
     }
 
     private void onDeath(Player player) {
-        // TODO : logique de mort LoL (respawn timer, etc.)
-        player.sendMessage(Component.text("☠ Tu es mort!", NamedTextColor.DARK_RED));
+        var plugin = LolPlugin.getInstance();
+        var tm = plugin.getTeamManager();
+        var mm = plugin.getMapManager();
+        var gm = plugin.getGameManager();
+        var cm = plugin.getChampionManager();
+
+        // Timer de respawn (LoL : ~8s niveau 1 → 50s niveau 18)
+        int level = cm.hasChampion(player) ? cm.getChampion(player).getLevelSystem().getLevel() : 1;
+        int respawnSeconds = Math.min(8 + (level - 1) * 2, 50);
+
+        // Passer en mode spectateur
+        player.setGameMode(org.bukkit.GameMode.SPECTATOR);
+        player.sendTitle(
+            net.kyori.adventure.text.Component.text("☠ Tu es mort", net.kyori.adventure.text.format.NamedTextColor.DARK_RED),
+            net.kyori.adventure.text.Component.text("Respawn dans " + respawnSeconds + "s", net.kyori.adventure.text.format.NamedTextColor.GRAY),
+            10, 60, 20);
+
+        // Countdown visible
+        new org.bukkit.scheduler.BukkitRunnable() {
+            int remaining = respawnSeconds;
+            @Override public void run() {
+                if (!player.isOnline()) { cancel(); return; }
+                if (remaining <= 0) {
+                    respawnPlayer(player);
+                    cancel();
+                    return;
+                }
+                player.sendActionBar(net.kyori.adventure.text.Component.text(
+                    "☠ Respawn dans " + remaining + "s",
+                    net.kyori.adventure.text.format.NamedTextColor.RED));
+                remaining--;
+            }
+        }.runTaskTimer(plugin, 0L, 20L);
+    }
+
+    private void respawnPlayer(Player player) {
+        var plugin = LolPlugin.getInstance();
+        var tm = plugin.getTeamManager();
+        var mm = plugin.getMapManager();
+        var cm = plugin.getChampionManager();
+
+        // Revenir en survie
+        player.setGameMode(org.bukkit.GameMode.SURVIVAL);
+
+        // Téléporter à la base de l'équipe
+        var team = tm.getTeam(player);
+        if (team != null && mm != null) {
+            var spawn = mm.getSpawn(team, 1);
+            if (spawn != null) player.teleport(spawn);
+        }
+
+        // Remettre HP à max
+        if (cm.hasChampion(player)) {
+            var champ = cm.getChampion(player);
+            champ.getHPSystem().setCurrentHP(champ.getHPSystem().getMaxHP());
+            champ.getResourceSystem().fill();
+            updateHUD(player, champ);
+        }
+
+        player.sendTitle(
+            net.kyori.adventure.text.Component.text("✔ Respawn", net.kyori.adventure.text.format.NamedTextColor.GREEN),
+            net.kyori.adventure.text.Component.empty(), 5, 20, 10);
     }
 
     /**

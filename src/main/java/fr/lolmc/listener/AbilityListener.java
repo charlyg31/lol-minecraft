@@ -321,17 +321,21 @@ public class AbilityListener implements Listener {
         if (minionTeam == null || minionTeam == victimTeam) return;
         // Dégâts du sbire selon son type
         String typeTag = fr.lolmc.game.MinionManager.getMinionTypeTag(damagerLe);
-        double dmg = switch (typeTag != null ? typeTag : "melee") {
-            case "cannon" -> 60.0;
-            case "super"  -> 90.0;
-            case "caster" -> 22.0;
-            default       -> 35.0; // melee
+        // Dégâts bruts LoL (avant réduction d'armure)
+        double rawDmg = switch (typeTag != null ? typeTag : "melee") {
+            case "cannon" -> 100.0;
+            case "super"  -> 190.0;
+            case "caster" -> 39.0;
+            default       -> 68.0; // melee
         };
-        // Appliquer via le système LoL (armure, bouclier, etc.)
+        // Appliquer via le système LoL (avec réduction d'armure)
         if (manager.hasChampion(victim)) {
-            manager.getChampion(victim).getHPSystem().takeDamage(dmg);
+            var champ = manager.getChampion(victim);
+            double armor = champ.getStats().getTotalArmor();
+            double dmgReduced = fr.lolmc.util.DamageUtil.mitigatePhysical(rawDmg, armor);
+            champ.getHPSystem().takeDamage(dmgReduced);
             var hud = LolPlugin.getInstance().getHUDManager();
-            if (hud != null) hud.updateHUD(victim, manager.getChampion(victim));
+            if (hud != null) hud.updateHUD(victim, champ);
         }
     }
 
