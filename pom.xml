@@ -88,14 +88,12 @@
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.13.0</version>
                 <configuration>
-                    <fork>true</fork>
-                    <meminitial>256m</meminitial>
-                    <maxmem>1024m</maxmem>
                     <source>25</source>
                     <target>25</target>
                     <release>25</release>
                     <compilerArgs>
                         <arg>--enable-preview</arg>
+                        <arg>-J-Xmx1024m</arg>
                     </compilerArgs>
                 </configuration>
             </plugin>
