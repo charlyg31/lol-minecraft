@@ -252,10 +252,11 @@ public class HUDManager {
 
         // Passer en mode spectateur
         player.setGameMode(org.bukkit.GameMode.SPECTATOR);
-        player.sendTitle(
+        player.showTitle(net.kyori.adventure.title.Title.title(
             net.kyori.adventure.text.Component.text("☠ Tu es mort", net.kyori.adventure.text.format.NamedTextColor.DARK_RED),
             net.kyori.adventure.text.Component.text("Respawn dans " + respawnSeconds + "s", net.kyori.adventure.text.format.NamedTextColor.GRAY),
-            10, 60, 20);
+            net.kyori.adventure.title.Title.Times.times(
+                java.time.Duration.ofMillis(500), java.time.Duration.ofSeconds(3), java.time.Duration.ofSeconds(1))));
 
         // Countdown visible
         new org.bukkit.scheduler.BukkitRunnable() {
@@ -299,9 +300,11 @@ public class HUDManager {
             updateHUD(player, champ);
         }
 
-        player.sendTitle(
+        player.showTitle(net.kyori.adventure.title.Title.title(
             net.kyori.adventure.text.Component.text("✔ Respawn", net.kyori.adventure.text.format.NamedTextColor.GREEN),
-            net.kyori.adventure.text.Component.empty(), 5, 20, 10);
+            net.kyori.adventure.text.Component.empty(),
+            net.kyori.adventure.title.Title.Times.times(
+                java.time.Duration.ofMillis(250), java.time.Duration.ofSeconds(1), java.time.Duration.ofMillis(500))));
     }
 
     /**
