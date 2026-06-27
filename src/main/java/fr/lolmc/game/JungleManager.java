@@ -80,7 +80,6 @@ public class JungleManager {
         DRAGON_CHEMTECH (EntityType.RAVAGER,   3500, 150, 25, 300, "drake_chemtech", 1, "☣ Dragon Chimtech"),
         DRAGON_ELDER    (EntityType.RAVAGER,   5000, 200, 40, 360, "drake_elder",    1, "🐲 Dragon Ancien"),
         // ── Épiques de la fosse ──
-        VOIDGRUB     (EntityType.SILVERFISH,    600,  50, 20, 120, "voidgrub", 6, "🪱 Voidgrub"),
         VOIDGRUB     (EntityType.SILVERFISH,    350,  50, 20,  0, "voidgrub", 3, "🐛 Nuée du Néant"),
         ATAKHAN      (EntityType.WARDEN,       9000, 250, 35,  0, "atakhan",  1, "🌺 Atakhan"),
         HERALD       (EntityType.RAVAGER,      4000, 200, 25,  0,  "none", 1, "👁 Héraut de la Faille"),
