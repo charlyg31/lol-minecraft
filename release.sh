@@ -30,7 +30,8 @@ cd "$SCRIPT_DIR"
 
 # ── Compilation LolMC.jar ─────────────────────────────────────────────
 echo "🔨 Compilation de LolMC.jar..."
-if ! mvn package -q -DskipTests 2>&1 | grep -v "WARNING"; then
+mvn package -q -DskipTests
+if [ $? -ne 0 ]; then
     echo "❌ Echec compilation LolMC"
     exit 1
 fi
@@ -42,7 +43,8 @@ echo "✅ LolMC-$VERSION.jar"
 # ── Compilation LolMC-Bungee.jar ─────────────────────────────────────
 echo "🔨 Compilation de LolMC-Bungee.jar..."
 cd bungee-plugin
-if ! mvn package -q -DskipTests -Dbungee.jar.path="$BUNGEE_PATH" 2>&1 | grep -v "WARNING"; then
+mvn package -q -DskipTests -Dbungee.jar.path="$BUNGEE_PATH"
+if [ $? -ne 0 ]; then
     echo "❌ Echec compilation Bungee"
     cd ..
     exit 1
