@@ -82,6 +82,24 @@
 
     <build>
         <plugins>
+            <!-- Compilateur avec mémoire augmentée (fix "this.hashes is null") -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.13.0</version>
+                <configuration>
+                    <fork>true</fork>
+                    <meminitial>256m</meminitial>
+                    <maxmem>1024m</maxmem>
+                    <source>25</source>
+                    <target>25</target>
+                    <release>25</release>
+                    <compilerArgs>
+                        <arg>--enable-preview</arg>
+                    </compilerArgs>
+                </configuration>
+            </plugin>
+
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
