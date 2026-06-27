@@ -103,8 +103,7 @@ public class HUDManager {
         // ── 5. Vitesse de mouvement LoL → Minecraft ──
         applyMovementSpeed(player, champ.getStats());
 
-        // ── 6. Vitesse d'attaque → cooldown AA slot 0 ──
-        applyAttackSpeed(champ);
+        // (la cadence d'AA est gérée par AutoAttackManager, pas par le cooldown du slot)
     }
 
     /**
@@ -119,21 +118,6 @@ public class HUDManager {
         float mcSpeed = (float) Math.min(1.0, Math.max(0.05, (lolMS / 330.0) * 0.2));
         if (Math.abs(player.getWalkSpeed() - mcSpeed) > 0.001f) {
             player.setWalkSpeed(mcSpeed);
-        }
-    }
-
-    /**
-     * Applique la vitesse d'attaque au cooldown du sort AA (slot 0).
-     * LoL: AS 0.5-2.5 attaques/sec → cooldown AA = 1.0/AS secondes
-     */
-    private void applyAttackSpeed(fr.lolmc.champion.base.BaseChampion champ) {
-        double as = champ.getStats().getFinalAttackSpeed();
-        as = Math.max(0.2, Math.min(2.5, as));
-        double newCooldown = 1.0 / as;
-        var aa = champ.getAbility(0);
-        if (aa != null) {
-            // Modifier le cooldown de base de l'AA dynamiquement
-            aa.setDynamicCooldown(newCooldown);
         }
     }
 
