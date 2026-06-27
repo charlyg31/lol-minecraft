@@ -62,12 +62,13 @@ public class MasterYi extends BaseChampion {
             org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
             Location dest=safeTeleport(c.getLocation(),tgt.getLocation());
             c.teleport(dest);
-            double[] base=fr.lolmc.util.Balance.base("q_masteryi",new double[]{25,60,95,130,165});double dmg=base[getLevel()-1]+s.getFinalAD()*1.0;
-            DamageUtil.trueDamageEntity(c, tgt, dmg);
+            double[] base=fr.lolmc.util.Balance.base("q_masteryi",new double[]{20,45,70,95,120});double dmg=base[getLevel()-1]+s.getFinalAD()*0.40;
+            TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.PHYSICAL);
             c.getWorld().spawnParticle(Particle.CRIT,tgt.getLocation(),10,0.5,0.5,0.5);
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            return String.format("%.0f dégâts vrais (25+110%%AD). Dash sur la cible.",25+s.getFinalAD()*1.1);
+            double[] base={20,45,70,95,120};
+            return String.format("%.0f dégâts physiques (+40%%AD). Dash sur la cible, intouchable.",base[getLevel()-1]+s.getFinalAD()*0.40);
         }
     }
 
@@ -102,7 +103,8 @@ public class MasterYi extends BaseChampion {
             }.runTaskLater(LolPlugin.getInstance(), 100L); // 5s
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            return String.format("5s: +%.0f dégâts vrais par AA (10+10%%AD).",10+s.getFinalAD()*fr.lolmc.util.Balance.ratio("e_masteryi","ad",0.1));
+            double[] tb={18,26,34,42,50};
+            return String.format("5s: +%.0f dégâts vrais par AA (+35%%AD bonus).",tb[getLevel()-1]+s.getFinalAD()*0.35);
         }
     }
 
