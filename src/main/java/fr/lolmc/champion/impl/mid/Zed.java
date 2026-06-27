@@ -100,7 +100,7 @@ public class Zed extends BaseChampion {
         W(){
             super("w_zed","Ombre Vivante",Material.GRAY_DYE,AbilitySlot.W,
                     new double[]{0,0,0,0,0},0,0,DamageType.TRUE);
-            resourceCost = 40;
+            resourceCost = 0; // géré manuellement : coûte seulement au placement de l'ombre
         }
         @Override public void cast(Player c,ChampionStats s,Player t){
             UUID uuid = c.getUniqueId();
@@ -128,6 +128,15 @@ public class Zed extends BaseChampion {
                     c.teleportAsync(shadowLoc.clone());
                 }
             } else {
+                // Coût en énergie uniquement au placement de l'ombre (40)
+                var cm0 = LolPlugin.getInstance().getChampionManager();
+                if (cm0.hasChampion(c)) {
+                    var res = cm0.getChampion(c).getResourceSystem();
+                    if (res != null && !res.consume(40)) {
+                        c.sendActionBar(Component.text("❌ Pas assez d'énergie (40)", NamedTextColor.RED));
+                        return;
+                    }
+                }
                 Vector dir = c.getLocation().getDirection().setY(0).normalize();
                 Location shadowLoc = c.getLocation().clone().add(dir.multiply(8));
                 shadowLoc.setY(c.getWorld().getHighestBlockYAt(shadowLoc) + 1);
