@@ -185,7 +185,7 @@ public class MinionManager {
             }
         });
         applyMinionModel(minion, type, team, type == MinionType.CASTER ? 0.7f : (type == MinionType.CANNON ? 1.0f : 0.8f));
-        // Barre de vie APRÈS le modèle (customName n'est pas écrasé par makeInvisible)
+        // Barre de vie APRÈS makeInvisible (forcer visible=true car Paper cache le name sur les entités invisibles)
         double initHp = switch (type) {
             case CANNON -> 100.0 + waveCount * 3;
             case SUPER  -> 1500.0;
@@ -193,6 +193,7 @@ public class MinionManager {
         };
         String label = team == Team.BLUE ? "🔵 Sbire" : "🔴 Sbire";
         fr.lolmc.util.HealthBar.apply(minion, initHp, initHp, label);
+        minion.setCustomNameVisible(true); // forcer après makeInvisible
             // HP du cannon plus élevé
             if (type == MinionType.CANNON) {
                 var hpAttr = minion.getAttribute(fr.lolmc.util.Compat.maxHealth());
@@ -231,6 +232,9 @@ public class MinionManager {
                             : net.kyori.adventure.text.format.NamedTextColor.RED));
         });
         applyMinionModel(superMinion, MinionType.SUPER, team, 1.0f);
+        fr.lolmc.util.HealthBar.apply(superMinion, Math.min(MINION_HP * 3, 1000.0),
+            Math.min(MINION_HP * 3, 1000.0), team == Team.BLUE ? "🔵 Super-Sbire" : "🔴 Super-Sbire");
+        superMinion.setCustomNameVisible(true);
     }
 
     // ── Déplacement ───────────────────────────────────────────────
