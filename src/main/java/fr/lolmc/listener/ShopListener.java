@@ -167,7 +167,7 @@ public class ShopListener implements Listener {
             }
             if (!goldManager.spendGold(player.getUniqueId(), item.getGoldCost())) return false;
             hb.addConsumable(player, item.getId());
-            hb.renderPage(player, champ);
+            hb.showPage2(player, champ); // basculer sur la page utilitaire pour voir le consommable
             player.sendActionBar(Component.text("🧪 " + item.getDisplayName() + " ajouté (page 2)", NamedTextColor.GREEN));
             player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1f, 1.3f);
             return true;

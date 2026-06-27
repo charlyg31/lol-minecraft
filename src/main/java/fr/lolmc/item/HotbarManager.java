@@ -225,6 +225,12 @@ public class HotbarManager {
                 NamedTextColor.YELLOW));
     }
 
+    /** Force l'affichage de la page 2 (utilitaire) — utilisé après achat d'un consommable. */
+    public void showPage2(Player player, BaseChampion champ) {
+        currentPage.put(player.getUniqueId(), 2);
+        renderPage(player, champ);
+    }
+
     public int getPage(Player player) {
         return currentPage.getOrDefault(player.getUniqueId(), 1);
     }
