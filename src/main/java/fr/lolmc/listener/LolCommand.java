@@ -62,10 +62,14 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
         // /lol → commandes joueur (uniquement ce qui n'est pas géré par BungeeCord)
         if (cmd.getName().equalsIgnoreCase("lol")) {
             String sub = args.length > 0 ? args[0].toLowerCase() : "help";
+            boolean inGame = LolPlugin.getInstance().getGameManager().isGameRunning()
+                    && LolPlugin.getInstance().getChampionManager().hasChampion(player);
+
             switch (sub) {
                 case "runes" ->
                     LolPlugin.getInstance().getRuneGUI().open(player);
                 case "ping" -> {
+                    if (!inGame) { player.sendMessage(Component.text("❌ Disponible uniquement en partie.", NamedTextColor.RED)); break; }
                     String ptype = args.length > 1 ? args[1].toLowerCase() : "danger";
                     var type = switch (ptype) {
                         case "danger", "warn"          -> fr.lolmc.game.AnnouncementManager.PingType.DANGER;
@@ -78,27 +82,25 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
                     LolPlugin.getInstance().getAnnouncementManager().sendPing(player, type);
                 }
                 case "ff", "forfait" -> {
-                    if (!LolPlugin.getInstance().getGameManager().isGameRunning()) {
-                        player.sendMessage(Component.text("❌ Aucune partie en cours.", NamedTextColor.RED));
-                    } else {
-                        var tm = LolPlugin.getInstance().getTeamManager();
-                        for (var p : player.getWorld().getPlayers()) {
-                            if (!tm.areEnemies(player, p))
-                                p.sendMessage(Component.text(
-                                    "🏳 " + player.getName() + " vote pour abandonner. (/lol ff pour voter)",
-                                    NamedTextColor.YELLOW));
-                        }
+                    if (!inGame) { player.sendMessage(Component.text("❌ Disponible uniquement en partie.", NamedTextColor.RED)); break; }
+                    var tm = LolPlugin.getInstance().getTeamManager();
+                    for (var p : player.getWorld().getPlayers()) {
+                        if (!tm.areEnemies(player, p))
+                            p.sendMessage(Component.text(
+                                "🏳 " + player.getName() + " vote pour abandonner. (/lol ff pour voter)",
+                                NamedTextColor.YELLOW));
                     }
                 }
                 case "stats" -> {
+                    if (!inGame) { player.sendMessage(Component.text("❌ Disponible uniquement en partie.", NamedTextColor.RED)); break; }
                     var msb = LolPlugin.getInstance().getMatchScoreboard();
-                    var stats = msb != null ? msb.getStats().get(player.getUniqueId()) : null;
-                    if (stats == null) {
+                    var st = msb != null ? msb.getStats().get(player.getUniqueId()) : null;
+                    if (st == null) {
                         player.sendMessage(Component.text("Aucune stat disponible.", NamedTextColor.GRAY));
                     } else {
                         player.sendMessage(Component.text(String.format(
                             "§eStats: %d/%d/%d | CS %d | Or %d | DMG %,d",
-                            stats.kills, stats.deaths, stats.assists, stats.cs, stats.gold, stats.damageDealt),
+                            st.kills, st.deaths, st.assists, st.cs, st.gold, st.damageDealt),
                             NamedTextColor.GOLD));
                     }
                 }
