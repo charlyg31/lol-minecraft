@@ -130,11 +130,14 @@ public class LolItem {
     private void applyPassive(ChampionStats stats) {
         if (passiveName == null) return;
         switch (passiveName) {
-            case "Amplification" -> stats.multiplyAP(1.35);  // Rabadon's +35% AP
-            case "Awe" -> {
-                // Archangel's/Manamune: +1% AP ou AD pour chaque 100 mana bonus
-                // Appliqué dynamiquement dans HUDManager
-            }
+            case "Amplification"  -> stats.multiplyAP(1.35);   // Rabadon's +35% AP
+            case "Dominance"      -> stats.addBonusCritDamage(0.30); // Infinity Edge +30%
+            case "Last Whisper"   -> stats.addBonusArmorPenPercent(0.20);
+            case "Void"           -> stats.addBonusMagicPen(0.40);
+            case "Haunting"       -> stats.addBonusFlatMagicPen(15);
+            case "Forbidden", "Staff","Dawncore","Moonstone","Whispering" -> {} // soin% géré par HUDManager
+            case "Awe"            -> {} // dynamique via HUDManager
+            case "Smite"          -> {} // jungle PassiveManager
         }
     }
 

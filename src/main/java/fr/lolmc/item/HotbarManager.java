@@ -49,8 +49,8 @@ public class HotbarManager {
         KEY_SLOT = new NamespacedKey(LolPlugin.getInstance(), "lol_slot");
         KEY_RECALL = new NamespacedKey(LolPlugin.getInstance(), "lol_recall");
     }
-    // Items achetés par joueur (max 6) — index 0..5
-    private final Map<UUID, List<String>> ownedItems = new HashMap<>();
+    // NOTE: les items achetés sont lus depuis PlayerInventoryManager (source de vérité unique)
+    // ownedItems supprimé pour éviter la désynchronisation
 
     // Slots INVENTAIRE (2e/3e rangée) pour afficher les 6 items achetés
     // Slots 9-14 : première rangée de l'inventaire (sous la hotbar)
@@ -69,7 +69,6 @@ public class HotbarManager {
 
     public void initPlayer(Player player, BaseChampion champ) {
         currentPage.put(player.getUniqueId(), 1);
-        ownedItems.computeIfAbsent(player.getUniqueId(), k -> new ArrayList<>());
         renderPage(player, champ);
     }
 
@@ -77,28 +76,42 @@ public class HotbarManager {
     // GESTION DES ITEMS ACHETÉS
     // ════════════════════════════════════════════════════════
 
-    public boolean addItem(Player player, String itemId) {
-        List<String> owned = ownedItems.computeIfAbsent(player.getUniqueId(), k -> new ArrayList<>());
-        if (owned.size() >= 6) {
-            player.sendMessage(Component.text("❌ Inventaire plein (6/6 items)!", NamedTextColor.RED));
-            return false;
-        }
-        owned.add(itemId);
-        return true;
-    }
+    /**
+     * Ajoute un item dans la liste visuelle (hotbar).
+     * NE FAIT PLUS RIEN — l'ajout se fait via PlayerInventoryManager.equipItem().
+     * Méthode gardée pour compatibilité des appels existants dans ShopListener.
+     */
+    public boolean addItem(Player player, String itemId) { return true; }
 
-    public boolean removeItem(Player player, String itemId) {
-        List<String> owned = ownedItems.get(player.getUniqueId());
-        if (owned == null) return false;
-        return owned.remove(itemId);
-    }
+    /**
+     * Retire un item de la liste visuelle (hotbar).
+     * NE FAIT PLUS RIEN — le retrait se fait via PlayerInventoryManager.removeItemNoRefund().
+     * Méthode gardée pour compatibilité des appels existants dans ShopListener.
+     */
+    public boolean removeItem(Player player, String itemId) { return true; }
 
+    /**
+     * Retourne les IDs des items équipés en lisant depuis PlayerInventoryManager.
+     * C'est la source de vérité unique — les consommables NE sont PAS inclus.
+     */
     public List<String> getOwnedItems(Player player) {
-        return ownedItems.getOrDefault(player.getUniqueId(), new ArrayList<>());
+        var sl = LolPlugin.getInstance().getShopListener();
+        if (sl == null) return new ArrayList<>();
+        var inv = sl.getOrCreate(player);
+        List<String> result = new ArrayList<>();
+        for (LolItem item : inv.getEquippedItems()) {
+            if (item != null) result.add(item.getId());
+        }
+        return result;
     }
 
+    /**
+     * Vérifie si l'inventaire est plein (6/6 items, consommables exclus).
+     */
     public boolean isFull(Player player) {
-        return getOwnedItems(player).size() >= 6;
+        var sl = LolPlugin.getInstance().getShopListener();
+        if (sl == null) return false;
+        return sl.getOrCreate(player).isFull();
     }
 
     // ════════════════════════════════════════════════════════
@@ -461,7 +474,6 @@ public class HotbarManager {
     // Nettoyage mémoire (appelé à la déconnexion)
     public void cleanup(UUID uuid) {
         currentPage.remove(uuid);
-        ownedItems.remove(uuid);
         consumables.remove(uuid);
     }
 }
