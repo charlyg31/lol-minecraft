@@ -43,8 +43,11 @@ public class MissFortune extends BaseChampion {
         @Override protected void onHit(Player c, ChampionStats s, org.bukkit.entity.LivingEntity tgt, double dmg) {
             java.util.UUID prev = lastTarget.get(c.getUniqueId());
             if (prev == null || !prev.equals(tgt.getUniqueId())) {
-                // Nouvelle cible : Love Tap (70% AD bonus physique)
-                double bonusDmg = s.getFinalAD() * 0.70;
+                // Nouvelle cible : Love Tap, 49-105% AD selon niveau (LoL)
+                var cm0=LolPlugin.getInstance().getChampionManager();
+                int lvl=cm0.hasChampion(c)?cm0.getChampion(c).getLevelSystem().getLevel():1;
+                double lovePct=0.49+(1.05-0.49)*((lvl-1)/17.0); // interpolation 49%→105%
+                double bonusDmg = s.getFinalAD() * lovePct;
                 fr.lolmc.util.TargetingUtil.dealDamage(c, tgt, bonusDmg, fr.lolmc.util.TargetingUtil.DmgType.PHYSICAL);
                 c.getWorld().spawnParticle(org.bukkit.Particle.HEART, tgt.getLocation().add(0,1.5,0), 3, 0.3, 0.3, 0.3);
                 lastTarget.put(c.getUniqueId(), tgt.getUniqueId());
@@ -101,8 +104,9 @@ public class MissFortune extends BaseChampion {
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : zone au sol visée, dégâts magiques toutes les 0.25s sur 2s + ralentit 40-60%
             Location loc=TargetingUtil.getAimedGroundLocation(c, 8.0);
-            double[] tickBase={15,20,25,30,35};
-            double perTick=tickBase[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("e_missfortune","ap",0.1);
+            // Total 70/100/130/160/190 sur 8 ticks + 120% AP total (15% AP/tick)
+            double[] totalBase={70,100,130,160,190};
+            double perTick=totalBase[getLevel()-1]/8.0+s.getFinalAP()*0.15;
             loc.getWorld().spawnParticle(Particle.ENCHANT,loc,20,3,0.2,3);
             new BukkitRunnable(){
                 int ticks=0;
@@ -120,23 +124,26 @@ public class MissFortune extends BaseChampion {
             c.getWorld().playSound(loc, Sound.ENTITY_FIREWORK_ROCKET_LAUNCH, 1f, 1.2f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            double[] tickBase={15,20,25,30,35};
-            return String.format("Zone visée: %.0f dégâts/0.25s sur 2s + ralentit (zone de contrôle).",tickBase[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("e_missfortune","ap",0.1));
+            double[] totalBase={70,100,130,160,190};
+            return String.format("Zone visée: %.0f dégâts magiques sur 2s (+120%%AP) + slow 40%%.",totalBase[getLevel()-1]+s.getFinalAP()*1.2);
         }
     }
 
     static class R extends BaseAbility {
         R(){super("r_missfortune","Déluge de Balles",Material.NETHERITE_HOE,AbilitySlot.R,
-            new double[]{120,100,80},25,8,DamageType.PHYSICAL);
+            new double[]{100,90,80},25,8,DamageType.PHYSICAL);
             resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : canalise 3s, ~8 vagues de balles en CÔNE devant. Chaque vague = 75% AD + 35% AP (peut critiquer)
             c.sendActionBar(Component.text("🔫 DÉLUGE DE BALLES! 3s",NamedTextColor.RED));
-            double perWave=s.getFinalAD()*fr.lolmc.util.Balance.ratio("r_missfortune","ad",0.75)+s.getFinalAP()*fr.lolmc.util.Balance.ratio("r_missfortune","ap",0.35);
+            double perWave=s.getFinalAD()*fr.lolmc.util.Balance.ratio("r_missfortune","ad",0.75)+s.getFinalAP()*fr.lolmc.util.Balance.ratio("r_missfortune","ap",0.25);
+            // Nombre de vagues selon rang : 12/14/16
+            int[] waveCount={12,14,16};
+            final int totalWaves=waveCount[Math.min(getLevel()-1,2)];
             new BukkitRunnable(){
                 int waves=0;
                 @Override public void run(){
-                    if(waves>=8){cancel();return;} // 8 vagues sur 3s
+                    if(waves>=totalWaves){cancel();return;} // 12-16 vagues sur 3s
                     // Vague en cône devant
                     var targets=TargetingUtil.enemiesInCone(c, 9.0, 40);
                     for(var __t : targets){
@@ -153,11 +160,12 @@ public class MissFortune extends BaseChampion {
                     c.getWorld().playSound(c.getLocation(), Sound.ENTITY_FIREWORK_ROCKET_BLAST, 0.8f, 1.5f);
                     waves++;
                 }
-            }.runTaskTimer(LolPlugin.getInstance(),0L,7L); // 8 vagues × 7 ticks ≈ 3s
+            }.runTaskTimer(LolPlugin.getInstance(),0L,Math.max(1L,(long)(60/totalWaves))); // étalé sur ~3s
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            double perWave=s.getFinalAD()*fr.lolmc.util.Balance.ratio("r_missfortune","ad",0.75)+s.getFinalAP()*fr.lolmc.util.Balance.ratio("r_missfortune","ap",0.35);
-            return String.format("Canalise 3s: 8 vagues en cône, %.0f dégâts/vague (peut critiquer).",perWave);
+            double perWave=s.getFinalAD()*fr.lolmc.util.Balance.ratio("r_missfortune","ad",0.75)+s.getFinalAP()*fr.lolmc.util.Balance.ratio("r_missfortune","ap",0.25);
+            int[] waveCount={12,14,16};int n=waveCount[Math.min(getLevel()-1,2)];
+            return String.format("Canalise 3s: %d vagues en cône, %.0f dégâts/vague (peut critiquer).",n,perWave);
         }
     }
 }
