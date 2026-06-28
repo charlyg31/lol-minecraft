@@ -57,6 +57,50 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
     @Override
     public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args) {
         if (!(sender instanceof Player player)) { sender.sendMessage("§cJoueur uniquement."); return true; }
+
+        // /lol → commandes joueur (ff, help, stats)
+        if (cmd.getName().equalsIgnoreCase("lol")) {
+            String sub = args.length > 0 ? args[0].toLowerCase() : "help";
+            switch (sub) {
+                case "ff" -> {
+                    var gm = LolPlugin.getInstance().getGameManager();
+                    if (!gm.isGameRunning()) {
+                        player.sendMessage(Component.text("❌ Aucune partie en cours.", NamedTextColor.RED));
+                    } else {
+                        // Vote ff : annonce à l'équipe
+                        var tm = LolPlugin.getInstance().getTeamManager();
+                        var team = tm.getTeam(player);
+                        if (team != null) {
+                            for (var p : player.getWorld().getPlayers()) {
+                                if (!tm.areEnemies(player, p))
+                                    p.sendMessage(Component.text(
+                                        "🏳 " + player.getName() + " vote pour abandonner (/lol ff pour voter).",
+                                        NamedTextColor.YELLOW));
+                            }
+                        }
+                    }
+                }
+                case "stats" -> {
+                    var msb = LolPlugin.getInstance().getMatchScoreboard();
+                    var stats = msb != null ? msb.getStats().get(player.getUniqueId()) : null;
+                    if (stats == null) {
+                        player.sendMessage(Component.text("Aucune stat disponible.", NamedTextColor.GRAY));
+                    } else {
+                        player.sendMessage(Component.text(String.format(
+                            "§eStats: %d/%d/%d | CS: %d | Or: %d | DMG: %,d",
+                            stats.kills, stats.deaths, stats.assists, stats.cs, stats.gold, stats.damageDealt),
+                            NamedTextColor.GOLD));
+                    }
+                }
+                default -> {
+                    player.sendMessage(Component.text("§e/lol ff §7— Demander un forfait", NamedTextColor.WHITE));
+                    player.sendMessage(Component.text("§e/lol stats §7— Voir ses statistiques", NamedTextColor.WHITE));
+                }
+            }
+            return true;
+        }
+
+        // /lola → commandes admin uniquement
         if (!player.hasPermission("lolmc.admin") && !player.isOp()) {
             player.sendMessage(Component.text("❌ Permission requise.", NamedTextColor.RED));
             return true;
@@ -68,7 +112,7 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
             case "set" -> handleSet(player, args);
             case "position" -> handlePosition(player, args);
             case "lane" -> handleLane(player, args);
-            case "schem" -> handleSchem(player, args); // AJOUT : Liaison vers le gestionnaire de schématiques
+            case "schem" -> handleSchem(player, args);
             case "road" -> handleRoad(player, args);
             case "jungle" -> handleJungle(player, args);
             case "shopnpc" -> handleShopNpc(player, args);

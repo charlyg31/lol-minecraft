@@ -31,8 +31,14 @@ commands:
     aliases: [file, q]
     permission: lolmc.player.queue
   lol:
-    description: Configuration de la carte et tests (admin)
-    usage: /lol <set|position|lane|start|stop|solo|give|level|gold|hp|resetcd|buff|spawn|wave|ff|help>
+    description: Commandes joueur (ff, help, stats)
+    usage: /lol <ff|help|stats>
+    aliases: [LoL]
+    permission: lolmc.player
+  lola:
+    description: Commandes admin (config carte, tests, start/stop)
+    usage: /lola <set|position|lane|start|stop|solo|give|level|gold|hp|resetcd|buff|spawn|wave|select|reload|debug|testgame|schem|road|jungle|shopnpc|mode|team|help>
+    aliases: [lolAdmin, lol-admin]
     permission: lolmc.admin
   recall:
     description: Retour à la base
