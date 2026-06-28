@@ -338,8 +338,13 @@ public class PassiveManager {
 
     /** Passifs on-hit sur une entité non-joueur (sbire/monstre). Version simplifiée. */
     public void onAutoAttackEntity(Player attacker, org.bukkit.entity.LivingEntity victim) {
-        // Les passifs on-hit complexes (BotRK, Kraken) ne s'appliquent qu'aux champions.
-        // Sur sbires/monstres, on ne déclenche rien de spécial pour l'instant.
+        if (!championManager.hasChampion(attacker)) return;
+        // ── Scorchclaw Smite : AA ralentissent les monstres de jungle ──
+        if (hasAnyItem(attacker, "blue_smite")) {
+            victim.addPotionEffect(new org.bukkit.potion.PotionEffect(
+                org.bukkit.potion.PotionEffectType.SLOWNESS, 40, 1, false, false));
+        }
+        // ── Gustwalker Smite : bonus vitesse après tuer un monstre (géré dans onJungleKill) ──
     }
 
     // ════════════════════════════════════════════════════════
@@ -958,6 +963,42 @@ public class PassiveManager {
         return states.containsKey(uuid) && states.get(uuid).gaActive;
     }
 
+
+    /**
+     * Appelé quand un joueur tue un monstre de jungle.
+     * Gère les passifs des items de jungle.
+     */
+    public void onJungleKill(Player killer) {
+        if (!championManager.hasChampion(killer)) return;
+        var champ = championManager.getChampion(killer);
+        // ── Gustwalker Smite : +20% vitesse de déplacement pendant 2s après un kill ──
+        if (hasAnyItem(killer, "smite_stalker")) {
+            champ.getStats().addBonusMoveSpeed(20);
+            new org.bukkit.scheduler.BukkitRunnable() {
+                @Override public void run() { champ.getStats().addBonusMoveSpeed(-20); }
+            }.runTaskLater(LolPlugin.getInstance(), 40L);
+            killer.sendActionBar(net.kyori.adventure.text.Component.text(
+                "🌿 Gustwalker: +20 MS!", net.kyori.adventure.text.format.NamedTextColor.GREEN));
+        }
+        // ── Mosstomper Smite : bouclier 65-170 après un kill de jungle (CD 12s) ──
+        if (hasAnyItem(killer, "pickaxe_jungle")) {
+            ItemState state = getState(killer);
+            long now = System.currentTimeMillis();
+            if (state.lastMosstomperShield == 0 || now - state.lastMosstomperShield > 12000) {
+                state.lastMosstomperShield = now;
+                int lvl = champ.getLevelSystem().getLevel();
+                double shield = 65 + lvl * 7.0; // ~65-170 selon niveau
+                champ.getStats().addShield(shield);
+                final double fsh = shield;
+                new org.bukkit.scheduler.BukkitRunnable() {
+                    @Override public void run() { champ.getStats().addShield(-fsh); }
+                }.runTaskLater(LolPlugin.getInstance(), 60L); // 3s
+                killer.sendActionBar(net.kyori.adventure.text.Component.text(
+                    String.format("🌿 Mosstomper: Bouclier %.0f!", shield),
+                    net.kyori.adventure.text.format.NamedTextColor.GREEN));
+            }
+        }
+    }
 
     /** Nettoie l'état d'un joueur (déconnexion / fin de partie). */
     public void cleanup(java.util.UUID uuid) {

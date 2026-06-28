@@ -20,6 +20,11 @@ public class MatchScoreboard {
         public final UUID uuid;
         public final String name;
         public int kills, deaths, assists, cs, gold;
+        public long damageDealt = 0;    // dégâts infligés aux champions
+        public long damageTaken = 0;    // dégâts subis
+        public long healingDone = 0;    // soins prodigués (self + alliés)
+        public int wardsPlaced = 0;     // wards posées
+        public int wardsKilled = 0;     // wards détruites
 
         public MatchStats(UUID uuid, String name) {
             this.uuid = uuid; this.name = name;
@@ -50,6 +55,11 @@ public class MatchScoreboard {
     public void addAssist(Player p) { get(p).assists++; }
     public void addCS(Player p)     { get(p).cs++; }
     public void addGold(Player p, int amount) { get(p).gold += amount; }
+    public void addDamageDealt(Player p, double dmg) { get(p).damageDealt += (long) dmg; }
+    public void addDamageTaken(Player p, double dmg) { get(p).damageTaken += (long) dmg; }
+    public void addHealing(Player p, double heal)    { get(p).healingDone += (long) heal; }
+    public void addWardPlaced(Player p)  { get(p).wardsPlaced++; }
+    public void addWardKilled(Player p)  { get(p).wardsKilled++; }
 
     // ══════════════════════════════════════════════════════════════
     // AFFICHAGE DE FIN DE PARTIE
@@ -59,28 +69,6 @@ public class MatchScoreboard {
      * Affiche le tableau de score à tous les joueurs et persiste en base.
      * @param winner équipe gagnante
      */
-    public void showEndScreen(Team winner) {
-        var tm = LolPlugin.getInstance().getTeamManager();
-
-        // Construire l'affichage
-        List<Component> lines = new ArrayList<>();
-        lines.add(Component.text("═══════ FIN DE PARTIE ═══════", NamedTextColor.GOLD));
-        lines.add(Component.text("🏆 Victoire : équipe " + (winner == Team.BLUE ? "BLEUE" : "ROUGE"),
-                winner.chatColor));
-        lines.add(Component.empty());
-
-        appendTeamScores(lines, Team.BLUE, tm);
-        lines.add(Component.empty());
-        appendTeamScores(lines, Team.RED, tm);
-
-        for (Player p : Bukkit.getOnlinePlayers()) {
-            for (Component line : lines) p.sendMessage(line);
-        }
-
-        // Persister en base (KDA + résultat) et mettre à jour le classement
-        persistResults(winner, tm);
-    }
-
     private void appendTeamScores(List<Component> lines, Team team, fr.lolmc.team.TeamManager tm) {
         lines.add(Component.text("── Équipe " + (team == Team.BLUE ? "Bleue" : "Rouge") + " ──",
                 team.chatColor));
@@ -90,10 +78,45 @@ public class MatchScoreboard {
             if (s == null) {
                 lines.add(Component.text("  " + name + " : 0/0/0", NamedTextColor.GRAY));
             } else {
-                lines.add(Component.text(String.format("  %s : %d/%d/%d  (CS %d, %d or)",
-                        name, s.kills, s.deaths, s.assists, s.cs, s.gold), NamedTextColor.WHITE));
+                lines.add(Component.text(String.format(
+                    "  %s : %d/%d/%d  CS %d  %dor",
+                    name, s.kills, s.deaths, s.assists, s.cs, s.gold),
+                    NamedTextColor.WHITE));
+                lines.add(Component.text(String.format(
+                    "    DMG: %,d infligés / %,d subis  Soins: %,d  Wards: %d posées %d détruites",
+                    s.damageDealt, s.damageTaken, s.healingDone, s.wardsPlaced, s.wardsKilled),
+                    NamedTextColor.GRAY));
             }
         }
+    }
+
+    /** Affiche le tableau de score à tous les joueurs et persiste en base. */
+    public void showEndScreen(Team winner) {
+        var tm = LolPlugin.getInstance().getTeamManager();
+        var feat = LolPlugin.getInstance().getFeatManager();
+
+        List<Component> lines = new ArrayList<>();
+        lines.add(Component.text("═══════ FIN DE PARTIE ═══════", NamedTextColor.GOLD));
+        lines.add(Component.text("🏆 Victoire : équipe " + (winner == Team.BLUE ? "BLEUE" : "ROUGE"),
+                winner.chatColor));
+        lines.add(Component.empty());
+
+        // Feats of Strength
+        if (feat != null) {
+            lines.add(Component.text("⚡ Feats of Strength : " + feat.getSummary(),
+                    NamedTextColor.YELLOW));
+            lines.add(Component.empty());
+        }
+
+        appendTeamScores(lines, Team.BLUE, tm);
+        lines.add(Component.empty());
+        appendTeamScores(lines, Team.RED, tm);
+
+        for (Player p : Bukkit.getOnlinePlayers()) {
+            for (Component line : lines) p.sendMessage(line);
+        }
+
+        persistResults(winner, tm);
     }
 
     private void persistResults(Team winner, fr.lolmc.team.TeamManager tm) {

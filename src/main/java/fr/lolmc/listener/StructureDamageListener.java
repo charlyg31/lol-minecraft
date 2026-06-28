@@ -109,6 +109,9 @@ public class StructureDamageListener implements Listener {
         // Inhibiteur détruit → super-sbires sur cette lane pour l'équipe adverse
         if (structure.getType() == Type.TURRET) {
             LolPlugin.getInstance().getRewardManager().onTurretDestroyed(player, playerTeam);
+            // Feat of Strength : Première Tourelle
+            LolPlugin.getInstance().getFeatManager().claim(
+                fr.lolmc.game.FeatManager.Feat.FIRST_TOWER, playerTeam, player);
         } else if (structure.getType() == Type.INHIBITOR) {
             LolPlugin.getInstance().getMinionManager()
                     .enableSuperMinions(enemyTeam, structure.getLane());

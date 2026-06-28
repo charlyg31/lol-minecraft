@@ -303,6 +303,9 @@ public class JungleManager {
             // (l'entité est déjà morte, on utilise l'or du type par défaut)
             LolPlugin.getInstance().getRewardManager()
                     .onJungleMonsterKill(killer, gold, type.xp);
+            // Passifs items de jungle (Gustwalker, Mosstomper, Scorchclaw)
+            var pm = LolPlugin.getInstance().getPassiveManager();
+            if (pm != null) pm.onJungleKill(killer);
 
             // Buffs d'objectifs : les épiques buffent TOUTE l'équipe (Dragon/Baron),
             // les camps rouge/bleu restent des buffs personnels.
@@ -335,6 +338,13 @@ public class JungleManager {
                 LolPlugin.getInstance().getServer().broadcast(Component.text(
                         "🌟 " + type.displayName + " tué par " + killer.getName() + "!",
                         NamedTextColor.GOLD));
+                // Feat of Strength : Premier Objectif Épique (Dragon ou Héraut)
+                if (type.isDragon() || type == MonsterType.HERALD) {
+                    var kt = LolPlugin.getInstance().getTeamManager().getTeam(killer);
+                    if (kt != null)
+                        LolPlugin.getInstance().getFeatManager().claim(
+                            fr.lolmc.game.FeatManager.Feat.FIRST_EPIC, kt, killer);
+                }
             }
         }
     }
