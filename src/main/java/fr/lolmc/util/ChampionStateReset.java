@@ -11,6 +11,7 @@ import fr.lolmc.champion.impl.jungle.Amumu;
 import fr.lolmc.champion.impl.jungle.LeeSin;
 import fr.lolmc.champion.impl.jungle.MasterYi;
 import fr.lolmc.champion.impl.support.Blitzcrank;
+import fr.lolmc.champion.impl.support.Leona;
 import fr.lolmc.champion.impl.adc.Jinx;
 import fr.lolmc.champion.impl.adc.MissFortune;
 import fr.lolmc.champion.impl.adc.Sivir;
@@ -39,6 +40,7 @@ public final class ChampionStateReset {
         LeeSin.resetState(id);
         MasterYi.resetState(id);
         Blitzcrank.resetState(id);
+        Leona.resetState(id);
         Jinx.resetState(id);
         MissFortune.resetState(id);
         Sivir.resetState(id);
@@ -57,6 +59,7 @@ public final class ChampionStateReset {
         LeeSin.resetAllState();
         MasterYi.resetAllState();
         Blitzcrank.resetAllState();
+        Leona.resetAllState();
         Jinx.resetAllState();
         MissFortune.resetAllState();
         Sivir.resetAllState();

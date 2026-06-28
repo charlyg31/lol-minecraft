@@ -36,6 +36,8 @@ public class Leona extends BaseChampion {
     // Un allié qui frappe un ennemi marqué inflige 35-80 dégâts magiques bonus.
     static final java.util.Map<java.util.UUID, Long> sunlightMark
         = new java.util.concurrent.ConcurrentHashMap<>();
+    public static void resetState(java.util.UUID id)  { sunlightMark.remove(id); }
+    public static void resetAllState()                 { sunlightMark.clear(); }
     public static void applyMark(org.bukkit.entity.LivingEntity target) {
         sunlightMark.put(target.getUniqueId(), System.currentTimeMillis() + 3500L);
         target.getWorld().spawnParticle(org.bukkit.Particle.END_ROD,
