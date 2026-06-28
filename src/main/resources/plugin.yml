@@ -7,59 +7,13 @@ description: League of Legends en Minecraft — 20 champions
 commands:
   lol:
     description: Commandes joueur LoL
-    usage: /lol <runes|sorts|pick|role|queue|lobby|recall|ping|ff|stats|help>
+    usage: /lol <runes|sorts|pick|lock|role|queue|party|recall|ping|ff|stats|help>
     permission: lolmc.player
   lola:
     description: Commandes admin LoL
     usage: /lola <start|stop|set|position|lane|solo|give|level|gold|hp|resetcd|buff|spawn|wave|select|reload|debug|testgame|schem|road|jungle|shopnpc|mode|team|help>
     aliases: [lolAdmin]
     permission: lolmc.admin
-  # Aliases standalone pour confort (redirigent vers /lol)
-  shop:
-    description: Ouvre la boutique LoL
-    aliases: [boutique, b]
-    permission: lolmc.player.shop
-  champion:
-    description: Gère les champions LoL
-    aliases: [champ]
-    permission: lolmc.champion.use
-  recall:
-    description: Retour à la base
-    permission: lolmc.player.recall
-  ping:
-    description: Envoyer un ping à l'équipe
-    permission: lolmc.player.ping
-  runes:
-    description: Configurer ses runes
-    permission: lolmc.player.runes
-  pick:
-    description: Choisir un champion
-    permission: lolmc.player.pick
-  spell:
-    description: Choisir ses sorts d'invocateur
-    permission: lolmc.player.spell
-  lock:
-    description: Verrouiller sa sélection
-    permission: lolmc.player.lock
-  queue:
-    description: Rejoindre la file d'attente
-    aliases: [file, q]
-    permission: lolmc.player.queue
-  roles:
-    description: Choisir ses rôles
-    permission: lolmc.player.roles
-  lobby:
-    description: Ouvrir le menu de préparation
-    aliases: [play]
-    permission: lolmc.player.lobby
-  party:
-    description: Gérer son groupe
-    aliases: [groupe, p]
-    permission: lolmc.player.party
-  team:
-    description: Rejoindre une équipe
-    aliases: [equipe]
-    permission: lolmc.player.team
 
 permissions:
   lolmc.admin:

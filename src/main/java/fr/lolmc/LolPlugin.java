@@ -220,34 +220,7 @@ public class LolPlugin extends JavaPlugin {
 
     /** Branche les commandes (/champion, /shop, /lol, ...) et les derniers ecouteurs. */
     private void registerCommands() {
-        var cmd = getCommand("champion");
-        if (cmd != null) {
-            var champCmd = new ChampionCommand(championManager, championGUI);
-            cmd.setExecutor(champCmd);
-            cmd.setTabCompleter(champCmd);
-        }
-
-        var shopCmd = getCommand("shop");
-        if (shopCmd != null) {
-            var sc = new ShopCommand(shopGUI, championManager, goldManager);
-            shopCmd.setExecutor(sc);
-            shopCmd.setTabCompleter(sc);
-        }
-        var teamCmd = getCommand("team");
-        if (teamCmd != null) {
-            var tc = new fr.lolmc.listener.TeamCommand(teamManager);
-            teamCmd.setExecutor(tc);
-            teamCmd.setTabCompleter(tc);
-        }
-        var partyCmd = new PartyCommand(partyManager, matchmakingManager);
-        if (getCommand("party") != null) {
-            getCommand("party").setExecutor(partyCmd);
-            getCommand("party").setTabCompleter(partyCmd);
-        }
-        if (getCommand("queue") != null) {
-            getCommand("queue").setExecutor(partyCmd);
-            getCommand("queue").setTabCompleter(partyCmd);
-        }
+        // Seules deux commandes : /lol (joueurs) et /lola (admins)
         var lolCmd = new LolCommand(mapManager, roadManager);
         if (getCommand("lol") != null) {
             getCommand("lol").setExecutor(lolCmd);
@@ -258,12 +231,6 @@ public class LolPlugin extends JavaPlugin {
             getCommand("lola").setTabCompleter(lolCmd);
         }
         getServer().getPluginManager().registerEvents(lolCmd, this);
-        var playerCmds = new fr.lolmc.listener.PlayerCommands();
-        if (getCommand("recall") != null) getCommand("recall").setExecutor(playerCmds);
-        if (getCommand("ping") != null) {
-            getCommand("ping").setExecutor(playerCmds);
-            getCommand("ping").setTabCompleter(playerCmds);
-        }
         getServer().getPluginManager().registerEvents(
                 new fr.lolmc.listener.StructureDamageListener(mapManager, championManager, teamManager), this);
         getServer().getPluginManager().registerEvents(new fr.lolmc.listener.ChatListener(), this);
