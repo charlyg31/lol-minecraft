@@ -5,89 +5,78 @@ api-version: '26.1'
 description: League of Legends en Minecraft — 20 champions
 
 commands:
-  champion:
-    description: Gère les champions LoL
-    usage: /champion <pick|list|info> [args]
-    aliases: [champ]
-    permission: lolmc.champion.use
-  shop:
-    description: Ouvre la boutique LoL
-    usage: /shop [gold|addgold <montant>]
-    aliases: [boutique, b]
-    permission: lolmc.player.shop
-  team:
-    description: Rejoindre une équipe (bleu/rouge)
-    usage: /team <bleu|rouge|auto>
-    aliases: [equipe]
-    permission: lolmc.player.team
-  party:
-    description: Gérer son groupe
-    usage: /party <invite|accept|leave|info>
-    aliases: [groupe, p]
-    permission: lolmc.player.party
-  queue:
-    description: Rejoindre la file d'attente
-    usage: /queue [leave]
-    aliases: [file, q]
-    permission: lolmc.player.queue
   lol:
-    description: Commandes joueur (ff, help, stats)
-    usage: /lol <ff|help|stats>
-    aliases: [LoL]
+    description: Commandes joueur LoL
+    usage: /lol <runes|sorts|pick|role|queue|lobby|recall|ping|ff|stats|help>
     permission: lolmc.player
   lola:
-    description: Commandes admin (config carte, tests, start/stop)
-    usage: /lola <set|position|lane|start|stop|solo|give|level|gold|hp|resetcd|buff|spawn|wave|select|reload|debug|testgame|schem|road|jungle|shopnpc|mode|team|help>
-    aliases: [lolAdmin, lol-admin]
+    description: Commandes admin LoL
+    usage: /lola <start|stop|set|position|lane|solo|give|level|gold|hp|resetcd|buff|spawn|wave|select|reload|debug|testgame|schem|road|jungle|shopnpc|mode|team|help>
+    aliases: [lolAdmin]
     permission: lolmc.admin
+  # Aliases standalone pour confort (redirigent vers /lol)
+  shop:
+    description: Ouvre la boutique LoL
+    aliases: [boutique, b]
+    permission: lolmc.player.shop
+  champion:
+    description: Gère les champions LoL
+    aliases: [champ]
+    permission: lolmc.champion.use
   recall:
     description: Retour à la base
-    usage: /recall
     permission: lolmc.player.recall
   ping:
     description: Envoyer un ping à l'équipe
-    usage: /ping <danger|omw|miss|assist|enemy>
     permission: lolmc.player.ping
-  pick:
-    description: Choisir un champion
-    permission: lolmc.player.pick
   runes:
     description: Configurer ses runes
     permission: lolmc.player.runes
+  pick:
+    description: Choisir un champion
+    permission: lolmc.player.pick
   spell:
     description: Choisir ses sorts d'invocateur
     permission: lolmc.player.spell
   lock:
     description: Verrouiller sa sélection
     permission: lolmc.player.lock
+  queue:
+    description: Rejoindre la file d'attente
+    aliases: [file, q]
+    permission: lolmc.player.queue
   roles:
-    description: Choisir ses roles preferes
+    description: Choisir ses rôles
     permission: lolmc.player.roles
   lobby:
-    description: Ouvrir le menu de preparation
+    description: Ouvrir le menu de préparation
+    aliases: [play]
     permission: lolmc.player.lobby
-  play:
-    description: Ouvrir le menu de preparation
-    permission: lolmc.player.lobby
+  party:
+    description: Gérer son groupe
+    aliases: [groupe, p]
+    permission: lolmc.player.party
+  team:
+    description: Rejoindre une équipe
+    aliases: [equipe]
+    permission: lolmc.player.team
 
 permissions:
-  # ── Permission maître admin ──
   lolmc.admin:
-    description: Accès à toutes les commandes admin (config carte, tests solo)
+    description: Accès à toutes les commandes admin
     default: op
     children:
       lolmc.admin.config: true
       lolmc.admin.test: true
   lolmc.admin.config:
-    description: Configurer la carte (tourelles, nexus, routes, jungle, npc)
+    description: Configurer la carte
     default: op
   lolmc.admin.test:
-    description: Commandes de test (solo, give, level, gold, testgame)
+    description: Commandes de test
     default: op
 
-  # ── Permissions joueur (regroupées) ──
   lolmc.player:
-    description: Toutes les commandes joueur de base
+    description: Toutes les commandes joueur
     default: true
     children:
       lolmc.player.shop: true
@@ -102,46 +91,21 @@ permissions:
       lolmc.player.lock: true
       lolmc.player.roles: true
       lolmc.player.lobby: true
-  lolmc.player.shop:
-    description: Ouvrir la boutique
-    default: true
-  lolmc.player.team:
-    description: Rejoindre une équipe
-    default: true
-  lolmc.player.party:
-    description: Gérer son groupe
-    default: true
-  lolmc.player.queue:
-    description: Rejoindre la file
-    default: true
-  lolmc.player.recall:
-    description: Utiliser le recall
-    default: true
-  lolmc.player.ping:
-    description: Envoyer des pings
-    default: true
-  lolmc.player.pick:
-    description: Choisir un champion en sélection
-    default: true
-  lolmc.player.runes:
-    description: Configurer ses runes
-    default: true
-  lolmc.player.spell:
-    description: Choisir ses sorts d'invocateur
-    default: true
-  lolmc.player.lock:
-    description: Verrouiller sa sélection
-    default: true
-  lolmc.player.roles:
-    description: Choisir ses rôles
-    default: true
-  lolmc.player.lobby:
-    description: Ouvrir le menu de préparation
-    default: true
+  lolmc.player.shop:    {description: Ouvrir la boutique,          default: true}
+  lolmc.player.team:    {description: Rejoindre une équipe,         default: true}
+  lolmc.player.party:   {description: Gérer son groupe,             default: true}
+  lolmc.player.queue:   {description: Rejoindre la file,            default: true}
+  lolmc.player.recall:  {description: Utiliser le recall,           default: true}
+  lolmc.player.ping:    {description: Envoyer des pings,            default: true}
+  lolmc.player.pick:    {description: Choisir un champion,          default: true}
+  lolmc.player.runes:   {description: Configurer ses runes,         default: true}
+  lolmc.player.spell:   {description: Choisir ses sorts,            default: true}
+  lolmc.player.lock:    {description: Verrouiller sa sélection,     default: true}
+  lolmc.player.roles:   {description: Choisir ses rôles,            default: true}
+  lolmc.player.lobby:   {description: Ouvrir le menu de préparation,default: true}
 
-  # ── Permissions champion ──
   lolmc.champion.use:
-    description: Utiliser la commande champion et jouer tous les champions
+    description: Jouer tous les champions
     default: true
     children:
       lolmc.champion.garen: true
@@ -164,27 +128,26 @@ permissions:
       lolmc.champion.sivir: true
       lolmc.champion.jinx: true
       lolmc.champion.missfortune: true
-  lolmc.champion.garen: {description: Jouer Garen, default: true}
-  lolmc.champion.darius: {description: Jouer Darius, default: true}
-  lolmc.champion.malphite: {description: Jouer Malphite, default: true}
-  lolmc.champion.nasus: {description: Jouer Nasus, default: true}
-  lolmc.champion.warwick: {description: Jouer Warwick, default: true}
-  lolmc.champion.amumu: {description: Jouer Amumu, default: true}
-  lolmc.champion.masteryi: {description: Jouer Master Yi, default: true}
-  lolmc.champion.leesin: {description: Jouer Lee Sin, default: true}
-  lolmc.champion.annie: {description: Jouer Annie, default: true}
-  lolmc.champion.veigar: {description: Jouer Veigar, default: true}
-  lolmc.champion.zed: {description: Jouer Zed, default: true}
-  lolmc.champion.yasuo: {description: Jouer Yasuo, default: true}
-  lolmc.champion.morgana: {description: Jouer Morgana, default: true}
-  lolmc.champion.leona: {description: Jouer Leona, default: true}
-  lolmc.champion.blitzcrank: {description: Jouer Blitzcrank, default: true}
-  lolmc.champion.janna: {description: Jouer Janna, default: true}
-  lolmc.champion.ashe: {description: Jouer Ashe, default: true}
-  lolmc.champion.sivir: {description: Jouer Sivir, default: true}
-  lolmc.champion.jinx: {description: Jouer Jinx, default: true}
+  lolmc.champion.garen:       {description: Jouer Garen,        default: true}
+  lolmc.champion.darius:      {description: Jouer Darius,       default: true}
+  lolmc.champion.malphite:    {description: Jouer Malphite,     default: true}
+  lolmc.champion.nasus:       {description: Jouer Nasus,        default: true}
+  lolmc.champion.warwick:     {description: Jouer Warwick,      default: true}
+  lolmc.champion.amumu:       {description: Jouer Amumu,        default: true}
+  lolmc.champion.masteryi:    {description: Jouer Master Yi,    default: true}
+  lolmc.champion.leesin:      {description: Jouer Lee Sin,      default: true}
+  lolmc.champion.annie:       {description: Jouer Annie,        default: true}
+  lolmc.champion.veigar:      {description: Jouer Veigar,       default: true}
+  lolmc.champion.zed:         {description: Jouer Zed,          default: true}
+  lolmc.champion.yasuo:       {description: Jouer Yasuo,        default: true}
+  lolmc.champion.morgana:     {description: Jouer Morgana,      default: true}
+  lolmc.champion.leona:       {description: Jouer Leona,        default: true}
+  lolmc.champion.blitzcrank:  {description: Jouer Blitzcrank,   default: true}
+  lolmc.champion.janna:       {description: Jouer Janna,        default: true}
+  lolmc.champion.ashe:        {description: Jouer Ashe,         default: true}
+  lolmc.champion.sivir:       {description: Jouer Sivir,        default: true}
+  lolmc.champion.jinx:        {description: Jouer Jinx,         default: true}
   lolmc.champion.missfortune: {description: Jouer Miss Fortune, default: true}
 
 bungeecord: true
-
 soft-depend: [Multiverse-Core]

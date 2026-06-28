@@ -43,6 +43,9 @@ public class ShopListener implements Listener {
         this.hudManager = hudManager;
     }
 
+    /** Ouvre la boutique pour un joueur (appelable depuis /lol shop). */
+    public void openShop(Player player) { shopGUI.open(player); }
+
     // ── Initialiser l'inventaire d'un joueur ──────────────────────
     public PlayerInventoryManager getOrCreate(Player player) {
         return inventoryManagers.computeIfAbsent(
