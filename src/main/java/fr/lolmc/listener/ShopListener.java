@@ -139,6 +139,9 @@ public class ShopListener implements Listener {
         }
 
         // ── Vue PARCOURS ──
+        // D'abord vérifier si c'est un bouton de pagination
+        if (shopGUI.handlePaginationClick(player, slot)) return;
+
         LolItem.ItemCategory cat = shopGUI.getClickedCategory(slot);
         if (cat != null) { shopGUI.open(player, cat); return; }
 
