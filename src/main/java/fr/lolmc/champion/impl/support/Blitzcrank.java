@@ -56,14 +56,14 @@ public class Blitzcrank extends BaseChampion {
 
     static class Q extends BaseAbility {
         Q(){super("q_blitzcrank","Grappin Fusée",Material.FISHING_ROD,AbilitySlot.Q,
-            new double[]{20,19,18,17,16},20,0,DamageType.MAGICAL);
+            new double[]{11,10.5,10,9.5,9},20,0,DamageType.MAGICAL);
             resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : SKILLSHOT signature. Attrape le 1er ennemi, 110-310 + 120% AP, stun + tire vers Blitz
             var hits=TargetingUtil.skillshot(c, 12.0, 1.0, false);
             if(hits.isEmpty()){c.sendActionBar(Component.text("🪝 Grappin manqué!",NamedTextColor.GRAY));return;}
             var tgt=hits.get(0);
-            double[] base=fr.lolmc.util.Balance.base("q_blitzcrank",new double[]{110,160,210,260,310});double dmg=base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("q_blitzcrank","ap",1.2);
+            double[] base=fr.lolmc.util.Balance.base("q_blitzcrank",new double[]{110,160,210,260,310});double dmg=base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("q_blitzcrank","ap",1.5);
             // Animation : chaîne qui voyage vers la cible
             org.bukkit.Location hookStart = c.getEyeLocation();
             org.bukkit.Location hookEnd = tgt.getLocation().add(0,1,0);
@@ -98,7 +98,7 @@ public class Blitzcrank extends BaseChampion {
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] base=fr.lolmc.util.Balance.base("q_blitzcrank",new double[]{110,160,210,260,310});
-            return String.format("Skillshot: %.0f dégâts (+120%%AP), attrape et tire la cible vers toi + stun.",base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("q_blitzcrank","ap",1.2));
+            return String.format("Skillshot: %.0f dégâts (+150%%AP), attrape et tire la cible vers toi + stun.",base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("q_blitzcrank","ap",1.5));
         }
     }
 
@@ -118,12 +118,13 @@ public class Blitzcrank extends BaseChampion {
 
     static class E extends BaseAbility {
         E(){super("e_blitzcrank","Poing de Force",Material.LIGHTNING_ROD,AbilitySlot.E,
-            new double[]{7,6.5,6,5.5,5},5,0,DamageType.PHYSICAL);
+            new double[]{9,8,7,6,5},5,0,DamageType.PHYSICAL);
             resourceCost = 25;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : prochaine attaque renforcée = knockup 1s + 200% AD
             org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,2.5); if(tgt==null){c.sendActionBar(Component.text("⚡ Poing de Force prêt (frappe un ennemi)",NamedTextColor.YELLOW));return;}
-            double dmg=s.getFinalAD()*fr.lolmc.util.Balance.ratio("e_blitzcrank","ad",2.0)+s.getFinalAP()*fr.lolmc.util.Balance.ratio("e_blitzcrank","ap",0.25);
+            // Double l'attaque de base : AA (100% AD) + 100% AD bonus = 200% AD total
+            double dmg=s.getFinalAD()*2.0;
             TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.PHYSICAL);
             tgt.setVelocity(new Vector(0,1.0,0)); // knockup
             if(tgt instanceof Player __p)__p.sendActionBar(Component.text("⚡ KNOCKUP! Poing de Force",NamedTextColor.YELLOW));
@@ -131,22 +132,29 @@ public class Blitzcrank extends BaseChampion {
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_PLAYER_ATTACK_CRIT, 1f, 0.7f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            return String.format("Prochaine attaque: %.0f dégâts (200%%AD) + knockup 1s.",s.getFinalAD()*fr.lolmc.util.Balance.ratio("e_blitzcrank","ad",2.0));
+            return String.format("Prochaine attaque double les dégâts: %.0f (200%%AD) + knockup 1s.",s.getFinalAD()*2.0);
         }
     }
 
     static class R extends BaseAbility {
         R(){super("r_blitzcrank","Champ Statique",Material.COPPER_INGOT,AbilitySlot.R,
-            new double[]{40,30,20},5,4,DamageType.MAGICAL);
+            new double[]{30,20,10},5,4,DamageType.MAGICAL);
             resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : 275/400/525 + 100% AP, silence 0.5s + détruit les boucliers, autour
             double[] base=fr.lolmc.util.Balance.base("r_blitzcrank",new double[]{275,400,525});int r=Math.min(getLevel()-1,2);double dmg=base[r]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("r_blitzcrank","ap",1.0);
+            var cc=LolPlugin.getInstance().getCCManager();
+            var cm=LolPlugin.getInstance().getChampionManager();
             for(var __t : TargetingUtil.enemiesAround(c, 4.5)){
+                // Détruit les boucliers avant les dégâts (signature du Champ Statique)
+                if(__t instanceof Player __sp && cm.hasChampion(__sp)){
+                    double sh=cm.getChampion(__sp).getStats().getShield();
+                    if(sh>0) cm.getChampion(__sp).getStats().addShield(-sh);
+                }
                 TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);
                 if(__t instanceof Player __p){
-                    __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,10,5,false,true)); // silence approx
-                    __p.sendActionBar(Component.text("⚡ CHAMP STATIQUE! Silence",NamedTextColor.AQUA));
+                    if(cc!=null) cc.silence(__p, 10); // vrai silence 0.5s
+                    __p.sendActionBar(Component.text("⚡ CHAMP STATIQUE! Silence + boucliers détruits",NamedTextColor.AQUA));
                 }
             }
             c.getWorld().strikeLightningEffect(c.getLocation());
