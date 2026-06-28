@@ -141,10 +141,6 @@ public abstract class BaseChampion {
 // Déclencher passifs post-sort (Spellblade, Shojin, etc.)
         var pm = LolPlugin.getInstance().getPassiveManager();
         if (pm != null) pm.onAbilityCast(caster, slot);
-
-// Refresh tooltip après le cast
-        refreshSlot(caster, slot);
-        if (pm != null) pm.onAbilityCast(caster, slot);
         // Refresh tooltip après le cast
         refreshSlot(caster, slot);
     }
