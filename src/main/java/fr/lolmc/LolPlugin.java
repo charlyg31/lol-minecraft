@@ -222,9 +222,9 @@ public class LolPlugin extends JavaPlugin {
     private void registerCommands() {
         // Seules deux commandes : /lol (joueurs) et /lola (admins)
         var lolCmd = new LolCommand(mapManager, roadManager);
-        if (getCommand("lol") != null) {
-            getCommand("lol").setExecutor(lolCmd);
-            getCommand("lol").setTabCompleter(lolCmd);
+        if (getCommand("l") != null) {
+            getCommand("l").setExecutor(lolCmd);
+            getCommand("l").setTabCompleter(lolCmd);
         }
         if (getCommand("lola") != null) {
             getCommand("lola").setExecutor(lolCmd);

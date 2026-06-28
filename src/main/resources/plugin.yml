@@ -5,9 +5,9 @@ api-version: '26.1'
 description: League of Legends en Minecraft — 20 champions
 
 commands:
-  lol:
-    description: Commandes joueur LoL
-    usage: /lol <runes|sorts|pick|lock|role|queue|party|recall|ping|ff|stats|help>
+  l:
+    description: Commandes joueur LoL (en partie)
+    usage: /l <runes|ping|ff|stats>
     permission: lolmc.player
   lola:
     description: Commandes admin LoL

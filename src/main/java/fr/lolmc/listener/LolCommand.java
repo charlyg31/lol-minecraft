@@ -60,7 +60,7 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
         if (!(sender instanceof Player player)) { sender.sendMessage("§cJoueur uniquement."); return true; }
 
         // /lol → commandes joueur (uniquement ce qui n'est pas géré par BungeeCord)
-        if (cmd.getName().equalsIgnoreCase("lol")) {
+        if (cmd.getName().equalsIgnoreCase("l")) {
             String sub = args.length > 0 ? args[0].toLowerCase() : "help";
             boolean inGame = LolPlugin.getInstance().getGameManager().isGameRunning()
                     && LolPlugin.getInstance().getChampionManager().hasChampion(player);
