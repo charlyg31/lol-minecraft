@@ -127,8 +127,8 @@ public class Zed extends BaseChampion {
                     wCooldowns.put(uuid, now + (long)(realCooldowns[rank] * 1000));
                     c.sendActionBar(Component.text("👤 Échange avec l'ombre !", NamedTextColor.DARK_GRAY));
                     c.getWorld().spawnParticle(Particle.SMOKE, shadowLoc, 15, 0.5, 1, 0.5);
-                    // CORRECTION : Téléportation synchrone pour éviter les conflits d'interaction
-                    c.teleport(shadowLoc.clone());
+                    // Paper 26.1.2 interdit teleport sync pendant un event → teleportAsync
+                    c.teleportAsync(shadowLoc.clone());
                 }
             } else {
                 // Coût en énergie uniquement au placement de l'ombre (40)

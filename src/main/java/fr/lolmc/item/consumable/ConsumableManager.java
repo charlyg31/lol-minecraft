@@ -292,7 +292,10 @@ public class ConsumableManager {
     // ════════════════════════════════════════════════════════
 
     public static ItemStack buildConsumable(String id) {
-        return switch (id) {
+        // Les consommables de catégorie CONSUMABLE ont un suffixe "2" dans leur ID
+        // (health_potion2, elixir_wrath2…). On normalise pour le switch.
+        String key = id.endsWith("2") ? id.substring(0, id.length() - 1) : id;
+        return switch (key) {
             case "health_potion"      -> buildItem(Material.POTION,          "🧪 Potion de vie",        "Soigne 150 HP sur 15s.",                 NamedTextColor.RED,    50);
             case "refillable_potion"  -> buildItem(Material.GLASS_BOTTLE,    "🧪 Fiole rechargeable",   "2 charges — Soigne 125 HP/12s chacune.", NamedTextColor.GREEN,  150);
             case "biscuit"            -> buildItem(Material.COOKIE,           "🍪 Biscuit de la Volonté","Soigne 150 HP + 100 mana. +50 mana max si mana plein.", NamedTextColor.GOLD, 0);
