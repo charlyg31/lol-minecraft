@@ -253,6 +253,10 @@ public class LolPlugin extends JavaPlugin {
             getCommand("lol").setExecutor(lolCmd);
             getCommand("lol").setTabCompleter(lolCmd);
         }
+        if (getCommand("lola") != null) {
+            getCommand("lola").setExecutor(lolCmd);
+            getCommand("lola").setTabCompleter(lolCmd);
+        }
         getServer().getPluginManager().registerEvents(lolCmd, this);
         var playerCmds = new fr.lolmc.listener.PlayerCommands();
         if (getCommand("recall") != null) getCommand("recall").setExecutor(playerCmds);
