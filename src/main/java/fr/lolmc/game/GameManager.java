@@ -168,6 +168,8 @@ public class GameManager {
         stopSystems();
         // États statiques champions
         fr.lolmc.util.ChampionStateReset.resetAll();
+        // Annonces (kill spree, first blood, multi-kills)
+        LolPlugin.getInstance().getAnnouncementManager().reset();
         // Inhibiteurs en attente de respawn
         inhibitorRespawnAt.clear();
         respawnTotalSecondsMap.clear();

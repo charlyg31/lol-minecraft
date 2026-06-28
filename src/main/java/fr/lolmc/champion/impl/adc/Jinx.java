@@ -36,6 +36,8 @@ public class Jinx extends BaseChampion {
             "🎉 GET EXCITED! +175% vitesse 6s!", net.kyori.adventure.text.format.NamedTextColor.RED));
     }
 
+    public static void resetState(java.util.UUID id) { fishbonesMode.remove(id); }
+    public static void resetAllState()               { fishbonesMode.clear(); }
     private static final java.util.Map<java.util.UUID, Boolean> fishbonesMode
         = new java.util.concurrent.ConcurrentHashMap<>();
 
