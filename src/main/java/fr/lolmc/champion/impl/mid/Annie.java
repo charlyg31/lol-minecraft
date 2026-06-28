@@ -266,7 +266,6 @@ public class Annie extends BaseChampion {
                 bear.customName(Component.text("🔥 Tibbers", NamedTextColor.RED));
                 bear.setCustomNameVisible(true);
                 bear.setVisualFire(true);
-                bear.setAngry(true);
                 bear.setRemoveWhenFarAway(false);
                 bear.setInvulnerable(false);
                 // HP

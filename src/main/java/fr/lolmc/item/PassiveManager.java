@@ -1,5 +1,6 @@
 package fr.lolmc.item;
 import fr.lolmc.util.DamageUtil;
+import fr.lolmc.util.TargetingUtil;
 
 import fr.lolmc.LolPlugin;
 import fr.lolmc.util.WorldContext;
@@ -905,7 +906,7 @@ public class PassiveManager {
                 if (state.isOnCooldown(state.lastQSS, 90000L)) { sendCDMessage(player,"QSS",state.lastQSS,90000L); break; }
                 state.lastQSS = System.currentTimeMillis();
                 var cc=LolPlugin.getInstance().getCCManager();
-                if(cc!=null) { cc.stunUntil.remove(player.getUniqueId()); cc.rootUntil.remove(player.getUniqueId()); cc.silenceUntil.remove(player.getUniqueId()); }
+                if(cc!=null) cc.cleanse(player);
                 player.removePotionEffect(PotionEffectType.SLOWNESS);
                 player.removePotionEffect(PotionEffectType.MINING_FATIGUE);
                 if (itemId.equals("silvermere_dawn")) { player.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE,60,0,false,false)); }
@@ -927,85 +928,6 @@ public class PassiveManager {
                     TargetingUtil.dealDamage(player, target2, 50+champ.getStats().getFinalAP()*0.20, TargetingUtil.DmgType.MAGICAL);
                 }
                 player.sendActionBar(Component.text("👥 Twin Shadows! Fantômes ralentissants.",NamedTextColor.DARK_PURPLE));
-            }
-            case "everfrost" -> {
-                if (state.isOnCooldown(state.lastEverfrost,40000L)) { sendCDMessage(player,"Everfrost",state.lastEverfrost,40000L); break; }
-                state.lastEverfrost=System.currentTimeMillis();
-                for(var t:TargetingUtil.entitiesInRadius(player,player.getLocation(),5.0)){
-                    TargetingUtil.dealDamage(player,t,100+champ.getStats().getFinalAP()*0.30,TargetingUtil.DmgType.MAGICAL);
-                    var cc=LolPlugin.getInstance().getCCManager(); if(cc!=null) cc.root(t,40);
-                }
-                player.getWorld().spawnParticle(org.bukkit.Particle.SNOWFLAKE,player.getLocation().add(0,1,0),30,2,1,2);
-                player.sendActionBar(net.kyori.adventure.text.Component.text("❄ Everfrost! Enracine ennemis proches.",NamedTextColor.AQUA));
-            }
-            case "gargoyle_stoneplate" -> {
-                if (state.isOnCooldown(state.lastGargoyle,90000L)) { sendCDMessage(player,"Gargoyle",state.lastGargoyle,90000L); break; }
-                state.lastGargoyle=System.currentTimeMillis();
-                double bHP=champ.getHPSystem().getMaxHP(); champ.getHPSystem().addBonusHP(bHP);
-                player.sendActionBar(net.kyori.adventure.text.Component.text("🗿 Gargoyle: +100%% HP bonus 4s!",NamedTextColor.GRAY));
-                new BukkitRunnable(){@Override public void run(){ champ.getHPSystem().addBonusHP(-bHP); }}.runTaskLater(LolPlugin.getInstance(),80L);
-            }
-            case "goredrinker" -> {
-                if (state.isOnCooldown(state.lastGoredrinker,60000L)) { sendCDMessage(player,"Goredrinker",state.lastGoredrinker,60000L); break; }
-                state.lastGoredrinker=System.currentTimeMillis();
-                double totD=0; for(var t:TargetingUtil.entitiesInRadius(player,player.getLocation(),4.5)){ double d=50+champ.getStats().getFinalAD()*0.40; TargetingUtil.dealDamage(player,t,d,TargetingUtil.DmgType.PHYSICAL); totD+=d; }
-                champ.getHPSystem().heal(totD*0.15+champ.getHPSystem().getMaxHP()*0.10);
-                player.getWorld().spawnParticle(org.bukkit.Particle.CRIT,player.getLocation().add(0,1,0),20,1.5,0.5,1.5);
-                player.sendActionBar(net.kyori.adventure.text.Component.text("🩸 Goredrinker! AoE + soin.",NamedTextColor.RED));
-            }
-            case "prowlers_claw" -> {
-                if (state.isOnCooldown(state.lastProwler,90000L)) { sendCDMessage(player,"Prowler's Claw",state.lastProwler,90000L); break; }
-                state.lastProwler=System.currentTimeMillis();
-                var ptgt=TargetingUtil.getTargetedEnemy(player,8.0);
-                if(ptgt==null){ player.sendActionBar(net.kyori.adventure.text.Component.text("Aucune cible.",NamedTextColor.GRAY)); break; }
-                player.teleportAsync(ptgt.getLocation().add(ptgt.getLocation().getDirection().normalize().multiply(-1.5)));
-                TargetingUtil.dealDamage(player,ptgt,65+champ.getStats().getFinalAD()*0.15,TargetingUtil.DmgType.PHYSICAL);
-                state.prowlerBonusDmg=true; new BukkitRunnable(){@Override public void run(){ state.prowlerBonusDmg=false; }}.runTaskLater(LolPlugin.getInstance(),60L);
-                player.sendActionBar(net.kyori.adventure.text.Component.text("🐾 Prowler's Claw! +15%% dégâts 3s.",NamedTextColor.DARK_RED));
-            }
-            case "stridebreaker" -> {
-                if (state.isOnCooldown(state.lastStridebreaker,60000L)) { sendCDMessage(player,"Stridebreaker",state.lastStridebreaker,60000L); break; }
-                state.lastStridebreaker=System.currentTimeMillis();
-                for(var t:TargetingUtil.entitiesInRadius(player,player.getLocation(),4.0)){
-                    TargetingUtil.dealDamage(player,t,100+champ.getStats().getFinalAD()*0.50,TargetingUtil.DmgType.PHYSICAL);
-                    if(t instanceof Player tp) tp.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,20,3,false,false));
-                }
-                player.sendActionBar(net.kyori.adventure.text.Component.text("⚡ Stridebreaker! AoE slow.",NamedTextColor.YELLOW));
-            }
-            case "mercurial_scimitar","quicksilver_sash","silvermere_dawn" -> {
-                if (state.isOnCooldown(state.lastQSS,90000L)) { sendCDMessage(player,"QSS",state.lastQSS,90000L); break; }
-                state.lastQSS=System.currentTimeMillis();
-                var cc2=LolPlugin.getInstance().getCCManager(); if(cc2!=null) cc2.cleanse(player);
-                player.removePotionEffect(PotionEffectType.SLOWNESS);
-                if(champ.getStats()!=null){ champ.getStats().addBonusMoveSpeed(0); } // refresh
-                if("silvermere_dawn".equals(itemId)) player.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE,60,0,false,false));
-                player.sendActionBar(net.kyori.adventure.text.Component.text("✨ Cleanse! Tous CC retirés.",NamedTextColor.WHITE));
-            }
-            case "stopwatch" -> {
-                if (state.stopwatchUsed) { player.sendActionBar(net.kyori.adventure.text.Component.text("Stopwatch déjà utilisée.",NamedTextColor.GRAY)); break; }
-                state.stopwatchUsed=true; champ.getStats().addShield(99999);
-                player.sendActionBar(net.kyori.adventure.text.Component.text("⏱ Stopwatch! Invulnérabilité 2.5s.",NamedTextColor.GOLD));
-                new BukkitRunnable(){@Override public void run(){ champ.getStats().addShield(-99999); }}.runTaskLater(LolPlugin.getInstance(),50L);
-            }
-            case "twin_shadows" -> {
-                if (state.isOnCooldown(state.lastTwinShadows,120000L)) { sendCDMessage(player,"Twin Shadows",state.lastTwinShadows,120000L); break; }
-                state.lastTwinShadows=System.currentTimeMillis();
-                var nt=TargetingUtil.getNearestEnemy(player,12.0);
-                if(nt!=null){ if(nt instanceof Player tp) tp.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,40,1,false,false));
-                    TargetingUtil.dealDamage(player,nt,50+champ.getStats().getFinalAP()*0.20,TargetingUtil.DmgType.MAGICAL); }
-                player.sendActionBar(net.kyori.adventure.text.Component.text("👥 Twin Shadows! Fantômes ralentissants.",NamedTextColor.DARK_PURPLE));
-            }
-            case "evenshroud" -> {
-                if (state.isOnCooldown(state.lastEvenshroud,30000L)) { sendCDMessage(player,"Evenshroud",state.lastEvenshroud,30000L); break; }
-                state.lastEvenshroud=System.currentTimeMillis();
-                for(var t:TargetingUtil.entitiesInRadius(player,player.getLocation(),5.0)){
-                    if(t instanceof Player tp && LolPlugin.getInstance().getTeamManager().areEnemies(player,tp) && championManager.hasChampion(tp)){
-                        championManager.getChampion(tp).getStats().addBonusArmor(-7); championManager.getChampion(tp).getStats().addBonusMR(-7);
-                        final var fstats=championManager.getChampion(tp).getStats();
-                        new BukkitRunnable(){@Override public void run(){ fstats.addBonusArmor(7); fstats.addBonusMR(7); }}.runTaskLater(LolPlugin.getInstance(),100L);
-                    }
-                }
-                player.sendActionBar(net.kyori.adventure.text.Component.text("🌑 Evenshroud: -7 Armure/MR ennemis 5s.",NamedTextColor.DARK_GRAY));
             }
         }
 
