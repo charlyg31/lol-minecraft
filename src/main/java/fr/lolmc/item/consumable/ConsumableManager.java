@@ -11,6 +11,7 @@ import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.Particle;
+import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -225,23 +226,30 @@ public class ConsumableManager {
 
     /** Place une ward visible (bloc de lumière temporaire) */
     public boolean placeWard(Player player, boolean visible) {
-        Location loc = (player.getTargetBlockExact(20) != null ? player.getTargetBlockExact(20).getLocation() : player.getLocation().add(player.getLocation().getDirection().multiply(20)));
-        if (loc == null) loc = player.getLocation();
+        Location target = (player.getTargetBlockExact(20) != null
+                ? player.getTargetBlockExact(20).getLocation()
+                : player.getLocation().add(player.getLocation().getDirection().multiply(20)));
+        if (target == null) target = player.getLocation();
 
-        final Location wardLoc = loc.clone().add(0, 1, 0);
-
-        // Simuler ward avec une torche temporaire
-        Material wardMat = visible ? Material.TORCH : Material.SOUL_TORCH;
-        wardLoc.getBlock().setType(wardMat);
+        // Pose sur la surface (au-dessus du sol visé) sans détruire de bloc.
+        final Location wardLoc = surfaceLocation(target);
 
         // Durée: ward normale = 150s visible, 60s invisible
         long duration = visible ? 3000L : 1200L;
         int wardDuration = visible ? 150 : 60;
 
+        // Entité invisible représentant la ward (ArmorStand marqueur + tête de torche).
+        Material headMat = visible ? Material.TORCH : Material.SOUL_TORCH;
+        final java.util.UUID wardEntityId = spawnWardEntity(wardLoc, headMat,
+                visible ? "🔵 Totem de vision" : "👁 Ward furtive", visible);
+
         new BukkitRunnable() {
             @Override public void run() {
-                if (wardLoc.getBlock().getType() == wardMat)
-                    wardLoc.getBlock().setType(Material.AIR);
+                org.bukkit.entity.Entity ent = org.bukkit.Bukkit.getEntity(wardEntityId);
+                if (ent != null) {
+                    ent.getWorld().spawnParticle(Particle.SMOKE, ent.getLocation().add(0,0.3,0), 6, 0.2,0.2,0.2);
+                    ent.remove();
+                }
             }
         }.runTaskLater(LolPlugin.getInstance(), duration);
 
@@ -257,34 +265,70 @@ public class ConsumableManager {
 
     /** Control Ward: révèle et détruit les wards ennemies proches */
     public void placeControlWard(Player player) {
-        Location loc = (player.getTargetBlockExact(15) != null ? player.getTargetBlockExact(15).getLocation() : player.getLocation().add(player.getLocation().getDirection().multiply(15)));
-        if (loc == null) loc = player.getLocation();
+        Location target = (player.getTargetBlockExact(15) != null
+                ? player.getTargetBlockExact(15).getLocation()
+                : player.getLocation().add(player.getLocation().getDirection().multiply(15)));
+        if (target == null) target = player.getLocation();
 
-        final Location wardLoc = loc.clone().add(0, 1, 0);
-        wardLoc.getBlock().setType(Material.PINK_CANDLE);
+        final Location wardLoc = surfaceLocation(target);
 
         // Détruire les wards ennemies enregistrées dans un rayon de 6 blocs
         int destroyed = LolPlugin.getInstance().getWardManager()
                 .destroyEnemyWards(player, wardLoc, 6.0);
-        // Détruire aussi les blocs torche soul résiduels
-        nearbyBlocks(wardLoc, 6).stream()
-            .filter(b -> b.getType() == Material.SOUL_TORCH || b.getType() == Material.TORCH)
-            .forEach(b -> {
-                b.setType(Material.AIR);
-                wardLoc.getWorld().spawnParticle(Particle.SMOKE, b.getLocation().add(0.5,0.5,0.5), 5);
-            });
+
+        // Entité invisible (control ward = chandelle rose)
+        final java.util.UUID wardEntityId = spawnWardEntity(wardLoc, Material.PINK_CANDLE,
+                "🔮 Control Ward", true);
+
         // Enregistrer la control ward elle-même (équipe du poseur)
         LolPlugin.getInstance().getWardManager().placeWard(player, wardLoc, 240);
 
-        // Dure jusqu'à destruction (peut être détruit par l'adversaire)
+        // Dure jusqu'à expiration (~240s)
         new BukkitRunnable() {
             @Override public void run() {
-                if (wardLoc.getBlock().getType() == Material.PINK_CANDLE)
-                    wardLoc.getBlock().setType(Material.AIR);
+                org.bukkit.entity.Entity ent = org.bukkit.Bukkit.getEntity(wardEntityId);
+                if (ent != null) ent.remove();
             }
-        }.runTaskLater(LolPlugin.getInstance(), 4800L); // ~240s max
+        }.runTaskLater(LolPlugin.getInstance(), 4800L);
 
-        player.sendActionBar(Component.text("🔮 Control Ward placée!", NamedTextColor.BLUE));
+        player.sendActionBar(Component.text(
+            String.format("🔮 Control Ward placée! (%d ward(s) ennemie(s) détruite(s))", destroyed),
+            NamedTextColor.BLUE));
+    }
+
+    /**
+     * Trouve la surface au-dessus du point visé : descend tant que c'est du vide,
+     * monte tant que c'est solide, puis pose juste au-dessus du premier bloc solide.
+     * Évite de remplacer l'herbe ou de flotter en l'air.
+     */
+    private Location surfaceLocation(Location target) {
+        org.bukkit.World w = target.getWorld();
+        int x = target.getBlockX(), z = target.getBlockZ();
+        int y = target.getBlockY();
+        // Remonte si on est dans un bloc solide (ex: on a visé un mur/sol)
+        for (int i = 0; i < 4 && w.getBlockAt(x, y, z).getType().isSolid(); i++) y++;
+        // Redescend jusqu'au premier bloc solide sous le point
+        for (int i = 0; i < 6 && y > w.getMinHeight()+1 && !w.getBlockAt(x, y-1, z).getType().isSolid(); i++) y--;
+        return new Location(w, x + 0.5, y, z + 0.5);
+    }
+
+    /** Spawn un ArmorStand invisible marqueur portant une tête (torche/chandelle) comme ward. */
+    private java.util.UUID spawnWardEntity(Location loc, Material headMat, String name, boolean nameVisible) {
+        org.bukkit.entity.ArmorStand as = loc.getWorld().spawn(loc, org.bukkit.entity.ArmorStand.class, stand -> {
+            stand.setMarker(true);          // pas de hitbox, n'interfère pas avec les clics
+            stand.setVisible(false);        // corps invisible
+            stand.setGravity(false);
+            stand.setInvulnerable(true);
+            stand.setSmall(true);
+            stand.setBasePlate(false);
+            stand.setArms(false);
+            stand.setCustomNameVisible(nameVisible);
+            stand.customName(Component.text(name, NamedTextColor.AQUA));
+            var eq = stand.getEquipment();
+            if (eq != null) eq.setHelmet(new ItemStack(headMat));
+            stand.getScoreboardTags().add("lol_ward");
+        });
+        return as.getUniqueId();
     }
 
     // ════════════════════════════════════════════════════════
