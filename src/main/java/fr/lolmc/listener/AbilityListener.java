@@ -424,10 +424,32 @@ public class AbilityListener implements Listener {
         if (e.getSlot() >= 0 && e.getSlot() <= 8 && e.getClickedInventory() == p.getInventory()) {
             e.setCancelled(true);
         }
-        // Bloquer l'échange main secondaire (touche F en survolant un slot) :
-        // déplacerait un item LoL vers l'offhand et casserait l'agencement.
+        // Slot main secondaire : raw slot 40 (vue inventaire standard) OU 45 (vue craft
+        // ouverte avec E) selon le contexte. On bloque par le type de slot, plus fiable
+        // que le numéro brut, pour empêcher tout dépôt/retrait en offhand pendant la partie.
+        boolean offhandSlot = e.getRawSlot() == 40 || e.getRawSlot() == 45
+                || e.getSlotType() == org.bukkit.event.inventory.InventoryType.SlotType.QUICKBAR;
+        // Le slot offhand est rapporté par Paper avec un SlotType dédié dans la vue craft.
+        if (e.getClickedInventory() instanceof org.bukkit.inventory.PlayerInventory
+                && e.getSlot() == 40) {
+            offhandSlot = true;
+        }
+        if (offhandSlot && fr.lolmc.util.WorldContext.isInGameWorld(p)) {
+            e.setCancelled(true);
+        }
+        // Toute action d'échange offhand (touche F / clic offhand) est bloquée en jeu,
+        // qu'un item LoL soit impliqué ou non : c'est ce qui cassait l'agencement.
+        if (e.getClick() == org.bukkit.event.inventory.ClickType.SWAP_OFFHAND
+                && fr.lolmc.util.WorldContext.isInGameWorld(p)) {
+            e.setCancelled(true);
+        }
+        // Shift-clic : déplace un item vers un autre inventaire/slot → casse la barre si LoL
         var ct = e.getClick();
-        if (ct == org.bukkit.event.inventory.ClickType.SWAP_OFFHAND) {
+        if (ct.isShiftClick() && (HotbarManager.isLolItem(clicked) || HotbarManager.isLolItem(cursor))) {
+            e.setCancelled(true);
+        }
+        // Double-clic (ramasse tous les items identiques) sur un item LoL
+        if (ct == org.bukkit.event.inventory.ClickType.DOUBLE_CLICK && HotbarManager.isLolItem(cursor)) {
             e.setCancelled(true);
         }
         // Échange par touche numérique (1-9) vers/depuis un slot hotbar
@@ -438,6 +460,20 @@ public class AbilityListener implements Listener {
                 if (HotbarManager.isLolItem(hbItem) || HotbarManager.isLolItem(clicked)) {
                     e.setCancelled(true);
                 }
+            }
+        }
+    }
+
+    // ── Bloquer le glisser-déposer (drag) d'items LoL ──
+    @EventHandler
+    public void onInventoryDrag(org.bukkit.event.inventory.InventoryDragEvent e) {
+        if (!(e.getWhoClicked() instanceof Player p)) return;
+        if (!manager.hasChampion(p)) return;
+        // Si on glisse un item LoL, ou si l'un des slots ciblés touche la hotbar/offhand
+        if (HotbarManager.isLolItem(e.getOldCursor())) { e.setCancelled(true); return; }
+        for (int raw : e.getRawSlots()) {
+            if (raw == 40 || raw == 45 || (raw >= 0 && raw <= 8)) {
+                if (fr.lolmc.util.WorldContext.isInGameWorld(p)) { e.setCancelled(true); return; }
             }
         }
     }
