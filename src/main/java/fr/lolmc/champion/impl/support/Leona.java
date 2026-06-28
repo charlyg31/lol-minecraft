@@ -94,7 +94,7 @@ public class Leona extends BaseChampion {
             }
             c.sendActionBar(Component.text("🛡 Éclipse! +20 Armure/RM + explosion dans 3s",NamedTextColor.GOLD));
             c.getWorld().playSound(c.getLocation(), Sound.BLOCK_BEACON_ACTIVATE, 0.8f, 0.8f);
-            double[] base=fr.lolmc.util.Balance.base("w_leona",new double[]{80,120,160,200,240});double dmg=base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("w_leona","ap",0.4);
+            double[] base=fr.lolmc.util.Balance.base("w_leona",new double[]{80,120,160,200,240});double dmg=base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("w_leona","ap",0.7);
             new BukkitRunnable(){
                 @Override public void run(){
                     boolean hit=false;
@@ -130,13 +130,13 @@ public class Leona extends BaseChampion {
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] base=fr.lolmc.util.Balance.base("w_leona",new double[]{80,120,160,200,240});
-            return String.format("Armure/RM + réduction de dégâts 3s, puis explosion %.0f dégâts (+40%%AP).",base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("w_leona","ap",0.4));
+            return String.format("Armure/RM + réduction de dégâts 3s, puis explosion %.0f dégâts (+70%%AP).",base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("w_leona","ap",0.7));
         }
     }
 
     static class E extends BaseAbility {
         E(){super("e_leona","Lame du Zénith",Material.BLAZE_ROD,AbilitySlot.E,
-            new double[]{12,10.5,9,7.5,6},20,0,DamageType.MAGICAL);
+            new double[]{14,13.5,13,12.5,12},20,0,DamageType.MAGICAL);
             resourceCost = 55;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : skillshot ligne 60-200 + 40% AP, dash sur le DERNIER ennemi touché + root 0.5s
@@ -177,12 +177,13 @@ public class Leona extends BaseChampion {
                         TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);
                         double distCenter=__t.getLocation().distance(loc);
                         if(__t instanceof Player __p){
-                            if(distCenter<=1.5){ // centre = stun
-                                __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,35,10,false,true));
-                                __p.sendActionBar(Component.text("☀ ÉRUPTION SOLAIRE! STUN",NamedTextColor.GOLD));
-                            } else { // extérieur = ralentit 80%
+                            var cc=LolPlugin.getInstance().getCCManager();
+                            if(distCenter<=1.5){ // centre = stun 1.75s (35 ticks)
+                                if(cc!=null) cc.stun(__p, 35);
+                                __p.sendActionBar(Component.text("☀ ÉRUPTION SOLAIRE! STUN 1.75s",NamedTextColor.GOLD));
+                            } else { // extérieur = ralentit 80% pendant 1.75s
                                 __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,35,4,false,true));
-                                __p.sendActionBar(Component.text("☀ Éruption Solaire! Ralenti",NamedTextColor.GOLD));
+                                __p.sendActionBar(Component.text("☀ Éruption Solaire! Ralenti 80%%",NamedTextColor.GOLD));
                             }
                         }
                     }
