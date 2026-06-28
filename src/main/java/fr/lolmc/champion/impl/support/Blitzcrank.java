@@ -34,6 +34,7 @@ public class Blitzcrank extends BaseChampion {
 
     static class AA extends BasicAttackAbility {
         AA(){super("blitzcrank",Material.IRON_INGOT,2.0f,DamageType.PHYSICAL);}
+    }
 
     // Passif Statique Mana : quand Blitzcrank tombe sous 20% HP, génère un bouclier = 50% de sa mana actuelle (CD 60s)
     private static final java.util.Map<java.util.UUID, Long> staticShieldCD = new java.util.concurrent.ConcurrentHashMap<>();
