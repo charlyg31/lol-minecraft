@@ -132,7 +132,8 @@ public abstract class BaseChampion {
         boolean manualCooldown =
                 this instanceof fr.lolmc.champion.impl.mid.Zed
                         && slot == 2
-                        && fr.lolmc.champion.impl.mid.Zed.getShadowLocation(caster.getUniqueId()) != null;
+                        && (fr.lolmc.champion.impl.mid.Zed.getShadowLocation(caster.getUniqueId()) != null
+                            || fr.lolmc.champion.impl.mid.Zed.isWOnCooldown(caster.getUniqueId()));
 
         if (!manualCooldown) {
             ability.triggerCooldown(caster, stats);
