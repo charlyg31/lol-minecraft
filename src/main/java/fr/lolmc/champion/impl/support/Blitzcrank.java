@@ -55,7 +55,6 @@ public class Blitzcrank extends BaseChampion {
             }
         }
     }
-    }
 
     static class Q extends BaseAbility {
         Q(){super("q_blitzcrank","Grappin Fusée",Material.FISHING_ROD,AbilitySlot.Q,
