@@ -15,10 +15,13 @@ import org.bukkit.inventory.meta.ItemMeta;
 import java.util.*;
 
 /**
- * Boutique LoL — deux vues :
- *   • PARCOURS : onglets de catégories + grille d'items (clic = ouvre la fiche).
- *   • FICHE (arborescence) : l'item, ses composants (recette), ce qu'il construit,
- *     et un bouton Acheter. On peut cliquer un composant pour naviguer dans l'arbre.
+ * Boutique LoL avec pagination.
+ *
+ * Layout (54 slots) :
+ *   Rangée 0 (slots 0-8) : onglets catégorie (0-6) + or (7) + fermer (8)
+ *   Rangées 1-4 (slots 9-44) : grille items — 36 items par page
+ *   Rangée 5 (slots 45-53) : nav pagination
+ *     45=◀◀ première  46=◀ précédent  47=vide  48=page X/Y  49=vide  50=vide  51=▶ suivant  52=▶▶ dernière  53=filtre
  */
 public class ShopGUI {
 
@@ -26,60 +29,120 @@ public class ShopGUI {
     public static final String DETAIL_PREFIX = "🧬 Recette — ";
 
     private static final LolItem.ItemCategory DEFAULT_CAT = LolItem.ItemCategory.DAMAGE;
+    private static final int ITEMS_PER_PAGE = 36;
+    private static final int ITEMS_START    = 9;
+    private static final int ITEMS_END      = 44; // inclusif
 
-    // ── PARCOURS ──
-    private static final int[] TAB_SLOTS   = {0, 1, 2, 3, 4, 5, 6};
-    private static final int   ITEMS_START = 9;
-    private static final int   GOLD_SLOT_B = 8;
+    // Slots onglets
+    private static final int[] TAB_SLOTS = {0, 1, 2, 3, 4, 5, 6};
+    private static final int GOLD_SLOT   = 7;
+    private static final int CLOSE_SLOT  = 8;
 
-    // ── FICHE ──
-    private static final int   D_ITEM   = 4;   // l'item affiché
-    private static final int   D_BACK   = 0;   // retour
-    private static final int   D_GOLD   = 8;   // or
-    private static final int   D_BUY    = 49;  // acheter
-    private static final int[] D_COMPONENTS = {20, 21, 22, 23, 24}; // recette (jusqu'à 5)
-    private static final int[] D_BUILDS    = {37, 38, 39, 40, 41, 42, 43}; // construit en (jusqu'à 7)
+    // Slots nav pagination (rangée 5)
+    private static final int NAV_FIRST  = 45;
+    private static final int NAV_PREV   = 46;
+    private static final int NAV_INFO   = 49;
+    private static final int NAV_NEXT   = 51;
+    private static final int NAV_LAST   = 52;
 
-    // État par joueur
-    private final Map<UUID, Map<Integer, String>> slotToItemId = new HashMap<>(); // parcours
-    private final Map<UUID, LolItem.ItemCategory> currentCategory = new HashMap<>();
-    private final Map<UUID, String> detailItem = new HashMap<>();                  // fiche ouverte
-    private final Map<UUID, Map<Integer, String>> detailNav = new HashMap<>();     // slots navigables de la fiche
+    // Fiche detail
+    private static final int D_ITEM       = 4;
+    private static final int D_BACK       = 0;
+    private static final int D_GOLD       = 8;
+    private static final int D_BUY        = 49;
+    private static final int[] D_COMPONENTS = {20, 21, 22, 23, 24};
+    private static final int[] D_BUILDS    = {37, 38, 39, 40, 41, 42, 43};
+
+    // ── État par joueur ───────────────────────────────────────────
+    private final Map<UUID, Map<Integer, String>>  slotToItemId    = new HashMap<>();
+    private final Map<UUID, LolItem.ItemCategory>  currentCategory = new HashMap<>();
+    private final Map<UUID, Integer>               currentPage     = new HashMap<>();
+    private final Map<UUID, String>                detailItem      = new HashMap<>();
+    private final Map<UUID, Map<Integer, String>>  detailNav       = new HashMap<>();
 
     // ══════════════════════════════════════════════════════════════
     // VUE PARCOURS
     // ══════════════════════════════════════════════════════════════
 
-    public void open(Player player) { open(player, getCurrentCategory(player)); }
+    public void open(Player player) {
+        open(player, getCurrentCategory(player), getPage(player));
+    }
 
     public void open(Player player, LolItem.ItemCategory cat) {
+        open(player, cat, 0);
+    }
+
+    public void open(Player player, LolItem.ItemCategory cat, int page) {
         detailItem.remove(player.getUniqueId());
         currentCategory.put(player.getUniqueId(), cat);
-        Inventory inv = Bukkit.createInventory(null, 54,
-                Component.text(BROWSE_PREFIX + getCategoryLabel(cat), NamedTextColor.GOLD));
 
-        // Onglets
+        List<LolItem> items = ItemRegistry.byCategory(cat);
+        int totalPages = Math.max(1, (items.size() + ITEMS_PER_PAGE - 1) / ITEMS_PER_PAGE);
+        page = Math.max(0, Math.min(page, totalPages - 1));
+        currentPage.put(player.getUniqueId(), page);
+
+        String title = BROWSE_PREFIX + getCategoryLabel(cat)
+                + (totalPages > 1 ? " [" + (page+1) + "/" + totalPages + "]" : "");
+        Inventory inv = Bukkit.createInventory(null, 54, Component.text(title, NamedTextColor.GOLD));
+
+        // ── Rangée 0 : onglets + or + fermer ──
         LolItem.ItemCategory[] cats = LolItem.ItemCategory.values();
-        for (int i = 0; i < Math.min(cats.length, TAB_SLOTS.length); i++) {
+        for (int i = 0; i < Math.min(cats.length, TAB_SLOTS.length); i++)
             inv.setItem(TAB_SLOTS[i], tabButton(cats[i], cats[i] == cat));
-        }
-        inv.setItem(GOLD_SLOT_B, goldDisplay(player));
+        inv.setItem(GOLD_SLOT, goldDisplay(player));
+        inv.setItem(CLOSE_SLOT, navButton(Material.BARRIER, "✖ Fermer", NamedTextColor.RED));
 
-        // Items de la catégorie
+        // ── Rangées 1-4 : items de la page ──
         Map<Integer, String> mapping = new HashMap<>();
-        int slot = ITEMS_START;
-        for (LolItem item : ItemRegistry.byCategory(cat)) {
-            if (slot >= 54) break;
+        int start = page * ITEMS_PER_PAGE;
+        int end   = Math.min(start + ITEMS_PER_PAGE, items.size());
+        for (int i = start; i < end; i++) {
+            LolItem item = items.get(i);
+            int slot = ITEMS_START + (i - start);
             inv.setItem(slot, decorateBrowse(item.buildItemStack(), item));
             mapping.put(slot, item.getId());
-            slot++;
         }
         slotToItemId.put(player.getUniqueId(), mapping);
 
+        // ── Rangée 5 : pagination ──
         ItemStack filler = filler();
-        for (int i = 0; i < 54; i++) if (inv.getItem(i) == null) inv.setItem(i, filler);
+        for (int s = 45; s <= 53; s++) inv.setItem(s, filler);
 
+        if (totalPages > 1) {
+            if (page > 0) {
+                inv.setItem(NAV_FIRST, navButton(Material.SPECTRAL_ARROW,
+                    "⏮ Première page", NamedTextColor.AQUA));
+                inv.setItem(NAV_PREV,  navButton(Material.ARROW,
+                    "◀ Page précédente", NamedTextColor.YELLOW));
+            }
+            inv.setItem(NAV_INFO, pageInfo(page, totalPages, start, Math.min(end, items.size()), items.size()));
+            if (page < totalPages - 1) {
+                inv.setItem(NAV_NEXT, navButton(Material.ARROW,
+                    "▶ Page suivante", NamedTextColor.YELLOW));
+                inv.setItem(NAV_LAST, navButton(Material.SPECTRAL_ARROW,
+                    "⏭ Dernière page", NamedTextColor.AQUA));
+            }
+        }
+
+        // Remplir les vides
+        for (int i = 0; i < 54; i++) if (inv.getItem(i) == null) inv.setItem(i, filler);
         player.openInventory(inv);
+    }
+
+    private ItemStack pageInfo(int page, int total, int from, int to, int totalItems) {
+        ItemStack item = new ItemStack(Material.PAPER);
+        ItemMeta m = item.getItemMeta();
+        if (m == null) return item;
+        m.displayName(Component.text(
+            String.format("Page %d / %d", page+1, total), NamedTextColor.WHITE)
+            .decoration(TextDecoration.ITALIC, false)
+            .decoration(TextDecoration.BOLD, true));
+        m.lore(List.of(
+            Component.text(String.format("Items %d-%d sur %d", from+1, to, totalItems), NamedTextColor.GRAY)
+                .decoration(TextDecoration.ITALIC, false)
+        ));
+        item.setItemMeta(m);
+        return item;
     }
 
     /** Ajoute un indice "clic = fiche" à l'item de la grille. */
@@ -88,34 +151,33 @@ public class ShopGUI {
         if (m == null) return stack;
         List<Component> lore = m.lore() != null ? new ArrayList<>(m.lore()) : new ArrayList<>();
         lore.add(Component.empty());
-        if (!item.getBuildsFrom().isEmpty()) {
+        if (!item.getBuildsFrom().isEmpty())
             lore.add(Component.text("🧬 " + item.getBuildsFrom().size() + " composants",
-                    NamedTextColor.AQUA).decoration(TextDecoration.ITALIC, false));
-        }
+                NamedTextColor.AQUA).decoration(TextDecoration.ITALIC, false));
         lore.add(Component.text("▶ Clic : voir la recette / acheter", NamedTextColor.YELLOW)
-                .decoration(TextDecoration.ITALIC, false));
+            .decoration(TextDecoration.ITALIC, false));
         m.lore(lore);
         stack.setItemMeta(m);
         return stack;
     }
 
     // ══════════════════════════════════════════════════════════════
-    // VUE FICHE (arborescence)
+    // VUE FICHE (arborescence + achat)
     // ══════════════════════════════════════════════════════════════
 
     public void openDetail(Player player, String itemId) {
         LolItem item = ItemRegistry.get(itemId);
         if (item == null) { open(player); return; }
         detailItem.put(player.getUniqueId(), itemId);
+
         Inventory inv = Bukkit.createInventory(null, 54,
-                Component.text(DETAIL_PREFIX + item.getDisplayName(), NamedTextColor.LIGHT_PURPLE));
+            Component.text(DETAIL_PREFIX + item.getDisplayName(), NamedTextColor.LIGHT_PURPLE));
 
         ItemStack filler = filler();
         for (int i = 0; i < 54; i++) inv.setItem(i, filler);
 
-        // L'item au centre haut
         inv.setItem(D_ITEM, item.buildItemStack());
-        inv.setItem(D_BACK, navButton(Material.ARROW, "◀ Retour", NamedTextColor.YELLOW));
+        inv.setItem(D_BACK, navButton(Material.ARROW, "◀ Retour à la boutique", NamedTextColor.YELLOW));
         inv.setItem(D_GOLD, goldDisplay(player));
 
         Map<Integer, String> nav = new HashMap<>();
@@ -123,30 +185,26 @@ public class ShopGUI {
         // Composants (recette)
         inv.setItem(18, label("⬇ Construit à partir de :", NamedTextColor.AQUA));
         List<String> comps = item.getBuildsFrom();
-        if (comps.isEmpty()) {
+        if (comps.isEmpty())
             inv.setItem(D_COMPONENTS[2], label("Composant de base (pas de recette)", NamedTextColor.GRAY));
-        } else {
+        else
             placeRow(inv, comps, D_COMPONENTS, nav);
-        }
 
         // Ce que l'item construit
         inv.setItem(27, label("⬆ Composant de :", NamedTextColor.GOLD));
         List<String> into = new ArrayList<>();
         for (LolItem b : ItemRegistry.buildsInto(itemId)) into.add(b.getId());
-        if (into.isEmpty()) {
+        if (into.isEmpty())
             inv.setItem(D_BUILDS[3], label("Item final (ne construit rien)", NamedTextColor.GRAY));
-        } else {
+        else
             placeRow(inv, into, D_BUILDS, nav);
-        }
 
-        // Bouton acheter
         inv.setItem(D_BUY, buyButton(player, item));
 
         detailNav.put(player.getUniqueId(), nav);
         player.openInventory(inv);
     }
 
-    /** Place une liste d'items dans une rangée de slots et les enregistre comme navigables. */
     private void placeRow(Inventory inv, List<String> ids, int[] slots, Map<Integer, String> nav) {
         for (int i = 0; i < ids.size() && i < slots.length; i++) {
             LolItem it = ItemRegistry.get(ids.get(i));
@@ -157,7 +215,7 @@ public class ShopGUI {
                 List<Component> lore = m.lore() != null ? new ArrayList<>(m.lore()) : new ArrayList<>();
                 lore.add(Component.empty());
                 lore.add(Component.text("▶ Clic : voir cet item", NamedTextColor.YELLOW)
-                        .decoration(TextDecoration.ITALIC, false));
+                    .decoration(TextDecoration.ITALIC, false));
                 m.lore(lore);
                 stack.setItemMeta(m);
             }
@@ -167,32 +225,86 @@ public class ShopGUI {
     }
 
     private ItemStack buyButton(Player player, LolItem item) {
-        int gold = LolPluginGold(player);
+        int gold = getGold(player);
         boolean afford = gold >= item.getGoldCost();
         ItemStack b = new ItemStack(afford ? Material.EMERALD_BLOCK : Material.REDSTONE_BLOCK);
         ItemMeta m = b.getItemMeta();
         if (m == null) return b;
-        m.displayName(Component.text((afford ? "✔ Acheter — " : "✘ ") + item.getGoldCost() + " or",
-                afford ? NamedTextColor.GREEN : NamedTextColor.RED)
-                .decoration(TextDecoration.ITALIC, false));
+        m.displayName(Component.text((afford ? "✔ Acheter — " : "✘ Or insuffisant — ")
+            + item.getGoldCost() + " or",
+            afford ? NamedTextColor.GREEN : NamedTextColor.RED)
+            .decoration(TextDecoration.ITALIC, false));
         List<Component> lore = new ArrayList<>();
         lore.add(Component.text(item.getDisplayName(), NamedTextColor.WHITE)
-                .decoration(TextDecoration.ITALIC, false));
+            .decoration(TextDecoration.ITALIC, false));
         lore.add(Component.text("Ton or : " + gold, NamedTextColor.GOLD)
-                .decoration(TextDecoration.ITALIC, false));
-        if (!afford) lore.add(Component.text("Il te manque " + (item.getGoldCost() - gold) + " or",
+            .decoration(TextDecoration.ITALIC, false));
+        if (!afford)
+            lore.add(Component.text("Il te manque " + (item.getGoldCost()-gold) + " or",
                 NamedTextColor.RED).decoration(TextDecoration.ITALIC, false));
         m.lore(lore);
         b.setItemMeta(m);
         return b;
     }
 
-    private int LolPluginGold(Player player) {
-        return fr.lolmc.LolPlugin.getInstance().getGoldManager().getGold(player.getUniqueId());
+    // ══════════════════════════════════════════════════════════════
+    // NAVIGATION — ROUTAGE DES CLICS (lu par ShopListener)
+    // ══════════════════════════════════════════════════════════════
+
+    /** Vérifie si le slot est un bouton de pagination et navigue. Retourne true si consommé. */
+    public boolean handlePaginationClick(Player player, int slot) {
+        LolItem.ItemCategory cat = getCurrentCategory(player);
+        int page = getPage(player);
+        List<LolItem> items = ItemRegistry.byCategory(cat);
+        int totalPages = Math.max(1, (items.size() + ITEMS_PER_PAGE - 1) / ITEMS_PER_PAGE);
+
+        if (slot == NAV_PREV  && page > 0)               { open(player, cat, page - 1); return true; }
+        if (slot == NAV_NEXT  && page < totalPages - 1)  { open(player, cat, page + 1); return true; }
+        if (slot == NAV_FIRST && page > 0)               { open(player, cat, 0);         return true; }
+        if (slot == NAV_LAST  && page < totalPages - 1)  { open(player, cat, totalPages - 1); return true; }
+        if (slot == CLOSE_SLOT) { player.closeInventory(); return true; }
+        if (slot == NAV_INFO)   return true; // bouton info, rien à faire
+        return false;
+    }
+
+    public boolean isDetailView(Player player) {
+        if (!detailItem.containsKey(player.getUniqueId())) return false;
+        var view = player.getOpenInventory();
+        if (view == null) return false;
+        String title = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
+            .plainText().serialize(view.title());
+        return title.startsWith(DETAIL_PREFIX);
+    }
+
+    public String getDetailItemId(Player player)             { return detailItem.get(player.getUniqueId()); }
+    public boolean isBackSlot(int slot)                      { return slot == D_BACK; }
+    public boolean isBuySlot(int slot)                       { return slot == D_BUY; }
+    public String getDetailNavId(Player player, int slot)    { var n=detailNav.get(player.getUniqueId()); return n!=null?n.get(slot):null; }
+    public String getClickedItemId(Player player, int slot)  { var m=slotToItemId.get(player.getUniqueId()); return m!=null?m.get(slot):null; }
+    public LolItem.ItemCategory getCurrentCategory(Player p) { return currentCategory.getOrDefault(p.getUniqueId(), DEFAULT_CAT); }
+    public int getPage(Player p)                             { return currentPage.getOrDefault(p.getUniqueId(), 0); }
+
+    public LolItem.ItemCategory getClickedCategory(int slot) {
+        LolItem.ItemCategory[] cats = LolItem.ItemCategory.values();
+        for (int i = 0; i < TAB_SLOTS.length; i++)
+            if (TAB_SLOTS[i] == slot && i < cats.length) return cats[i];
+        return null;
+    }
+
+    public void cleanup(Player player) {
+        UUID id = player.getUniqueId();
+        slotToItemId.remove(id); currentCategory.remove(id);
+        currentPage.remove(id); detailItem.remove(id); detailNav.remove(id);
+    }
+
+    public static boolean isShopInventory(Component title) {
+        String plain = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
+            .plainText().serialize(title);
+        return plain.startsWith("🏪 Boutique") || plain.startsWith("🧬 Recette");
     }
 
     // ══════════════════════════════════════════════════════════════
-    // BOUTONS / HELPERS VISUELS
+    // HELPERS VISUELS
     // ══════════════════════════════════════════════════════════════
 
     private ItemStack tabButton(LolItem.ItemCategory cat, boolean selected) {
@@ -208,21 +320,23 @@ public class ShopGUI {
         ItemStack item = new ItemStack(mat);
         ItemMeta meta = item.getItemMeta();
         if (meta == null) return item;
-        meta.displayName(Component.text((selected ? "▶ " : "") + getCategoryLabel(cat),
-                        selected ? NamedTextColor.GOLD : NamedTextColor.GRAY)
-                .decoration(TextDecoration.ITALIC, false)
-                .decoration(TextDecoration.BOLD, selected));
+        // Compter les items de cette catégorie
+        int count = ItemRegistry.byCategory(cat).size();
+        meta.displayName(Component.text((selected ? "▶ " : "") + getCategoryLabel(cat)
+            + " (" + count + ")", selected ? NamedTextColor.GOLD : NamedTextColor.GRAY)
+            .decoration(TextDecoration.ITALIC, false)
+            .decoration(TextDecoration.BOLD, selected));
         item.setItemMeta(meta);
         return item;
     }
 
     private ItemStack goldDisplay(Player player) {
-        int gold = LolPluginGold(player);
+        int gold = getGold(player);
         ItemStack item = new ItemStack(Material.GOLD_INGOT);
         ItemMeta m = item.getItemMeta();
         if (m == null) return item;
-        m.displayName(Component.text("💰 Ton or : " + gold, NamedTextColor.GOLD)
-                .decoration(TextDecoration.ITALIC, false));
+        m.displayName(Component.text("💰 " + gold + " or", NamedTextColor.GOLD)
+            .decoration(TextDecoration.ITALIC, false));
         item.setItemMeta(m);
         return item;
     }
@@ -248,71 +362,12 @@ public class ShopGUI {
     private ItemStack filler() {
         ItemStack f = new ItemStack(Material.GRAY_STAINED_GLASS_PANE);
         ItemMeta m = f.getItemMeta();
-        if (m != null) {
-            m.displayName(Component.text(" ").decoration(TextDecoration.ITALIC, false));
-            f.setItemMeta(m);
-        }
+        if (m != null) { m.displayName(Component.text(" ").decoration(TextDecoration.ITALIC, false)); f.setItemMeta(m); }
         return f;
     }
 
-    // ══════════════════════════════════════════════════════════════
-    // ROUTAGE DES CLICS (lu par ShopListener)
-    // ══════════════════════════════════════════════════════════════
-
-    public boolean isDetailView(Player player) {
-        if (!detailItem.containsKey(player.getUniqueId())) return false;
-        // Vérifier que la vue détail est bien ouverte (titre commence par DETAIL_PREFIX)
-        var view = player.getOpenInventory();
-        if (view == null) return false;
-        String title = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
-            .plainText().serialize(view.title());
-        return title.startsWith(DETAIL_PREFIX);
-    }
-
-    /** Item dont la fiche est ouverte (pour l'achat). */
-    public String getDetailItemId(Player player) {
-        return detailItem.get(player.getUniqueId());
-    }
-
-    public boolean isBackSlot(int slot)  { return slot == D_BACK; }
-    public boolean isBuySlot(int slot)   { return slot == D_BUY; }
-
-    /** Slot navigable de la fiche (composant / construit en) → item ID, ou null. */
-    public String getDetailNavId(Player player, int slot) {
-        Map<Integer, String> nav = detailNav.get(player.getUniqueId());
-        return nav != null ? nav.get(slot) : null;
-    }
-
-    /** (Parcours) item cliqué dans la grille → ID, ou null. */
-    public String getClickedItemId(Player player, int slot) {
-        Map<Integer, String> mapping = slotToItemId.get(player.getUniqueId());
-        return mapping != null ? mapping.get(slot) : null;
-    }
-
-    /** (Parcours) onglet cliqué → catégorie, ou null. */
-    public LolItem.ItemCategory getClickedCategory(int slot) {
-        LolItem.ItemCategory[] cats = LolItem.ItemCategory.values();
-        for (int i = 0; i < TAB_SLOTS.length; i++) {
-            if (TAB_SLOTS[i] == slot && i < cats.length) return cats[i];
-        }
-        return null;
-    }
-
-    public LolItem.ItemCategory getCurrentCategory(Player player) {
-        return currentCategory.getOrDefault(player.getUniqueId(), DEFAULT_CAT);
-    }
-
-    public void cleanup(Player player) {
-        slotToItemId.remove(player.getUniqueId());
-        currentCategory.remove(player.getUniqueId());
-        detailItem.remove(player.getUniqueId());
-        detailNav.remove(player.getUniqueId());
-    }
-
-    public static boolean isShopInventory(Component title) {
-        String plain = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
-                .plainText().serialize(title);
-        return plain.startsWith("🏪 Boutique") || plain.startsWith("🧬 Recette");
+    private int getGold(Player player) {
+        return fr.lolmc.LolPlugin.getInstance().getGoldManager().getGold(player.getUniqueId());
     }
 
     private String getCategoryLabel(LolItem.ItemCategory cat) {
