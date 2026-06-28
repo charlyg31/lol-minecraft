@@ -11,7 +11,7 @@ import fr.lolmc.util.TargetingUtil;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.*;
-import org.bukkit.attribute.Attribute; // AJOUT : Import de l'attribut
+import org.bukkit.attribute.Attribute;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffect;
@@ -34,8 +34,8 @@ public class Zed extends BaseChampion {
     }
 
     // Gestion de l'ombre et des cooldowns manuels
-    private static final Map<UUID,Location> shadows = new java.util.concurrent.ConcurrentHashMap<>();
-    private static final Map<UUID, Long> wCooldowns = new java.util.concurrent.ConcurrentHashMap<>();
+    public static final Map<UUID,Location> shadows = new java.util.concurrent.ConcurrentHashMap<>();
+    public static final Map<UUID, Long> wCooldowns = new java.util.concurrent.ConcurrentHashMap<>();
     private static final Map<UUID, UUID> shadowEntities = new java.util.concurrent.ConcurrentHashMap<>();
 
     public static void resetState(UUID id) {
@@ -60,7 +60,6 @@ public class Zed extends BaseChampion {
     static class AA extends BasicAttackAbility {
         AA(){super("zed",Material.IRON_SWORD,2.5f,DamageType.PHYSICAL);}
         @Override protected void onHit(Player c, ChampionStats s, org.bukkit.entity.LivingEntity tgt, double dmg){
-            // CORRECTION : Utilisation de l'attribut GENERIC_MAX_HEALTH au lieu de getMaxHealth() déprécié
             var maxHealthAttr = tgt.getAttribute(fr.lolmc.util.Compat.maxHealth());
             double maxHealth = maxHealthAttr != null ? maxHealthAttr.getValue() : 20.0;
 
@@ -128,8 +127,8 @@ public class Zed extends BaseChampion {
                     wCooldowns.put(uuid, now + (long)(realCooldowns[rank] * 1000));
                     c.sendActionBar(Component.text("👤 Échange avec l'ombre !", NamedTextColor.DARK_GRAY));
                     c.getWorld().spawnParticle(Particle.SMOKE, shadowLoc, 15, 0.5, 1, 0.5);
-                    // Téléportation async (Paper 26.1.2)
-                    c.teleportAsync(shadowLoc.clone());
+                    // CORRECTION : Téléportation synchrone pour éviter les conflits d'interaction
+                    c.teleport(shadowLoc.clone());
                 }
             } else {
                 // Coût en énergie uniquement au placement de l'ombre (40)
@@ -143,29 +142,34 @@ public class Zed extends BaseChampion {
                 }
                 Vector dir = c.getLocation().getDirection().setY(0).normalize();
                 Location shadowLoc = c.getLocation().clone().add(dir.multiply(8));
-                shadowLoc.setY(c.getWorld().getHighestBlockYAt(shadowLoc) + 1);
+
+                // CORRECTION : Conserve le Y du joueur pour éviter que l'ombre spawn sur les toits en intérieur
+                shadowLoc.setY(c.getLocation().getY());
                 shadowLoc.setYaw(c.getLocation().getYaw());
                 shadowLoc.setPitch(c.getLocation().getPitch());
 
                 shadows.put(uuid, shadowLoc);
                 // Spawner un ArmorStand visible représentant l'ombre
                 final org.bukkit.entity.ArmorStand shadowStand =
-                    shadowLoc.getWorld().spawn(shadowLoc, org.bukkit.entity.ArmorStand.class, as -> {
-                        as.setVisible(true);
-                        as.setGravity(false);
-                        as.setInvulnerable(true);
-                        as.setCustomNameVisible(true);
-                        as.customName(Component.text("👤 Ombre de Zed", NamedTextColor.DARK_GRAY));
-                        // Armure en cuir noir
-                        var eq = as.getEquipment();
-                        if (eq != null) {
-                            eq.setHelmet(blackLeather(org.bukkit.Material.LEATHER_HELMET));
-                            eq.setChestplate(blackLeather(org.bukkit.Material.LEATHER_CHESTPLATE));
-                            eq.setLeggings(blackLeather(org.bukkit.Material.LEATHER_LEGGINGS));
-                            eq.setBoots(blackLeather(org.bukkit.Material.LEATHER_BOOTS));
-                        }
-                        as.getScoreboardTags().add("zed_shadow");
-                    });
+                        shadowLoc.getWorld().spawn(shadowLoc, org.bukkit.entity.ArmorStand.class, as -> {
+                            // CORRECTION : Supprime la hitbox de l'entité pour ne pas bloquer les événements de clic
+                            as.setMarker(true);
+
+                            as.setVisible(true);
+                            as.setGravity(false);
+                            as.setInvulnerable(true);
+                            as.setCustomNameVisible(true);
+                            as.customName(Component.text("👤 Ombre de Zed", NamedTextColor.DARK_GRAY));
+                            // Armure en cuir noir
+                            var eq = as.getEquipment();
+                            if (eq != null) {
+                                eq.setHelmet(blackLeather(org.bukkit.Material.LEATHER_HELMET));
+                                eq.setChestplate(blackLeather(org.bukkit.Material.LEATHER_CHESTPLATE));
+                                eq.setLeggings(blackLeather(org.bukkit.Material.LEATHER_LEGGINGS));
+                                eq.setBoots(blackLeather(org.bukkit.Material.LEATHER_BOOTS));
+                            }
+                            as.getScoreboardTags().add("zed_shadow");
+                        });
                 shadowEntities.put(uuid, shadowStand.getUniqueId());
                 c.getWorld().spawnParticle(Particle.SMOKE, shadowLoc, 20, 0.5, 1, 0.5);
                 c.getWorld().playSound(shadowLoc, Sound.ENTITY_ENDERMAN_TELEPORT, 0.8f, 1.5f);
@@ -207,18 +211,21 @@ public class Zed extends BaseChampion {
                     champsHit++;
                 }
             }
-            // Réduit le CD du W de 2s par champion touché (LoL)
-            if(champsHit>0){
-                var cm=LolPlugin.getInstance().getChampionManager();
-                if(cm.hasChampion(c)){
-                    var wAbil=cm.getChampion(c).getAbility(2);
-                    if(wAbil!=null){
-                        double rem=wAbil.getRemainingCooldown(c)-2.0*champsHit;
-                        if(rem<0) rem=0;
-                        wAbil.setDynamicCooldown(Math.max(0.1, rem));
+
+            // CORRECTION : Réduction du cooldown en manipulant directement la map manuelle wCooldowns
+            if (champsHit > 0) {
+                UUID id = c.getUniqueId();
+                if (Zed.wCooldowns.containsKey(id)) {
+                    long currentCd = Zed.wCooldowns.get(id);
+                    long newCd = currentCd - (champsHit * 2000L); // Enlève 2000ms par champion
+                    // S'assure que le CD ne tombe pas dans le négatif
+                    if (newCd < System.currentTimeMillis()) {
+                        newCd = System.currentTimeMillis();
                     }
+                    Zed.wCooldowns.put(id, newCd);
                 }
             }
+
             c.getWorld().spawnParticle(Particle.SWEEP_ATTACK,c.getLocation().add(0,1,0),6,2,0.5,2);
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 0.9f);
 
@@ -260,7 +267,7 @@ public class Zed extends BaseChampion {
             double ad=s.getFinalAD();
             // Créer une ombre miroir (à l'opposé de la cible)
             Location shadowRLoc = tgt.getLocation().clone().subtract(
-                c.getLocation().toVector().subtract(tgt.getLocation().toVector()).normalize().multiply(2.0));
+                    c.getLocation().toVector().subtract(tgt.getLocation().toVector()).normalize().multiply(2.0));
             shadowRLoc.setY(tgt.getLocation().getY());
             tgt.getWorld().spawnParticle(Particle.SMOKE, shadowRLoc.add(0,1,0), 15, 0.5,1,0.5);
             // L'ombre lance Q (shuriken) et E (taillade) depuis sa position
@@ -276,14 +283,14 @@ public class Zed extends BaseChampion {
                     tgt.getWorld().spawnParticle(Particle.FLASH,tgt.getLocation().add(0,1,0),2);
                     TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.TRUE);
                     if(tgt instanceof Player _tp)_tp.sendMessage(Component.text("☠ DÉTONATION! Marque de Mort",NamedTextColor.DARK_RED));
-                // Ombre miroir : lance Q puis E sur les ennemis proches
-                for (var nearTgt : TargetingUtil.entitiesInRadius(c, shadowFinalLoc.clone().subtract(0,1,0), 5.0)) {
-                    TargetingUtil.dealDamage(c, nearTgt, shadowQDmg, TargetingUtil.DmgType.PHYSICAL);
-                }
-                for (var nearTgt : TargetingUtil.entitiesInRadius(c, shadowFinalLoc.clone().subtract(0,1,0), 4.0)) {
-                    TargetingUtil.dealDamage(c, nearTgt, shadowEDmg, TargetingUtil.DmgType.PHYSICAL);
-                }
-                shadowFinalLoc.getWorld().spawnParticle(Particle.FLASH, shadowFinalLoc, 2);
+                    // Ombre miroir : lance Q puis E sur les ennemis proches
+                    for (var nearTgt : TargetingUtil.entitiesInRadius(c, shadowFinalLoc.clone().subtract(0,1,0), 5.0)) {
+                        TargetingUtil.dealDamage(c, nearTgt, shadowQDmg, TargetingUtil.DmgType.PHYSICAL);
+                    }
+                    for (var nearTgt : TargetingUtil.entitiesInRadius(c, shadowFinalLoc.clone().subtract(0,1,0), 4.0)) {
+                        TargetingUtil.dealDamage(c, nearTgt, shadowEDmg, TargetingUtil.DmgType.PHYSICAL);
+                    }
+                    shadowFinalLoc.getWorld().spawnParticle(Particle.FLASH, shadowFinalLoc, 2);
                 }
             }.runTaskLater(LolPlugin.getInstance(),60L);
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 1f, 0.7f);
