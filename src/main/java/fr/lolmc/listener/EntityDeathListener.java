@@ -107,6 +107,10 @@ public class EntityDeathListener implements Listener {
             // Jinx passif Get Excited
             if ("jinx".equals(killerChamp.getId()))
                 fr.lolmc.champion.impl.adc.Jinx.getExcited(killer);
+            // Annie meurt → Tibbers s'enrage
+            var victimChamp = championManager.getChampion(victim);
+            if ("annie".equals(victimChamp.getId()))
+                fr.lolmc.champion.impl.mid.Annie.onAnnieDeath(victim);
             // Scoreboard de partie
             LolPlugin.getInstance().getMatchScoreboard().addKill(killer);
             LolPlugin.getInstance().getMatchScoreboard().addDeath(victim);
