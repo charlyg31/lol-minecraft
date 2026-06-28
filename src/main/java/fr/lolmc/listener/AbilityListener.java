@@ -176,6 +176,17 @@ public class AbilityListener implements Listener {
         if (!"ability".equals(t)) return;
         if (!canCast(caster)) return; // anti-double-déclenchement
 
+        // ── Contrôle de Tibbers (Annie) : clic gauche avec le R en main = envoyer Tibbers ──
+        var tibbersEnt = fr.lolmc.champion.impl.mid.Annie.getActiveTibbers(caster);
+        if (tibbersEnt instanceof org.bukkit.entity.PolarBear tib
+                && "ability".equals(t)
+                && "r_annie".equals(HotbarManager.getId(held))) {
+            fr.lolmc.champion.impl.mid.Annie.onTibbersControl(caster, tib);
+            return;
+        }
+
+        if (!\"ability\".equals(t)) return;
+
         onLeftClickCast(caster, slot, held, null);
     }
 
