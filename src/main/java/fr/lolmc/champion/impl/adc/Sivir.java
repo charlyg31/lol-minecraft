@@ -33,6 +33,8 @@ public class Sivir extends BaseChampion {
     }
 
     private static final java.util.Map<java.util.UUID, Boolean> ricochetActive = new java.util.concurrent.ConcurrentHashMap<>();
+    public static void resetState(java.util.UUID id) { ricochetActive.remove(id); }
+    public static void resetAllState()               { ricochetActive.clear(); }
     public static void setRicochet(java.util.UUID id, boolean v) { ricochetActive.put(id, v); }
 
     static class AA extends BasicAttackAbility {

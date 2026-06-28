@@ -37,6 +37,8 @@ public class Blitzcrank extends BaseChampion {
 
     // Passif Statique Mana : quand Blitzcrank tombe sous 20% HP, génère un bouclier = 50% de sa mana actuelle (CD 60s)
     private static final java.util.Map<java.util.UUID, Long> staticShieldCD = new java.util.concurrent.ConcurrentHashMap<>();
+    public static void resetState(java.util.UUID id) { staticShieldCD.remove(id); }
+    public static void resetAllState()               { staticShieldCD.clear(); }
     public static void tickStaticShield(org.bukkit.entity.Player p, fr.lolmc.champion.base.BaseChampion champ) {
         var hp = champ.getHPSystem(); var res = champ.getResourceSystem();
         if (hp.getHPRatio() < 0.20 && champ.getStats().getShield() <= 0) {

@@ -38,7 +38,8 @@ public class Amumu extends BaseChampion {
     private static final java.util.Map<java.util.UUID, Long> cursed = new java.util.concurrent.ConcurrentHashMap<>();
     public static void applyCurse(org.bukkit.entity.LivingEntity tgt) { cursed.put(tgt.getUniqueId(), System.currentTimeMillis()+3000L); }
     public static boolean isCursed(java.util.UUID id) { Long u=cursed.get(id); return u!=null && u>System.currentTimeMillis(); }
-    public static void resetAllState() { cursed.clear(); }
+    public static void resetState(java.util.UUID id) { cursed.remove(id); }
+    public static void resetAllState()                { cursed.clear(); }
     /** Bonus de dégâts vrais (10% des dégâts magiques) si la cible est maudite. */
     public static void onMagicHit(org.bukkit.entity.Player amumu, org.bukkit.entity.LivingEntity tgt, double magicDmg) {
         if (isCursed(tgt.getUniqueId())) {

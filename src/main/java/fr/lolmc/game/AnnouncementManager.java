@@ -23,7 +23,8 @@ import java.util.UUID;
 public class AnnouncementManager {
 
     public AnnouncementManager() {}
-    private static final java.util.Map<java.util.UUID, Integer> spreeStreak = new java.util.HashMap<>();
+    // Killing spree par joueur (Doublé/Triplé/Quadra/Penta meurtre)
+    private final java.util.Map<java.util.UUID, Integer> spreeStreak = new java.util.HashMap<>();
 
     private boolean firstBloodDone = false;
     // Série de kills par joueur (pour Double/Triple/Quadra/Penta)
@@ -37,6 +38,7 @@ public class AnnouncementManager {
         firstBloodDone = false;
         killStreak.clear();
         lastKillTime.clear();
+        spreeStreak.clear(); // reset killing spree entre les parties
     }
 
     /**
