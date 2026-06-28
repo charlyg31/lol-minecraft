@@ -49,6 +49,10 @@ public class Zed extends BaseChampion {
     }
     /** Retourne la position de l'ombre active (pour AbilityPreview). */
     public static org.bukkit.Location getShadowLocation(UUID id) { return shadows.get(id); }
+    public static boolean isWOnCooldown(UUID id) {
+        Long until = wCooldowns.get(id);
+        return until != null && until > System.currentTimeMillis();
+    }
     public static void resetAllState() {
         for (UUID entityId : shadowEntities.values()) {
             org.bukkit.entity.Entity e = org.bukkit.Bukkit.getEntity(entityId);
