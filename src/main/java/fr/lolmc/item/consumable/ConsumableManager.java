@@ -292,20 +292,18 @@ public class ConsumableManager {
     // ════════════════════════════════════════════════════════
 
     public static ItemStack buildConsumable(String id) {
-        // Les consommables de catégorie CONSUMABLE ont un suffixe "2" dans leur ID
-        // (health_potion2, elixir_wrath2…). On normalise pour le switch.
-        String key = id.endsWith("2") ? id.substring(0, id.length() - 1) : id;
-        return switch (key) {
-            case "health_potion"      -> buildItem(Material.POTION,          "🧪 Potion de vie",        "Soigne 150 HP sur 15s.",                 NamedTextColor.RED,    50);
-            case "refillable_potion"  -> buildItem(Material.GLASS_BOTTLE,    "🧪 Fiole rechargeable",   "2 charges — Soigne 125 HP/12s chacune.", NamedTextColor.GREEN,  150);
-            case "biscuit"            -> buildItem(Material.COOKIE,           "🍪 Biscuit de la Volonté","Soigne 150 HP + 100 mana. +50 mana max si mana plein.", NamedTextColor.GOLD, 0);
-            case "elixir_wrath"       -> buildItem(Material.DRAGON_BREATH,    "⚔ Élixir de Fureur",      "+30 AD + vol de vie 3 minutes.",         NamedTextColor.RED,    500);
-            case "elixir_iron"        -> buildItem(Material.FERMENTED_SPIDER_EYE,"🛡 Élixir de Fer",   "+300 HP + Ténacité 3 minutes.",          NamedTextColor.GRAY,   500);
-            case "elixir_sorcery"     -> buildItem(Material.MAGENTA_DYE,      "✨ Élixir de Sorcellerie","+50 AP 3 minutes.",                      NamedTextColor.BLUE,   500);
-            case "stealth_ward"       -> buildItem(Material.SOUL_TORCH,        "👁 Totem furtif",         "Place une ward furtive (60s).",          NamedTextColor.YELLOW, 0);
-            case "control_ward"       -> buildItem(Material.PINK_CANDLE,       "🔮 Control Ward",         "Révèle et détruit wards ennemies (75g).",NamedTextColor.AQUA,   75);
-            case "oracle_lens"        -> buildItem(Material.SPYGLASS,          "🔍 Lentille Oracle",      "Révèle wards proches 10s.",              NamedTextColor.YELLOW, 0);
-            case "farsight"           -> buildItem(Material.COMPASS,           "🔭 Vision Lointaine",     "Place ward révélatrice à longue portée.",NamedTextColor.YELLOW, 0);
+        return switch (id) {
+            case "health_potion", "health_potion2"      -> buildItem(Material.POTION,          "🧪 Potion de vie",        "Soigne 150 HP sur 15s.",                 NamedTextColor.RED,    50);
+            case "refillable_potion", "refillable_potion2" -> buildItem(Material.GLASS_BOTTLE,  "🧪 Fiole rechargeable",   "2 charges — Soigne 125 HP/12s chacune.", NamedTextColor.GREEN,  150);
+            case "biscuit", "biscuit_will"               -> buildItem(Material.COOKIE,           "🍪 Biscuit de la Volonté","Soigne 150 HP + 100 mana. +50 mana max si mana plein.", NamedTextColor.GOLD, 0);
+            case "elixir_wrath", "elixir_wrath2"         -> buildItem(Material.DRAGON_BREATH,    "⚔ Élixir de Fureur",      "+30 AD + vol de vie 3 minutes.",         NamedTextColor.RED,    500);
+            case "elixir_iron", "elixir_iron2"           -> buildItem(Material.FERMENTED_SPIDER_EYE,"🛡 Élixir de Fer",   "+300 HP + Ténacité 3 minutes.",          NamedTextColor.GRAY,   500);
+            case "elixir_sorcery", "elixir_sorcery2"     -> buildItem(Material.MAGENTA_DYE,      "✨ Élixir de Sorcellerie","+50 AP 3 minutes.",                      NamedTextColor.BLUE,   500);
+            case "stealth_ward", "stealth_ward2"         -> buildItem(Material.SOUL_TORCH,        "👁 Totem furtif",         "Place une ward furtive (60s).",          NamedTextColor.YELLOW, 0);
+            case "control_ward", "control_ward2"         -> buildItem(Material.PINK_CANDLE,       "🔮 Control Ward",         "Révèle et détruit wards ennemies (75g).",NamedTextColor.AQUA,   75);
+            case "oracle_lens", "oracle_lens2"           -> buildItem(Material.SPYGLASS,          "🔍 Lentille Oracle",      "Révèle wards proches 10s.",              NamedTextColor.YELLOW, 0);
+            case "farsight", "farsight2"                 -> buildItem(Material.COMPASS,           "🔭 Vision Lointaine",     "Place ward révélatrice à longue portée.",NamedTextColor.YELLOW, 0);
+            case "cappa_juice", "cappa_juice2"           -> buildItem(Material.HONEY_BOTTLE,      "🍯 Cappa Juice",          "Soigne 40% HP max sur 120s.",            NamedTextColor.GOLD,   700);
             default -> new ItemStack(Material.BARRIER);
         };
     }

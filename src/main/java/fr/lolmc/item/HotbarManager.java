@@ -163,7 +163,9 @@ public class HotbarManager {
         }
         // Consommables possédés
         for (String consId : getConsumables(player)) {
-            page2Content.add(fr.lolmc.item.consumable.ConsumableManager.buildConsumable(consId));
+            ItemStack cons = fr.lolmc.item.consumable.ConsumableManager.buildConsumable(consId);
+            tag(cons, "consumable", consId, -1); // sans tag, le clic ne route pas vers l'usage
+            page2Content.add(cons);
         }
 
         // Placer dans les slots 0-6

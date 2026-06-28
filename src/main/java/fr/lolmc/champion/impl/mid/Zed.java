@@ -127,8 +127,15 @@ public class Zed extends BaseChampion {
                     wCooldowns.put(uuid, now + (long)(realCooldowns[rank] * 1000));
                     c.sendActionBar(Component.text("👤 Échange avec l'ombre !", NamedTextColor.DARK_GRAY));
                     c.getWorld().spawnParticle(Particle.SMOKE, shadowLoc, 15, 0.5, 1, 0.5);
-                    // Paper 26.1.2 interdit teleport sync pendant un event → teleportAsync
-                    c.teleportAsync(shadowLoc.clone());
+                    // Paper 26.1.2 interdit teleport sync pendant un event → teleportAsync.
+                    // On garde l'orientation actuelle du joueur pour éviter une caméra cassée.
+                    Location dest = shadowLoc.clone();
+                    dest.setYaw(c.getLocation().getYaw());
+                    dest.setPitch(c.getLocation().getPitch());
+                    c.teleportAsync(dest).exceptionally(ex -> {
+                        c.sendActionBar(Component.text("❌ Échec téléport ombre", NamedTextColor.RED));
+                        return false;
+                    });
                 }
             } else {
                 // Coût en énergie uniquement au placement de l'ombre (40)
