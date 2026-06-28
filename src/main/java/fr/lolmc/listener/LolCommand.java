@@ -80,13 +80,37 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
                 case "role", "roles", "lobby", "play" ->
                     LolPlugin.getInstance().getPreGameGUI().open(player);
                 case "queue", "file" -> {
+                    var mm = LolPlugin.getInstance().getMatchmakingManager();
                     if (subArgs.length > 0 && subArgs[0].equalsIgnoreCase("leave"))
-                        LolPlugin.getInstance().getRoleQueueManager().leaveQueue(player);
+                        mm.leaveQueue(player);
                     else
-                        LolPlugin.getInstance().getRoleQueueManager().joinQueue(player);
+                        mm.joinQueue(player);
                 }
-                case "party", "groupe" ->
-                    player.sendMessage(Component.text("§cUtilise /party <invite|accept|leave|info>", NamedTextColor.RED));
+                case "party", "groupe" -> {
+                    String sub2 = subArgs.length > 0 ? subArgs[0].toLowerCase() : "info";
+                    var pm2 = LolPlugin.getInstance().getPartyManager();
+                    switch (sub2) {
+                        case "invite" -> {
+                            if (subArgs.length < 2) { player.sendMessage("§cUsage: /lol party invite <joueur>"); break; }
+                            Player target = org.bukkit.Bukkit.getPlayerExact(subArgs[1]);
+                            if (target == null || target.equals(player)) { player.sendMessage("§cJoueur introuvable."); break; }
+                            pm2.invite(player, target);
+                        }
+                        case "accept" -> pm2.acceptInvite(player);
+                        case "leave"  -> { pm2.leaveParty(player, true); player.sendMessage(Component.text("Tu as quitté le groupe.", NamedTextColor.GRAY)); }
+                        default -> {
+                            var party = pm2.getParty(player);
+                            if (party == null || party.size() <= 1) {
+                                player.sendMessage(Component.text("Aucun groupe actif. /lol party invite <joueur>", NamedTextColor.GRAY));
+                            } else {
+                                String members = party.members.stream()
+                                    .map(id -> { Player pp = org.bukkit.Bukkit.getPlayer(id); return pp != null ? pp.getName() : "?"; })
+                                    .collect(java.util.stream.Collectors.joining(", "));
+                                player.sendMessage(Component.text("👥 Groupe (" + party.size() + "/5): " + members, NamedTextColor.GOLD));
+                            }
+                        }
+                    }
+                }
                 case "team", "equipe" -> {
                     if (subArgs.length < 1) { player.sendMessage("§cUsage: /lol team <bleu|rouge|auto>"); break; }
                     String t = subArgs[0].toLowerCase();
@@ -100,8 +124,6 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
                 // ── En jeu ──
                 case "recall", "b" ->
                     LolPlugin.getInstance().getBaseManager().startRecall(player);
-                case "shop", "boutique" ->
-                    LolPlugin.getInstance().getShopListener().openShop(player);
                 case "ping" -> {
                     String ptype = subArgs.length > 0 ? subArgs[0].toLowerCase() : "danger";
                     var type = switch (ptype) {
@@ -147,9 +169,9 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
                     player.sendMessage(Component.text("§e/lol pick <champion> §7— Choisir un champion"));
                     player.sendMessage(Component.text("§e/lol lock §7— Verrouiller la sélection"));
                     player.sendMessage(Component.text("§e/lol role §7— Menu de préparation"));
-                    player.sendMessage(Component.text("§e/lol queue §7— Rejoindre la file"));
+                    player.sendMessage(Component.text("§e/lol queue [leave] §7— File d'attente"));
+                    player.sendMessage(Component.text("§e/lol party <invite|accept|leave|info> §7— Groupe"));
                     player.sendMessage(Component.text("§e/lol recall §7— Retour en base"));
-                    player.sendMessage(Component.text("§e/lol shop §7— Boutique"));
                     player.sendMessage(Component.text("§e/lol ping <type> §7— Ping équipe"));
                     player.sendMessage(Component.text("§e/lol ff §7— Vote d'abandon"));
                     player.sendMessage(Component.text("§e/lol stats §7— Statistiques"));
