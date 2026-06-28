@@ -101,6 +101,9 @@ public class ItemState {
     // ── Omnivamp ──
     public double pendingOmnivampHeal = 0;     // accumulé en combat
 
+    // ── Items de jungle ──
+    public long lastMosstomperShield = 0;      // CD 12s (Mosstomper Smite)
+
     // ── Nouveaux items passifs ──
     public int eclipseStacks = 0;
     public boolean terminusLight = true;
