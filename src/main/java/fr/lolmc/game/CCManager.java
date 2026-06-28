@@ -113,7 +113,6 @@ public class CCManager {
         stunUntil.remove(id);
         rootUntil.remove(id);
         silenceUntil.remove(id);
-        slowUntil.remove(id);
         if (target instanceof Player p) {
             p.removePotionEffect(org.bukkit.potion.PotionEffectType.SLOWNESS);
             p.removePotionEffect(org.bukkit.potion.PotionEffectType.MINING_FATIGUE);

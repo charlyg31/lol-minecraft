@@ -443,151 +443,85 @@ public class PassiveManager {
 
         // ── Tiamat / Ravenous Hydra / Profane Hydra / Ironspike Whip : AoE AA ──
         if (hasAnyItem(attacker,"tiamat","ravenous_hydra","profane_hydra","ironspike_whip")) {
-            double aoeDmg = dmg * 0.40;
-            for (var t : TargetingUtil.enemiesAround(attacker, 3.0)) {
+            for (var t : fr.lolmc.util.TargetingUtil.enemiesAround(attacker, 3.0)) {
                 if (t.equals(victim)) continue;
-                TargetingUtil.dealDamage(attacker, t, aoeDmg, TargetingUtil.DmgType.PHYSICAL);
+                fr.lolmc.util.TargetingUtil.dealDamage(attacker, t, aaDmg*0.40, fr.lolmc.util.TargetingUtil.DmgType.PHYSICAL);
             }
         }
         // ── Umbral Glaive : détecte/détruit wards ──
-        if (hasAnyItem(attacker,"umbral_glaive")) {
+        if (hasAnyItem(attacker,"umbral_glaive"))
             LolPlugin.getInstance().getWardManager().destroyEnemyWards(attacker, victim.getLocation(), 4.0);
-        }
         // ── Eclipse : 2 AA → bouclier + 15% MS ──
         if (hasAnyItem(attacker,"eclipse")) {
             int stk = getState(attacker).eclipseStacks + 1;
             getState(attacker).eclipseStacks = stk;
             if (stk >= 2) {
                 getState(attacker).eclipseStacks = 0;
-                double sh = 60 + s.getFinalAD() * 0.10;
-                champ.getStats().addShield(sh);
-                champ.getStats().addBonusMoveSpeed(15);
-                final double fsh=sh; new BukkitRunnable(){@Override public void run(){ champ.getStats().addShield(-fsh); champ.getStats().addBonusMoveSpeed(-15); }}.runTaskLater(LolPlugin.getInstance(),40L);
+                double sh = 60 + as.getFinalAD()*0.10;
+                ac.getStats().addShield(sh); ac.getStats().addBonusMoveSpeed(15);
+                final double fsh=sh; new BukkitRunnable(){@Override public void run(){ ac.getStats().addShield(-fsh); ac.getStats().addBonusMoveSpeed(-15); }}.runTaskLater(LolPlugin.getInstance(),40L);
             }
         }
         // ── Terminus : Light/Dark alternés (+Armor ou +MR) ──
         if (hasAnyItem(attacker,"terminus")) {
             boolean light = (getState(attacker).terminusLight = !getState(attacker).terminusLight);
-            if (light) { s.addBonusArmor(8); new BukkitRunnable(){@Override public void run(){ s.addBonusArmor(-8); }}.runTaskLater(LolPlugin.getInstance(),60L); }
-            else        { s.addBonusMR(8);    new BukkitRunnable(){@Override public void run(){ s.addBonusMR(-8);    }}.runTaskLater(LolPlugin.getInstance(),60L); }
+            if (light) { as.addBonusArmor(8); new BukkitRunnable(){@Override public void run(){ as.addBonusArmor(-8); }}.runTaskLater(LolPlugin.getInstance(),60L); }
+            else        { as.addBonusMR(8);    new BukkitRunnable(){@Override public void run(){ as.addBonusMR(-8);    }}.runTaskLater(LolPlugin.getInstance(),60L); }
         }
         // ── Sundered Sky : AA crit → soigne 10% HP manquants ──
-        if (hasAnyItem(attacker,"sundered_sky")) {
-            double heal = (champ.getHPSystem().getMaxHP()-champ.getHPSystem().getCurrentHP())*0.10;
-            champ.getHPSystem().heal(heal);
-        }
+        if (hasAnyItem(attacker,"sundered_sky"))
+            ahp.heal((ahp.getMaxHP()-ahp.getCurrentHP())*0.10);
         // ── Stormrazor : 1ère AA → slow 99% 0.5s (CD 18s) ──
         if (hasAnyItem(attacker,"stormrazor")) {
-            long now=System.currentTimeMillis(); ItemState st=getState(attacker);
-            if (now-st.lastStormrazor > 18000) {
-                st.lastStormrazor = now;
+            long now=System.currentTimeMillis(); ItemState stsr=getState(attacker);
+            if (now-stsr.lastStormrazor > 18000) {
+                stsr.lastStormrazor = now;
                 if (victim instanceof Player vp) vp.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,10,5,false,false));
             }
         }
-        // ── Phage : +15 vitesse 2s ──
+        // ── Phage : +15 MS 2s ──
         if (hasAnyItem(attacker,"phage")) {
-            s.addBonusMoveSpeed(15);
-            new BukkitRunnable(){@Override public void run(){ s.addBonusMoveSpeed(-15); }}.runTaskLater(LolPlugin.getInstance(),40L);
+            as.addBonusMoveSpeed(15);
+            new BukkitRunnable(){@Override public void run(){ as.addBonusMoveSpeed(-15); }}.runTaskLater(LolPlugin.getInstance(),40L);
         }
-        // ── Rageknife : toutes les 2 AA → applique on-hit ×2 ──
+        // ── Rageknife : toutes les 2 AA → on-hit ×2 ──
         if (hasAnyItem(attacker,"rageknife")) {
-            int stk = (getState(attacker).rageknifeCount+1) % 2;
-            getState(attacker).rageknifeCount = stk;
-            if (stk == 0) {
-                TargetingUtil.dealDamage(attacker, victim, dmg * 0.20, TargetingUtil.DmgType.MAGICAL);
-            }
+            int rk = (getState(attacker).rageknifeCount+1) % 2;
+            getState(attacker).rageknifeCount = rk;
+            if (rk == 0) fr.lolmc.util.TargetingUtil.dealDamage(attacker, victim, aaDmg*0.20, fr.lolmc.util.TargetingUtil.DmgType.MAGICAL);
         }
-        // ── Phantom Dancer : ghosting + 7% MS ──
+        // ── Phantom Dancer : +7% MS ──
         if (hasAnyItem(attacker,"phantom_dancer","phantom_dancer2")) {
-            s.addBonusMoveSpeed(7);
-            new BukkitRunnable(){@Override public void run(){ s.addBonusMoveSpeed(-7); }}.runTaskLater(LolPlugin.getInstance(),40L);
+            as.addBonusMoveSpeed(7);
+            new BukkitRunnable(){@Override public void run(){ as.addBonusMoveSpeed(-7); }}.runTaskLater(LolPlugin.getInstance(),40L);
+        }
+        // ── Bloodthirster : vol de vie excédentaire → bouclier ──
+        if (hasAnyItem(attacker,"bloodthirster")) {
+            double overHeal = Math.max(0, ahp.getCurrentHP() + aaDmg*0.18 - ahp.getMaxHP());
+            if (overHeal > 0) { double sh=Math.min(overHeal,50+as.getFinalAD()*0.40); as.addShield(sh); new BukkitRunnable(){@Override public void run(){ as.addShield(-sh); }}.runTaskLater(LolPlugin.getInstance(),60L); }
         }
         // ── Dusk and Dawn : après sort, prochain AA double on-hit ──
         if (getState(attacker).duskDawnReady) {
             getState(attacker).duskDawnReady = false;
-            TargetingUtil.dealDamage(attacker, victim, dmg * 0.50, TargetingUtil.DmgType.PHYSICAL);
+            fr.lolmc.util.TargetingUtil.dealDamage(attacker, victim, aaDmg*0.50, fr.lolmc.util.TargetingUtil.DmgType.PHYSICAL);
         }
         // ── Emblem All-In / Fiendhunter : prochain AA crit garanti ──
         if (getState(attacker).nextAACrit) {
             getState(attacker).nextAACrit = false;
-            TargetingUtil.dealDamage(attacker, victim, dmg * 0.75, TargetingUtil.DmgType.PHYSICAL);
+            fr.lolmc.util.TargetingUtil.dealDamage(attacker, victim, aaDmg*0.75, fr.lolmc.util.TargetingUtil.DmgType.PHYSICAL);
         }
         // ── Protoplasm Harness : 6 stacks → AoE ──
         if (hasAnyItem(attacker,"protoplasm_harness")) {
-            int stk = (getState(attacker).protoStacks+1) % 6;
-            getState(attacker).protoStacks = stk;
-            if (stk == 0) TargetingUtil.dealDamageAll(attacker, TargetingUtil.enemiesAround(attacker,3.5), dmg*0.30, TargetingUtil.DmgType.PHYSICAL);
+            int ph = (getState(attacker).protoStacks+1) % 6;
+            getState(attacker).protoStacks = ph;
+            if (ph == 0) fr.lolmc.util.TargetingUtil.dealDamageAll(attacker, fr.lolmc.util.TargetingUtil.enemiesAround(attacker,3.5), aaDmg*0.30, fr.lolmc.util.TargetingUtil.DmgType.PHYSICAL);
         }
         // ── Yun Tal Wildarrows : crits → DoT 60%AD physique 3s ──
-        if (hasAnyItem(attacker,"yun_tal_wildarrows") && getState(attacker).lastHitCrit) {
-            applyDoT(attacker, victim, s.getFinalAD()*0.20, 3, "yuntal");
-        }
-        // ── Noonquiver : tir bonus 50 dégâts physiques ──
-        if (hasAnyItem(attacker,"noonquiver")) {
-            TargetingUtil.dealDamage(attacker, victim, 50, TargetingUtil.DmgType.PHYSICAL);
-        }
-
-        // ── Bloodthirster : vol de vie excédentaire → bouclier ──
-        if (hasAnyItem(attacker,"bloodthirster")) {
-            double overHeal = Math.max(0, champ.getHPSystem().getCurrentHP() + dmg*0.18 - champ.getHPSystem().getMaxHP());
-            if (overHeal > 0) { double sh=Math.min(overHeal,50+s.getFinalAD()*0.40); champ.getStats().addShield(sh); new BukkitRunnable(){@Override public void run(){ champ.getStats().addShield(-sh); }}.runTaskLater(LolPlugin.getInstance(),60L); }
-        }
-        // ── Eclipse : 2 AA → bouclier + 15% MS ──
-        if (hasAnyItem(attacker,"eclipse")) {
-            int stk=(getState(attacker).eclipseStacks+1)%2; getState(attacker).eclipseStacks=stk;
-            if(stk==0){ double sh=60+s.getFinalAD()*0.10; champ.getStats().addShield(sh); champ.getStats().addBonusMoveSpeed(15);
-                new BukkitRunnable(){@Override public void run(){ champ.getStats().addShield(-sh); champ.getStats().addBonusMoveSpeed(-15); }}.runTaskLater(LolPlugin.getInstance(),40L); }
-        }
-        // ── Terminus : alternate Light/Dark (+Armor ou +MR) ──
-        if (hasAnyItem(attacker,"terminus")) {
-            boolean light=(getState(attacker).terminusLight=!getState(attacker).terminusLight);
-            if(light){ s.addBonusArmor(8); new BukkitRunnable(){@Override public void run(){ s.addBonusArmor(-8); }}.runTaskLater(LolPlugin.getInstance(),60L); }
-            else      { s.addBonusMR(8);   new BukkitRunnable(){@Override public void run(){ s.addBonusMR(-8);   }}.runTaskLater(LolPlugin.getInstance(),60L); }
-        }
-        // ── Stormrazor : 1ère AA toutes les 18s → slow 99% 0.5s ──
-        if (hasAnyItem(attacker,"stormrazor")) {
-            long now2=System.currentTimeMillis(); ItemState st2=getState(attacker);
-            if(now2-st2.lastStormrazor>18000){ st2.lastStormrazor=now2;
-                if(victim instanceof Player vp) vp.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,10,5,false,false)); }
-        }
-        // ── Phage : +15 MS 2s après AA ──
-        if (hasAnyItem(attacker,"phage")) {
-            s.addBonusMoveSpeed(15); new BukkitRunnable(){@Override public void run(){ s.addBonusMoveSpeed(-15); }}.runTaskLater(LolPlugin.getInstance(),40L);
-        }
-        // ── Rageknife : toutes les 2 AA → on-hit ×2 ──
-        if (hasAnyItem(attacker,"rageknife")) {
-            getState(attacker).rageknifeCount=(getState(attacker).rageknifeCount+1)%2;
-            if(getState(attacker).rageknifeCount==0) TargetingUtil.dealDamage(attacker,victim,dmg*0.20,TargetingUtil.DmgType.MAGICAL);
-        }
-        // ── Tiamat / Ravenous Hydra / Profane Hydra / Ironspike Whip : AoE AA ──
-        if (hasAnyItem(attacker,"tiamat","ravenous_hydra","profane_hydra","ironspike_whip")) {
-            for(var t:TargetingUtil.enemiesAround(attacker,3.0)){ if(!t.equals(victim)) TargetingUtil.dealDamage(attacker,t,dmg*0.40,TargetingUtil.DmgType.PHYSICAL); }
-        }
-        // ── Phantom Dancer : ghosting + 7% MS ──
-        if (hasAnyItem(attacker,"phantom_dancer","phantom_dancer2")) {
-            s.addBonusMoveSpeed(7); new BukkitRunnable(){@Override public void run(){ s.addBonusMoveSpeed(-7); }}.runTaskLater(LolPlugin.getInstance(),40L);
-        }
-        // ── Yun Tal Wildarrows : crit → DoT 60%AD/3s ──
         if (hasAnyItem(attacker,"yun_tal_wildarrows") && getState(attacker).lastHitCrit)
-            applyDoT(attacker,victim,s.getFinalAD()*0.20,3,"yuntal");
+            applyDoT(attacker, victim, as.getFinalAD()*0.20, 3, "yuntal");
         // ── Noonquiver : tir bonus 50 dégâts physiques ──
         if (hasAnyItem(attacker,"noonquiver"))
-            TargetingUtil.dealDamage(attacker,victim,50,TargetingUtil.DmgType.PHYSICAL);
-        // ── Umbral Glaive : détruit wards proches ──
-        if (hasAnyItem(attacker,"umbral_glaive"))
-            LolPlugin.getInstance().getWardManager().destroyEnemyWards(attacker,victim.getLocation(),4.0);
-        // ── Sundered Sky : soigne 10% HP manquants ──
-        if (hasAnyItem(attacker,"sundered_sky"))
-            champ.getHPSystem().heal((champ.getHPSystem().getMaxHP()-champ.getHPSystem().getCurrentHP())*0.10);
-        // ── Protoplasm Harness : 6 stacks → AoE ──
-        if (hasAnyItem(attacker,"protoplasm_harness")) {
-            int stk3=(getState(attacker).protoStacks+1)%6; getState(attacker).protoStacks=stk3;
-            if(stk3==0) TargetingUtil.dealDamageAll(attacker,TargetingUtil.enemiesAround(attacker,3.5),dmg*0.30,TargetingUtil.DmgType.PHYSICAL);
-        }
-        // ── Dusk and Dawn : prochain AA après sort → double on-hit ──
-        if (getState(attacker).duskDawnReady) { getState(attacker).duskDawnReady=false; TargetingUtil.dealDamage(attacker,victim,dmg*0.50,TargetingUtil.DmgType.PHYSICAL); }
-        // ── Emblem All-In / Fiendhunter : prochain AA crit garanti ──
-        if (getState(attacker).nextAACrit) { getState(attacker).nextAACrit=false; TargetingUtil.dealDamage(attacker,victim,dmg*0.75,TargetingUtil.DmgType.PHYSICAL); }
+            fr.lolmc.util.TargetingUtil.dealDamage(attacker, victim, 50, fr.lolmc.util.TargetingUtil.DmgType.PHYSICAL);
 
         // ── Lifesteal (tous items) ──
         double lifesteal = as.getFinalLifeSteal();
