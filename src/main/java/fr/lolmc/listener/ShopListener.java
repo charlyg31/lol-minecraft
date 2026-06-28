@@ -347,6 +347,8 @@ public class ShopListener implements Listener {
             case "stealth_ward", "stealth_ward2"            -> cm.placeWard(player, false);
             case "control_ward", "control_ward2"            -> cm.placeControlWard(player);
             case "farsight", "farsight2"                    -> cm.placeWard(player, true);
+            case "oracle_lens", "oracle_lens2"              -> cm.placeWard(player, true);
+            case "cappa_juice", "cappa_juice2"              -> cm.useHealthPotion(player);
             default -> player.sendActionBar(net.kyori.adventure.text.Component.text(
                     "Consommable: " + id, net.kyori.adventure.text.format.NamedTextColor.GRAY));
         }
