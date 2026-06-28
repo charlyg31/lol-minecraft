@@ -253,8 +253,8 @@ public class ConsumableManager {
             }
         }.runTaskLater(LolPlugin.getInstance(), duration);
 
-        // Enregistrer la ward dans le WardManager (détection des ennemis)
-        LolPlugin.getInstance().getWardManager().placeWard(player, wardLoc, wardDuration);
+        // Enregistrer la ward dans le WardManager (avec entityId pour la visibilité)
+        LolPlugin.getInstance().getWardManager().placeWard(player, wardLoc, wardDuration, wardEntityId);
 
         String wardType = visible ? "🔵 Totem de vision" : "👁 Ward furtive";
         player.sendActionBar(Component.text(
@@ -272,16 +272,17 @@ public class ConsumableManager {
 
         final Location wardLoc = surfaceLocation(target);
 
-        // Détruire les wards ennemies enregistrées dans un rayon de 6 blocs
+        // Détruire les wards ennemies ET révéler les survivantes dans un rayon de 6 blocs
         int destroyed = LolPlugin.getInstance().getWardManager()
                 .destroyEnemyWards(player, wardLoc, 6.0);
+        LolPlugin.getInstance().getWardManager().revealEnemyWards(player, wardLoc, 6.0, 10_000L);
 
         // Entité invisible (control ward = chandelle rose)
         final java.util.UUID wardEntityId = spawnWardEntity(wardLoc, Material.PINK_CANDLE,
                 "🔮 Control Ward", true);
 
         // Enregistrer la control ward elle-même (équipe du poseur)
-        LolPlugin.getInstance().getWardManager().placeWard(player, wardLoc, 240);
+        LolPlugin.getInstance().getWardManager().placeWard(player, wardLoc, 240, wardEntityId);
 
         // Dure jusqu'à expiration (~240s)
         new BukkitRunnable() {

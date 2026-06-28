@@ -123,9 +123,29 @@ public class AbilityListener implements Listener {
     public void onInteractEntity(PlayerInteractEntityEvent e) {
         Player caster = e.getPlayer();
         if (!manager.hasChampion(caster)) return;
-        // Clic droit sur entité : on annule juste l'interaction vanilla.
-        // Le ciblage des sorts se fait au CLIC GAUCHE (voir onLeftClick).
+
+        // Clic droit sur un ArmorStand tagué "lol_ward" → tentative de destruction
+        if (e.getRightClicked() instanceof org.bukkit.entity.ArmorStand as
+                && as.getScoreboardTags().contains("lol_ward")) {
+            e.setCancelled(true);
+            LolPlugin.getInstance().getWardManager().destroyWardByEntity(as.getUniqueId(), caster);
+            return;
+        }
+
+        // Autres clics droits sur entité : annuler l'interaction vanilla.
         e.setCancelled(true);
+    }
+
+    // ── Oracle Lens / Farsight : révèle les wards ennemies proches ──
+    // Appelé depuis handleSlotAction quand l'item consommable est oracle_lens/farsight.
+    public void revealNearbyWards(Player player) {
+        int count = LolPlugin.getInstance().getWardManager()
+                .revealEnemyWards(player, player.getLocation(), 10.0, 10_000L);
+        player.sendActionBar(net.kyori.adventure.text.Component.text(
+                count > 0 ? "🔍 " + count + " ward(s) ennemie(s) révélée(s)! Clic droit pour détruire."
+                          : "🔍 Aucune ward ennemie dans le rayon.",
+                net.kyori.adventure.text.format.NamedTextColor.YELLOW));
+        player.getWorld().playSound(player.getLocation(), org.bukkit.Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1f, 1.2f);
     }
 
     // ── CLIC GAUCHE FIABLE via PlayerAnimationEvent ──
