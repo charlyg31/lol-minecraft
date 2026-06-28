@@ -126,9 +126,24 @@ public abstract class BaseChampion {
 
         ability.setLevel(levelSystem.getAbilityRank(slot));
         ability.cast(caster, stats, target);
-        ability.triggerCooldown(caster, stats);
-        // Déclencher passifs post-sort (Spellblade, Shojin, etc.)
+
+// Cas particulier : Zed W gère son cooldown lui-même.
+// Cela permet le second lancer pour échanger avec l'ombre.
+        boolean manualCooldown =
+                this instanceof fr.lolmc.champion.impl.mid.Zed
+                        && slot == 2
+                        && fr.lolmc.champion.impl.mid.Zed.getShadowLocation(caster.getUniqueId()) != null;
+
+        if (!manualCooldown) {
+            ability.triggerCooldown(caster, stats);
+        }
+
+// Déclencher passifs post-sort (Spellblade, Shojin, etc.)
         var pm = LolPlugin.getInstance().getPassiveManager();
+        if (pm != null) pm.onAbilityCast(caster, slot);
+
+// Refresh tooltip après le cast
+        refreshSlot(caster, slot);
         if (pm != null) pm.onAbilityCast(caster, slot);
         // Refresh tooltip après le cast
         refreshSlot(caster, slot);
