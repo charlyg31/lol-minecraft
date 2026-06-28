@@ -414,7 +414,7 @@ public class AbilityListener implements Listener {
     public void onInventoryClick(InventoryClickEvent e) {
         if (!(e.getWhoClicked() instanceof Player p)) return;
         if (!manager.hasChampion(p)) return;
-        // Bloquer si l'item cliqué OU le slot est un item LoL
+        // Bloquer si l'item cliqué OU le curseur est un item LoL
         ItemStack clicked = e.getCurrentItem();
         ItemStack cursor = e.getCursor();
         if (HotbarManager.isLolItem(clicked) || HotbarManager.isLolItem(cursor)) {
@@ -422,6 +422,40 @@ public class AbilityListener implements Listener {
         }
         // Bloquer les slots hotbar 0-8 systématiquement
         if (e.getSlot() >= 0 && e.getSlot() <= 8 && e.getClickedInventory() == p.getInventory()) {
+            e.setCancelled(true);
+        }
+        // Bloquer l'échange main secondaire (touche F en survolant un slot) :
+        // déplacerait un item LoL vers l'offhand et casserait l'agencement.
+        var ct = e.getClick();
+        if (ct == org.bukkit.event.inventory.ClickType.SWAP_OFFHAND) {
+            e.setCancelled(true);
+        }
+        // Échange par touche numérique (1-9) vers/depuis un slot hotbar
+        if (ct == org.bukkit.event.inventory.ClickType.NUMBER_KEY) {
+            int hb = e.getHotbarButton();
+            if (hb >= 0 && hb <= 8) {
+                ItemStack hbItem = p.getInventory().getItem(hb);
+                if (HotbarManager.isLolItem(hbItem) || HotbarManager.isLolItem(clicked)) {
+                    e.setCancelled(true);
+                }
+            }
+        }
+    }
+
+    // ── Empêcher l'échange main principale ↔ main secondaire (touche F) ──
+    @EventHandler
+    public void onSwapHands(org.bukkit.event.player.PlayerSwapHandItemsEvent e) {
+        Player p = e.getPlayer();
+        if (!manager.hasChampion(p)) return;
+        // Tout item LoL (ou n'importe quel item de la hotbar gérée) ne doit jamais
+        // basculer en main secondaire : ça déplace les sorts/items et casse la barre.
+        if (HotbarManager.isLolItem(e.getMainHandItem())
+                || HotbarManager.isLolItem(e.getOffHandItem())) {
+            e.setCancelled(true);
+            return;
+        }
+        // Par sécurité en partie : bloquer tout swap offhand dans le monde de jeu.
+        if (fr.lolmc.util.WorldContext.isInGameWorld(p)) {
             e.setCancelled(true);
         }
     }
