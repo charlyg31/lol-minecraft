@@ -65,7 +65,7 @@ public class LeeSin extends BaseChampion {
     static class Q extends BaseAbility {
         // onSpellCast appelé dans cast() pour activer Flurry
         Q(){super("q_leesin","Onde Sonique",Material.ECHO_SHARD,AbilitySlot.Q,
-                new double[]{9,8,7,6,5},15,0,DamageType.PHYSICAL);
+                new double[]{8.5,7.5,6.5,5.5,4.5},15,0,DamageType.PHYSICAL);
             resourceCost = 50;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             fr.lolmc.champion.impl.jungle.LeeSin.onSpellCast(c.getUniqueId()); // Flurry
@@ -111,23 +111,40 @@ public class LeeSin extends BaseChampion {
 
     static class W extends BaseAbility {
         W(){super("w_leesin","Protection",Material.SHIELD,AbilitySlot.W,
-                new double[]{14,13,12,11,10},15,0,DamageType.TRUE);
+                new double[]{7,7,7,7,7},15,0,DamageType.TRUE);
             resourceCost = 50;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             fr.lolmc.champion.impl.jungle.LeeSin.onSpellCast(c.getUniqueId()); // Flurry
-
             Player dest = (t!=null) ? t : c;
-            dest.addPotionEffect(new PotionEffect(PotionEffectType.ABSORPTION,40,1,false,true));
             if(t!=null && !t.equals(c)){
                 Location safe=safeTeleport(c.getLocation(),t.getLocation());
                 c.teleport(safe);
             }
-            c.addPotionEffect(new PotionEffect(PotionEffectType.ABSORPTION,40,1,false,true));
-            c.addPotionEffect(new PotionEffect(PotionEffectType.REGENERATION,80,1,false,true));
-            c.sendActionBar(Component.text("🛡 Protection / Volonté de Fer!",NamedTextColor.GREEN));
+            // Bouclier 60/105/150/195/240 +80%AP pendant 2s (40 ticks) sur Lee Sin (et la cible si champion)
+            double[] shieldBase={60,105,150,195,240};
+            double shield=shieldBase[getLevel()-1]+s.getFinalAP()*0.80;
+            var cm=LolPlugin.getInstance().getChampionManager();
+            if(cm.hasChampion(c)) cm.getChampion(c).getStats().addShield(shield);
+            if(t!=null && !t.equals(c) && cm.hasChampion(t)) cm.getChampion(t).getStats().addShield(shield);
+            final Player fdest=dest; final double fsh=shield; final Player fc=c;
+            new BukkitRunnable(){@Override public void run(){
+                if(cm.hasChampion(fc)) cm.getChampion(fc).getStats().addShield(-fsh);
+                if(fdest!=null && !fdest.equals(fc) && cm.hasChampion(fdest)) cm.getChampion(fdest).getStats().addShield(-fsh);
+            }}.runTaskLater(LolPlugin.getInstance(), 40L);
+            // Volonté de Fer : omnivamp 10/14/18/22/26% pendant 4s
+            double[] omni={0.10,0.14,0.18,0.22,0.26};
+            if(cm.hasChampion(c)){
+                final var fstats=cm.getChampion(c).getStats();
+                fstats.addBonusOmnivamp(omni[getLevel()-1]);
+                new BukkitRunnable(){@Override public void run(){ fstats.addBonusOmnivamp(-omni[getLevel()-1]); }}.runTaskLater(LolPlugin.getInstance(), 80L);
+            }
+            c.sendActionBar(Component.text(String.format("🛡 Protection %.0f + Volonté de Fer!",shield),NamedTextColor.GREEN));
             c.getWorld().playSound(c.getLocation(), Sound.ITEM_SHIELD_BLOCK, 1f, 1.3f);
         }
-        @Override public String getDynamicDescription(ChampionStats s){return "Dash vers un allié + bouclier (les deux). Recast: omnivamp.";}
+        @Override public String getDynamicDescription(ChampionStats s){
+            double[] shieldBase={60,105,150,195,240};
+            return String.format("Dash vers un allié + bouclier %.0f (+80%%AP) 2s. Recast: omnivamp 4s.",shieldBase[getLevel()-1]+s.getFinalAP()*0.80);
+        }
     }
 
     static class E extends BaseAbility {
@@ -140,8 +157,10 @@ public class LeeSin extends BaseChampion {
             double[] base=fr.lolmc.util.Balance.base("e_leesin",new double[]{35,60,85,110,135});double dmg=base[getLevel()-1]+s.getFinalAD()*fr.lolmc.util.Balance.ratio("e_leesin","ad",0.9);
             for(var __t : TargetingUtil.enemiesAround(c, 4.0)){
                 TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);
-                if(__t instanceof Player __p)
-                    __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,80,2,false,true));
+                if(__t instanceof Player __p){
+                    int slowAmp=Math.min(4, 1+getLevel()/2); // ~35-75% selon rang
+                    __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,80,slowAmp,false,true)); // decay 4s
+                }
             }
             c.getWorld().spawnParticle(Particle.SONIC_BOOM,c.getLocation().add(0,1,0),3,2,0.5,2);
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_RAVAGER_ROAR, 1f, 1.2f);
@@ -154,7 +173,7 @@ public class LeeSin extends BaseChampion {
 
     static class R extends BaseAbility {
         R(){super("r_leesin","Dragon's Rage",Material.DRAGON_EGG,AbilitySlot.R,
-                new double[]{90,75,60},5,0,DamageType.PHYSICAL);
+                new double[]{110,85,60},5,0,DamageType.PHYSICAL);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,4.0); if(tgt==null){c.sendActionBar(Component.text("🐉 Aucune cible visée",NamedTextColor.GRAY));return;}
