@@ -38,6 +38,12 @@ public class ChampSelectManager {
     private BukkitRunnable timerTask;
 
     private static final int SELECT_DURATION = 60; // 60s de sélection
+    private static final int BAN_DURATION    = 30; // 30s de ban (classé)
+
+    private boolean ranked = false;
+    private final java.util.Set<String> bannedChampions = new java.util.LinkedHashSet<>();
+    private int banTimeLeft = 0;
+    private BukkitRunnable banTask;
 
     // ══════════════════════════════════════════════════════════════
     // DÉMARRAGE DE LA SÉLECTION
@@ -57,8 +63,95 @@ public class ChampSelectManager {
         fr.lolmc.game.ChampSelectGUI.banChampion(championId);
     }
 
+    /** Surcharge avec mode ranked (pick+ban) ou normal (pick seul). */
+    public void startSelection(Collection<UUID> players, boolean ranked) {
+        this.ranked = ranked;
+        this.bannedChampions.clear();
+        if (ranked) {
+            startBanPhaseInternal(players);
+        } else {
+            startPickPhase(players);
+        }
+    }
+
     public void startSelection(Collection<UUID> players) {
+        startSelection(players, false);
+    }
+
+    // ── Phase de BAN (classé uniquement) ──────────────────────────────
+
+    private void startBanPhaseInternal(Collection<UUID> players) {
         if (phase != Phase.IDLE && phase != Phase.LOBBY) return;
+        phase = Phase.SELECTING;
+        participants.clear();
+        participants.addAll(players);
+        banTimeLeft = BAN_DURATION;
+
+        selectBar = BossBar.bossBar(
+            Component.text("⛔ Phase de BAN — " + BAN_DURATION + "s", NamedTextColor.RED),
+            1.0f, BossBar.Color.RED, BossBar.Overlay.PROGRESS);
+
+        for (UUID id : participants) {
+            Player p = Bukkit.getPlayer(id);
+            if (p == null) continue;
+            p.showBossBar(selectBar);
+            p.sendMessage(Component.text("═══ PHASE DE BAN — CLASSÉ ═══", NamedTextColor.RED));
+            p.sendMessage(Component.text("Clique sur un champion pour le bannir!", NamedTextColor.YELLOW));
+            LolPlugin.getInstance().getChampSelectGUI().openBanMenu(p);
+        }
+
+        banTask = new BukkitRunnable() {
+            @Override public void run() {
+                banTimeLeft--;
+                if (selectBar != null) {
+                    selectBar.name(Component.text("⛔ Phase de BAN — " + banTimeLeft + "s | Bannis: " + bannedChampions.size(), NamedTextColor.RED));
+                    selectBar.progress(Math.max(0f, (float) banTimeLeft / BAN_DURATION));
+                }
+                if (banTimeLeft <= 0) {
+                    cancel();
+                    // Fermer les menus de ban et passer au pick
+                    for (UUID id : participants) {
+                        Player p = Bukkit.getPlayer(id);
+                        if (p != null) p.closeInventory();
+                    }
+                    if (selectBar != null) for (UUID id : participants) {
+                        Player p = Bukkit.getPlayer(id);
+                        if (p != null) p.hideBossBar(selectBar);
+                    }
+                    startPickPhase(participants);
+                }
+            }
+        };
+        banTask.runTaskTimer(LolPlugin.getInstance(), 20L, 20L);
+    }
+
+    /** Appelé depuis ChampSelectGUI quand un joueur bannit un champion. */
+    public void onBanClick(Player player, String championId) {
+        if (phase != Phase.SELECTING || bannedChampions.contains(championId)) return;
+        bannedChampions.add(championId);
+        ChampSelectGUI.banChampion(championId);
+        for (UUID id : participants) {
+            Player p = Bukkit.getPlayer(id);
+            if (p != null) p.sendMessage(Component.text(
+                "⛔ " + player.getName() + " a banni " + championId + "!", NamedTextColor.RED));
+        }
+        // 6 bans total (3 par équipe) → passer au pick
+        if (bannedChampions.size() >= 6) {
+            if (banTask != null) banTask.cancel();
+            if (selectBar != null) for (UUID id : participants) {
+                Player p = Bukkit.getPlayer(id);
+                if (p != null) { p.hideBossBar(selectBar); p.closeInventory(); }
+            }
+            startPickPhase(participants);
+        }
+    }
+
+    public java.util.Set<String> getBannedChampions() { return bannedChampions; }
+
+    // ── Phase de PICK ──────────────────────────────────────────────────
+
+    private void startPickPhase(Collection<UUID> players) {
+        if (phase != Phase.IDLE && phase != Phase.LOBBY && phase != Phase.SELECTING) return;
         phase = Phase.SELECTING;
         participants.clear();
         participants.addAll(players);
@@ -179,7 +272,12 @@ public class ChampSelectManager {
             rm.setPage(id, page);
             rm.applyRuneStats(p);
 
-            p.sendMessage(Component.text("⚔ Partie lancée avec " + champ + "!", NamedTextColor.GOLD));
+            // Sorts d'invocateur
+            String[] spells = chosenSpells.getOrDefault(id, new String[]{"FLASH", "IGNITE"});
+            if (ssm != null) ssm.setSpells(p, spells[0], spells[1]);
+
+            p.sendMessage(Component.text("⚔ Partie lancée avec " + champ
+                + " | Sorts: " + spells[0] + " + " + spells[1] + "!", NamedTextColor.GOLD));
         }
 
         // Lancer la partie physique

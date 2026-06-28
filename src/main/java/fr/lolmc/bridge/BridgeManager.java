@@ -92,6 +92,7 @@ public class BridgeManager implements PluginMessageListener {
             case "QUEUE_JOIN"  -> handleQueueJoin(data);
             case "QUEUE_LEAVE" -> handleQueueLeave(data);
             case "PLAYER_DATA" -> handlePlayerData(data);
+            case "GAME_READY"  -> handleGameReady(data);
             default -> log.warning("[Bridge] Message inconnu: " + type);
         }
     }
@@ -115,6 +116,42 @@ public class BridgeManager implements PluginMessageListener {
         if (player != null) {
             plugin.getMatchmakingManager().leaveQueue(player);
         }
+    }
+
+    private void handleGameReady(Map<String, String> data) {
+        boolean ranked = "true".equalsIgnoreCase(data.getOrDefault("ranked", "false"));
+        String playersStr = data.getOrDefault("players", "");
+        if (playersStr.isEmpty()) { log.warning("[Bridge] GAME_READY sans joueurs"); return; }
+
+        List<UUID> expected = new java.util.ArrayList<>();
+        for (String s : playersStr.split(",")) {
+            try { expected.add(UUID.fromString(s.trim())); } catch (IllegalArgumentException ignored) {}
+        }
+
+        log.info("[Bridge] GAME_READY reçu — " + expected.size() + " joueurs, ranked=" + ranked);
+
+        // Attendre que tous les joueurs soient connectés (max 30s, vérification toutes les 2s)
+        final long deadline = System.currentTimeMillis() + 30_000L;
+        new org.bukkit.scheduler.BukkitRunnable() {
+            @Override public void run() {
+                long now = System.currentTimeMillis();
+                // Compter les joueurs connectés parmi ceux attendus
+                List<UUID> connected = expected.stream()
+                    .filter(id -> Bukkit.getPlayer(id) != null)
+                    .toList();
+
+                if (connected.size() >= expected.size() || now >= deadline) {
+                    cancel();
+                    if (connected.isEmpty()) { log.warning("[Bridge] Aucun joueur connecté à GAME_READY"); return; }
+                    log.info("[Bridge] Lancement pick/ban — " + connected.size() + "/" + expected.size() + " joueurs");
+                    // Lancer la sélection sur le thread principal
+                    Bukkit.getScheduler().runTask(plugin, () -> {
+                        var csm = plugin.getChampSelectManager();
+                        csm.startSelection(connected, ranked);
+                    });
+                }
+            }
+        }.runTaskTimerAsynchronously(plugin, 40L, 40L); // vérifie toutes les 2s, commence après 2s
     }
 
     private void handlePlayerData(Map<String, String> data) {
