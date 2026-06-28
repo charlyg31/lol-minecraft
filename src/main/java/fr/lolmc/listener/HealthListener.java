@@ -114,6 +114,7 @@ public class HealthListener implements Listener {
                     if (team != null && !tm.hasTeam(p)) tm.setTeam(p, team);
                     var champ = cm.getChampion(p);
                     try { plugin.getHotbarManager().renderPage(p, champ); } catch (Exception ignored) {}
+                    plugin.getMinimapManager().giveMinimap(p); // redonner la minimap en offhand
                     var spawn = (team != null) ? plugin.getMapManager().getSpawn(team, 1) : null;
                     if (spawn != null) p.teleport(spawn);
                     p.sendMessage(net.kyori.adventure.text.Component.text(
@@ -156,9 +157,11 @@ public class HealthListener implements Listener {
             }
         }
 
-        // Re-init le HUD
+        // Re-init le HUD + minimap en offhand
         LolPlugin.getInstance().getServer().getScheduler()
-            .runTaskLater(LolPlugin.getInstance(),
-                () -> hud.initPlayer(p, champ), 1L);
+            .runTaskLater(LolPlugin.getInstance(), () -> {
+                hud.initPlayer(p, champ);
+                LolPlugin.getInstance().getMinimapManager().giveMinimap(p);
+            }, 1L);
     }
 }

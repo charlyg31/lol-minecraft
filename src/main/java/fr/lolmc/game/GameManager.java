@@ -155,6 +155,12 @@ public class GameManager {
         for (Player p : WorldContext.getGamePlayers()) {
             p.showBossBar(timerBar);
         }
+
+        // Donner la minimap en main secondaire à chaque participant
+        var mm = LolPlugin.getInstance().getMinimapManager();
+        for (Player p : WorldContext.getGamePlayers()) {
+            mm.giveMinimap(p);
+        }
     }
 
     public void stopGame() {
