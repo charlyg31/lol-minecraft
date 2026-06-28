@@ -11,3 +11,7 @@ players-per-game: 10
 
 # ── Groupes ────────────────────────────────────────────────────────────
 max-party-size: 5
+
+# ── Mode de jeu ────────────────────────────────────────────────────────
+# true = classé (pick + ban), false = normal (pick uniquement)
+ranked-mode: false

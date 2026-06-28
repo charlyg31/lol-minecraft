@@ -234,13 +234,27 @@ public class BungeeQueueManager {
             sendPlayerData(carrier, p, assignedRole);
         }
 
-        // Connecter après 2s
+        // Connecter après 2s puis envoyer GAME_READY après 5s (temps de connexion)
+        boolean isRanked = plugin.getConfig().getBoolean("ranked-mode", false);
         ProxyServer.getInstance().getScheduler().schedule(plugin, () -> {
             for (UUID uid : allPlayers) {
                 ProxiedPlayer p = ProxyServer.getInstance().getPlayer(uid);
                 if (p != null) p.connect(gameServerInfo);
             }
         }, 2, TimeUnit.SECONDS);
+
+        // GAME_READY après 6s (2s connect + 4s chargement)
+        ProxyServer.getInstance().getScheduler().schedule(plugin, () -> {
+            StringBuilder sb = new StringBuilder("{");
+            sb.append("\"type\":\"GAME_READY\",");
+            sb.append("\"ranked\":").append(isRanked).append(",");
+            sb.append("\"count\":").append(allPlayers.size()).append(",");
+            sb.append("\"players\":\"");
+            sb.append(String.join(",", allPlayers.stream().map(UUID::toString).toList()));
+            sb.append("\"}");
+            sendPluginMessage(carrier, gameServer, sb.toString());
+            plugin.getLogger().info("[Queue] GAME_READY envoyé pour " + allPlayers.size() + " joueurs (ranked=" + isRanked + ")");
+        }, 6, TimeUnit.SECONDS);
     }
 
     // ══════════════════════════════════════════════════════════════════════
