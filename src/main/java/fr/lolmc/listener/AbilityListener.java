@@ -185,7 +185,7 @@ public class AbilityListener implements Listener {
             return;
         }
 
-        if (!\"ability\".equals(t)) return;
+        if (!"ability".equals(t)) return;
 
         onLeftClickCast(caster, slot, held, null);
     }
