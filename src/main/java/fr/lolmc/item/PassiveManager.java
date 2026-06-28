@@ -90,6 +90,48 @@ public class PassiveManager {
             }}.runTaskLater(LolPlugin.getInstance(), 100L);
         }
 
+        // ── Cosmic Drive / Crimson Lucidity : +MS après un sort ──
+        if (hasAnyItem(caster,"cosmic_drive","cosmic_drive2")) {
+            champ.getStats().addBonusMoveSpeed(20);
+            new BukkitRunnable(){@Override public void run(){ champ.getStats().addBonusMoveSpeed(-20); }}.runTaskLater(LolPlugin.getInstance(),40L);
+        }
+        if (hasAnyItem(caster,"crimson_lucidity")) {
+            champ.getStats().addBonusMoveSpeed(8);
+            new BukkitRunnable(){@Override public void run(){ champ.getStats().addBonusMoveSpeed(-8); }}.runTaskLater(LolPlugin.getInstance(),40L);
+        }
+        // ── Opportunity : prochain dégât +15% hors combat ──
+        if (hasAnyItem(caster,"opportunity")) {
+            getState(caster).opportunityReady = true;
+        }
+        // ── Experimental Hexplate : après ultime → +30% AS + 15% MS 7s ──
+        if (slot == 4 && hasAnyItem(caster,"experimental_hexplate")) {
+            champ.getStats().addBonusMoveSpeed(15); champ.getStats().multiplyAS(1.30);
+            new BukkitRunnable(){@Override public void run(){ champ.getStats().addBonusMoveSpeed(-15); champ.getStats().multiplyAS(1.0/1.30); }}.runTaskLater(LolPlugin.getInstance(),140L);
+        }
+        // ── Radiant Virtue : ultime → soigne alliés 6% HP max + MS 8s ──
+        if (slot == 4 && hasAnyItem(caster,"radiant_virtue")) {
+            for (Player ally : caster.getWorld().getPlayers()) {
+                if (ally.equals(caster)) continue;
+                if (!LolPlugin.getInstance().getTeamManager().areEnemies(caster,ally)) {
+                    if (championManager.hasChampion(ally)) {
+                        var ah=championManager.getChampion(ally).getHPSystem();
+                        ah.heal(ah.getMaxHP()*0.06);
+                        championManager.getChampion(ally).getStats().addBonusMoveSpeed(10);
+                        final Player fa=ally; new BukkitRunnable(){@Override public void run(){ if(championManager.hasChampion(fa)) championManager.getChampion(fa).getStats().addBonusMoveSpeed(-10); }}.runTaskLater(LolPlugin.getInstance(),160L);
+                    }
+                }
+            }
+        }
+        // ── Malignance : dégâts d'ultime → -20% MR cible 3s ──
+        // (géré dans onAbilityDamage si slot==4)
+        // ── Emblem of All-In / Dusk and Dawn : prochain AA crit ou double on-hit ──
+        if (slot == 4 && hasAnyItem(caster,"emblem_allin","fiendhunter_bolts")) {
+            getState(caster).nextAACrit = true;
+        }
+        if (hasAnyItem(caster,"dusk_and_dawn")) {
+            getState(caster).duskDawnReady = true;
+        }
+
         // ── Spellblade (Trinity, Lich Bane, Sheen, Divine Sunderer, Essence Reaver) ──
         if (hasAnyItem(caster, "trinity_force","trinity_force2","lich_bane","sheen",
                 "divine_sunderer","essence_reaver") && !state.isSpellbladeReady()) {
@@ -316,6 +358,92 @@ public class PassiveManager {
                 state.voltaicStacks = 0;
                 victim.getWorld().strikeLightningEffect(victim.getLocation());
             }
+        }
+
+        // ── Tiamat / Ravenous Hydra / Profane Hydra / Ironspike Whip : AoE AA ──
+        if (hasAnyItem(attacker,"tiamat","ravenous_hydra","profane_hydra","ironspike_whip")) {
+            double aoeDmg = dmg * 0.40;
+            for (var t : TargetingUtil.enemiesAround(attacker, 3.0)) {
+                if (t.equals(victim)) continue;
+                TargetingUtil.dealDamage(attacker, t, aoeDmg, TargetingUtil.DmgType.PHYSICAL);
+            }
+        }
+        // ── Umbral Glaive : détecte/détruit wards ──
+        if (hasAnyItem(attacker,"umbral_glaive")) {
+            LolPlugin.getInstance().getWardManager().destroyEnemyWards(attacker, victim.getLocation(), 4.0);
+        }
+        // ── Eclipse : 2 AA → bouclier + 15% MS ──
+        if (hasAnyItem(attacker,"eclipse")) {
+            int stk = getState(attacker).eclipseStacks + 1;
+            getState(attacker).eclipseStacks = stk;
+            if (stk >= 2) {
+                getState(attacker).eclipseStacks = 0;
+                double sh = 60 + s.getFinalAD() * 0.10;
+                champ.getStats().addShield(sh);
+                champ.getStats().addBonusMoveSpeed(15);
+                final double fsh=sh; new BukkitRunnable(){@Override public void run(){ champ.getStats().addShield(-fsh); champ.getStats().addBonusMoveSpeed(-15); }}.runTaskLater(LolPlugin.getInstance(),40L);
+            }
+        }
+        // ── Terminus : Light/Dark alternés (+Armor ou +MR) ──
+        if (hasAnyItem(attacker,"terminus")) {
+            boolean light = (getState(attacker).terminusLight = !getState(attacker).terminusLight);
+            if (light) { s.addBonusArmor(8); new BukkitRunnable(){@Override public void run(){ s.addBonusArmor(-8); }}.runTaskLater(LolPlugin.getInstance(),60L); }
+            else        { s.addBonusMR(8);    new BukkitRunnable(){@Override public void run(){ s.addBonusMR(-8);    }}.runTaskLater(LolPlugin.getInstance(),60L); }
+        }
+        // ── Sundered Sky : AA crit → soigne 10% HP manquants ──
+        if (hasAnyItem(attacker,"sundered_sky")) {
+            double heal = (champ.getHPSystem().getMaxHP()-champ.getHPSystem().getCurrentHP())*0.10;
+            champ.getHPSystem().heal(heal);
+        }
+        // ── Stormrazor : 1ère AA → slow 99% 0.5s (CD 18s) ──
+        if (hasAnyItem(attacker,"stormrazor")) {
+            long now=System.currentTimeMillis(); ItemState st=getState(attacker);
+            if (now-st.lastStormrazor > 18000) {
+                st.lastStormrazor = now;
+                if (victim instanceof Player vp) vp.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,10,5,false,false));
+            }
+        }
+        // ── Phage : +15 vitesse 2s ──
+        if (hasAnyItem(attacker,"phage")) {
+            s.addBonusMoveSpeed(15);
+            new BukkitRunnable(){@Override public void run(){ s.addBonusMoveSpeed(-15); }}.runTaskLater(LolPlugin.getInstance(),40L);
+        }
+        // ── Rageknife : toutes les 2 AA → applique on-hit ×2 ──
+        if (hasAnyItem(attacker,"rageknife")) {
+            int stk = (getState(attacker).rageknifeCount+1) % 2;
+            getState(attacker).rageknifeCount = stk;
+            if (stk == 0) {
+                TargetingUtil.dealDamage(attacker, victim, dmg * 0.20, TargetingUtil.DmgType.MAGICAL);
+            }
+        }
+        // ── Phantom Dancer : ghosting + 7% MS ──
+        if (hasAnyItem(attacker,"phantom_dancer","phantom_dancer2")) {
+            s.addBonusMoveSpeed(7);
+            new BukkitRunnable(){@Override public void run(){ s.addBonusMoveSpeed(-7); }}.runTaskLater(LolPlugin.getInstance(),40L);
+        }
+        // ── Dusk and Dawn : après sort, prochain AA double on-hit ──
+        if (getState(attacker).duskDawnReady) {
+            getState(attacker).duskDawnReady = false;
+            TargetingUtil.dealDamage(attacker, victim, dmg * 0.50, TargetingUtil.DmgType.PHYSICAL);
+        }
+        // ── Emblem All-In / Fiendhunter : prochain AA crit garanti ──
+        if (getState(attacker).nextAACrit) {
+            getState(attacker).nextAACrit = false;
+            TargetingUtil.dealDamage(attacker, victim, dmg * 0.75, TargetingUtil.DmgType.PHYSICAL);
+        }
+        // ── Protoplasm Harness : 6 stacks → AoE ──
+        if (hasAnyItem(attacker,"protoplasm_harness")) {
+            int stk = (getState(attacker).protoStacks+1) % 6;
+            getState(attacker).protoStacks = stk;
+            if (stk == 0) TargetingUtil.dealDamageAll(attacker, TargetingUtil.enemiesAround(attacker,3.5), dmg*0.30, TargetingUtil.DmgType.PHYSICAL);
+        }
+        // ── Yun Tal Wildarrows : crits → DoT 60%AD physique 3s ──
+        if (hasAnyItem(attacker,"yun_tal_wildarrows") && getState(attacker).lastHitCrit) {
+            applyDoT(attacker, victim, s.getFinalAD()*0.20, 3, "yuntal");
+        }
+        // ── Noonquiver : tir bonus 50 dégâts physiques ──
+        if (hasAnyItem(attacker,"noonquiver")) {
+            TargetingUtil.dealDamage(attacker, victim, 50, TargetingUtil.DmgType.PHYSICAL);
         }
 
         // ── Lifesteal (tous items) ──
@@ -552,6 +680,47 @@ public class PassiveManager {
             }
         }
 
+        // ── Dark Seal : +5 AP par kill (max 10 stacks) ──
+        if (hasAnyItem(killer,"dark_seal")) {
+            getState(killer).darkSealStacks = Math.min(10, getState(killer).darkSealStacks+1);
+            stats.addBonusAP(5);
+        }
+        // ── Mejai's Soulstealer : +5 AP par kill (max 25 stacks) ──
+        if (hasAnyItem(killer,"mejais_soulstealer")) {
+            int stk = Math.min(25, getState(killer).mejaisStacks+1);
+            getState(killer).mejaisStacks = stk;
+            stats.addBonusAP(5);
+        }
+        // ── Stormsurge / Stormsurge NH : kill → foudre sur voisins ──
+        if (hasAnyItem(killer,"stormsurge","stormsurge_nh")) {
+            double ldmg = 300 + stats.getFinalAP()*0.25;
+            for (var t : TargetingUtil.enemiesAround(killer, 6.0)) TargetingUtil.dealDamage(killer,t,ldmg,TargetingUtil.DmgType.MAGICAL);
+            killer.getWorld().spawnParticle(org.bukkit.Particle.ELECTRIC_SPARK, killer.getLocation().add(0,1,0), 30, 2,2,2);
+        }
+        // ── Cryptbloom : kill/assist → zone qui soigne alliés ──
+        if (hasAnyItem(killer,"cryptbloom")) {
+            for (Player ally : killer.getWorld().getPlayers()) {
+                if (!LolPlugin.getInstance().getTeamManager().areEnemies(killer,ally) && championManager.hasChampion(ally) && ally.getLocation().distance(killer.getLocation())<6.0)
+                    championManager.getChampion(ally).getHPSystem().heal(championManager.getChampion(ally).getHPSystem().getMaxHP()*0.08);
+            }
+        }
+        // ── The Collector : exécute <5% HP (déjà en fin de vie, on accorde du gold) ──
+        if (hasAnyItem(killer,"the_collector")) {
+            LolPlugin.getInstance().getGoldManager().addGold(killer.getUniqueId(), 25);
+        }
+        // ── Unending Fury : kill/assist → +15% omnivamp 3s ──
+        if (hasAnyItem(killer,"unending_fury")) {
+            stats.addBonusOmnivamp(0.15);
+            new BukkitRunnable(){@Override public void run(){ stats.addBonusOmnivamp(-0.15); }}.runTaskLater(LolPlugin.getInstance(),60L);
+        }
+        // ── Cull : +1 or/minion tué (ici kill champion, bonus extra) ──
+        if (hasAnyItem(killer,"cull") && getState(killer).cullStacks < 100) {
+            getState(killer).cullStacks += 5;
+            LolPlugin.getInstance().getGoldManager().addGold(killer.getUniqueId(), 5);
+        }
+        // ── Dead Man's Plate reset stacks ──
+        if (hasAnyItem(killer,"dead_mans_plate")) getState(killer).deadManStacks = 0;
+
         hudManager.updateHUD(killer, champ);
     }
 
@@ -572,6 +741,85 @@ public class PassiveManager {
             case "mikaels" -> activateMikaels(player, champ, state);
             case "rocketbelt", "hextec_rocketbelt2" -> activateRocketbelt(player, champ, state);
             case "botrk" -> activateBotrk(player, champ, state);
+            // Actifs nouveaux
+            case "everfrost" -> {
+                if (state.isOnCooldown(state.lastEverfrost, 40000L)) { sendCDMessage(player,"Everfrost",state.lastEverfrost,40000L); break; }
+                state.lastEverfrost = System.currentTimeMillis();
+                for (var t : TargetingUtil.entitiesInRadius(player, player.getLocation(), 5.0)) {
+                    TargetingUtil.dealDamage(player, t, 100+champ.getStats().getFinalAP()*0.30, TargetingUtil.DmgType.MAGICAL);
+                    var cc=LolPlugin.getInstance().getCCManager(); if(cc!=null) cc.root(t,40);
+                }
+                player.getWorld().spawnParticle(org.bukkit.Particle.SNOWFLAKE, player.getLocation().add(0,1,0), 30, 2,1,2);
+                player.sendActionBar(Component.text("❄ Everfrost! Enracine ennemis proches.",NamedTextColor.AQUA));
+            }
+            case "gargoyle_stoneplate" -> {
+                if (state.isOnCooldown(state.lastGargoyle, 90000L)) { sendCDMessage(player,"Gargoyle",state.lastGargoyle,90000L); break; }
+                state.lastGargoyle = System.currentTimeMillis();
+                double bonusHP = champ.getHPSystem().getMaxHP();
+                champ.getHPSystem().addBonusHP(bonusHP);
+                player.sendActionBar(Component.text("🗿 Gargoyle: +100% HP temporaire 4s!",NamedTextColor.GRAY));
+                new BukkitRunnable(){@Override public void run(){ champ.getHPSystem().addBonusHP(-bonusHP); }}.runTaskLater(LolPlugin.getInstance(),80L);
+            }
+            case "goredrinker" -> {
+                if (state.isOnCooldown(state.lastGoredrinker, 60000L)) { sendCDMessage(player,"Goredrinker",state.lastGoredrinker,60000L); break; }
+                state.lastGoredrinker = System.currentTimeMillis();
+                double totalDmg = 0;
+                for (var t : TargetingUtil.entitiesInRadius(player, player.getLocation(), 4.5)) {
+                    double d = 50 + champ.getStats().getFinalAD()*0.40;
+                    TargetingUtil.dealDamage(player, t, d, TargetingUtil.DmgType.PHYSICAL);
+                    totalDmg+=d;
+                }
+                champ.getHPSystem().heal(totalDmg*0.15 + champ.getHPSystem().getMaxHP()*0.10);
+                player.getWorld().spawnParticle(org.bukkit.Particle.CRIT, player.getLocation().add(0,1,0), 20, 1.5,0.5,1.5);
+                player.sendActionBar(Component.text("🩸 Goredrinker! AoE + soin.",NamedTextColor.RED));
+            }
+            case "prowlers_claw" -> {
+                if (state.isOnCooldown(state.lastProwler, 90000L)) { sendCDMessage(player,"Prowler's Claw",state.lastProwler,90000L); break; }
+                state.lastProwler = System.currentTimeMillis();
+                var target = TargetingUtil.getTargetedEnemy(player, 8.0);
+                if (target == null) { player.sendActionBar(Component.text("Aucune cible.",NamedTextColor.GRAY)); break; }
+                player.teleportAsync(target.getLocation().add(target.getLocation().getDirection().normalize().multiply(-1.5)));
+                TargetingUtil.dealDamage(player, target, 65+champ.getStats().getFinalAD()*0.15+champ.getStats().getFinalAP()*0.15, TargetingUtil.DmgType.PHYSICAL);
+                player.sendActionBar(Component.text("🐾 Prowler's Claw! +15% dégâts 3s.",NamedTextColor.DARK_RED));
+                state.prowlerBonusDmg = true;
+                new BukkitRunnable(){@Override public void run(){ state.prowlerBonusDmg=false; }}.runTaskLater(LolPlugin.getInstance(),60L);
+            }
+            case "stridebreaker" -> {
+                if (state.isOnCooldown(state.lastStridebreaker, 60000L)) { sendCDMessage(player,"Stridebreaker",state.lastStridebreaker,60000L); break; }
+                state.lastStridebreaker = System.currentTimeMillis();
+                for (var t : TargetingUtil.entitiesInRadius(player, player.getLocation(), 4.0)) {
+                    TargetingUtil.dealDamage(player, t, 100+champ.getStats().getFinalAD()*0.50, TargetingUtil.DmgType.PHYSICAL);
+                    if (t instanceof Player tp) tp.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,20,3,false,false));
+                }
+                player.sendActionBar(Component.text("⚡ Stridebreaker! AoE slow.",NamedTextColor.YELLOW));
+            }
+            case "mercurial_scimitar","quicksilver_sash","silvermere_dawn" -> {
+                if (state.isOnCooldown(state.lastQSS, 90000L)) { sendCDMessage(player,"QSS",state.lastQSS,90000L); break; }
+                state.lastQSS = System.currentTimeMillis();
+                var cc=LolPlugin.getInstance().getCCManager();
+                if(cc!=null) { cc.stunUntil.remove(player.getUniqueId()); cc.rootUntil.remove(player.getUniqueId()); cc.silenceUntil.remove(player.getUniqueId()); }
+                player.removePotionEffect(PotionEffectType.SLOWNESS);
+                player.removePotionEffect(PotionEffectType.MINING_FATIGUE);
+                if (itemId.equals("silvermere_dawn")) { player.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE,60,0,false,false)); }
+                player.sendActionBar(Component.text("✨ Cleanse! Tous CC retirés.",NamedTextColor.WHITE));
+            }
+            case "stopwatch" -> {
+                if (state.stopwatchUsed) { player.sendActionBar(Component.text("Stopwatch déjà utilisée.",NamedTextColor.GRAY)); break; }
+                state.stopwatchUsed = true;
+                champ.getStats().addShield(99999);
+                player.sendActionBar(Component.text("⏱ Stopwatch! Invulnérabilité 2.5s.",NamedTextColor.GOLD));
+                new BukkitRunnable(){@Override public void run(){ champ.getStats().addShield(-99999); }}.runTaskLater(LolPlugin.getInstance(),50L);
+            }
+            case "twin_shadows" -> {
+                if (state.isOnCooldown(state.lastTwinShadows, 120000L)) { sendCDMessage(player,"Twin Shadows",state.lastTwinShadows,120000L); break; }
+                state.lastTwinShadows = System.currentTimeMillis();
+                var target2 = TargetingUtil.getNearestEnemy(player, 12.0);
+                if (target2 != null) {
+                    if (target2 instanceof Player tp) tp.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,40,1,false,false));
+                    TargetingUtil.dealDamage(player, target2, 50+champ.getStats().getFinalAP()*0.20, TargetingUtil.DmgType.MAGICAL);
+                }
+                player.sendActionBar(Component.text("👥 Twin Shadows! Fantômes ralentissants.",NamedTextColor.DARK_PURPLE));
+            }
         }
 
         hudManager.updateHUD(player, champ);

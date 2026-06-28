@@ -106,6 +106,19 @@ public class CCManager {
 
     /** Peut lancer un sort ? (bloqué par stun ou silence) */
     public boolean canCastAbility(UUID id) { return !isStunned(id) && !isSilenced(id); }
+
+    /** Retire tous les CC sur une entité (QSS, Purification, Mercurial). */
+    public void cleanse(LivingEntity target) {
+        UUID id = target.getUniqueId();
+        stunUntil.remove(id);
+        rootUntil.remove(id);
+        silenceUntil.remove(id);
+        slowUntil.remove(id);
+        if (target instanceof Player p) {
+            p.removePotionEffect(org.bukkit.potion.PotionEffectType.SLOWNESS);
+            p.removePotionEffect(org.bukkit.potion.PotionEffectType.MINING_FATIGUE);
+        }
+    }
     /** Peut auto-attaquer ? (bloqué par stun seulement ; le silence n'empêche pas l'AA) */
     public boolean canAutoAttack(UUID id) { return !isStunned(id); }
 
