@@ -33,8 +33,13 @@ public class Annie extends BaseChampion {
         setAutoAttackRange(5.5);
     }
 
+    /** Retourne le Tibbers actif d'un joueur, ou null. */
+    public static org.bukkit.entity.LivingEntity getActiveTibbers(Player owner) {
+        return activeTibbers.get(owner.getUniqueId());
+    }
+
     // Suivi de Tibbers et cooldowns manuels
-    private static final Map<UUID, org.bukkit.entity.IronGolem> activeTibbers = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final Map<UUID, org.bukkit.entity.LivingEntity> activeTibbers = new java.util.concurrent.ConcurrentHashMap<>();
     private static final Map<UUID, Long> rCooldowns = new java.util.concurrent.ConcurrentHashMap<>();
     // Passif Pyromanie : tous les 4 sorts lancés, le suivant étourdit
     private static final Map<UUID, Integer> pyroStacks = new java.util.concurrent.ConcurrentHashMap<>();
@@ -150,6 +155,37 @@ public class Annie extends BaseChampion {
         }
     }
 
+    // ────────────────────────────────────────────────────────────
+    // TIBBERS CONTROL — clic gauche envoi vers la position visée
+    // ────────────────────────────────────────────────────────────
+    /** Appelé par AbilityListener quand Annie fait un clic gauche avec Tibbers actif. */
+    public static void onTibbersControl(Player annie, org.bukkit.entity.PolarBear tibbers) {
+        // Chercher un ennemi dans la zone visée (5 blocs autour du point)
+        Location aimed = fr.lolmc.util.TargetingUtil.getAimedGroundLocation(annie, 20.0);
+        if (aimed == null) aimed = annie.getLocation().add(annie.getLocation().getDirection().multiply(10));
+        final Location dest = aimed.clone();
+        // Y a-t-il un ennemi proche du point visé ?
+        org.bukkit.entity.LivingEntity nearEnemy = null;
+        double best = 5.0;
+        for (Entity e : dest.getWorld().getNearbyEntities(dest, 5, 5, 5)) {
+            if (!(e instanceof org.bukkit.entity.LivingEntity le)) continue;
+            if (e.equals(annie) || e.equals(tibbers)) continue;
+            var cm = LolPlugin.getInstance().getChampionManager();
+            if (!(e instanceof Player) && !cm.hasChampion((Player)annie)) continue;
+            if (e instanceof Player ep && !LolPlugin.getInstance().getTeamManager().areEnemies(annie, ep)) continue;
+            double d = e.getLocation().distance(dest);
+            if (d < best) { best = d; nearEnemy = le; }
+        }
+        if (nearEnemy != null) {
+            tibbers.setTarget(nearEnemy);
+            annie.sendActionBar(Component.text("🐻 Tibbers → attaque " + nearEnemy.getName() + "!", NamedTextColor.RED));
+        } else {
+            tibbers.getPathfinder().moveTo(dest, 1.4);
+            annie.sendActionBar(Component.text("🐻 Tibbers → déplacement!", NamedTextColor.GOLD));
+        }
+        dest.getWorld().spawnParticle(Particle.FLAME, dest.clone().add(0,0.1,0), 12, 0.5,0,0.5, 0.02);
+    }
+
     static class R extends BaseAbility {
         R(){
             super("r_annie","Invocation de Tibbers",Material.NETHERITE_BLOCK,AbilitySlot.R,
@@ -157,30 +193,21 @@ public class Annie extends BaseChampion {
             resourceCost = 100;
         }
 
-        @Override public void cast(Player c,ChampionStats s,Player t){
+        @Override public void cast(Player c, ChampionStats s, Player t){
             UUID uuid = c.getUniqueId();
             long now = System.currentTimeMillis();
             double[] realCooldowns = {120, 100, 80};
             int r = Math.min(getLevel() - 1, 2);
             R thisAbility = this;
 
-            // 1. RE-CAST : Si Tibbers est vivant, on redirige ses attaques
+            // 1. RE-CAST : Tibbers déjà actif → re-cast R = le renvoyer à la position visée
             if (activeTibbers.containsKey(uuid)) {
-                org.bukkit.entity.IronGolem tibbers = activeTibbers.get(uuid);
+                org.bukkit.entity.PolarBear tibbers = (org.bukkit.entity.PolarBear) activeTibbers.get(uuid);
                 if (tibbers != null && tibbers.isValid()) {
-                    org.bukkit.entity.LivingEntity enemy = TargetingUtil.getTargetedEnemy(c, 15.0);
-                    if (enemy != null) {
-                        tibbers.setTarget(enemy);
-                        c.sendActionBar(Component.text("🐻 Tibbers cible ➔ " + enemy.getName() + " !", NamedTextColor.RED));
-                    } else {
-                        Location ground = TargetingUtil.getAimedGroundLocation(c, 15.0);
-                        if (ground != null) {
-                            tibbers.getPathfinder().moveTo(ground, 1.4);
-                            c.sendActionBar(Component.text("🐻 Tibbers se déplace !", NamedTextColor.GOLD));
-                        }
-                    }
+                    onTibbersControl(c, tibbers);
                     return;
                 }
+                activeTibbers.remove(uuid); // mort entre temps
             }
 
             // 2. VÉRIFICATION DU COOLDOWN MANUEL
@@ -193,48 +220,62 @@ public class Annie extends BaseChampion {
             // 3. PREMIER CAST : Explosion de zone + Invocation
             double[] base = fr.lolmc.util.Balance.base("r_annie", new double[]{150, 275, 400});
             double dmg = base[r] + s.getFinalAP() * fr.lolmc.util.Balance.ratio("r_annie", "ap", 0.75);
-            var ground = TargetingUtil.getAimedGroundLocation(c, 7.0);
+            var ground = fr.lolmc.util.TargetingUtil.getAimedGroundLocation(c, 7.0);
             if (ground == null) ground = c.getLocation();
 
-            var targets = TargetingUtil.entitiesInRadius(c, ground, 4.0);
-            for(var e: targets){
-                TargetingUtil.dealDamage(c, e, dmg, TargetingUtil.DmgType.MAGICAL);
+            for (var e : fr.lolmc.util.TargetingUtil.entitiesInRadius(c, ground, 4.0)) {
+                fr.lolmc.util.TargetingUtil.dealDamage(c, e, dmg, fr.lolmc.util.TargetingUtil.DmgType.MAGICAL);
                 e.setFireTicks(60);
             }
-
             ground.getWorld().spawnParticle(Particle.LAVA, ground, 40, 3, 1, 3);
             ground.getWorld().spawnParticle(Particle.FLAME, ground, 50, 3, 1.5, 3, 0.1);
             ground.getWorld().playSound(ground, Sound.ENTITY_BLAZE_SHOOT, 1.5f, 0.6f);
 
-            // Spawner de Tibbers (IronGolem modifié)
-            org.bukkit.entity.IronGolem tibbers = ground.getWorld().spawn(ground, org.bukkit.entity.IronGolem.class, golem -> {
-                // CORRECTION : Remplacement de setCustomName(String) par customName(Component)
-                golem.customName(Component.text("Tibbers de " + c.getName(), NamedTextColor.RED));
-                golem.setCustomNameVisible(true);
-
-                var speedAttr = golem.getAttribute(fr.lolmc.util.Compat.movementSpeed());
-                if (speedAttr != null) speedAttr.setBaseValue(0.35);
-
-                var dmgAttr = golem.getAttribute(fr.lolmc.util.Compat.attackDamage());
-                if (dmgAttr != null) dmgAttr.setBaseValue(20.0 + (s.getFinalAP() * 0.15));
+            // ── Spawner Tibbers : PolarBear en feu (ours + visualFire = Tibbers) ──
+            final Location spawnLoc = ground.clone();
+            org.bukkit.entity.PolarBear tibbers = spawnLoc.getWorld().spawn(spawnLoc, org.bukkit.entity.PolarBear.class, bear -> {
+                bear.customName(Component.text("🔥 Tibbers", NamedTextColor.RED));
+                bear.setCustomNameVisible(true);
+                bear.setVisualFire(true);   // toujours en feu visuellement
+                bear.setAngry(true);        // posture agressive
+                bear.setRemoveWhenFarAway(false);
+                bear.setInvulnerable(false);
+                // HP : 1300 de base (LoL) → on scale en Minecraft
+                var hpAttr = bear.getAttribute(fr.lolmc.util.Compat.maxHealth());
+                if (hpAttr != null) hpAttr.setBaseValue(200.0 + s.getFinalAP() * 0.5);
+                bear.setHealth(bear.getAttribute(fr.lolmc.util.Compat.maxHealth()).getValue());
+                // Vitesse
+                var spAttr = bear.getAttribute(fr.lolmc.util.Compat.movementSpeed());
+                if (spAttr != null) spAttr.setBaseValue(0.38);
+                // Dégâts AA
+                var dmgAttr = bear.getAttribute(fr.lolmc.util.Compat.attackDamage());
+                if (dmgAttr != null) dmgAttr.setBaseValue(20.0 + s.getFinalAP() * 0.15);
+                // Taille (scale) : Tibbers est grand
+                var scaleAttr = bear.getAttribute(org.bukkit.attribute.Attribute.SCALE);
+                if (scaleAttr != null) scaleAttr.setBaseValue(2.0); // 2× la taille d'un ours
+                bear.getScoreboardTags().add("tibbers_" + c.getUniqueId().toString().substring(0,8));
             });
 
-            activeTibbers.put(uuid, tibbers);
-            thisAbility.resourceCost = 0;
-
-            for (Entity entity : tibbers.getNearbyEntities(10.0, 10.0, 10.0)) {
-                if (entity instanceof org.bukkit.entity.LivingEntity le && !entity.equals(c) && !entity.equals(tibbers)) {
-                    tibbers.setTarget(le);
-                    break;
+            // Cibler l'ennemi le plus proche immédiatement
+            for (Entity entity : tibbers.getNearbyEntities(10,10,10)) {
+                if (entity instanceof Player ep && LolPlugin.getInstance().getTeamManager().areEnemies(c, ep)) {
+                    tibbers.setTarget(ep); break;
                 }
             }
 
-            // Boucle de cycle de vie : Aura de feu et expiration après 45 secondes
+            activeTibbers.put(uuid, tibbers);
+            thisAbility.resourceCost = 0;
+            c.sendActionBar(Component.text("🔥 TIBBERS INVOQUÉ! Clic gauche pour contrôler.", NamedTextColor.RED));
+
+            // ── Boucle de vie (toutes les secondes) ──
             new BukkitRunnable() {
                 int elapsed = 0;
                 @Override public void run() {
                     if (!tibbers.isValid() || elapsed >= 45 || !c.isOnline()) {
-                        if (tibbers.isValid()) tibbers.remove();
+                        if (tibbers.isValid()) {
+                            tibbers.getWorld().spawnParticle(Particle.FLAME, tibbers.getLocation().add(0,1,0), 30, 1,1,1,0.05);
+                            tibbers.remove();
+                        }
                         activeTibbers.remove(uuid);
                         thisAbility.resourceCost = 100;
                         rCooldowns.put(uuid, System.currentTimeMillis() + (long)(realCooldowns[r] * 1000));
@@ -243,13 +284,29 @@ public class Annie extends BaseChampion {
                         return;
                     }
 
-                    tibbers.getWorld().spawnParticle(Particle.FLAME, tibbers.getLocation().add(0, 1, 0), 8, 0.4, 0.5, 0.4, 0.02);
+                    Location tLoc = tibbers.getLocation();
 
-                    double auraDmg = 20 + (s.getFinalAP() * 0.12);
+                    // ── Retour automatique si trop loin (>22 blocs) ──
+                    if (c.isOnline() && tLoc.getWorld().equals(c.getWorld())
+                            && tLoc.distance(c.getLocation()) > 22.0) {
+                        Location returnLoc = c.getLocation().clone().add(
+                            c.getLocation().getDirection().normalize().multiply(-1.5));
+                        returnLoc.setY(c.getLocation().getY());
+                        tibbers.teleportAsync(returnLoc);
+                        c.sendActionBar(Component.text("🐻 Tibbers revient!", NamedTextColor.GOLD));
+                    }
+
+                    // ── Aura de feu autour de Tibbers ──
+                    tLoc.getWorld().spawnParticle(Particle.FLAME, tLoc.add(0,1,0), 12, 0.6,0.7,0.6, 0.03);
+                    tLoc.getWorld().spawnParticle(Particle.LAVA,  tLoc, 3, 0.5,0.3,0.5);
+
+                    double auraDmg = 20 + s.getFinalAP() * 0.12;
                     for (Entity entity : tibbers.getNearbyEntities(3.5, 3.5, 3.5)) {
-                        if (entity instanceof org.bukkit.entity.LivingEntity target && !entity.equals(c) && !entity.equals(tibbers)) {
-                            TargetingUtil.dealDamage(c, target, auraDmg, TargetingUtil.DmgType.MAGICAL);
-                            target.setFireTicks(30);
+                        if (entity instanceof org.bukkit.entity.LivingEntity target
+                                && !entity.equals(c) && !entity.equals(tibbers)) {
+                            fr.lolmc.util.TargetingUtil.dealDamage(c, target, auraDmg, fr.lolmc.util.TargetingUtil.DmgType.MAGICAL);
+                            target.setVisualFire(true);
+                            new BukkitRunnable(){ @Override public void run(){ target.setVisualFire(false); }}.runTaskLater(LolPlugin.getInstance(),60L);
                         }
                     }
                     elapsed++;
@@ -258,9 +315,9 @@ public class Annie extends BaseChampion {
         }
 
         @Override public String getDynamicDescription(ChampionStats s){
-            double[] base=fr.lolmc.util.Balance.base("r_annie",new double[]{150,275,400});
-            int r=Math.min(getLevel()-1,2);
-            return String.format("%.0f dégâts AoE + Invoque Tibbers (45s). Re-cast R pour ordonner d'attaquer.",base[r]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("r_annie", "ap", 0.75));
+            double[] base = fr.lolmc.util.Balance.base("r_annie", new double[]{150,275,400});
+            int r = Math.min(getLevel()-1, 2);
+            return String.format("%.0f dégâts AoE + Invoque Tibbers 45s (ours en feu). Clic gauche = contrôle. Re-cast R = envoyer Tibbers.", base[r]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("r_annie","ap",0.75));
         }
     }
 }
