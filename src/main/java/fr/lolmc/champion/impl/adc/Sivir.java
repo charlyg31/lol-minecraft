@@ -42,7 +42,7 @@ public class Sivir extends BaseChampion {
             // Ricochet W : AA rebondit sur jusqu'à 6 cibles proches (60% dégâts)
             int bounces = 0;
             for (var e : fr.lolmc.util.TargetingUtil.enemiesAround(c, 5.0)) {
-                if (e.equals(tgt) || bounces >= 6) continue;
+                if (e.equals(tgt) || bounces >= 8) continue; // jusqu'à 8 rebonds (LoL)
                 fr.lolmc.util.TargetingUtil.dealDamage(c, e, dmg * 0.60, fr.lolmc.util.TargetingUtil.DmgType.PHYSICAL);
                 e.getWorld().spawnParticle(org.bukkit.Particle.CRIT, e.getLocation().add(0,1,0), 3, 0.2,0.2,0.2);
                 bounces++;
@@ -52,29 +52,29 @@ public class Sivir extends BaseChampion {
 
     static class Q extends BaseAbility {
         Q(){super("q_sivir","Lame Boomerang",Material.IRON_AXE,AbilitySlot.Q,
-            new double[]{9,8,7,6,5},25,0,DamageType.PHYSICAL);
+            new double[]{14,13,12,11,10},25,0,DamageType.PHYSICAL);
             resourceCost = 70;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
-            double[] base=fr.lolmc.util.Balance.base("q_sivir",new double[]{25,45,65,85,105});double dmg=base[getLevel()-1]+s.getFinalAD()*1.0;
+            double[] base=fr.lolmc.util.Balance.base("q_sivir",new double[]{60,105,150,195,240});double dmg=base[getLevel()-1]+s.getFinalAD()*1.0;
             DamageUtil.abilityDamageEntity(c, tgt, dmg);
-            // Retour: dégâts réduits
+            // Retour: dégâts pleins (plus de falloff en LoL actuel)
             new BukkitRunnable(){@Override public void run(){
-                if(!(!tgt.isDead()))return;
-                DamageUtil.abilityDamageEntity(c, tgt, dmg*0.7);
+                if(tgt.isDead())return;
+                DamageUtil.abilityDamageEntity(c, tgt, dmg);
                 c.getWorld().spawnParticle(Particle.CRIT,tgt.getLocation(),5);
             }}.runTaskLater(LolPlugin.getInstance(),15L);
             c.getWorld().spawnParticle(Particle.CRIT,tgt.getLocation(),10);
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            double d=50+s.getFinalAD()*0.5;
-            return String.format("Aller: %.0f dégâts. Retour: %.0f dégâts.",d,d*0.7);
+            double[] base={60,105,150,195,240};double d=base[getLevel()-1]+s.getFinalAD();
+            return String.format("Aller: %.0f dégâts. Retour: %.0f dégâts (boomerang).",d,d);
         }
     }
 
     static class W extends BaseAbility {
         W(){super("w_sivir","Ricochets",Material.MUSIC_DISC_13,AbilitySlot.W,
-            new double[]{10,9,8,7,6},0,0,DamageType.PHYSICAL);
+            new double[]{7,7,7,7,7},0,0,DamageType.PHYSICAL);
             resourceCost = 22;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // W Ricochet : active le rebond des AA pendant 6s
@@ -99,12 +99,20 @@ public class Sivir extends BaseChampion {
 
     static class R extends BaseAbility {
         R(){super("r_sivir","Appel des Flèches",Material.GOLDEN_AXE,AbilitySlot.R,
-            new double[]{120,100,80},0,0,DamageType.TRUE);
+            new double[]{120,90,60},0,0,DamageType.TRUE);
             resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             c.addPotionEffect(new PotionEffect(PotionEffectType.SPEED,80,2,false,true));
             c.addPotionEffect(new PotionEffect(PotionEffectType.HASTE,80,2,false,true));
-            c.sendActionBar(Component.text("⚡ Appel des Flèches 4s! Toucher reset Surrégime",NamedTextColor.GOLD));
+            // Aura d'équipe : +vitesse aux alliés proches (LoL "On The Hunt")
+            var tm0=LolPlugin.getInstance().getTeamManager();
+            for(var ally : c.getWorld().getPlayers()){
+                if(ally.equals(c)) continue;
+                if(tm0!=null && !tm0.areEnemies(c, ally) && ally.getLocation().distance(c.getLocation())<=10){
+                    ally.addPotionEffect(new PotionEffect(PotionEffectType.SPEED,80,1,false,true));
+                }
+            }
+            c.sendActionBar(Component.text("⚡ Appel des Flèches 4s! Alliés boostés, AA reset Surrégime",NamedTextColor.GOLD));
             c.getWorld().playSound(c.getLocation(), org.bukkit.Sound.ENTITY_FIREWORK_ROCKET_BLAST, 1f, 1f);
             // Passif Volonté de Bataille : chaque ennemi touché par une AA pendant R
             // reset le CD de Surrégime (W)
