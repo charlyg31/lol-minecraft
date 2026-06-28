@@ -35,15 +35,19 @@ public class Ashe extends BaseChampion {
     static class AA extends BasicAttackAbility {
         AA(){super("ashe",Material.ARROW,6.0f,DamageType.PHYSICAL);}
         @Override protected void onHit(Player c, ChampionStats s, org.bukkit.entity.LivingEntity tgt, double dmg){
-            // Passif Tir de Givre : les attaques ralentissent la cible
-            if(tgt instanceof Player __p)
-                __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,30,0,false,true));
+            // Passif Tir de Givre : slow 15-30% selon niveau (2s = 40 ticks)
+            if(tgt instanceof Player __p){
+                var cm=LolPlugin.getInstance().getChampionManager();
+                int lvl=cm.hasChampion(c)?cm.getChampion(c).getLevelSystem().getLevel():1;
+                int amp=lvl>=10?1:0; // ~15% puis ~30%
+                __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,40,amp,false,true));
+            }
         }
     }
 
     static class Q extends BaseAbility {
         Q(){super("q_ashe","Tir Concentré",Material.SPECTRAL_ARROW,AbilitySlot.Q,
-            new double[]{14,12,10,8,6},25,0,DamageType.PHYSICAL);
+            new double[]{15,12.5,10,7.5,5},25,0,DamageType.PHYSICAL);
             resourceCost = 25;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             c.addPotionEffect(new PotionEffect(PotionEffectType.STRENGTH,120,0,false,true));
@@ -81,7 +85,7 @@ public class Ashe extends BaseChampion {
 
     static class E extends BaseAbility {
         E(){super("e_ashe","Faucon Explorateur",Material.FEATHER,AbilitySlot.E,
-            new double[]{5,4,3,2,1},60,0,DamageType.TRUE);
+            new double[]{90,80,70,60,50},60,0,DamageType.TRUE);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // Faucon qui voyage 40 blocs dans la direction du regard
@@ -128,7 +132,7 @@ public class Ashe extends BaseChampion {
 
     static class R extends BaseAbility {
         R(){super("r_ashe","Flèche de Cristal Enchantée",Material.DIAMOND,AbilitySlot.R,
-            new double[]{100,80,60},25,2,DamageType.MAGICAL);
+            new double[]{100,90,80},25,2,DamageType.MAGICAL);
             resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : skillshot longue portée. Stun 1-3.5s selon distance parcourue. Zone autour = 50% dégâts + slow
