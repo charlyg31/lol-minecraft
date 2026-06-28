@@ -151,6 +151,9 @@ public class WardManager {
             it.remove();
             attacker.sendActionBar(Component.text("💥 Ward ennemie détruite!", NamedTextColor.GREEN));
             attacker.getWorld().playSound(attacker.getLocation(), Sound.ENTITY_ITEM_BREAK, 1f, 1.5f);
+            // Tracker dans le scoreboard
+            var msb = fr.lolmc.LolPlugin.getInstance().getMatchScoreboard();
+            if (msb != null) msb.addWardKilled(attacker);
             return true;
         }
         return false;

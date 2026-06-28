@@ -95,6 +95,12 @@ public class DamageUtil {
             var rw = LolPlugin.getInstance().getRewardManager();
             if (rw != null) rw.recordDamage(attacker.getUniqueId(), victim.getUniqueId());
         }
+        // Tracker dégâts infligés/subis dans le scoreboard de partie
+        var msb = LolPlugin.getInstance().getMatchScoreboard();
+        if (msb != null && afterShield > 0) {
+            if (attacker != null) msb.addDamageDealt(attacker, afterShield);
+            msb.addDamageTaken(victim, afterShield);
+        }
         // Passif Amumu : désormais géré via Toucher Maudit (applyCurse/onMagicHit)
         // dans Amumu.java — plus de renvoi de dégâts ici.
         // Dragon Elder : exécution si la cible tombe sous 20% HP

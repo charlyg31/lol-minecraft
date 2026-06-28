@@ -32,6 +32,10 @@ public class RuneManager {
     // Stacks de keystones par joueur (Conqueror, Electrocute, etc.)
     private final Map<UUID, Integer> keystoneStacks = new HashMap<>();
     private final Map<UUID, Long> keystoneLastProc = new HashMap<>();
+    // Gathering Storm : bonus adaptatif croissant avec le temps de partie
+    private final Map<UUID, Double> gatheringStormBonus = new HashMap<>();
+    // Relentless Hunter : stacks de kills uniques (un stack par champion différent tué)
+    private final Map<UUID, java.util.Set<UUID>> relentlessKills = new HashMap<>();
 
     public RuneManager() {
         this.runeFile = new java.io.File(LolPlugin.getInstance().getDataFolder(), "runes.yml");
@@ -40,6 +44,40 @@ public class RuneManager {
         }
         this.runeConfig = org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(runeFile);
         loadAllPages();
+        startGatheringStormTask();
+    }
+
+    /** Tâche Tempête Montante : toutes les 10 minutes, +8 force adaptative (+8 AD ou +14 AP). */
+    private void startGatheringStormTask() {
+        new org.bukkit.scheduler.BukkitRunnable() {
+            int minutes = 0;
+            @Override public void run() {
+                minutes += 10;
+                double bonus = switch (minutes) {
+                    case 10 -> 8;
+                    case 20 -> 24;
+                    case 30 -> 48;
+                    case 40 -> 80;
+                    case 50 -> 120;
+                    default -> minutes > 50 ? 120 + (minutes - 50) * 8 : 0;
+                };
+                var cm = LolPlugin.getInstance().getChampionManager();
+                for (var entry : playerPages.entrySet()) {
+                    if (!entry.getValue().has("gathering_storm")) continue;
+                    var p = org.bukkit.Bukkit.getPlayer(entry.getKey());
+                    if (p == null || !cm.hasChampion(p)) continue;
+                    double prev = gatheringStormBonus.getOrDefault(entry.getKey(), 0.0);
+                    double delta = bonus - prev;
+                    if (delta > 0) {
+                        gatheringStormBonus.put(entry.getKey(), bonus);
+                        cm.getChampion(p).getStats().addBonusAD(delta);
+                        p.sendActionBar(Component.text(
+                            String.format("⛈ Tempête Montante: +%.0f AD (%dmin)", bonus, minutes),
+                            NamedTextColor.AQUA));
+                    }
+                }
+            }
+        }.runTaskTimer(LolPlugin.getInstance(), 12000L, 12000L); // toutes les 10 minutes
     }
 
     // ── Gestion des pages ─────────────────────────────────────────
@@ -490,11 +528,33 @@ public class RuneManager {
                 cm.getChampion(player).getHPSystem().heal(cm.getChampion(player).getHPSystem().getMaxHP() * 0.05);
             }
         }
+        // Relentless Hunter : +5 MS hors combat par champion unique tué (max +45 à 8 stacks)
+        if (page.has("relentless_hunter")) {
+            var kills = relentlessKills.computeIfAbsent(player.getUniqueId(), k -> new java.util.HashSet<>());
+            // Ajouter la victime si on peut l'identifier
+            var cm2 = LolPlugin.getInstance().getChampionManager();
+            // On cherche la cible dans les entités proches (approximation)
+            for (var e : player.getNearbyEntities(20,20,20)) {
+                if (e instanceof Player vp && !vp.equals(player) && cm2.hasChampion(vp)) {
+                    kills.add(vp.getUniqueId());
+                }
+            }
+            int stacks = Math.min(8, kills.size());
+            int msBonus = 5 + stacks * 5; // +5 base +5/stack unique
+            if (cm2.hasChampion(player)) {
+                // Recalculer depuis 0 (reset puis re-apply pour éviter accumulation)
+                var stats = cm2.getChampion(player).getStats();
+                int prev = relentlessKills.getOrDefault(player.getUniqueId(), new java.util.HashSet<>()).size();
+                if (stacks > prev) stats.addBonusMoveSpeed(5); // +5 par stack gagné
+            }
+        }
     }
 
     public void cleanup(UUID uuid) {
         keystoneStacks.remove(uuid);
         keystoneLastProc.remove(uuid);
+        gatheringStormBonus.remove(uuid);
+        relentlessKills.remove(uuid);
     }
 
 

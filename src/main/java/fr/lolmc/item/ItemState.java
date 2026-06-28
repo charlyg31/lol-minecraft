@@ -101,6 +101,9 @@ public class ItemState {
     // ── Omnivamp ──
     public double pendingOmnivampHeal = 0;     // accumulé en combat
 
+    // ── Items de jungle ──
+    public long lastMosstomperShield = 0;      // CD 12s (Mosstomper Smite)
+
     // ── Helpers ──
     public boolean isSpellbladeReady() {
         return spellbladePrimed && (System.currentTimeMillis() - spellbladeTime) < 10000L;

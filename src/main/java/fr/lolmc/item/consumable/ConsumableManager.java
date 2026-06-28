@@ -255,6 +255,9 @@ public class ConsumableManager {
 
         // Enregistrer la ward dans le WardManager (avec entityId pour la visibilité)
         LolPlugin.getInstance().getWardManager().placeWard(player, wardLoc, wardDuration, wardEntityId);
+        // Tracker dans le scoreboard
+        var msb = LolPlugin.getInstance().getMatchScoreboard();
+        if (msb != null) msb.addWardPlaced(player);
 
         String wardType = visible ? "🔵 Totem de vision" : "👁 Ward furtive";
         player.sendActionBar(Component.text(

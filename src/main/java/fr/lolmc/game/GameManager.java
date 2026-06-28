@@ -170,6 +170,8 @@ public class GameManager {
         fr.lolmc.util.ChampionStateReset.resetAll();
         // Annonces (kill spree, first blood, multi-kills)
         LolPlugin.getInstance().getAnnouncementManager().reset();
+        // Feats of Strength
+        LolPlugin.getInstance().getFeatManager().reset();
         // Inhibiteurs en attente de respawn
         inhibitorRespawnAt.clear();
         respawnTotalSecondsMap.clear();

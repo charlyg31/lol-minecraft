@@ -114,6 +114,11 @@ public class EntityDeathListener implements Listener {
             // Scoreboard de partie
             LolPlugin.getInstance().getMatchScoreboard().addKill(killer);
             LolPlugin.getInstance().getMatchScoreboard().addDeath(victim);
+            // Feat of Strength : Premier Sang
+            var killerTeam = LolPlugin.getInstance().getTeamManager().getTeam(killer);
+            if (killerTeam != null)
+                LolPlugin.getInstance().getFeatManager().claim(
+                    fr.lolmc.game.FeatManager.Feat.FIRST_BLOOD, killerTeam, killer);
             // Timer de respawn
             LolPlugin.getInstance().getGameManager().onPlayerDeath(victim);
             // Runes : Triomphe, Absorption (soin/or sur takedown)
