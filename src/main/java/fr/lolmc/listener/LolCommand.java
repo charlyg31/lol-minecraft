@@ -59,80 +59,21 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
     public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args) {
         if (!(sender instanceof Player player)) { sender.sendMessage("§cJoueur uniquement."); return true; }
 
-        // /lol → commandes joueur
+        // /lol → commandes joueur (uniquement ce qui n'est pas géré par BungeeCord)
         if (cmd.getName().equalsIgnoreCase("lol")) {
             String sub = args.length > 0 ? args[0].toLowerCase() : "help";
-            String[] subArgs = args.length > 1 ? Arrays.copyOfRange(args, 1, args.length) : new String[0];
             switch (sub) {
-                // ── Préparation ──
                 case "runes" ->
                     LolPlugin.getInstance().getRuneGUI().open(player);
-                case "sorts", "spell", "sort" -> {
-                    if (subArgs.length < 2) { player.sendMessage("§cUsage: /lol sorts <sort1> <sort2>"); break; }
-                    LolPlugin.getInstance().getChampSelectManager().chooseSpells(player, subArgs[0], subArgs[1]);
-                }
-                case "pick", "champion", "champ" -> {
-                    if (subArgs.length < 1) { player.sendMessage("§cUsage: /lol pick <champion>"); break; }
-                    LolPlugin.getInstance().getChampSelectManager().chooseChampion(player, subArgs[0].toLowerCase());
-                }
-                case "lock" ->
-                    LolPlugin.getInstance().getChampSelectManager().lock(player);
-                case "role", "roles", "lobby", "play" ->
-                    LolPlugin.getInstance().getPreGameGUI().open(player);
-                case "queue", "file" -> {
-                    var mm = LolPlugin.getInstance().getMatchmakingManager();
-                    if (subArgs.length > 0 && subArgs[0].equalsIgnoreCase("leave"))
-                        mm.leaveQueue(player);
-                    else
-                        mm.joinQueue(player);
-                }
-                case "party", "groupe" -> {
-                    String sub2 = subArgs.length > 0 ? subArgs[0].toLowerCase() : "info";
-                    var pm2 = LolPlugin.getInstance().getPartyManager();
-                    switch (sub2) {
-                        case "invite" -> {
-                            if (subArgs.length < 2) { player.sendMessage("§cUsage: /lol party invite <joueur>"); break; }
-                            Player target = org.bukkit.Bukkit.getPlayerExact(subArgs[1]);
-                            if (target == null || target.equals(player)) { player.sendMessage("§cJoueur introuvable."); break; }
-                            pm2.invite(player, target);
-                        }
-                        case "accept" -> pm2.acceptInvite(player);
-                        case "leave"  -> { pm2.leaveParty(player, true); player.sendMessage(Component.text("Tu as quitté le groupe.", NamedTextColor.GRAY)); }
-                        default -> {
-                            var party = pm2.getParty(player);
-                            if (party == null || party.size() <= 1) {
-                                player.sendMessage(Component.text("Aucun groupe actif. /lol party invite <joueur>", NamedTextColor.GRAY));
-                            } else {
-                                String members = party.members.stream()
-                                    .map(id -> { Player pp = org.bukkit.Bukkit.getPlayer(id); return pp != null ? pp.getName() : "?"; })
-                                    .collect(java.util.stream.Collectors.joining(", "));
-                                player.sendMessage(Component.text("👥 Groupe (" + party.size() + "/5): " + members, NamedTextColor.GOLD));
-                            }
-                        }
-                    }
-                }
-                case "team", "equipe" -> {
-                    if (subArgs.length < 1) { player.sendMessage("§cUsage: /lol team <bleu|rouge|auto>"); break; }
-                    String t = subArgs[0].toLowerCase();
-                    var teamManager = LolPlugin.getInstance().getTeamManager();
-                    switch (t) {
-                        case "bleu", "blue" -> teamManager.setTeam(player, fr.lolmc.team.TeamManager.Team.BLUE);
-                        case "rouge", "red"  -> teamManager.setTeam(player, fr.lolmc.team.TeamManager.Team.RED);
-                        default -> player.sendMessage("§cUsage: /lol team <bleu|rouge>");
-                    }
-                }
-                // ── En jeu ──
-                case "recall", "b" ->
-                    LolPlugin.getInstance().getBaseManager().startRecall(player);
                 case "ping" -> {
-                    String ptype = subArgs.length > 0 ? subArgs[0].toLowerCase() : "danger";
+                    String ptype = args.length > 1 ? args[1].toLowerCase() : "danger";
                     var type = switch (ptype) {
-                        case "danger", "warn" -> fr.lolmc.game.AnnouncementManager.PingType.DANGER;
-                        case "omw", "onmyway" -> fr.lolmc.game.AnnouncementManager.PingType.ON_MY_WAY;
-                        case "miss", "missing", "mia" -> fr.lolmc.game.AnnouncementManager.PingType.MISSING;
-                        case "assist" -> fr.lolmc.game.AnnouncementManager.PingType.ASSIST;
-                        case "enemy", "here" -> fr.lolmc.game.AnnouncementManager.PingType.ENEMY;
-                        default -> fr.lolmc.game.AnnouncementManager.PingType.DANGER;
+                        case "danger", "warn"          -> fr.lolmc.game.AnnouncementManager.PingType.DANGER;
+                        case "omw", "onmyway"          -> fr.lolmc.game.AnnouncementManager.PingType.ON_MY_WAY;
+                        case "miss", "missing", "mia"  -> fr.lolmc.game.AnnouncementManager.PingType.MISSING;
+                        case "assist"                  -> fr.lolmc.game.AnnouncementManager.PingType.ASSIST;
+                        case "enemy", "here"           -> fr.lolmc.game.AnnouncementManager.PingType.ENEMY;
+                        default                        -> fr.lolmc.game.AnnouncementManager.PingType.DANGER;
                     };
                     LolPlugin.getInstance().getAnnouncementManager().sendPing(player, type);
                 }
@@ -161,26 +102,19 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
                             NamedTextColor.GOLD));
                     }
                 }
-                // ── Aide ──
                 default -> {
                     player.sendMessage(Component.text("§6=== Commandes /lol ===", NamedTextColor.GOLD));
                     player.sendMessage(Component.text("§e/lol runes §7— Configurer ses runes"));
-                    player.sendMessage(Component.text("§e/lol sorts <s1> <s2> §7— Sorts d'invocateur"));
-                    player.sendMessage(Component.text("§e/lol pick <champion> §7— Choisir un champion"));
-                    player.sendMessage(Component.text("§e/lol lock §7— Verrouiller la sélection"));
-                    player.sendMessage(Component.text("§e/lol role §7— Menu de préparation"));
-                    player.sendMessage(Component.text("§e/lol queue [leave] §7— File d'attente"));
-                    player.sendMessage(Component.text("§e/lol party <invite|accept|leave|info> §7— Groupe"));
-                    player.sendMessage(Component.text("§e/lol recall §7— Retour en base"));
-                    player.sendMessage(Component.text("§e/lol ping <type> §7— Ping équipe"));
+                    player.sendMessage(Component.text("§e/lol ping <danger|omw|miss|assist|enemy> §7— Ping équipe"));
                     player.sendMessage(Component.text("§e/lol ff §7— Vote d'abandon"));
-                    player.sendMessage(Component.text("§e/lol stats §7— Statistiques"));
+                    player.sendMessage(Component.text("§e/lol stats §7— Statistiques de la partie"));
+                    player.sendMessage(Component.text("§7File d'attente, groupes et rôles : §e/lol <top|mid|adc|jungle|support|all>", NamedTextColor.GRAY));
                 }
             }
             return true;
         }
 
-        // /lola → commandes admin uniquement
+                // /lola → commandes admin uniquement
         if (!player.hasPermission("lolmc.admin") && !player.isOp()) {
             player.sendMessage(Component.text("❌ Permission requise.", NamedTextColor.RED));
             return true;
