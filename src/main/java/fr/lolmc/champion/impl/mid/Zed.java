@@ -121,24 +121,18 @@ public class Zed extends BaseChampion {
                 Location shadowLoc = shadows.get(uuid);
                 if (shadowLoc != null) {
                     shadows.remove(uuid);
-                    // Supprimer l'ArmorStand
                     UUID eid = shadowEntities.remove(uuid);
                     if (eid != null) { var se = org.bukkit.Bukkit.getEntity(eid); if (se != null) se.remove(); }
+                    // Déclencher le CD après l'échange
                     wCooldowns.put(uuid, now + (long)(realCooldowns[rank] * 1000));
-                    Location playerLoc = c.getLocation().clone();
                     c.sendActionBar(Component.text("👤 Échange avec l'ombre !", NamedTextColor.DARK_GRAY));
                     c.getWorld().spawnParticle(Particle.SMOKE, shadowLoc, 15, 0.5, 1, 0.5);
-                    c.teleport(shadowLoc.clone());
-                    shadows.put(uuid, playerLoc);
-                    final org.bukkit.entity.ArmorStand newStand =
-                            playerLoc.getWorld().spawn(playerLoc, org.bukkit.entity.ArmorStand.class, as -> {
-                                as.setMarker(true);
-                                as.setVisible(true);
-                                as.setGravity(false);
-                                as.setInvulnerable(true);
-                                as.customName(Component.text("👤 Ombre de Zed", NamedTextColor.DARK_GRAY));
-                            });
-                    shadowEntities.put(uuid, newStand.getUniqueId());
+                    c.getWorld().spawnParticle(Particle.SMOKE, c.getLocation(), 15, 0.5, 1, 0.5);
+                    // Téléporter le joueur à la position de l'ombre
+                    Location dest = shadowLoc.clone();
+                    dest.setYaw(c.getLocation().getYaw());
+                    dest.setPitch(c.getLocation().getPitch());
+                    c.teleport(dest);
                 }
             } else {
                 // Coût en énergie uniquement au placement de l'ombre (40)
