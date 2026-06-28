@@ -101,8 +101,46 @@ public class ItemState {
     // ── Omnivamp ──
     public double pendingOmnivampHeal = 0;     // accumulé en combat
 
-    // ── Items de jungle ──
-    public long lastMosstomperShield = 0;      // CD 12s (Mosstomper Smite)
+    // ── Nouveaux items passifs ──
+    public int eclipseStacks = 0;
+    public boolean terminusLight = true;
+    public long lastStormrazor = 0;
+    public int rageknifeCount = 0;
+    public int protoStacks = 0;
+    public boolean duskDawnReady = false;
+    public boolean nextAACrit = false;
+    public boolean malignanceReady = false;
+    public int riftmakerStacks = 0;
+    public final java.util.Map<java.util.UUID, Integer> bloodletterStacks = new java.util.HashMap<>();
+    public final java.util.Map<java.util.UUID, Integer> riteStacks = new java.util.HashMap<>();
+    public long lastLudensProc = 0;
+    public boolean bansheeActive = false;
+    public long lastBansheeBreak = 0;
+    public boolean crownActive = false;
+    public boolean shieldbowActive = false;
+    public long lastShieldbowProc = 0;
+    public boolean seraphActive = false;
+    public boolean mantle12Active = false;
+    public java.util.UUID anathemaTarget = null;
+    public int darkSealStacks = 0;
+    public int mejaisStacks = 0;
+    public int cullStacks = 0;
+    public boolean opportunityReady = false;
+    public boolean prowlerBonusDmg = false;
+    public boolean stopwatchUsed = false;
+    public boolean hullbreakerActive = false;
+    public boolean swiftmarchActive = false;
+    public int rodStacks = 0;
+    public long lastRodStack = 0;
+    // Cooldowns nouveaux actifs
+    public long lastEverfrost = 0;
+    public long lastGargoyle = 0;
+    public long lastGoredrinker = 0;
+    public long lastProwler = 0;
+    public long lastStridebreaker = 0;
+    public long lastQSS = 0;
+    public long lastTwinShadows = 0;
+    public long lastEvenshroud = 0;
 
     // ── Nouveaux items passifs ──
     public int eclipseStacks = 0;
