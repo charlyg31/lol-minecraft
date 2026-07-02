@@ -106,6 +106,12 @@ public class AutoAttackManager {
         target.setHealth(newHealth);
         target.playHurtAnimation(attacker.getLocation().getYaw());
 
+        // Mettre à jour la HealthBar au-dessus de l'entité
+        fr.lolmc.util.HealthBar.update(target, newHealth, target.getAttribute(
+            fr.lolmc.util.Compat.maxHealth()) != null
+            ? target.getAttribute(fr.lolmc.util.Compat.maxHealth()).getValue()
+            : target.getMaxHealth());
+
         var pm = LolPlugin.getInstance().getPassiveManager();
         if (pm != null) pm.onAutoAttackEntity(attacker, target);
 
