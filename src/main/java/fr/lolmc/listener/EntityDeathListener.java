@@ -24,6 +24,36 @@ public class EntityDeathListener implements Listener {
         this.rewardManager = rewardManager;
     }
 
+    /** XP de proximité : quand un sbire meurt, tous les champions alliés dans 14 blocs reçoivent de l'XP. */
+    @EventHandler
+    public void onMinionDeath(EntityDeathEvent e) {
+        if (!(e.getEntity() instanceof org.bukkit.entity.LivingEntity le)) return;
+        if (!fr.lolmc.game.MinionManager.isMinion(le)) return;
+        fr.lolmc.team.TeamManager.Team minionTeam = fr.lolmc.game.MinionManager.getMinionTeam(le);
+        if (minionTeam == null) return;
+
+        // XP pour les champions ennemis proches (rayon 14 blocs comme LoL)
+        // On exclut le killer (il reçoit son XP via onMinionKill)
+        Player killer = e.getEntity().getKiller();
+        for (Player p : le.getWorld().getPlayers()) {
+            if (p.equals(killer)) continue; // le killer a déjà son XP
+            if (!championManager.hasChampion(p)) continue;
+            fr.lolmc.team.TeamManager.Team pTeam = LolPlugin.getInstance().getTeamManager().getTeam(p);
+            if (pTeam == null || pTeam == minionTeam) continue; // allié du sbire
+            if (p.getLocation().distance(le.getLocation()) > 14.0) continue;
+            // XP de proximité : 80% de l'XP normale (divisé par les joueurs proches)
+            // Simplifié : XP fixe de proximité (LoL ~50-60 XP selon le type)
+            String typeTag = fr.lolmc.game.MinionManager.getMinionTypeTag(le);
+            double xp = switch (typeTag != null ? typeTag : "melee") {
+                case "cannon" -> 92.0;
+                case "super"  -> 97.0;
+                case "caster" -> 55.0;
+                default       -> 60.0; // melee
+            };
+            LolPlugin.getInstance().getRewardManager().grantProximityXP(p, xp);
+        }
+    }
+
     @EventHandler
     public void onEntityDeath(EntityDeathEvent e) {
         LivingEntity dead = e.getEntity();

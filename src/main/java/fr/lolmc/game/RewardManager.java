@@ -105,6 +105,9 @@ public class RewardManager {
         int total = goldAmount + bonus;
         goldManager.addGold(killer.getUniqueId(), total);
         grantXP(killer, xpAmount);
+        // CS tracker
+        var msb = LolPlugin.getInstance().getMatchScoreboard();
+        if (msb != null) msb.addCS(killer);
         killer.sendActionBar(net.kyori.adventure.text.Component.text(
                 String.format("+%d or  +%.0f XP", total, xpAmount), NamedTextColor.GOLD));
     }
@@ -145,6 +148,11 @@ public class RewardManager {
     }
 
     // ── XP & montée de niveau ─────────────────────────────────────
+
+    /** XP de proximité (sbire mort sans last-hit) — public pour EntityDeathListener. */
+    public void grantProximityXP(Player player, double xp) {
+        grantXP(player, xp);
+    }
 
     private void grantXP(Player player, double xp) {
         BaseChampion champ = championManager.getChampion(player);
