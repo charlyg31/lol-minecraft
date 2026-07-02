@@ -89,6 +89,17 @@ bushes:
     - SWEET_BERRY_BUSH
 
 # ═══════════════════════════════════════════════════════
+# ÉCHELLE — conversion unités LoL → blocs Minecraft
+# ═══════════════════════════════════════════════════════
+# Toutes les portées AA des champions sont définies en unités LoL
+# et converties automatiquement au démarrage.
+# 1 bloc Minecraft = X unités LoL
+# Valeur recommandée : 65 (défaut). Ajuster si les portées semblent
+# trop grandes (augmenter) ou trop petites (diminuer) en jeu.
+scale:
+  lol-units-per-block: 65
+
+# ═══════════════════════════════════════════════════════
 # TOURELLES — portée d'attaque (mêmes valeurs pour toutes)
 # ═══════════════════════════════════════════════════════
 # Zone d'attaque en forme de CYLINDRE depuis le point de pose du schématique.
