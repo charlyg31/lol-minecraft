@@ -164,6 +164,11 @@ public class DamageUtil {
             if (attacker != null && cm.hasChampion(attacker))
                 hud.updateHUD(attacker, cm.getChampion(attacker));
         }
+
+        // 7. Vérifier la mort
+        if (vc.getHPSystem().isDead()) {
+            hud.triggerDeath(victim, attacker);
+        }
     }
 
     // ── Raccourcis (compat avec l'ancien code) ──
