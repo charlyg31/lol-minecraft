@@ -75,12 +75,14 @@ public class StructureDamageListener implements Listener {
         // Infliger les degats (bases sur l'AD du champion)
         BaseChampion champ = championManager.getChampion(player);
         double damage = champ.getStats().getFinalAD();
-        // Turret Plating : -40% degats si plaques actives
+        // Turret Plating : -40% degats si plaques actives + or de plaque au frappeur
         var tm = LolPlugin.getInstance().getTurretManager();
         String structKey = structure.getType().name() + "_" + structure.getTeam() + "_" + structure.getLane();
         if (structure.getType() == fr.lolmc.game.GameStructure.Type.TURRET && tm.hasPlating(structKey)) {
             damage *= 0.60;
             tm.tickPlating(structKey, player);
+            // Or de plaque (avant 14min, max 5 par tour)
+            LolPlugin.getInstance().getRewardManager().onTurretHit(player, structure);
         }
 
         boolean phaseChanged = structure.takeDamage(damage);
@@ -108,8 +110,8 @@ public class StructureDamageListener implements Listener {
 
         // Inhibiteur détruit → super-sbires sur cette lane pour l'équipe adverse
         if (structure.getType() == Type.TURRET) {
-            LolPlugin.getInstance().getRewardManager().onTurretDestroyed(player, playerTeam);
-            // Feat of Strength : Première Tourelle
+            int turretIndex = structure.getIndex(); // 1=T1, 2=T2, 3=T3
+            LolPlugin.getInstance().getRewardManager().onTurretDestroyed(player, playerTeam, turretIndex);
             LolPlugin.getInstance().getFeatManager().claim(
                 fr.lolmc.game.FeatManager.Feat.FIRST_TOWER, playerTeam, player);
         } else if (structure.getType() == Type.INHIBITOR) {
@@ -119,7 +121,7 @@ public class StructureDamageListener implements Listener {
             LolPlugin.getInstance().getGameManager().onInhibitorDestroyed(inhKey);
             LolPlugin.getInstance().getAnnouncementManager().announceInhibitorDestroyed(
                     structure.getLane(), enemyTeam.name());
-            LolPlugin.getInstance().getRewardManager().onInhibitorDestroyed(playerTeam);
+            LolPlugin.getInstance().getRewardManager().onInhibitorDestroyed(player, playerTeam);
         }
 
         // Annonce
