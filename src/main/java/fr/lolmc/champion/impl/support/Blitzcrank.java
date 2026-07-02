@@ -24,7 +24,7 @@ public class Blitzcrank extends BaseChampion {
         super("blitzcrank", "Blitzcrank", ChampionRole.SUPPORT,
             new ChampionStats(600,62,0,37,32,0.625,0,325,1.25,7.5));
         getStats().setGrowthStats(109.0,3.5,4.7,2.05,0.01130,0.75);
-        setAutoAttackRange(2.0);
+        setAutoAttackRange(2.7);
     }
     @Override protected void registerAbilities() {
         setAbility(0,new AA()); setAbility(1,new Q());

@@ -25,7 +25,7 @@ public class Warwick extends BaseChampion {
         super("warwick", "Warwick", ChampionRole.JUNGLE,
                 new ChampionStats(620,65,0,33,32,0.638,0,335,1.25,5.0));
         getStats().setGrowthStats(99.0,3.0,4.6,2.05,0.02300,0.80);
-        setAutoAttackRange(2.0);
+        setAutoAttackRange(2.7);
     }
     // Passif Instinct de Chasse : révèle les ennemis sous 50% HP dans un rayon de 25 blocs
     // Bonus de vitesse vers eux, fureur au combat contre eux

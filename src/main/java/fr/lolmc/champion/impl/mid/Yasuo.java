@@ -24,7 +24,7 @@ public class Yasuo extends BaseChampion {
         super("yasuo", "Yasuo", ChampionRole.MID,
             new ChampionStats(590,60,0,30,32,0.697,0,345,1.75,6.5));
         getStats().setGrowthStats(110.0,3.5,4.3,2.05,0.03500,0.90);
-        setAutoAttackRange(2.0);
+        setAutoAttackRange(2.7);
     }
     @Override protected void registerAbilities() {
         setAbility(0,new AA()); setAbility(1,new Q());

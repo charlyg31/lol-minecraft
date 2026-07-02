@@ -29,7 +29,7 @@ public class Janna extends BaseChampion {
         setAbility(0,new AA()); setAbility(1,new Q());
         setAbility(2,new W()); setAbility(3,new E()); setAbility(4,new R());
         initSystems(476, 7.0, ResourceSystem.ResourceType.MANA, 480, 11.0);
-        setAutoAttackRange(5.5);
+        setAutoAttackRange(8.5);
     }
 
     static class AA extends BasicAttackAbility {
