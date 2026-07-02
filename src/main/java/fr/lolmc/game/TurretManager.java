@@ -58,18 +58,7 @@ public class TurretManager {
         this.detectionHeight = config.getDouble("turrets.detection-height", 6.0);
         this.beamHeight = config.getDouble("turrets.beam-height", 6.0);
         this.baseDamage = config.getDouble("turrets.base-damage", 150.0);
-        startTurretTask();
-    }
-
-    private void startTurretTask() {
-        new BukkitRunnable() {
-            @Override public void run() {
-                for (GameStructure turret : mapManager.getStructures()) {
-                    if (turret.getType() != Type.TURRET || turret.isDestroyed()) continue;
-                    processTurret(turret);
-                }
-            }
-        }.runTaskTimer(LolPlugin.getInstance(), 0L, ATTACK_PERIOD);
+        startTurretTaskTracked();
     }
 
     private void processTurret(GameStructure turret) {
@@ -213,14 +202,18 @@ public class TurretManager {
         // Projectile visuel
         shootBeam(beamFrom, target.getLocation().add(0, 1, 0));
 
-        // Dégâts via le système LoL (dégâts vrais de tourelle, mais ici on passe par HPSystem)
+        // Dégâts de tourelle : physiques, réduits par l'armure du champion
         if (championManager.hasChampion(target)) {
             BaseChampion champ = championManager.getChampion(target);
-            champ.getHPSystem().takeDamage(damage);
+            // Réduction d'armure : dégâts × 100/(100+armure) comme LoL
+            double armor = champ.getStats().getFinalArmor();
+            double reduced = damage * 100.0 / (100.0 + armor);
+            champ.getHPSystem().takeDamage(reduced);
             var hud = LolPlugin.getInstance().getHUDManager();
             if (hud != null) hud.updateHUD(target, champ);
             target.sendActionBar(Component.text(
-                    String.format("🗼 Tourelle! -%.0f", damage), NamedTextColor.RED));
+                    String.format("🗼 Tourelle! -%.0f (armure: %.0f)", reduced, armor),
+                    NamedTextColor.RED));
         }
     }
 
@@ -249,22 +242,43 @@ public class TurretManager {
         return platingLeft.getOrDefault(key, MAX_PLATING) > 0;
     }
 
-    public void tickPlating(String key, Player attacker) {
+    /**
+     * Décrémente une plaque. L'or est distribué par RewardManager.onTurretHit()
+     * pour éviter la duplication.
+     */
+    public void tickPlating(String key) {
         if (!hasPlating(key)) return;
         int left = platingLeft.getOrDefault(key, MAX_PLATING);
         platingLeft.put(key, Math.max(0, left - 1));
-        LolPlugin.getInstance().getGoldManager().addGold(attacker.getUniqueId(), 160);
-        attacker.sendActionBar(net.kyori.adventure.text.Component.text(
-            "Plaque detruite! +160 or (" + Math.max(0, left-1) + " restantes)",
-            net.kyori.adventure.text.format.NamedTextColor.GOLD));
+    }
+
+    /** Rétrocompatibilité. */
+    public void tickPlating(String key, Player attacker) {
+        tickPlating(key);
+    }
+
+    public int getPlatingLeft(String key) {
+        return platingLeft.getOrDefault(key, MAX_PLATING);
     }
 
 
 
-    /** Arrête les tâches de tir des tourelles (onDisable). */
+    private org.bukkit.scheduler.BukkitTask turretTask;
+
+    private void startTurretTaskTracked() {
+        if (turretTask != null) turretTask.cancel();
+        turretTask = new BukkitRunnable() {
+            @Override public void run() {
+                for (GameStructure turret : mapManager.getStructures()) {
+                    if (turret.getType() != Type.TURRET || turret.isDestroyed()) continue;
+                    processTurret(turret);
+                }
+            }
+        }.runTaskTimer(LolPlugin.getInstance(), 0L, ATTACK_PERIOD);
+    }
+
+    /** Arrête uniquement la tâche de tir des tourelles. */
     public void stopTasks() {
-        // Les tâches TurretManager sont par entité ; annuler via le scheduler
-        LolPlugin.getInstance().getServer().getScheduler()
-            .cancelTasks(LolPlugin.getInstance());
+        if (turretTask != null) { turretTask.cancel(); turretTask = null; }
     }
 }
