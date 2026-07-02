@@ -85,9 +85,11 @@ public class DatabaseManager {
                 CREATE TABLE IF NOT EXISTS match_history (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     uuid VARCHAR(36) NOT NULL,
+                    match_id VARCHAR(36),
                     played_at BIGINT NOT NULL,
                     ranked BOOLEAN DEFAULT FALSE,
                     won BOOLEAN DEFAULT FALSE,
+                    team VARCHAR(8) DEFAULT 'UNKNOWN',
                     champion VARCHAR(32),
                     kills INT DEFAULT 0,
                     deaths INT DEFAULT 0,
@@ -95,7 +97,27 @@ public class DatabaseManager {
                     cs INT DEFAULT 0,
                     gold INT DEFAULT 0,
                     damage_dealt BIGINT DEFAULT 0,
+                    damage_taken BIGINT DEFAULT 0,
+                    healing_done BIGINT DEFAULT 0,
+                    wards_placed INT DEFAULT 0,
+                    wards_killed INT DEFAULT 0,
+                    largest_killing_spree INT DEFAULT 0,
+                    first_blood BOOLEAN DEFAULT FALSE,
+                    items TEXT DEFAULT '[]',
                     duration_seconds INT DEFAULT 0
+                )""");
+            st.execute("""
+                CREATE TABLE IF NOT EXISTS champion_stats (
+                    uuid VARCHAR(36) NOT NULL,
+                    champion VARCHAR(32) NOT NULL,
+                    games INT DEFAULT 0,
+                    wins INT DEFAULT 0,
+                    kills INT DEFAULT 0,
+                    deaths INT DEFAULT 0,
+                    assists INT DEFAULT 0,
+                    total_cs INT DEFAULT 0,
+                    total_damage BIGINT DEFAULT 0,
+                    PRIMARY KEY (uuid, champion)
                 )""");
         }
     }
@@ -236,19 +258,100 @@ public class DatabaseManager {
     public void saveMatch(MatchRecord match) {
         if (!available || connection == null) return;
         String sql = "INSERT INTO match_history "
-            + "(uuid,played_at,ranked,won,champion,kills,deaths,assists,cs,gold,damage_dealt,duration_seconds)"
-            + " VALUES (?,?,?,?,?,?,?,?,?,?,?,?)";
+            + "(uuid,match_id,played_at,ranked,won,team,champion,kills,deaths,assists,"
+            + "cs,gold,damage_dealt,damage_taken,healing_done,wards_placed,wards_killed,"
+            + "largest_killing_spree,first_blood,items,duration_seconds)"
+            + " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
         try (PreparedStatement ps = connection.prepareStatement(sql)) {
-            ps.setString(1, match.uuid.toString()); ps.setLong(2, match.playedAt);
-            ps.setBoolean(3, match.ranked);         ps.setBoolean(4, match.won);
-            ps.setString(5, match.champion);        ps.setInt(6, match.kills);
-            ps.setInt(7, match.deaths);             ps.setInt(8, match.assists);
-            ps.setInt(9, match.cs);                 ps.setInt(10, match.gold);
-            ps.setLong(11, match.damageDealt);      ps.setInt(12, match.durationSeconds);
+            ps.setString(1, match.uuid.toString());
+            ps.setString(2, match.matchId != null ? match.matchId : "");
+            ps.setLong(3, match.playedAt);          ps.setBoolean(4, match.ranked);
+            ps.setBoolean(5, match.won);            ps.setString(6, match.team != null ? match.team : "UNKNOWN");
+            ps.setString(7, match.champion);        ps.setInt(8, match.kills);
+            ps.setInt(9, match.deaths);             ps.setInt(10, match.assists);
+            ps.setInt(11, match.cs);                ps.setInt(12, match.gold);
+            ps.setLong(13, match.damageDealt);      ps.setLong(14, match.damageTaken);
+            ps.setLong(15, match.healingDone);      ps.setInt(16, match.wardsPlaced);
+            ps.setInt(17, match.wardsKilled);       ps.setInt(18, match.largestKillingSpree);
+            ps.setBoolean(19, match.firstBlood);    ps.setString(20, match.items != null ? match.items : "[]");
+            ps.setInt(21, match.durationSeconds);
             ps.executeUpdate();
         } catch (SQLException e) {
             LolPlugin.getInstance().getLogger().warning("saveMatch: " + e.getMessage());
         }
+        // Mettre à jour champion_stats
+        if (match.champion != null && !match.champion.isEmpty()) saveChampionStats(match);
+    }
+
+    private void saveChampionStats(MatchRecord m) {
+        if (!available || connection == null) return;
+        String sql = dbType.equals("sqlite")
+            ? "INSERT INTO champion_stats (uuid,champion,games,wins,kills,deaths,assists,total_cs,total_damage) VALUES (?,?,1,?,?,?,?,?,?) ON CONFLICT(uuid,champion) DO UPDATE SET games=games+1,wins=wins+excluded.wins,kills=kills+excluded.kills,deaths=deaths+excluded.deaths,assists=assists+excluded.assists,total_cs=total_cs+excluded.total_cs,total_damage=total_damage+excluded.total_damage"
+            : "INSERT INTO champion_stats (uuid,champion,games,wins,kills,deaths,assists,total_cs,total_damage) VALUES (?,?,1,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE games=games+1,wins=wins+VALUES(wins),kills=kills+VALUES(kills),deaths=deaths+VALUES(deaths),assists=assists+VALUES(assists),total_cs=total_cs+VALUES(total_cs),total_damage=total_damage+VALUES(total_damage)";
+        try (PreparedStatement ps = connection.prepareStatement(sql)) {
+            ps.setString(1, m.uuid.toString()); ps.setString(2, m.champion);
+            ps.setInt(3, m.won ? 1 : 0);       ps.setInt(4, m.kills);
+            ps.setInt(5, m.deaths);             ps.setInt(6, m.assists);
+            ps.setInt(7, m.cs);                 ps.setLong(8, m.damageDealt);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            LolPlugin.getInstance().getLogger().warning("saveChampionStats: " + e.getMessage());
+        }
+    }
+
+    /** Stats par champion d'un joueur. */
+    public java.util.List<PlayerStats.ChampionStats> getChampionStats(java.util.UUID uuid) {
+        java.util.List<PlayerStats.ChampionStats> result = new java.util.ArrayList<>();
+        if (!available || connection == null) return result;
+        try (PreparedStatement ps = connection.prepareStatement(
+                "SELECT * FROM champion_stats WHERE uuid=? ORDER BY games DESC")) {
+            ps.setString(1, uuid.toString());
+            java.sql.ResultSet rs = ps.executeQuery();
+            while (rs.next()) {
+                PlayerStats.ChampionStats cs = new PlayerStats.ChampionStats(rs.getString("champion"));
+                cs.games = rs.getInt("games"); cs.wins = rs.getInt("wins");
+                cs.kills = rs.getInt("kills"); cs.deaths = rs.getInt("deaths");
+                cs.assists = rs.getInt("assists"); cs.totalCS = rs.getInt("total_cs");
+                cs.totalDamage = rs.getLong("total_damage");
+                result.add(cs);
+            }
+        } catch (SQLException e) {
+            LolPlugin.getInstance().getLogger().warning("getChampionStats: " + e.getMessage());
+        }
+        return result;
+    }
+
+    /** Tous les joueurs d'une même partie (par matchId). */
+    public java.util.List<MatchRecord> getMatchPlayers(String matchId) {
+        java.util.List<MatchRecord> result = new java.util.ArrayList<>();
+        if (!available || connection == null) return result;
+        try (PreparedStatement ps = connection.prepareStatement(
+                "SELECT * FROM match_history WHERE match_id=? ORDER BY team,kills DESC")) {
+            ps.setString(1, matchId);
+            java.sql.ResultSet rs = ps.executeQuery();
+            while (rs.next()) result.add(mapMatchRow(rs));
+        } catch (SQLException e) {
+            LolPlugin.getInstance().getLogger().warning("getMatchPlayers: " + e.getMessage());
+        }
+        return result;
+    }
+
+    private MatchRecord mapMatchRow(java.sql.ResultSet rs) throws SQLException {
+        MatchRecord r = new MatchRecord();
+        r.uuid = java.util.UUID.fromString(rs.getString("uuid"));
+        r.matchId = rs.getString("match_id");
+        r.playedAt = rs.getLong("played_at");        r.ranked = rs.getBoolean("ranked");
+        r.won = rs.getBoolean("won");                r.team = rs.getString("team");
+        r.champion = rs.getString("champion");        r.kills = rs.getInt("kills");
+        r.deaths = rs.getInt("deaths");              r.assists = rs.getInt("assists");
+        r.cs = rs.getInt("cs");                      r.gold = rs.getInt("gold");
+        r.damageDealt = rs.getLong("damage_dealt");  r.damageTaken = rs.getLong("damage_taken");
+        r.healingDone = rs.getLong("healing_done");  r.wardsPlaced = rs.getInt("wards_placed");
+        r.wardsKilled = rs.getInt("wards_killed");
+        r.largestKillingSpree = rs.getInt("largest_killing_spree");
+        r.firstBlood = rs.getBoolean("first_blood"); r.items = rs.getString("items");
+        r.durationSeconds = rs.getInt("duration_seconds");
+        return r;
     }
 
     /** Retourne les N dernières parties d'un joueur. */

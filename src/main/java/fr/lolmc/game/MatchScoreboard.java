@@ -153,21 +153,47 @@ public class MatchScoreboard {
 
         // Reporter les KDA de la partie dans les stats persistantes
         long duration = LolPlugin.getInstance().getGameManager().getElapsedSeconds();
+        String matchId = java.util.UUID.randomUUID().toString(); // ID unique pour cette partie
+        long now = System.currentTimeMillis();
+        var tm2 = LolPlugin.getInstance().getTeamManager();
+        var cm2 = LolPlugin.getInstance().getChampionManager();
         var mode = this.ranked ? fr.lolmc.stats.persistence.RankedManager.Mode.RANKED
                 : fr.lolmc.stats.persistence.RankedManager.Mode.NORMAL;
         for (var entry : stats.entrySet()) {
             MatchStats s = entry.getValue();
-            // Sauvegarder dans match_history
-            var mr = new fr.lolmc.stats.persistence.MatchRecord();
-            mr.uuid = entry.getKey(); mr.playedAt = System.currentTimeMillis();
-            mr.ranked = this.ranked;
-            mr.won = winners.contains(entry.getKey());
             org.bukkit.entity.Player mp = org.bukkit.Bukkit.getPlayer(entry.getKey());
-            var cm2 = LolPlugin.getInstance().getChampionManager();
-            mr.champion = (mp != null && cm2.hasChampion(mp)) ? cm2.getChampion(mp).getId() : "?";
-            mr.kills = s.kills; mr.deaths = s.deaths; mr.assists = s.assists;
-            mr.cs = s.cs; mr.gold = s.gold; mr.damageDealt = (long) s.damageDealt;
+            // Construire MatchRecord enrichi
+            var mr = new fr.lolmc.stats.persistence.MatchRecord();
+            mr.uuid    = entry.getKey();
+            mr.matchId = matchId;
+            mr.playedAt = now;
+            mr.ranked  = this.ranked;
+            mr.won     = winners.contains(entry.getKey());
+            mr.team    = (mp != null && tm2.getTeam(mp) != null)
+                         ? tm2.getTeam(mp).name() : "UNKNOWN";
+            mr.champion = (mp != null && cm2.hasChampion(mp))
+                         ? cm2.getChampion(mp).getId() : "?";
+            mr.kills   = s.kills;     mr.deaths       = s.deaths;
+            mr.assists = s.assists;   mr.cs            = s.cs;
+            mr.gold    = s.gold;      mr.damageDealt   = s.damageDealt;
+            mr.damageTaken  = s.damageTaken;
+            mr.healingDone  = s.healingDone;
+            mr.wardsPlaced  = s.wardsPlaced;
+            mr.wardsKilled  = s.wardsKilled;
             mr.durationSeconds = (int) duration;
+            // Items équipés
+            if (mp != null) {
+                var inv = LolPlugin.getInstance().getShopListener().getOrCreate(mp);
+                StringBuilder items = new StringBuilder("[");
+                boolean fi = true;
+                for (fr.lolmc.item.LolItem item : inv.getEquippedItems()) {
+                    if (item == null) continue;
+                    if (!fi) items.append(","); fi = false;
+                    items.append("\"").append(item.getId()).append("\"");
+                }
+                items.append("]");
+                mr.items = items.toString();
+            }
             db.saveMatch(mr);
             var ps = db.getCached(entry.getKey());
             if (ps == null) continue;
