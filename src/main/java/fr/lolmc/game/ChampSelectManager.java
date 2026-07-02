@@ -278,7 +278,7 @@ public class ChampSelectManager {
 
             // Skin choisi
             String skinId = chosenSkin.getOrDefault(id, "base");
-            LolPlugin.getInstance().getSkinManager().applySkin(p, champ, skinId);
+            LolPlugin.getInstance().getManagerSkin().applySkin(p, champ, skinId);
 
             p.sendMessage(Component.text("⚔ Partie lancée avec " + champ
                 + " | Skin: " + skinId + " | Sorts: " + spells[0] + " + " + spells[1] + "!", NamedTextColor.GOLD));

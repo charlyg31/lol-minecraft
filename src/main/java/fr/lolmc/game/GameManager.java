@@ -180,6 +180,8 @@ public class GameManager {
         LolPlugin.getInstance().getFeatManager().reset();
         // Tab scoreboard
         LolPlugin.getInstance().getTabScoreboard().stop();
+        // Réinitialiser les skins
+        LolPlugin.getInstance().getManagerSkin().resetAll();
         // FF reset
         LolPlugin.getInstance().getForfeitManager().reset();
         // Inhibiteurs en attente de respawn
