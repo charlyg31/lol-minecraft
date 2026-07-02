@@ -23,10 +23,24 @@ public class RewardManager {
     public static final int GOLD_MINION_CANNON = 60;  // sbire canon/siège (60-90 selon temps)
     public static final int GOLD_CHAMPION_KILL = 300; // kill de base (valeur LoL)
     // Or global (distribué à toute l'équipe) pour destruction de structures
-    public static final int GOLD_TURRET_GLOBAL   = 150; // or global par tourelle
-    public static final int GOLD_TURRET_KILLER   = 100; // bonus au dernier coup
-    public static final int GOLD_INHIBITOR_GLOBAL = 50; // or global inhibiteur
-    public static final int GOLD_NEXUS_GLOBAL     = 100; // or global nexus
+    // Tourelles — or global par type (LoL)
+    public static final int GOLD_TURRET_T1_GLOBAL = 600; // T1 extérieure
+    public static final int GOLD_TURRET_T2_GLOBAL = 750; // T2 intérieure
+    public static final int GOLD_TURRET_T3_GLOBAL = 875; // T3 inhibiteur
+    public static final int GOLD_TURRET_KILLER    = 150; // bonus last-hit
+    public static final int GOLD_TURRET_PLATE     = 160; // plaque (avant 14min)
+    public static final int TURRET_PLATE_MAX      = 5;
+    public static final long TURRET_PLATE_DURATION = 14 * 60 * 1000L;
+    // Inhibiteur
+    public static final int GOLD_INHIBITOR_GLOBAL = 400;
+    public static final int GOLD_INHIBITOR_KILLER = 25;
+    // Nexus
+    public static final int GOLD_NEXUS_GLOBAL     = 100;
+    // XP structures
+    public static final double XP_TURRET    = 100;
+    public static final double XP_INHIBITOR = 150;
+    // Plaques par tourelle
+    private final java.util.Map<String, Integer> turretPlates = new java.util.concurrent.ConcurrentHashMap<>();
     public static final int GOLD_ASSIST = 150;
 
     public static final double XP_MINION = 60;
@@ -159,37 +173,74 @@ public class RewardManager {
     }
     public void resetKillStreaks() { killStreak.clear(); gameStartMs = 0; }
 
-    /** Distribue l'or quand une tourelle est détruite (global + bonus au last-hit). */
-    public void onTurretDestroyed(Player lastHit, fr.lolmc.team.TeamManager.Team attackingTeam) {
-        // Or global à toute l'équipe attaquante
+    /** Plaque de tourelle : +160 or avant 14min, max 5 par tour. */
+    public void onTurretHit(Player attacker, GameStructure turret) {
+        if (gameStartMs == 0) return;
+        if (System.currentTimeMillis() - gameStartMs > TURRET_PLATE_DURATION) return;
+        String tid = turret.getId();
+        int plates = turretPlates.getOrDefault(tid, TURRET_PLATE_MAX);
+        if (plates <= 0) return;
+        turretPlates.put(tid, plates - 1);
+        goldManager.addGold(attacker.getUniqueId(), GOLD_TURRET_PLATE);
+        attacker.sendActionBar(net.kyori.adventure.text.Component.text(
+            "🏛 Plaque! +" + GOLD_TURRET_PLATE + " or (" + (plates-1) + " restantes)",
+            net.kyori.adventure.text.format.NamedTextColor.GOLD));
+    }
+
+    /** Distribue l'or et l'XP quand une tourelle est détruite. */
+    public void onTurretDestroyed(Player lastHit, fr.lolmc.team.TeamManager.Team attackingTeam, int turretIndex) {
+        int globalGold = switch (turretIndex) {
+            case 1  -> GOLD_TURRET_T1_GLOBAL;
+            case 2  -> GOLD_TURRET_T2_GLOBAL;
+            default -> GOLD_TURRET_T3_GLOBAL;
+        };
+        String teamName = attackingTeam == fr.lolmc.team.TeamManager.Team.BLUE ? "Bleue" : "Rouge";
         for (java.util.UUID id : LolPlugin.getInstance().getGameManager().getParticipants()) {
             var p = org.bukkit.Bukkit.getPlayer(id);
             if (p == null) continue;
-            if (LolPlugin.getInstance().getTeamManager().getTeam(p) == attackingTeam)
-                goldManager.addGold(id, GOLD_TURRET_GLOBAL);
+            if (LolPlugin.getInstance().getTeamManager().getTeam(p) == attackingTeam) {
+                goldManager.addGold(id, globalGold);
+                grantXP(p, XP_TURRET);
+            }
         }
-        // Bonus last-hit
         if (lastHit != null) {
             goldManager.addGold(lastHit.getUniqueId(), GOLD_TURRET_KILLER);
             lastHit.sendActionBar(net.kyori.adventure.text.Component.text(
-                "🏛 Tourelle! +" + (GOLD_TURRET_GLOBAL + GOLD_TURRET_KILLER) + " or",
+                "🏛 Tourelle T" + turretIndex + "! +" + (globalGold + GOLD_TURRET_KILLER) + " or",
                 net.kyori.adventure.text.format.NamedTextColor.GOLD));
         }
         org.bukkit.Bukkit.broadcast(net.kyori.adventure.text.Component.text(
-            "🏛 Tourelle détruite! +" + GOLD_TURRET_GLOBAL + " or pour l'équipe " + attackingTeam.name(),
+            "🏛 Tourelle T" + turretIndex + " détruite! +" + globalGold + " or — Équipe " + teamName,
             net.kyori.adventure.text.format.NamedTextColor.YELLOW));
     }
 
-    /** Distribue l'or quand un inhibiteur est détruit. */
-    public void onInhibitorDestroyed(fr.lolmc.team.TeamManager.Team attackingTeam) {
+    public void onTurretDestroyed(Player lastHit, fr.lolmc.team.TeamManager.Team attackingTeam) {
+        onTurretDestroyed(lastHit, attackingTeam, 1);
+    }
+
+    /** Distribue l'or et l'XP quand un inhibiteur est détruit. */
+    public void onInhibitorDestroyed(Player lastHit, fr.lolmc.team.TeamManager.Team attackingTeam) {
+        String teamName = attackingTeam == fr.lolmc.team.TeamManager.Team.BLUE ? "Bleue" : "Rouge";
         for (java.util.UUID id : LolPlugin.getInstance().getGameManager().getParticipants()) {
             var p = org.bukkit.Bukkit.getPlayer(id);
             if (p == null) continue;
-            if (LolPlugin.getInstance().getTeamManager().getTeam(p) == attackingTeam)
+            if (LolPlugin.getInstance().getTeamManager().getTeam(p) == attackingTeam) {
                 goldManager.addGold(id, GOLD_INHIBITOR_GLOBAL);
+                grantXP(p, XP_INHIBITOR);
+            }
+        }
+        if (lastHit != null) {
+            goldManager.addGold(lastHit.getUniqueId(), GOLD_INHIBITOR_KILLER);
+            lastHit.sendActionBar(net.kyori.adventure.text.Component.text(
+                "💎 Inhibiteur! +" + (GOLD_INHIBITOR_GLOBAL + GOLD_INHIBITOR_KILLER) + " or",
+                net.kyori.adventure.text.format.NamedTextColor.AQUA));
         }
         org.bukkit.Bukkit.broadcast(net.kyori.adventure.text.Component.text(
-            "💎 Inhibiteur détruit! +" + GOLD_INHIBITOR_GLOBAL + " or pour l'équipe " + attackingTeam.name(),
+            "💎 Inhibiteur détruit! +" + GOLD_INHIBITOR_GLOBAL + " or — Équipe " + teamName,
             net.kyori.adventure.text.format.NamedTextColor.AQUA));
+    }
+
+    public void onInhibitorDestroyed(fr.lolmc.team.TeamManager.Team attackingTeam) {
+        onInhibitorDestroyed(null, attackingTeam);
     }
 }
