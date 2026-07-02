@@ -50,6 +50,11 @@ public class JungleManager {
     private final Map<String, CampSpawn> camps = new HashMap<>();
     // Monstres vivants : entityUUID → MonsterType
     private final Map<UUID, MonsterType> liveMonsters = new HashMap<>();
+    // Voidgrubs tués par équipe → bonus dégâts aux structures
+    private final java.util.Map<fr.lolmc.team.TeamManager.Team, Integer> voidgrubKills
+        = new java.util.EnumMap<>(fr.lolmc.team.TeamManager.Team.class);
+    // Chrono de respawn des épiques : type → timestamp de respawn
+    private final java.util.Map<String, Long> epicRespawnAt = new java.util.concurrent.ConcurrentHashMap<>();
     // Décorations : monstreUUID → liste des UUID des parties du modèle (nettoyage)
     private final Map<UUID, List<UUID>> monsterDeco = new HashMap<>();
     // Dragons tués par équipe (pour l'âme du Dragon au 4e)
@@ -334,6 +339,22 @@ public class JungleManager {
             }
 
             // Annonce pour les épiques (uniquement quand le camp est vidé)
+            // Voidgrubs : compter les kills et appliquer bonus
+            if (type == MonsterType.VOIDGRUB) {
+                var kteam = LolPlugin.getInstance().getTeamManager().getTeam(killer);
+                if (kteam != null) {
+                    int grubs = voidgrubKills.merge(kteam, 1, Integer::sum);
+                    if (grubs == 3 || grubs == 6) {
+                        for (UUID mid : LolPlugin.getInstance().getTeamManager().getTeamMembers(kteam)) {
+                            Player mp = org.bukkit.Bukkit.getPlayer(mid);
+                            if (mp != null) mp.sendMessage(net.kyori.adventure.text.Component.text(
+                                "🐛 " + grubs + " Nuées du Néant — +" + (grubs == 3 ? "6" : "14")
+                                + "% dégâts aux structures!", net.kyori.adventure.text.format.NamedTextColor.DARK_PURPLE));
+                        }
+                    }
+                }
+            }
+
             if (type.isEpic() && (camp == null || camp.liveEntities.isEmpty())) {
                 LolPlugin.getInstance().getServer().broadcast(Component.text(
                         "🌟 " + type.displayName + " tué par " + killer.getName() + "!",
@@ -447,6 +468,17 @@ public class JungleManager {
                 player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 180 * 20, 0, false, true));
                 player.sendActionBar(Component.text(
                         "🪱 Buff du Baron! +24 AD +40 AP (3min)", NamedTextColor.LIGHT_PURPLE));
+                // Particules violettes autour du joueur pendant 180s
+                new BukkitRunnable() {
+                    int ticks = 0;
+                    @Override public void run() {
+                        if (ticks >= 180*20/10 || !player.isOnline()) { cancel(); return; }
+                        player.getWorld().spawnParticle(org.bukkit.Particle.DUST,
+                            player.getLocation().add(0,1,0), 5, 0.4,0.6,0.4, 0,
+                            new org.bukkit.Particle.DustOptions(org.bukkit.Color.fromRGB(128,0,128), 1.2f));
+                        ticks++;
+                    }
+                }.runTaskTimer(LolPlugin.getInstance(), 0L, 10L);
                 scheduleBuffRemoval(player, () -> {
                     champ.getStats().addBonusAD(-24);
                     champ.getStats().addBonusAP(-40);
@@ -484,6 +516,15 @@ public class JungleManager {
     // ══════════════════════════════════════════════════════════════
     // HELPERS
     // ══════════════════════════════════════════════════════════════
+
+    public int getVoidgrubKills(fr.lolmc.team.TeamManager.Team team) {
+        return voidgrubKills.getOrDefault(team, 0);
+    }
+    public double getVoidgrubDamageBonus(fr.lolmc.team.TeamManager.Team team) {
+        int g = getVoidgrubKills(team);
+        if (g >= 6) return 1.14; if (g >= 3) return 1.06; return 1.0;
+    }
+    public java.util.Map<String, Long> getEpicRespawnAt() { return epicRespawnAt; }
 
     public static boolean isJungleMonster(Entity e) {
         if (!(e instanceof LivingEntity)) return false;

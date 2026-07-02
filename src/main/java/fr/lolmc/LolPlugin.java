@@ -21,6 +21,9 @@ import fr.lolmc.game.JungleManager;
 import fr.lolmc.game.BushManager;
 import fr.lolmc.game.MonsterAbilities;
 import fr.lolmc.game.FeatManager;
+import fr.lolmc.game.DeathRecapManager;
+import fr.lolmc.game.TabScoreboardManager;
+import fr.lolmc.game.ForfeitManager;
 import fr.lolmc.game.GameManager;
 import fr.lolmc.game.BaseManager;
 import fr.lolmc.game.FogOfWarManager;
@@ -79,6 +82,9 @@ public class LolPlugin extends JavaPlugin {
     private TurretManager turretManager;
     private MinionManager minionManager;
     private RoadManager roadManager;
+    private DeathRecapManager deathRecapManager;
+    private TabScoreboardManager tabScoreboardManager;
+    private ForfeitManager forfeitManager;
     private FeatManager featManager;
     private RewardManager rewardManager;
     private JungleManager jungleManager;
@@ -169,6 +175,9 @@ public class LolPlugin extends JavaPlugin {
         turretManager = new TurretManager(mapManager, championManager, teamManager);
         roadManager = new RoadManager();
         roadManager.applyToMinionManager();
+        deathRecapManager = new DeathRecapManager();
+        tabScoreboardManager = new TabScoreboardManager();
+        forfeitManager = new ForfeitManager();
         featManager = new FeatManager();
         rewardManager = new RewardManager(championManager, goldManager);
         jungleManager = new JungleManager();
@@ -288,6 +297,9 @@ public class LolPlugin extends JavaPlugin {
     public TurretManager getTurretManager()     { return turretManager; }
     public MinionManager getMinionManager()     { return minionManager; }
     public RoadManager getRoadManager()         { return roadManager; }
+    public DeathRecapManager getDeathRecapManager()  { return deathRecapManager; }
+    public TabScoreboardManager getTabScoreboard()    { return tabScoreboardManager; }
+    public ForfeitManager getForfeitManager()          { return forfeitManager; }
     public FeatManager getFeatManager()          { return featManager; }
     public RewardManager getRewardManager()     { return rewardManager; }
     public JungleManager getJungleManager()     { return jungleManager; }

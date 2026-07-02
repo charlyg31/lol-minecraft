@@ -61,6 +61,12 @@ public class StructureDamageListener implements Listener {
         BaseChampion champ = championManager.getChampion(player);
         double damage = champ.getStats().getFinalAD();
 
+        // Bonus voidgrubs (3 grubs: +6%, 6 grubs: +14%)
+        var jm = LolPlugin.getInstance().getJungleManager();
+        if (jm != null && structure.getType() == Type.TURRET) {
+            damage *= jm.getVoidgrubDamageBonus(playerTeam);
+        }
+
         // Plaques
         var tm = LolPlugin.getInstance().getTurretManager();
         String structKey = structure.getType().name() + "_" + structure.getTeam() + "_" + structure.getLane();

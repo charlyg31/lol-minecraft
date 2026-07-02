@@ -101,6 +101,14 @@ public class DamageUtil {
             if (attacker != null) msb.addDamageDealt(attacker, afterShield);
             msb.addDamageTaken(victim, afterShield);
         }
+        // Death recap : enregistrer la source
+        var drm = LolPlugin.getInstance().getDeathRecapManager();
+        if (drm != null && afterShield > 0 && attacker != null) {
+            String src = attacker.getName();
+            String typ = dmgType == fr.lolmc.util.DamageUtil.Type.MAGICAL ? "magic"
+                       : dmgType == fr.lolmc.util.DamageUtil.Type.TRUE ? "true" : "physical";
+            drm.record(victim.getUniqueId(), src, typ, afterShield);
+        }
         // Passif Amumu : désormais géré via Toucher Maudit (applyCurse/onMagicHit)
         // dans Amumu.java — plus de renvoi de dégâts ici.
         // Dragon Elder : exécution si la cible tombe sous 20% HP

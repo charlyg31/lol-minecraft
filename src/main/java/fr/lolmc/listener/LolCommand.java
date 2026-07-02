@@ -83,13 +83,7 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
                 }
                 case "ff", "forfait" -> {
                     if (!inGame) { player.sendMessage(Component.text("❌ Disponible uniquement en partie.", NamedTextColor.RED)); break; }
-                    var tm = LolPlugin.getInstance().getTeamManager();
-                    for (var p : player.getWorld().getPlayers()) {
-                        if (!tm.areEnemies(player, p))
-                            p.sendMessage(Component.text(
-                                "🏳 " + player.getName() + " vote pour abandonner. (/lol ff pour voter)",
-                                NamedTextColor.YELLOW));
-                    }
+                    LolPlugin.getInstance().getForfeitManager().vote(player);
                 }
                 case "stats" -> {
                     if (!inGame) { player.sendMessage(Component.text("❌ Disponible uniquement en partie.", NamedTextColor.RED)); break; }

@@ -161,6 +161,10 @@ public class GameManager {
         for (Player p : WorldContext.getGamePlayers()) {
             mm.giveMinimap(p);
         }
+        // Tab scoreboard
+        LolPlugin.getInstance().getTabScoreboard().start();
+        // FF + death recap reset
+        LolPlugin.getInstance().getForfeitManager().reset();
     }
 
     public void stopGame() {
@@ -172,6 +176,10 @@ public class GameManager {
         LolPlugin.getInstance().getAnnouncementManager().reset();
         // Feats of Strength
         LolPlugin.getInstance().getFeatManager().reset();
+        // Tab scoreboard
+        LolPlugin.getInstance().getTabScoreboard().stop();
+        // FF reset
+        LolPlugin.getInstance().getForfeitManager().reset();
         // Inhibiteurs en attente de respawn
         inhibitorRespawnAt.clear();
         respawnTotalSecondsMap.clear();
@@ -229,7 +237,17 @@ public class GameManager {
                 if (!gameRunning || timerBar == null) return;
                 long secs = getElapsedSeconds();
                 String time = String.format("%02d:%02d", secs / 60, secs % 60);
-                timerBar.name(Component.text("⏱ " + time, NamedTextColor.WHITE));
+                // Chrono respawn épiques dans la BossBar
+                var jm2 = LolPlugin.getInstance().getJungleManager();
+                StringBuilder epicTimers = new StringBuilder();
+                if (jm2 != null) {
+                    long now2 = System.currentTimeMillis();
+                    for (var re : jm2.getEpicRespawnAt().entrySet()) {
+                        long rem = (re.getValue() - now2) / 1000L;
+                        if (rem > 0) epicTimers.append(" | ").append(re.getKey()).append(" ").append(String.format("%02d:%02d", rem/60, rem%60));
+                    }
+                }
+                timerBar.name(Component.text("⏱ " + time + epicTimers, NamedTextColor.WHITE));
                 // Mettre à jour la BossBar pour chaque joueur avec son CS et or
                 for (Player p : WorldContext.getGamePlayers()) {
                     p.showBossBar(timerBar);
