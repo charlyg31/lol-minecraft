@@ -284,16 +284,18 @@ public class MapManager {
     }
 
     /**
-     * Résout le nom de base du schéma en cherchant du plus spécifique au plus générique.
+     * Résout le nom de base du schéma (SANS le seuil de HP).
      *
-     * Format : <Type>_<Team>[_<Lane>[_<Index>]][_<Threshold>]
+     * Priorité (Turret, Blue, top, index=1) :
+     *   1. Turret_Blue_Top_1  ← tour précise
+     *   2. Turret_Blue_Top    ← toutes les tours top bleues
+     *   3. Turret_Blue        ← générique
      *
-     * Priorité (exemple Turret, Blue, top, index=1) :
-     *   1. Turret_Blue_Top_1   ← schéma unique pour cette tour précise
-     *   2. Turret_Blue_Top     ← commun à toutes les tours top bleues
-     *   3. Turret_Blue         ← générique pour toutes les tours bleues
+     * Les phases ajoutent ensuite le seuil : Turret_Blue_Top_1_75.json
+     * Le générique utilise : Turret_Blue_75.json
      *
-     * Les phases de dégâts ajoutent le seuil : Turret_Blue_Top_75
+     * Le seuil est toujours le dernier suffixe numérique — il ne fait
+     * jamais partie du nom de base, qui ne contient que des mots.
      */
     private String schematicBaseName(Type type, Team team, String lane, int index, File folder) {
         String teamName = (team == Team.BLUE) ? "Blue" : "Red";
@@ -305,27 +307,38 @@ public class MapManager {
         };
 
         String root = typeName + "_" + teamName;
-        String laneCap = lane == null || lane.isEmpty() ? "" :
+        String laneCap = (lane == null || lane.isEmpty()) ? "" :
             lane.substring(0, 1).toUpperCase() + lane.substring(1).toLowerCase();
 
-        // Chercher du plus spécifique au plus générique
-        String[] candidates = {
-            root + "_" + laneCap + "_" + index,  // Turret_Blue_Top_1
-            root + "_" + laneCap,                  // Turret_Blue_Top
-            root                                   // Turret_Blue
-        };
+        // Candidats du plus spécifique au plus générique (sans seuil)
+        List<String> candidates = new ArrayList<>();
+        if (!laneCap.isEmpty()) {
+            candidates.add(root + "_" + laneCap + "_" + index); // Turret_Blue_Top_1
+            candidates.add(root + "_" + laneCap);                // Turret_Blue_Top
+        }
+        candidates.add(root);                                    // Turret_Blue
 
         if (folder.exists() && folder.isDirectory()) {
             for (String candidate : candidates) {
-                File[] match = folder.listFiles((d, n) ->
-                    n.startsWith(candidate) && n.endsWith(".json"));
+                // Un fichier correspondant existe si : candidate.json
+                // OU candidate_<number>.json (phase)
+                File[] match = folder.listFiles((d, n) -> {
+                    if (!n.endsWith(".json")) return false;
+                    String base = n.substring(0, n.length() - 5); // sans .json
+                    if (base.equals(candidate)) return true;
+                    // Vérifier si c'est candidate_<number>
+                    if (base.startsWith(candidate + "_")) {
+                        String suffix = base.substring(candidate.length() + 1);
+                        return suffix.matches("\\d+");
+                    }
+                    return false;
+                });
                 if (match != null && match.length > 0) return candidate;
             }
         }
         return root;
     }
 
-    // Ancienne signature conservée pour compatibilité interne
     private String schematicBaseName(Type type, Team team) {
         String teamName = (team == Team.BLUE) ? "Blue" : "Red";
         return switch (type) {
