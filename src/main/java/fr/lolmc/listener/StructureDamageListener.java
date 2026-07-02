@@ -41,6 +41,49 @@ public class StructureDamageListener implements Listener {
     }
 
     @EventHandler
+    /**
+     * Applique les dégâts d'une auto-attaque sur une structure.
+     * Appelé depuis AbilityListener quand un joueur attaque depuis sa portée AA LoL.
+     */
+    public void applyAutoAttackDamage(Player player, GameStructure structure) {
+        if (!championManager.hasChampion(player)) return;
+        Team playerTeam = teamManager.getTeam(player);
+        if (playerTeam == null || structure.getTeam() == playerTeam) return;
+        if (structure.isDestroyed()) return;
+
+        // Protection Nexus
+        if (structure.getType() == Type.NEXUS_BASE && !mapManager.canAttackBaseNexus(structure.getTeam())) {
+            player.sendActionBar(Component.text(
+                "🛡 Le Nexus est protégé !", NamedTextColor.RED));
+            return;
+        }
+
+        BaseChampion champ = championManager.getChampion(player);
+        double damage = champ.getStats().getFinalAD();
+
+        // Plaques
+        var tm = LolPlugin.getInstance().getTurretManager();
+        String structKey = structure.getType().name() + "_" + structure.getTeam() + "_" + structure.getLane();
+        if (structure.getType() == Type.TURRET && tm.hasPlating(structKey)) {
+            damage *= 0.60;
+            tm.tickPlating(structKey);
+            LolPlugin.getInstance().getRewardManager().onTurretHit(player, structure);
+        }
+
+        boolean phaseChanged = structure.takeDamage(damage);
+        player.playSound(player.getLocation(), Sound.BLOCK_ANVIL_HIT, 0.5f, 1.2f);
+
+        if (structure.isDestroyed()) {
+            onStructureDestroyed(structure, player);
+        } else {
+            if (phaseChanged) mapManager.updateStructurePhase(structure);
+            player.sendActionBar(Component.text(String.format(
+                "%s : %.0f/%.0f HP (%.0f%%)",
+                structureName(structure), structure.getCurrentHP(),
+                structure.getMaxHP(), structure.getHealthPercent()), NamedTextColor.YELLOW));
+        }
+    }
+
     public void onAttack(PlayerInteractEvent e) {
         if (e.getAction() != Action.LEFT_CLICK_BLOCK && e.getAction() != Action.LEFT_CLICK_AIR) return;
         Player player = e.getPlayer();

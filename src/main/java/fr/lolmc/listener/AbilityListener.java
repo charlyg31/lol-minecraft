@@ -238,12 +238,59 @@ public class AbilityListener implements Listener {
             Player aimed = target != null ? target : getTargetedPlayer(caster);
             if (aimed != null) {
                 LolPlugin.getInstance().getAutoAttackManager().tryAutoAttack(caster, aimed);
+            } else {
+                // Aucun joueur visé — chercher une structure ennemie dans la portée AA
+                tryAttackStructure(caster);
             }
         } else if (slot >= 1 && slot <= 4) {
             // Lancer le sort, avec la cible visée s'il y en a une
             Player aimed = target != null ? target : getTargetedPlayer(caster);
             manager.getChampion(caster).tryUseAbility(caster, slot, aimed);
         }
+    }
+
+    /**
+     * Cherche la structure ennemie la plus proche dans la portée AA du joueur
+     * et l'attaque si elle est visée (angle ≤ 45°).
+     */
+    private void tryAttackStructure(Player caster) {
+        if (!manager.hasChampion(caster)) return;
+        var champ = manager.getChampion(caster);
+        double range = champ.getAutoAttackRange();
+        var tm = LolPlugin.getInstance().getTeamManager();
+        var mm = LolPlugin.getInstance().getMapManager();
+        if (mm == null) return;
+
+        GameStructure closest = null;
+        double closestDist = Double.MAX_VALUE;
+        var eye = caster.getEyeLocation();
+        var dir = eye.getDirection();
+
+        for (var structure : mm.getStructures()) {
+            if (structure.isDestroyed()) continue;
+            if (structure.getTeam() == tm.getTeam(caster)) continue; // structure alliée
+            var center = structure.getCenter().clone().add(0.5, 1, 0.5);
+            if (!center.getWorld().equals(caster.getWorld())) continue;
+            double dist = caster.getLocation().distance(center);
+            if (dist > range) continue;
+            // Vérifier que le joueur regarde vers la structure (angle ≤ 45°)
+            var toStruct = center.toVector().subtract(eye.toVector()).normalize();
+            double dot = dir.dot(toStruct);
+            if (dot < 0.7) continue; // cos(45°) ≈ 0.7
+            if (dist < closestDist) { closestDist = dist; closest = structure; }
+        }
+
+        if (closest == null) return;
+
+        // Vérifier la cadence AA (même cooldown que les AA sur champions)
+        var aam = LolPlugin.getInstance().getAutoAttackManager();
+        if (!aam.canAutoAttack(caster)) return;
+        aam.triggerCooldown(caster);
+
+        // Infliger les dégâts AA à la structure
+        final var target = closest;
+        var sdl = LolPlugin.getInstance().getStructureDamageListener();
+        if (sdl != null) sdl.applyAutoAttackDamage(caster, target);
     }
 
     /** Trouve le joueur visé par le caster (raycast simple, portée 30 blocs). */
