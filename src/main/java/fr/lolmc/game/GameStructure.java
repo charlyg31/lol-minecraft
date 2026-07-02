@@ -74,6 +74,8 @@ public class GameStructure {
     public boolean takeDamage(double amount) {
         if (destroyed) return false;
         currentHP = Math.max(0, currentHP - amount);
+        // Mettre à jour la HealthBar au-dessus de la structure
+        updateHealthBarNametag();
         if (currentHP <= 0) {
             destroyed = true;
             return true;

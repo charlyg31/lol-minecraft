@@ -104,6 +104,9 @@ public class HUDManager {
         applyMovementSpeed(player, champ.getStats());
 
         // (la cadence d'AA est gérée par AutoAttackManager, pas par le cooldown du slot)
+
+        // ── 6. Nametag barre de vie pour les autres joueurs ──
+        updatePlayerHealthBar(player, champ);
     }
 
     /**

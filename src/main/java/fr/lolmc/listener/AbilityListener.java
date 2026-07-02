@@ -246,8 +246,8 @@ public class AbilityListener implements Listener {
             // 2. Entité (sbire, monstre de jungle) visée dans la portée AA
             org.bukkit.entity.LivingEntity entity = getTargetedEntity(caster);
             if (entity != null) {
-                aam.tryAutoAttackEntity(caster, entity);
-                return;
+                boolean hit = aam.tryAutoAttackEntity(caster, entity);
+                if (hit) return;
             }
 
             // 3. Structure ennemie dans la portée AA
