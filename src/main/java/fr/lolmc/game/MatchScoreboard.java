@@ -152,10 +152,23 @@ public class MatchScoreboard {
         List<UUID> losers = new ArrayList<>(tm.getTeamMembers(winner.opposite()));
 
         // Reporter les KDA de la partie dans les stats persistantes
+        long duration = LolPlugin.getInstance().getGameManager().getElapsedSeconds();
         var mode = this.ranked ? fr.lolmc.stats.persistence.RankedManager.Mode.RANKED
                 : fr.lolmc.stats.persistence.RankedManager.Mode.NORMAL;
         for (var entry : stats.entrySet()) {
             MatchStats s = entry.getValue();
+            // Sauvegarder dans match_history
+            var mr = new fr.lolmc.stats.persistence.MatchRecord();
+            mr.uuid = entry.getKey(); mr.playedAt = System.currentTimeMillis();
+            mr.ranked = this.ranked;
+            mr.won = winners.contains(entry.getKey());
+            org.bukkit.entity.Player mp = org.bukkit.Bukkit.getPlayer(entry.getKey());
+            var cm2 = LolPlugin.getInstance().getChampionManager();
+            mr.champion = (mp != null && cm2.hasChampion(mp)) ? cm2.getChampion(mp).getId() : "?";
+            mr.kills = s.kills; mr.deaths = s.deaths; mr.assists = s.assists;
+            mr.cs = s.cs; mr.gold = s.gold; mr.damageDealt = (long) s.damageDealt;
+            mr.durationSeconds = (int) duration;
+            db.saveMatch(mr);
             var ps = db.getCached(entry.getKey());
             if (ps == null) continue;
             if (mode == fr.lolmc.stats.persistence.RankedManager.Mode.RANKED) {
