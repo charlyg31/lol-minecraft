@@ -121,6 +121,19 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
         switch (args[0].toLowerCase()) {
             case "set" -> handleSet(player, args);
             case "position" -> handlePosition(player, args);
+            case "center" -> {
+                var loc = player.getLocation();
+                var cfg = LolPlugin.getInstance().getConfig();
+                cfg.set("minimap.center-x", loc.getBlockX());
+                cfg.set("minimap.center-z", loc.getBlockZ());
+                LolPlugin.getInstance().saveConfig();
+                // Réinitialiser la vue partagée pour forcer un re-rendu
+                LolPlugin.getInstance().getMinimapManager().resetView();
+                player.sendMessage(net.kyori.adventure.text.Component.text(
+                    String.format("✔ Centre de la minimap défini à X=%d Z=%d (reçu les changements)",
+                        loc.getBlockX(), loc.getBlockZ()),
+                    net.kyori.adventure.text.format.NamedTextColor.GREEN));
+            }
             case "lane" -> handleLane(player, args);
             case "schem" -> handleSchem(player, args);
             case "road" -> handleRoad(player, args);
@@ -660,7 +673,7 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
 
     @Override
     public List<String> onTabComplete(CommandSender sender, Command cmd, String alias, String[] args) {
-        if (args.length == 1) return List.of("set", "position", "lane", "schem", "road", "jungle", "shopnpc", "mode", "select", "solo", "give", "level", "gold", "team", "testgame", "debug", "reload", "start", "stop"); // MODIFICATION : Injecté "schem"
+        if (args.length == 1) return List.of("set", "position", "lane", "schem", "road", "jungle", "shopnpc", "mode", "select", "solo", "give", "level", "gold", "team", "testgame", "debug", "reload", "start", "stop", "center"); // MODIFICATION : Injecté "schem"
         if (args.length == 2) {
             return switch (args[0].toLowerCase()) {
                 case "set" -> List.of("turret", "inhibitor", "nexus", "basenexus");
