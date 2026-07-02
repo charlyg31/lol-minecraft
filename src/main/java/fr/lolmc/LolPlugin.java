@@ -88,7 +88,7 @@ public class LolPlugin extends JavaPlugin {
     private BaseManager baseManager;
     private FogOfWarManager fogOfWarManager;
     private ShopNpcManager shopNpcManager;
-    private AutoAttackManager autoAttackManager;
+    private fr.lolmc.listener.StructureDamageListener structureDamageListener;
     private AnnouncementManager announcementManager;
     private SummonerSpellManager summonerSpellManager;
     private ChunkLoaderManager chunkLoaderManager; // AJOUT : Variable d'instance
@@ -232,7 +232,8 @@ public class LolPlugin extends JavaPlugin {
         }
         getServer().getPluginManager().registerEvents(lolCmd, this);
         getServer().getPluginManager().registerEvents(
-                new fr.lolmc.listener.StructureDamageListener(mapManager, championManager, teamManager), this);
+                structureDamageListener = new fr.lolmc.listener.StructureDamageListener(mapManager, championManager, teamManager);
+                getServer().getPluginManager().registerEvents(structureDamageListener, this);
         getServer().getPluginManager().registerEvents(new fr.lolmc.listener.ChatListener(), this);
         getServer().getPluginManager().registerEvents(
                 new EntityDeathListener(championManager, rewardManager), this);
@@ -295,6 +296,7 @@ public class LolPlugin extends JavaPlugin {
     public FogOfWarManager getFogOfWarManager() { return fogOfWarManager; }
     public ShopNpcManager getShopNpcManager()   { return shopNpcManager; }
     public AutoAttackManager getAutoAttackManager() { return autoAttackManager; }
+    public fr.lolmc.listener.StructureDamageListener getStructureDamageListener() { return structureDamageListener; }
     public AnnouncementManager getAnnouncementManager() { return announcementManager; }
     public SummonerSpellManager getSummonerSpellManager() { return summonerSpellManager; }
     public ChunkLoaderManager getChunkLoaderManager() { return chunkLoaderManager; } // AJOUT : Getter associé

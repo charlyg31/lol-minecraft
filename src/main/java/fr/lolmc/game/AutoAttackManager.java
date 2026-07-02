@@ -293,6 +293,22 @@ public class AutoAttackManager {
         return true;
     }
 
+    /** Vérifie si le joueur peut auto-attaquer (cadence respectée), sans déclencher. */
+    public boolean canAutoAttack(Player attacker) {
+        if (!LolPlugin.getInstance().getChampionManager().hasChampion(attacker)) return false;
+        var champ = LolPlugin.getInstance().getChampionManager().getChampion(attacker);
+        long now = System.currentTimeMillis();
+        double attackSpeed = champ.getStats().getFinalAttackSpeed();
+        long cooldownMs = (long)(1000.0 / Math.max(0.1, attackSpeed));
+        Long last = lastAttack.get(attacker.getUniqueId());
+        return last == null || (now - last) >= cooldownMs;
+    }
+
+    /** Déclenche le cooldown d'AA sans infliger de dégâts. */
+    public void triggerCooldown(Player attacker) {
+        lastAttack.put(attacker.getUniqueId(), System.currentTimeMillis());
+    }
+
     public void cleanup(UUID uuid) {
         lastAttack.remove(uuid);
     }
