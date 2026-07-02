@@ -52,6 +52,7 @@ public class MinionManager {
 
     private boolean spawning = false;
     private int waveCount = 0; // numéro de vague GLOBAL (incrémenté une fois par cycle)
+    public int getWaveCount() { return waveCount; }
     // Tâches stockées pour annulation propre
     private org.bukkit.scheduler.BukkitTask waveTask;
     private org.bukkit.scheduler.BukkitTask moveTask;

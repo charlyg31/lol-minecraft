@@ -451,12 +451,14 @@ public class AbilityListener implements Listener {
         if (minionTeam == null || minionTeam == victimTeam) return;
         // Dégâts du sbire selon son type
         String typeTag = fr.lolmc.game.MinionManager.getMinionTypeTag(damagerLe);
-        // Dégâts bruts LoL (avant réduction d'armure)
+        // Dégâts bruts LoL avec scaling par vague (patch 26)
+        // Mêlée : 69 + 1.5/vague | Caster : 39 + 0.75/vague | Canon : 100 + 3/vague
+        int wave = LolPlugin.getInstance().getMinionManager().getWaveCount();
         double rawDmg = switch (typeTag != null ? typeTag : "melee") {
-            case "cannon" -> 100.0;
-            case "super"  -> 190.0;
-            case "caster" -> 39.0;
-            default       -> 68.0; // melee
+            case "cannon" -> 100.0 + wave * 3.0;
+            case "super"  -> 190.0 + wave * 5.0;
+            case "caster" -> 39.0  + wave * 0.75;
+            default       -> 69.0  + wave * 1.5; // melee
         };
         // Appliquer via le système LoL (avec réduction d'armure)
         if (manager.hasChampion(victim)) {
@@ -468,6 +470,43 @@ public class AbilityListener implements Listener {
             var hud = LolPlugin.getInstance().getHUDManager();
             if (hud != null) hud.updateHUD(victim, champ);
         }
+    }
+
+    /** Dégâts d'un monstre de jungle sur un joueur — remplace le vanilla par les valeurs LoL. */
+    @EventHandler
+    public void onJungleMonsterAttackPlayer(EntityDamageByEntityEvent e) {
+        if (!(e.getEntity() instanceof Player victim)) return;
+        if (!(e.getDamager() instanceof org.bukkit.entity.LivingEntity damager)) return;
+        if (!fr.lolmc.game.JungleManager.isJungleMonster(damager)) return;
+        e.setCancelled(true);
+        if (!manager.hasChampion(victim)) return;
+
+        // Dégâts LoL par type de monstre (patch 26, valeurs approximées)
+        fr.lolmc.game.JungleManager.MonsterType type = fr.lolmc.game.JungleManager.getMonsterType(damager);
+        if (type == null) return;
+        double rawDmg = switch (type) {
+            case BARON          -> 600.0;
+            case DRAGON_ELDER   -> 250.0;
+            case DRAGON_INFERNAL, DRAGON_OCEAN, DRAGON_MOUNTAIN,
+                 DRAGON_CLOUD, DRAGON_CHEMTECH -> 150.0;
+            case HERALD         -> 200.0;
+            case ATAKHAN        -> 300.0;
+            case RED_BUFF       -> 80.0;
+            case BLUE_BUFF      -> 80.0;
+            case GROMP          -> 60.0;
+            case MURKWOLF       -> 40.0;  // gros loup
+            case RAPTOR         -> 30.0;  // gros raptor
+            case KRUG           -> 50.0;
+            case SCUTTLE_CRAB   -> 40.0;
+            case VOIDGRUB       -> 30.0;
+        };
+
+        var champ = manager.getChampion(victim);
+        double armor = champ.getStats().getFinalArmor();
+        double reduced = rawDmg * (100.0 / (100.0 + Math.max(0, armor)));
+        champ.getHPSystem().takeDamage(reduced);
+        var hud = LolPlugin.getInstance().getHUDManager();
+        if (hud != null) hud.updateHUD(victim, champ);
     }
 
     // ── Clic gauche sur entité → AA (slot 0) ──
