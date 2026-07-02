@@ -91,9 +91,12 @@ public class MinimapManager implements Listener {
             sharedView.setScale(scale);
             sharedView.setCenterX(centerX);
             sharedView.setCenterZ(centerZ);
-            sharedView.setTrackingPosition(true);
-            sharedView.setUnlimitedTracking(false);
-            // On GARDE le renderer terrain par défaut, on ajoute juste l'overlay curseurs
+            sharedView.setTrackingPosition(false);  // carte fixe, ne suit pas le joueur
+            sharedView.setUnlimitedTracking(true);  // affiche le terrain même non exploré
+            // Retirer le renderer par défaut (qui dessine le terrain déjà chargé)
+            // et ajouter notre renderer de curseurs
+            for (MapRenderer r : sharedView.getRenderers()) sharedView.removeRenderer(r);
+            sharedView.addRenderer(new TerrainRenderer());
             sharedView.addRenderer(new CursorRenderer());
         }
         ItemStack map = new ItemStack(Material.FILLED_MAP);
@@ -117,6 +120,76 @@ public class MinimapManager implements Listener {
         Player p = e.getPlayer();
         if (WorldContext.isInGameWorld(p)) giveMinimap(p);
         else removeMinimap(p);
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    // RENDU DU TERRAIN (non contextuel — dessiné une seule fois)
+    // ──────────────────────────────────────────────────────────────
+    private class TerrainRenderer extends MapRenderer {
+        private boolean rendered = false;
+
+        TerrainRenderer() { super(false); } // non contextuel = rendu une fois pour tous
+
+        @Override
+        public void render(MapView map, MapCanvas canvas, Player viewer) {
+            if (rendered) return;
+            rendered = true;
+
+            World w = map.getWorld();
+            if (w == null) return;
+
+            int blocksPerPixel = switch (scale) {
+                case CLOSEST -> 1; case CLOSE -> 2; case NORMAL -> 4;
+                case FAR -> 8; default -> 16; // FARTHEST
+            };
+
+            // La carte fait 128×128 pixels
+            for (int px = 0; px < 128; px++) {
+                for (int pz = 0; pz < 128; pz++) {
+                    int worldX = centerX + (px - 64) * blocksPerPixel;
+                    int worldZ = centerZ + (pz - 64) * blocksPerPixel;
+
+                    // Lire la couleur du bloc de surface
+                    byte color = getSurfaceColor(w, worldX, worldZ);
+                    canvas.setPixel(px, pz, color);
+                }
+            }
+        }
+
+        /** Retourne la couleur MapColor du bloc de surface à (x, z). */
+        private byte getSurfaceColor(World w, int x, int z) {
+            try {
+                int y = w.getHighestBlockYAt(x, z);
+                var block = w.getBlockAt(x, y, z);
+                // Utiliser la couleur MapPalette du matériau
+                return org.bukkit.map.MapPalette.getColor(block.getType().createBlockData().hashCode() % 0xFF == 0
+                    ? java.awt.Color.GRAY : blockToColor(block.getType()));
+            } catch (Exception e) {
+                return (byte) 0; // transparent/blanc si hors chunk
+            }
+        }
+
+        private java.awt.Color blockToColor(Material mat) {
+            return switch (mat) {
+                case GRASS_BLOCK, SHORT_GRASS, TALL_GRASS -> new java.awt.Color(80, 150, 50);
+                case DIRT, ROOTED_DIRT, COARSE_DIRT       -> new java.awt.Color(120, 80, 50);
+                case STONE, COBBLESTONE, DEEPSLATE         -> new java.awt.Color(100, 100, 100);
+                case SAND, SANDSTONE                       -> new java.awt.Color(220, 200, 140);
+                case WATER                                 -> new java.awt.Color(50, 80, 180);
+                case LAVA                                  -> new java.awt.Color(220, 80, 20);
+                case WOOD, OAK_LOG, SPRUCE_LOG, BIRCH_LOG -> new java.awt.Color(100, 65, 30);
+                case OAK_LEAVES, SPRUCE_LEAVES, BIRCH_LEAVES,
+                     JUNGLE_LEAVES, ACACIA_LEAVES          -> new java.awt.Color(40, 120, 30);
+                case SNOW, SNOW_BLOCK                      -> new java.awt.Color(230, 240, 255);
+                case ICE, PACKED_ICE                       -> new java.awt.Color(150, 180, 220);
+                case OBSIDIAN                              -> new java.awt.Color(20, 10, 30);
+                case GOLD_BLOCK                            -> new java.awt.Color(230, 200, 40);
+                case IRON_BLOCK                            -> new java.awt.Color(190, 190, 190);
+                case DIAMOND_BLOCK                         -> new java.awt.Color(70, 210, 200);
+                case AIR, CAVE_AIR, VOID_AIR               -> new java.awt.Color(50, 50, 50);
+                default                                    -> new java.awt.Color(128, 128, 128);
+            };
+        }
     }
 
     // ──────────────────────────────────────────────────────────────
