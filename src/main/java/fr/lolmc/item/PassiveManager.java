@@ -1316,6 +1316,13 @@ public class PassiveManager {
         return false;
     }
 
+    /** Retourne true si le joueur est sous Grievous Wounds (anti-heal -50%). */
+    public boolean hasGrievousWounds(Player target) {
+        var st = getState(target);
+        return st.antihealTargets.containsKey(target.getUniqueId())
+            && st.antihealTargets.get(target.getUniqueId()) > System.currentTimeMillis();
+    }
+
     public boolean isReviving(java.util.UUID uuid) {
         return states.containsKey(uuid) && states.get(uuid).gaActive;
     }

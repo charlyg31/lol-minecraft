@@ -33,6 +33,8 @@ public class GameManager {
     public fr.lolmc.instance.GameInstance getGameInstance() { return gameInstance; }
 
     private boolean gameRunning = false;
+    private final java.util.Map<java.util.UUID, PlayerSnapshot> snapshots
+        = new java.util.concurrent.ConcurrentHashMap<>();
     // Tâches BukkitTask stockées pour annulation explicite
     private org.bukkit.scheduler.BukkitTask timerTask;
     private org.bukkit.scheduler.BukkitTask passiveGoldTask;

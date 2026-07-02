@@ -154,23 +154,48 @@ public class RewardManager {
         grantXP(player, xp);
     }
 
+    /**
+     * Soigne un allié en tenant compte du Healing Power (items/runes support).
+     * À appeler depuis les sorts/items qui soignent (Redemption, Moonstone, Heal, etc.)
+     * @param healer  le joueur qui soigne (source du buff)
+     * @param target  le joueur soigné
+     * @param baseHeal montant brut de soin
+     */
+    public static double applyHealPower(Player healer, Player target, double baseHeal) {
+        var cm = LolPlugin.getInstance().getChampionManager();
+        if (!cm.hasChampion(healer) || !cm.hasChampion(target)) return baseHeal;
+        var healerStats = cm.getChampion(healer).getStats();
+        double healPower = 1.0 + healerStats.getHealShieldPower(); // ex: 1.15 si +15%
+        double finalHeal = baseHeal * healPower;
+        // Anti-heal (Grievous Wounds) côté cible
+        var pm = LolPlugin.getInstance().getPassiveManager();
+        if (pm != null && pm.hasGrievousWounds(target)) finalHeal *= 0.50;
+        cm.getChampion(target).getHPSystem().heal(finalHeal);
+        return finalHeal;
+    }
+
     private void grantXP(Player player, double xp) {
         BaseChampion champ = championManager.getChampion(player);
         int levelsGained = champ.getLevelSystem().addXP(xp);
         if (levelsGained > 0) {
             int newLevel = champ.getLevelSystem().getLevel();
-            // Synchroniser le niveau avec les stats (déclenche la croissance LoL)
             champ.getStats().setChampionLevel(newLevel);
+            // Titre + son + particules level-up
             player.showTitle(net.kyori.adventure.title.Title.title(
-                    net.kyori.adventure.text.Component.empty(),
-                    net.kyori.adventure.text.Component.text("⬆ Niveau " + newLevel,
-                        net.kyori.adventure.text.format.NamedTextColor.GREEN),
-                    net.kyori.adventure.title.Title.Times.times(
-                        java.time.Duration.ofMillis(250),
-                        java.time.Duration.ofMillis(1500),
-                        java.time.Duration.ofMillis(500))));
-            player.playSound(player.getLocation(),
-                    org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 1f, 1f);
+                net.kyori.adventure.text.Component.text("⬆ NIVEAU " + newLevel,
+                    net.kyori.adventure.text.format.NamedTextColor.GOLD,
+                    net.kyori.adventure.text.format.Style.style(
+                        net.kyori.adventure.text.format.TextDecoration.BOLD)),
+                net.kyori.adventure.text.Component.text(
+                    champ.getLevelSystem().getSkillPoints() + " point(s) — clique droit sur Q/W/E/R",
+                    net.kyori.adventure.text.format.NamedTextColor.YELLOW),
+                net.kyori.adventure.title.Title.Times.times(
+                    java.time.Duration.ofMillis(200),
+                    java.time.Duration.ofMillis(2500),
+                    java.time.Duration.ofMillis(500))));
+            player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 1f, 1.1f);
+            player.getWorld().spawnParticle(org.bukkit.Particle.TOTEM_OF_UNDYING,
+                player.getLocation().add(0,1,0), 40, 0.5, 0.8, 0.5);
             // Faire clignoter les sorts désormais améliorables
             var listener = LolPlugin.getInstance().getAbilityListener();
             if (listener != null) listener.updateAbilityGlow(player, champ);

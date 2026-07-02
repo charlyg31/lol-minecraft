@@ -76,7 +76,12 @@ public class ShopGUI {
         detailItem.remove(player.getUniqueId());
         currentCategory.put(player.getUniqueId(), cat);
 
-        List<LolItem> items = ItemRegistry.byCategory(cat);
+        String search = currentSearch.getOrDefault(player.getUniqueId(), "").toLowerCase().trim();
+        List<LolItem> items = ItemRegistry.byCategory(cat).stream()
+            .filter(it -> search.isEmpty()
+                || it.getDisplayName().toLowerCase().contains(search)
+                || it.getId().toLowerCase().contains(search))
+            .toList();
         int totalPages = Math.max(1, (items.size() + ITEMS_PER_PAGE - 1) / ITEMS_PER_PAGE);
         page = Math.max(0, Math.min(page, totalPages - 1));
         currentPage.put(player.getUniqueId(), page);
@@ -124,6 +129,8 @@ public class ShopGUI {
             }
         }
 
+        // Slot 53 : filtre texte actuel
+        inv.setItem(53, searchButton(currentSearch.getOrDefault(player.getUniqueId(), "")));
         // Remplir les vides
         for (int i = 0; i < 54; i++) if (inv.getItem(i) == null) inv.setItem(i, filler);
         player.openInventory(inv);
@@ -255,7 +262,12 @@ public class ShopGUI {
     public boolean handlePaginationClick(Player player, int slot) {
         LolItem.ItemCategory cat = getCurrentCategory(player);
         int page = getPage(player);
-        List<LolItem> items = ItemRegistry.byCategory(cat);
+        String search = currentSearch.getOrDefault(player.getUniqueId(), "").toLowerCase().trim();
+        List<LolItem> items = ItemRegistry.byCategory(cat).stream()
+            .filter(it -> search.isEmpty()
+                || it.getDisplayName().toLowerCase().contains(search)
+                || it.getId().toLowerCase().contains(search))
+            .toList();
         int totalPages = Math.max(1, (items.size() + ITEMS_PER_PAGE - 1) / ITEMS_PER_PAGE);
 
         if (slot == NAV_PREV  && page > 0)               { open(player, cat, page - 1); return true; }
@@ -291,10 +303,18 @@ public class ShopGUI {
         return null;
     }
 
+    private final Map<UUID, String> currentSearch = new HashMap<>();
+
+    public void setSearch(Player player, String query) {
+        currentSearch.put(player.getUniqueId(), query.toLowerCase().trim());
+        open(player, getCurrentCategory(player), 0);
+    }
+
     public void cleanup(Player player) {
         UUID id = player.getUniqueId();
         slotToItemId.remove(id); currentCategory.remove(id);
         currentPage.remove(id); detailItem.remove(id); detailNav.remove(id);
+        currentSearch.remove(id);
     }
 
     public static boolean isShopInventory(Component title) {
@@ -306,6 +326,42 @@ public class ShopGUI {
     // ══════════════════════════════════════════════════════════════
     // HELPERS VISUELS
     // ══════════════════════════════════════════════════════════════
+
+    private ItemStack searchButton(String current) {
+        ItemStack item = new ItemStack(Material.COMPASS);
+        ItemMeta m = item.getItemMeta();
+        if (m == null) return item;
+        String label = current.isEmpty() ? "🔍 Rechercher un item..." : "🔍 Filtre: " + current;
+        m.displayName(Component.text(label, NamedTextColor.AQUA)
+            .decoration(TextDecoration.ITALIC, false));
+        if (!current.isEmpty()) {
+            m.lore(List.of(
+                Component.text("Clic droit → effacer le filtre", NamedTextColor.GRAY)
+                    .decoration(TextDecoration.ITALIC, false)));
+        }
+        item.setItemMeta(m);
+        return item;
+    }
+
+    public static final int SEARCH_SLOT = 53;
+
+    public boolean handleSearchClick(Player player, int slot, boolean rightClick) {
+        if (slot != SEARCH_SLOT) return false;
+        if (rightClick) {
+            currentSearch.remove(player.getUniqueId());
+            open(player, getCurrentCategory(player), 0);
+        } else {
+            // Demander au joueur de taper dans le chat
+            player.closeInventory();
+            player.sendMessage(Component.text(
+                "🔍 Tape le nom de l'item à rechercher dans le chat (ou 'annuler'):",
+                NamedTextColor.AQUA));
+            LolPlugin.getInstance().getShopListener().awaitSearchInput(player);
+        }
+        return true;
+    }
+
+    public boolean isSearchSlot(int slot) { return slot == SEARCH_SLOT; }
 
     private ItemStack tabButton(LolItem.ItemCategory cat, boolean selected) {
         Material mat = switch (cat) {

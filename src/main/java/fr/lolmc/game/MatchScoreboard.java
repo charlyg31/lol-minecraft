@@ -70,6 +70,30 @@ public class MatchScoreboard {
      * @param winner équipe gagnante
      */
     private void appendTeamScores(List<Component> lines, Team team, fr.lolmc.team.TeamManager tm) {
+        // Entête équipe
+        String teamName = team == Team.BLUE ? "§9═══ Équipe Bleue ═══" : "§c═══ Équipe Rouge ═══";
+        lines.add(Component.text(teamName));
+        // En-tête colonnes
+        lines.add(Component.text(
+            String.format("  %-16s %5s %5s %5s %5s %8s %8s",
+                "Joueur", "K", "D", "A", "CS", "Or", "Dégâts"),
+            NamedTextColor.GRAY));
+        for (UUID id : tm.getTeamMembers(team)) {
+            var ms = stats.get(id);
+            if (ms == null) continue;
+            var cm = LolPlugin.getInstance().getChampionManager();
+            String champName = cm.hasChampion(Bukkit.getPlayer(id))
+                ? cm.getChampion(Bukkit.getPlayer(id)).getDisplayName() : "?";
+            lines.add(Component.text(String.format(
+                "  %-8s %-8s %5d %5d %5d %5d %8d %8d",
+                ms.name.length() > 8 ? ms.name.substring(0,8) : ms.name,
+                champName.length() > 8 ? champName.substring(0,8) : champName,
+                ms.kills, ms.deaths, ms.assists, ms.cs, ms.gold, (int)ms.damageDealt),
+                team == Team.BLUE ? NamedTextColor.AQUA : NamedTextColor.RED));
+        }
+    }
+
+    private void appendTeamScores_OLD(List<Component> lines, Team team, fr.lolmc.team.TeamManager tm) {
         lines.add(Component.text("── Équipe " + (team == Team.BLUE ? "Bleue" : "Rouge") + " ──",
                 team.chatColor));
         for (UUID id : tm.getTeamMembers(team)) {
