@@ -234,26 +234,76 @@ public class AbilityListener implements Listener {
         fr.lolmc.util.DebugLogger.log("LeftClickCast", "slot=" + slot + " caster=" + caster.getName());
 
         if (slot == 0) {
-            // Slot 0 = auto-attaque : cherche la cible visée
+            var aam = LolPlugin.getInstance().getAutoAttackManager();
+
+            // 1. Joueur ennemi visé
             Player aimed = target != null ? target : getTargetedPlayer(caster);
             if (aimed != null) {
-                LolPlugin.getInstance().getAutoAttackManager().tryAutoAttack(caster, aimed);
-            } else {
-                // Aucun joueur visé — chercher une structure ennemie dans la portée AA
-                tryAttackStructure(caster);
+                aam.tryAutoAttack(caster, aimed);
+                return;
             }
+
+            // 2. Entité (sbire, monstre de jungle) visée dans la portée AA
+            org.bukkit.entity.LivingEntity entity = getTargetedEntity(caster);
+            if (entity != null) {
+                aam.tryAutoAttackEntity(caster, entity);
+                return;
+            }
+
+            // 3. Structure ennemie dans la portée AA
+            if (tryAttackStructure(caster)) return;
+
+            // 4. Rien visé — jouer l'animation dans le vide (ADC/Mage uniquement)
+            if (aam.canAutoAttack(caster)) {
+                var champ = manager.getChampion(caster);
+                var aaType = AutoAttackManager.getAAType(champ);
+                if (aaType != AutoAttackManager.AAType.MELEE) {
+                    aam.triggerCooldown(caster);
+                    // Tir dans la direction du regard
+                    Location aim = caster.getEyeLocation()
+                        .add(caster.getEyeLocation().getDirection().multiply(15));
+                    aam.playAnimationToLocation(caster, aim, aaType, false);
+                }
+            }
+
         } else if (slot >= 1 && slot <= 4) {
-            // Lancer le sort, avec la cible visée s'il y en a une
             Player aimed = target != null ? target : getTargetedPlayer(caster);
             manager.getChampion(caster).tryUseAbility(caster, slot, aimed);
         }
     }
 
     /**
-     * Cherche la structure ennemie la plus proche dans la portée AA du joueur
-     * et l'attaque si elle est visée (angle ≤ 45°).
+     * Cherche une entité non-joueur visée (sbire, monstre) dans la portée AA.
      */
-    private void tryAttackStructure(Player caster) {
+    private org.bukkit.entity.LivingEntity getTargetedEntity(Player caster) {
+        if (!manager.hasChampion(caster)) return null;
+        double range = manager.getChampion(caster).getAutoAttackRange();
+        var eye = caster.getEyeLocation();
+        var dir = eye.getDirection();
+        org.bukkit.entity.LivingEntity closest = null;
+        double closestDist = Double.MAX_VALUE;
+
+        for (var entity : caster.getWorld().getNearbyEntities(
+                caster.getLocation(), range, range, range)) {
+            if (!(entity instanceof org.bukkit.entity.LivingEntity le)) continue;
+            if (entity instanceof Player) continue; // les joueurs sont gérés par getTargetedPlayer
+            if (entity.equals(caster)) continue;
+            double dist = entity.getLocation().distance(caster.getLocation());
+            if (dist > range) continue;
+            // Angle vers l'entité
+            var toTarget = entity.getLocation().add(0,1,0).toVector()
+                    .subtract(eye.toVector()).normalize();
+            if (dir.dot(toTarget) < 0.7) continue;
+            if (dist < closestDist) { closestDist = dist; closest = le; }
+        }
+        return closest;
+    }
+
+    /**
+     * Cherche la structure ennemie visée dans la portée AA et l'attaque.
+     * @return true si une structure a été attaquée
+     */
+    private boolean tryAttackStructure(Player caster) {
         if (!manager.hasChampion(caster)) return;
         var champ = manager.getChampion(caster);
         double range = champ.getAutoAttackRange();
@@ -280,17 +330,15 @@ public class AbilityListener implements Listener {
             if (dist < closestDist) { closestDist = dist; closest = structure; }
         }
 
-        if (closest == null) return;
+        if (closest == null) return false;
 
-        // Vérifier la cadence AA (même cooldown que les AA sur champions)
         var aam = LolPlugin.getInstance().getAutoAttackManager();
-        if (!aam.canAutoAttack(caster)) return;
+        if (!aam.canAutoAttack(caster)) return false;
         aam.triggerCooldown(caster);
 
-        // Infliger les dégâts AA à la structure
-        final var target = closest;
         var sdl = LolPlugin.getInstance().getStructureDamageListener();
-        if (sdl != null) sdl.applyAutoAttackDamage(caster, target);
+        if (sdl != null) sdl.applyAutoAttackDamage(caster, closest);
+        return true;
     }
 
     /** Trouve le joueur visé par le caster (raycast simple, portée 30 blocs). */
