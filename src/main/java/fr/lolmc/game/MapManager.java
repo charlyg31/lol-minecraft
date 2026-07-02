@@ -147,14 +147,16 @@ public class MapManager {
                     config.getInt(path + "z"));
             Type type = Type.valueOf(config.getString(path + "type"));
             Team team = Team.valueOf(config.getString(path + "team"));
-            String lane = config.getString(path + "lane");
-            int index = config.getInt(path + "index");
+            String lane  = config.getString(path + "lane");
+            int index    = config.getInt(path + "index");
 
-            String baseName = schematicBaseName(type, team);
+            // Nom de base avec fallback : TurretBlue_top_1 → TurretBlue_top → TurretBlue
+            // Permet d'avoir des schémas différents par tour sans tout redéfinir.
+            File folder = new File(LolPlugin.getInstance().getDataFolder(), "schematics");
+            String baseName = schematicBaseName(type, team, lane, index, folder);
 
             // CORRECTION : Instanciation et extraction dynamique des objets GameStructure.Phase
             List<GameStructure.Phase> phases = new ArrayList<>();
-            File folder = new File(LolPlugin.getInstance().getDataFolder(), "schematics");
 
             if (folder.exists() && folder.isDirectory()) {
                 File[] files = folder.listFiles((dir, name) -> name.startsWith(baseName) && name.endsWith(".json"));
@@ -281,13 +283,52 @@ public class MapManager {
         return type.name().toLowerCase() + "_" + team.name().toLowerCase() + "_" + lane + "_" + index;
     }
 
+    /**
+     * Résout le nom de base du schéma en cherchant du plus spécifique au plus générique.
+     *
+     * Priorité (exemple pour TurretBlue, lane=top, index=1) :
+     *   1. TurretBlue_top_1   ← schéma unique pour cette tour précise
+     *   2. TurretBlue_top     ← schéma commun à toutes les tours top bleues
+     *   3. TurretBlue         ← schéma générique pour toutes les tours bleues
+     *
+     * Le dossier schematics/ doit contenir au moins TurretBlue.json (ou similaire).
+     */
+    private String schematicBaseName(Type type, Team team, String lane, int index, File folder) {
+        String teamName = (team == Team.BLUE) ? "Blue" : "Red";
+        String root = switch (type) {
+            case TURRET     -> "Turret"     + teamName;
+            case INHIBITOR  -> "Inhibitor"  + teamName;
+            case NEXUS      -> "Nexus"      + teamName;
+            case NEXUS_BASE -> "NexusBase"  + teamName;
+        };
+
+        // Chercher du plus spécifique au plus générique
+        String[] candidates = {
+            root + "_" + lane + "_" + index,  // TurretBlue_top_1
+            root + "_" + lane,                 // TurretBlue_top
+            root                               // TurretBlue
+        };
+
+        if (folder.exists() && folder.isDirectory()) {
+            for (String candidate : candidates) {
+                // Vérifier qu'au moins un fichier .json commence par ce nom
+                File[] match = folder.listFiles((d, n) ->
+                    n.startsWith(candidate) && n.endsWith(".json"));
+                if (match != null && match.length > 0) return candidate;
+            }
+        }
+        // Aucun schéma trouvé → retourner le nom générique (sera géré par phases.isEmpty())
+        return root;
+    }
+
+    // Ancienne signature conservée pour compatibilité interne
     private String schematicBaseName(Type type, Team team) {
         String teamName = (team == Team.BLUE) ? "Blue" : "Red";
         return switch (type) {
-            case TURRET -> "Turret" + teamName;
-            case INHIBITOR -> "Inhibitor" + teamName;
-            case NEXUS -> "Nexus" + teamName;
-            case NEXUS_BASE -> "NexusBase" + teamName;
+            case TURRET     -> "Turret"     + teamName;
+            case INHIBITOR  -> "Inhibitor"  + teamName;
+            case NEXUS      -> "Nexus"      + teamName;
+            case NEXUS_BASE -> "NexusBase"  + teamName;
         };
     }
 
