@@ -137,12 +137,21 @@ public class AutoAttackManager {
     // ANIMATIONS
     // ════════════════════════════════════════════════════════
 
+    /** Joue l'animation vers une position (tir dans le vide). */
+    public void playAnimationToLocation(Player attacker, Location target, AAType type, boolean crit) {
+        switch (type) {
+            case ADC  -> playADCAnimation(attacker, target);
+            case MAGE -> playMageAnimation(attacker, target);
+            default   -> {} // mêlée : pas d'animation dans le vide
+        }
+    }
+
     /** Joue l'animation d'AA appropriée entre attaquant et cible. */
     private void playAnimation(Player attacker, LivingEntity target, AAType type, boolean crit) {
         switch (type) {
             case MELEE -> playMeleeAnimation(attacker, target, crit);
-            case MAGE  -> playMageAnimation(attacker, target, crit);
-            case ADC   -> playADCAnimation(attacker, target, crit);
+            case MAGE  -> playMageAnimationLE(attacker, target, crit);
+            case ADC   -> playADCAnimationLE(attacker, target, crit);
         }
     }
 
@@ -180,9 +189,16 @@ public class AutoAttackManager {
      * Traînée WITCH_MAGIC_PARTICLE + explosion ENCHANT à l'impact.
      * L'orbe est simulée en ticks (BukkitRunnable) pour un effet fluide.
      */
-    private void playMageAnimation(Player attacker, LivingEntity target, boolean crit) {
+    // Surcharges Location (pour tir dans le vide ou vers une structure)
+    private void playMageAnimation(Player attacker, Location end) {
+        playMageAnimation(attacker, end, false);
+    }
+    private void playADCAnimation(Player attacker, Location end) {
+        playADCAnimation(attacker, end, false);
+    }
+
+    private void playMageAnimation(Player attacker, Location end, boolean crit) {
         Location start = attacker.getEyeLocation();
-        Location end   = target.getLocation().add(0, 1, 0);
         World world = attacker.getWorld();
 
         double totalDist = start.distance(end);
@@ -231,9 +247,12 @@ public class AutoAttackManager {
      * ADC : projectile physique rapide (flèche / balle) en CRIT + traînée blanche.
      * Plus rapide que l'orbe mage : avance de 0.6 blocs/tick.
      */
-    private void playADCAnimation(Player attacker, LivingEntity target, boolean crit) {
+    private void playMageAnimationLE(Player attacker, LivingEntity target, boolean crit) {
+        playMageAnimation(attacker, target.getLocation().add(0,1,0), crit);
+    }
+
+    private void playADCAnimation(Player attacker, Location end, boolean crit) {
         Location start = attacker.getEyeLocation();
-        Location end   = target.getLocation().add(0, 1, 0);
         World world = attacker.getWorld();
 
         double totalDist = start.distance(end);
@@ -276,6 +295,10 @@ public class AutoAttackManager {
         world.playSound(attacker.getLocation(),
                 crit ? Sound.ENTITY_ARROW_SHOOT : Sound.ENTITY_ARROW_SHOOT, 0.8f,
                 crit ? 0.9f : 1.1f);
+    }
+
+    private void playADCAnimationLE(Player attacker, LivingEntity target, boolean crit) {
+        playADCAnimation(attacker, target.getLocation().add(0,1,0), crit);
     }
 
     // ════════════════════════════════════════════════════════
