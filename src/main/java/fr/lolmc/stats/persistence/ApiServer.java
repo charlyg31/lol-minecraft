@@ -236,7 +236,6 @@ public class ApiServer {
     }
 
     /** GET /api/online */
-    private void handleOnline(HttpExchange ex) throws java.io.IOException {    /** GET /api/online */
     private void handleOnline(HttpExchange ex) throws java.io.IOException {
         if (!isAuthorized(ex)) { respond(ex, 401, err("unauthorized")); return; }
         StringBuilder json = new StringBuilder("{\"online\":[");
