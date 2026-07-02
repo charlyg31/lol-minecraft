@@ -254,6 +254,8 @@ public class BungeeQueueManager {
             sb.append("\"}");
             sendPluginMessage(carrier, gameServer, sb.toString());
             plugin.getLogger().info("[Queue] GAME_READY envoyé pour " + allPlayers.size() + " joueurs (ranked=" + isRanked + ")");
+            // Remettre ranked-mode à false après usage (par défaut non-ranked)
+            if (isRanked) plugin.setRankedMode(false);
         }, 6, TimeUnit.SECONDS);
     }
 
