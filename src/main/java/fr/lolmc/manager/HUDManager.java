@@ -226,6 +226,17 @@ public class HUDManager {
         syncMinecraftHP(player, hp);
     }
 
+    public void triggerDeath(Player victim, Player killer) {
+        // Éviter de déclencher deux fois si déjà en spectateur
+        if (victim.getGameMode() == org.bukkit.GameMode.SPECTATOR) return;
+        onDeath(victim);
+        // Déclencher l'event de mort pour EntityDeathListener (rewards, assists)
+        LolPlugin.getInstance().getServer().getScheduler().runTask(LolPlugin.getInstance(), () -> {
+            victim.setHealth(0.0001);
+            // setHealth(0) déclenche EntityDeathEvent → géré par EntityDeathListener
+        });
+    }
+
     private void onDeath(Player player) {
         var plugin = LolPlugin.getInstance();
         var tm = plugin.getTeamManager();
