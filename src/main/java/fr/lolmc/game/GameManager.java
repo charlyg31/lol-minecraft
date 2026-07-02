@@ -229,10 +229,21 @@ public class GameManager {
                 if (!gameRunning || timerBar == null) return;
                 long secs = getElapsedSeconds();
                 String time = String.format("%02d:%02d", secs / 60, secs % 60);
-                timerBar.name(Component.text("⏱ Partie — " + time, NamedTextColor.WHITE));
-                // S'assurer que les nouveaux joueurs voient la barre
+                timerBar.name(Component.text("⏱ " + time, NamedTextColor.WHITE));
+                // Mettre à jour la BossBar pour chaque joueur avec son CS et or
                 for (Player p : WorldContext.getGamePlayers()) {
                     p.showBossBar(timerBar);
+                    var msb = LolPlugin.getInstance().getMatchScoreboard();
+                    if (msb != null) {
+                        var stats = msb.getStats().get(p.getUniqueId());
+                        var gm2 = LolPlugin.getInstance().getGoldManager();
+                        int gold = gm2 != null ? gm2.getGold(p.getUniqueId()) : 0;
+                        int cs = stats != null ? stats.cs : 0;
+                        // BossBar personnalisée par joueur via titre d'action bar
+                        p.sendActionBar(Component.text(
+                            String.format("⏱ %s  |  CS %d  |  💰 %d or", time, cs, gold),
+                            NamedTextColor.WHITE));
+                    }
                 }
             }
         }.runTaskTimer(LolPlugin.getInstance(), 20L, 20L);
