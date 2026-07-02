@@ -46,6 +46,22 @@ public class ShopListener implements Listener {
     /** Ouvre la boutique pour un joueur (appelable depuis /lol shop). */
     public void openShop(Player player) { shopGUI.open(player); }
 
+    private final java.util.Set<java.util.UUID> awaitingSearch =
+        java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
+    public void awaitSearchInput(Player p) { awaitingSearch.add(p.getUniqueId()); }
+
+    @org.bukkit.event.EventHandler
+    public void onChatSearch(org.bukkit.event.player.AsyncPlayerChatEvent e) {
+        if (!awaitingSearch.remove(e.getPlayer().getUniqueId())) return;
+        e.setCancelled(true);
+        String msg = e.getMessage().trim();
+        Player p = e.getPlayer();
+        org.bukkit.Bukkit.getScheduler().runTask(LolPlugin.getInstance(), () -> {
+            if (msg.equalsIgnoreCase("annuler")) shopGUI.open(p);
+            else shopGUI.setSearch(p, msg);
+        });
+    }
+
     // ── Initialiser l'inventaire d'un joueur ──────────────────────
     public PlayerInventoryManager getOrCreate(Player player) {
         return inventoryManagers.computeIfAbsent(

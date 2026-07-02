@@ -103,6 +103,10 @@ public class ChampionStats {
     public double getFinalAP()           { return (baseAbilityPower + bonusAbilityPower) * multAbilityPower; }
     public double getFinalArmor()        { return baseArmor + growthBonus(growthArmor) + bonusArmor; }
     public double getFinalMagicResist()  { return baseMagicResist + growthBonus(growthMR) + bonusMagicResist; }
+    private double healShieldPower = 0.0;
+    public double getHealShieldPower() { return healShieldPower; }
+    public void addHealShieldPower(double v) { healShieldPower = Math.max(0, healShieldPower + v); }
+
     public double getFinalAttackSpeed()  { return Math.min((baseAttackSpeed + growthBonus(growthAttackSpeed) + bonusAttackSpeed) * multAttackSpeed, 2.5); }
     public double getFinalCritChance()   { return Math.min(baseCritChance + bonusCritChance, 1.0); }
     public double getFinalCritDamage()   { return baseCritDamage + bonusCritDamage; }

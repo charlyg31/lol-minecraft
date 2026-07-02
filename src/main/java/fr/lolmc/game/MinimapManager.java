@@ -231,6 +231,19 @@ public class MinimapManager implements Listener {
                 addCursor(cursors, other.getLocation(), directionFromYaw(other.getLocation().getYaw()), type);
             }
 
+            // Wards alliées (curseurs verts) et wards révélées (curseurs rouges)
+            var wm = LolPlugin.getInstance().getWardManager();
+            if (wm != null && myTeam != null) {
+                for (var ward : wm.getAllWards()) {
+                    boolean isAlly = ward.getTeam() == myTeam;
+                    boolean isRevealed = wm.isRevealed(ward);
+                    if (isAlly || isRevealed) {
+                        MapCursor.Type wType = isAlly ? MapCursor.Type.GREEN_MARKER : MapCursor.Type.RED_MARKER;
+                        addCursor(cursors, ward.getLocation(), (byte)0, wType);
+                    }
+                }
+            }
+
             // Pings de mon équipe
             if (myTeam != null) {
                 List<Ping> list = pings.get(myTeam);

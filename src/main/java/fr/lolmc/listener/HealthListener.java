@@ -90,7 +90,34 @@ public class HealthListener implements Listener {
 
     // ── À la connexion → désactiver regen vanilla ─────────────────
     @EventHandler
+    public void onQuit(org.bukkit.event.player.PlayerQuitEvent e) {
+        Player p = e.getPlayer();
+        var gm = LolPlugin.getInstance().getGameManager();
+        if (gm != null && gm.isGameRunning()
+                && LolPlugin.getInstance().getChampionManager().hasChampion(p)) {
+            gm.saveSnapshot(p);
+        }
+    }
+
+    @EventHandler
     public void onJoin(PlayerJoinEvent e) {
+        Player p = e.getPlayer();
+        // Reconnexion mid-game : restaurer l'état sauvegardé
+        var gm = LolPlugin.getInstance().getGameManager();
+        if (gm != null && gm.isGameRunning()) {
+            var snap = gm.getPlayerSnapshot(p.getUniqueId());
+            if (snap != null) {
+                // Attendre 1 tick que le joueur soit complètement connecté
+                new org.bukkit.scheduler.BukkitRunnable() {
+                    @Override public void run() {
+                        snap.restore(p);
+                        p.sendMessage(net.kyori.adventure.text.Component.text(
+                            "✔ Reconnexion — état restauré.", net.kyori.adventure.text.format.NamedTextColor.GREEN));
+                    }
+                }.runTaskLater(LolPlugin.getInstance(), 20L);
+                return;
+            }
+        }
         Player p = e.getPlayer();
         // Désactiver la regen naturelle de Minecraft
         p.setFoodLevel(20);

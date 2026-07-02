@@ -231,7 +231,34 @@ public class SummonerSpellManager {
             }
         }
 
-        // 2. Fallback : TP vers la base de l'equipe
+        // 2. Chercher un sbire allié visé (dans la direction du regard, portée 50 blocs)
+        if (team != null) {
+            var eye = caster.getEyeLocation();
+            var dir = eye.getDirection().normalize();
+            org.bukkit.entity.LivingEntity minionTarget = null;
+            double bestDot = 0.85;
+            for (var e : caster.getNearbyEntities(50, 50, 50)) {
+                if (!(e instanceof org.bukkit.entity.LivingEntity le)) continue;
+                if (!fr.lolmc.game.MinionManager.isMinion(le)) continue;
+                if (fr.lolmc.game.MinionManager.getMinionTeam(le) != team) continue;
+                var toE = e.getLocation().add(0,1,0).toVector().subtract(eye.toVector()).normalize();
+                double dot = dir.dot(toE);
+                if (dot > bestDot) { bestDot = dot; minionTarget = le; }
+            }
+            if (minionTarget != null) {
+                final var ft = minionTarget;
+                caster.sendActionBar(Component.text("🌀 Téléportation → sbire allié dans 4s...", NamedTextColor.AQUA));
+                new org.bukkit.scheduler.BukkitRunnable() {
+                    @Override public void run() {
+                        if (caster.isOnline() && ft.isValid())
+                            caster.teleportAsync(ft.getLocation().add(0,0.1,0));
+                    }
+                }.runTaskLater(LolPlugin.getInstance(), 80L);
+                return true;
+            }
+        }
+
+        // 3. Fallback : TP vers la base de l'equipe
         var base = mapMgr != null && team != null ? mapMgr.getSpawn(team, 0) : null;
         if (base != null && caster.isOnline()) {
             caster.sendActionBar(net.kyori.adventure.text.Component.text(
@@ -252,8 +279,36 @@ public class SummonerSpellManager {
     // ── Châtiment : dégâts bruts à un monstre proche (LoL: 600 vrais) ──
 
     private boolean castSmite(Player caster) {
-        // Portée Smite : 500 unités = 5 blocs
         double range = LolUnits.toBlocks(500);
+        // Smite upgradé : vérifier l'item jungle équipé
+        var inv = LolPlugin.getInstance().getShopListener().getOrCreate(caster);
+        boolean hasMosstomper = inv.hasItem("smite_mosstomper") || inv.hasItem("mosstomper");
+        boolean hasGustwalker = inv.hasItem("smite_stalker") || inv.hasItem("gustwalker");
+        boolean hasBluesmite  = inv.hasItem("smite_blue")    || inv.hasItem("bluesmite");
+
+        // Châtiment rouge (Mosstomper/Bluesmite) → peut cibler les joueurs ennemis
+        if ((hasMosstomper || hasBluesmite)) {
+            // Chercher d'abord un ennemi joueur dans la portée
+            Player enemyTarget = null;
+            double closestEnemy = range;
+            var tm = LolPlugin.getInstance().getTeamManager();
+            for (Player p : caster.getWorld().getPlayers()) {
+                if (!tm.areEnemies(caster, p)) continue;
+                double d = p.getLocation().distance(caster.getLocation());
+                if (d < closestEnemy) { closestEnemy = d; enemyTarget = p; }
+            }
+            if (enemyTarget != null && LolPlugin.getInstance().getChampionManager().hasChampion(enemyTarget)) {
+                var ec = LolPlugin.getInstance().getChampionManager().getChampion(enemyTarget);
+                double dmg = 600;
+                ec.getHPSystem().takeDamage(dmg);
+                enemyTarget.sendActionBar(Component.text("💀 Châtiment ennemi! -600", NamedTextColor.RED));
+                caster.sendActionBar(Component.text("⚔ Châtiment → " + enemyTarget.getName() + "!", NamedTextColor.RED));
+                caster.getWorld().spawnParticle(Particle.CRIT, enemyTarget.getLocation().add(0,1,0), 20, 0.4,0.4,0.4);
+                return true;
+            }
+        }
+
+        // Châtiment normal : cibler un monstre de jungle
         LivingEntity target = null;
         double closest = Double.MAX_VALUE;
         for (var e : caster.getNearbyEntities(range, range, range)) {
@@ -266,11 +321,19 @@ public class SummonerSpellManager {
             caster.sendActionBar(Component.text("⚔ Aucun monstre à châtier", NamedTextColor.GRAY));
             return false;
         }
-        // Châtiment = dégâts bruts ; sécurise l'objectif (crédit/or au lanceur)
         double smiteDamage = 600;
+        // Gustwalker : +20% MS après smite
+        if (hasGustwalker) {
+            var sc = LolPlugin.getInstance().getChampionManager().getChampion(caster);
+            if (sc != null) {
+                sc.getStats().addBonusMoveSpeed(20);
+                new org.bukkit.scheduler.BukkitRunnable(){@Override public void run(){
+                    if(sc.getStats()!=null) sc.getStats().addBonusMoveSpeed(-20);
+                }}.runTaskLater(LolPlugin.getInstance(), 40L);
+            }
+        }
         double cur = target.getHealth();
         if (smiteDamage >= cur) {
-            // EXÉCUTION : on garantit la mort attribuée au lanceur (vol de Dragon/Baron)
             target.damage(cur + 100, caster);
             caster.sendActionBar(Component.text("⚔ Châtiment — EXÉCUTÉ!", NamedTextColor.GOLD));
         } else {
