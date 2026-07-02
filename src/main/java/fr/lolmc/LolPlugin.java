@@ -185,6 +185,8 @@ public class LolPlugin extends JavaPlugin {
         shopNpcManager = new ShopNpcManager();
         getServer().getPluginManager().registerEvents(shopNpcManager, this);
         autoAttackManager = new AutoAttackManager();
+        // Appliquer le ratio unités LoL → blocs depuis la config
+        applyAAScaleFromConfig();
         announcementManager = new AnnouncementManager();
         summonerSpellManager = new SummonerSpellManager();
         runeManager = new RuneManager();
@@ -295,6 +297,45 @@ public class LolPlugin extends JavaPlugin {
     public BaseManager getBaseManager()         { return baseManager; }
     public FogOfWarManager getFogOfWarManager() { return fogOfWarManager; }
     public ShopNpcManager getShopNpcManager()   { return shopNpcManager; }
+    /**
+     * Portées AA LoL en unités (patch 26).
+     * Converties en blocs avec le ratio scale.lol-units-per-block de config.yml.
+     */
+    private static final java.util.Map<String, Double> LOL_AA_RANGES = java.util.Map.ofEntries(
+        java.util.Map.entry("garen",       175.0),
+        java.util.Map.entry("darius",      175.0),
+        java.util.Map.entry("malphite",    150.0),
+        java.util.Map.entry("nasus",       175.0),
+        java.util.Map.entry("warwick",     175.0),
+        java.util.Map.entry("amumu",       150.0),
+        java.util.Map.entry("masteryi",    175.0),
+        java.util.Map.entry("leesin",      175.0),
+        java.util.Map.entry("annie",       625.0),
+        java.util.Map.entry("veigar",      700.0),
+        java.util.Map.entry("zed",         175.0),
+        java.util.Map.entry("yasuo",       175.0),
+        java.util.Map.entry("morgana",     900.0),
+        java.util.Map.entry("leona",       175.0),
+        java.util.Map.entry("blitzcrank",  175.0),
+        java.util.Map.entry("janna",       550.0),
+        java.util.Map.entry("ashe",        600.0),
+        java.util.Map.entry("sivir",       500.0),
+        java.util.Map.entry("jinx",        525.0),
+        java.util.Map.entry("missfortune", 650.0)
+    );
+
+    private void applyAAScaleFromConfig() {
+        double ratio = getConfig().getDouble("scale.lol-units-per-block", 65.0);
+        for (var entry : LOL_AA_RANGES.entrySet()) {
+            var champ = championManager.getPrototype(entry.getKey());
+            if (champ != null) {
+                double blocks = Math.round(entry.getValue() / ratio * 10.0) / 10.0;
+                champ.setAutoAttackRange(blocks);
+            }
+        }
+        getLogger().info("[LolMC] Portées AA recalculées (1 bloc = " + (int)ratio + " unités LoL)");
+    }
+
     public AutoAttackManager getAutoAttackManager() { return autoAttackManager; }
     public fr.lolmc.listener.StructureDamageListener getStructureDamageListener() { return structureDamageListener; }
     public AnnouncementManager getAnnouncementManager() { return announcementManager; }

@@ -85,6 +85,8 @@ public class ChampionManager {
         return activeChampions.containsKey(player.getUniqueId());
     }
 
+    public BaseChampion getPrototype(String id) { return registry.get(id.toLowerCase()); }
+
     public Collection<BaseChampion> getAllChampions() {
         return registry.values();
     }
