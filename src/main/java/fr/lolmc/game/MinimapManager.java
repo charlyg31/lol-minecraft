@@ -83,6 +83,17 @@ public class MinimapManager implements Listener {
     // DISTRIBUTION DE LA CARTE
     // ──────────────────────────────────────────────────────────────
 
+    /** Force un re-rendu de la minimap (après changement de centre). */
+    public void resetView() {
+        var cfg = LolPlugin.getInstance().getConfig();
+        centerX = cfg.getInt("minimap.center-x", 0);
+        centerZ = cfg.getInt("minimap.center-z", 0);
+        sharedView = null;
+        for (Player p : org.bukkit.Bukkit.getOnlinePlayers()) {
+            if (fr.lolmc.util.WorldContext.isInGameWorld(p)) giveMinimap(p);
+        }
+    }
+
     /** Donne la minimap dans la main secondaire du joueur. */
     public void giveMinimap(Player player) {
         World world = player.getWorld();
