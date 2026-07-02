@@ -50,11 +50,15 @@ public class ApiServer {
         try {
             server = HttpServer.create(new InetSocketAddress(port), 0);
 
-            server.createContext("/api/player/name/", this::handlePlayerByName);
-            server.createContext("/api/player/",      this::handlePlayerByUuid);
-            server.createContext("/api/leaderboard",  this::handleLeaderboard);
-            server.createContext("/api/match/history/",this::handleMatchHistory);
-            server.createContext("/api/online",       this::handleOnline);
+            server.createContext("/api/player/name/",        this::handlePlayerByName);
+            server.createContext("/api/player/",               this::handlePlayerByUuid);
+            server.createContext("/api/player-champions/",     this::handlePlayerChampions);
+            server.createContext("/api/leaderboard",           this::handleLeaderboard);
+            server.createContext("/api/match/detail/",         this::handleMatchDetail);
+            server.createContext("/api/match/history/",        this::handleMatchHistory);
+            server.createContext("/api/champions",             this::handleChampionsList);
+            server.createContext("/api/online",                this::handleOnline);
+            server.createContext("/api/status",                this::handleStatus);
 
             server.setExecutor(java.util.concurrent.Executors.newFixedThreadPool(4));
             server.start();
@@ -148,7 +152,91 @@ public class ApiServer {
         }
     }
 
+    /** GET /api/player-champions/{uuid} */
+    private void handlePlayerChampions(HttpExchange ex) throws java.io.IOException {
+        if (!isAuthorized(ex)) { respond(ex, 401, err("unauthorized")); return; }
+        String path = ex.getRequestURI().getPath();
+        String uuidStr = path.substring("/api/player-champions/".length());
+        try {
+            UUID uuid = UUID.fromString(uuidStr);
+            var list = database.getChampionStats(uuid);
+            StringBuilder json = new StringBuilder("[");
+            for (int i = 0; i < list.size(); i++) {
+                if (i > 0) json.append(",");
+                json.append(list.get(i).toJson());
+            }
+            json.append("]");
+            respond(ex, 200, json.toString());
+        } catch (IllegalArgumentException e) { respond(ex, 400, err("invalid uuid")); }
+    }
+
+    /** GET /api/match/detail/{matchId} → tous les joueurs de la partie */
+    private void handleMatchDetail(HttpExchange ex) throws java.io.IOException {
+        if (!isAuthorized(ex)) { respond(ex, 401, err("unauthorized")); return; }
+        String path = ex.getRequestURI().getPath();
+        String matchId = path.substring("/api/match/detail/".length());
+        var players = database.getMatchPlayers(matchId);
+        if (players.isEmpty()) { respond(ex, 404, err("match not found")); return; }
+        StringBuilder json = new StringBuilder("{");
+        json.append("\"match_id\":\"").append(matchId).append("\",");
+        json.append("\"played_at\":").append(players.get(0).playedAt).append(",");
+        json.append("\"ranked\":").append(players.get(0).ranked).append(",");
+        json.append("\"duration_seconds\":").append(players.get(0).durationSeconds).append(",");
+        // Séparer les équipes
+        json.append("\"blue\":[");
+        boolean firstB = true;
+        for (var p : players) {
+            if (!"BLUE".equals(p.team)) continue;
+            if (!firstB) json.append(","); firstB = false;
+            json.append(p.toJson());
+        }
+        json.append("],\"red\":[");
+        boolean firstR = true;
+        for (var p : players) {
+            if (!"RED".equals(p.team)) continue;
+            if (!firstR) json.append(","); firstR = false;
+            json.append(p.toJson());
+        }
+        json.append("]}");
+        respond(ex, 200, json.toString());
+    }
+
+    /** GET /api/champions → liste de tous les champions avec leurs stats de base */
+    private void handleChampionsList(HttpExchange ex) throws java.io.IOException {
+        if (!isAuthorized(ex)) { respond(ex, 401, err("unauthorized")); return; }
+        var cm = LolPlugin.getInstance().getChampionManager();
+        StringBuilder json = new StringBuilder("[");
+        boolean first = true;
+        for (var champ : cm.getAllChampions()) {
+            if (!first) json.append(","); first = false;
+            json.append(String.format(
+                "{\"id\":\"%s\",\"name\":\"%s\",\"role\":\"%s\",\"aa_range\":%.1f}",
+                champ.getId(), champ.getDisplayName(),
+                champ.getRole() != null ? champ.getRole().name() : "UNKNOWN",
+                champ.getAutoAttackRange()));
+        }
+        json.append("]");
+        respond(ex, 200, json.toString());
+    }
+
+    /** GET /api/status → état du serveur */
+    private void handleStatus(HttpExchange ex) throws java.io.IOException {
+        if (!isAuthorized(ex)) { respond(ex, 401, err("unauthorized")); return; }
+        var gm = LolPlugin.getInstance().getGameManager();
+        long elapsed = gm.isGameRunning() ? gm.getElapsedSeconds() : 0;
+        int online = org.bukkit.Bukkit.getOnlinePlayers().size();
+        var db = LolPlugin.getInstance().getDatabaseManager();
+        int totalPlayers = db.getAllFromDb().size();
+        String json = String.format(
+            "{\"online_players\":%d,\"game_running\":%b,\"game_elapsed_seconds\":%d,"
+            + "\"total_registered_players\":%d,\"server_version\":\"%s\"}",
+            online, gm.isGameRunning(), elapsed, totalPlayers,
+            org.bukkit.Bukkit.getVersion());
+        respond(ex, 200, json);
+    }
+
     /** GET /api/online */
+    private void handleOnline(HttpExchange ex) throws java.io.IOException {    /** GET /api/online */
     private void handleOnline(HttpExchange ex) throws java.io.IOException {
         if (!isAuthorized(ex)) { respond(ex, 401, err("unauthorized")); return; }
         StringBuilder json = new StringBuilder("{\"online\":[");
