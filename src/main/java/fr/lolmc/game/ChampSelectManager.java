@@ -276,8 +276,12 @@ public class ChampSelectManager {
             String[] spells = chosenSpells.getOrDefault(id, new String[]{"FLASH", "IGNITE"});
             if (ssm != null) ssm.setSpells(p, spells[0], spells[1]);
 
+            // Skin choisi
+            String skinId = chosenSkin.getOrDefault(id, "base");
+            LolPlugin.getInstance().getSkinManager().applySkin(p, champ, skinId);
+
             p.sendMessage(Component.text("⚔ Partie lancée avec " + champ
-                + " | Sorts: " + spells[0] + " + " + spells[1] + "!", NamedTextColor.GOLD));
+                + " | Skin: " + skinId + " | Sorts: " + spells[0] + " + " + spells[1] + "!", NamedTextColor.GOLD));
         }
 
         // Lancer la partie physique

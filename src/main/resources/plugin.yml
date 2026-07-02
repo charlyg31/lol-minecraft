@@ -105,3 +105,74 @@ permissions:
 
 bungeecord: true
 soft-depend: [Multiverse-Core]
+
+  # ── Skins de champions ─────────────────────────────────────────────
+  lolmc.skin:
+    description: Accès à tous les skins (donne tous les skins)
+    default: false
+    children:
+      lolmc.skin.garen.steel_legion: true
+      lolmc.skin.garen.demacia_vice: true
+      lolmc.skin.darius.god_king: true
+      lolmc.skin.malphite.obsidian: true
+      lolmc.skin.malphite.mecha: true
+      lolmc.skin.nasus.infernal: true
+      lolmc.skin.nasus.dreadknight: true
+      lolmc.skin.warwick.firefang: true
+      lolmc.skin.warwick.blood_moon: true
+      lolmc.skin.amumu.infernal: true
+      lolmc.skin.masteryi.project: true
+      lolmc.skin.masteryi.blood_moon: true
+      lolmc.skin.leesin.god_fist: true
+      lolmc.skin.annie.hextech: true
+      lolmc.skin.annie.frostfire: true
+      lolmc.skin.veigar.omega_squad: true
+      lolmc.skin.zed.project: true
+      lolmc.skin.zed.death_sworn: true
+      lolmc.skin.yasuo.true_damage: true
+      lolmc.skin.yasuo.blood_moon: true
+      lolmc.skin.morgana.lunar_goddess: true
+      lolmc.skin.leona.solar_eclipse: true
+      lolmc.skin.blitzcrank.witch_craft: true
+      lolmc.skin.janna.hextech: true
+      lolmc.skin.ashe.project: true
+      lolmc.skin.ashe.cosmic: true
+      lolmc.skin.sivir.snow_day: true
+      lolmc.skin.jinx.star_guardian: true
+      lolmc.skin.jinx.arcane: true
+      lolmc.skin.jinx.crime_city: true
+      lolmc.skin.missfortune.pool_party: true
+      lolmc.skin.missfortune.bullet_angel: true
+  # Permissions individuelles (attribuables via LuckPerms etc.)
+  lolmc.skin.garen.steel_legion:    {description: "Garen - Légion d'Acier",          default: false}
+  lolmc.skin.garen.demacia_vice:    {description: "Garen - Démacie Vice",             default: false}
+  lolmc.skin.darius.god_king:       {description: "Darius - God-King",                default: false}
+  lolmc.skin.malphite.obsidian:     {description: "Malphite - Obsidian",              default: false}
+  lolmc.skin.malphite.mecha:        {description: "Malphite - Mecha",                 default: false}
+  lolmc.skin.nasus.infernal:        {description: "Nasus - Infernal",                 default: false}
+  lolmc.skin.nasus.dreadknight:     {description: "Nasus - Chevalier Sinistre",       default: false}
+  lolmc.skin.warwick.firefang:      {description: "Warwick - Crocfeu",                default: false}
+  lolmc.skin.warwick.blood_moon:    {description: "Warwick - Lune de Sang",           default: false}
+  lolmc.skin.amumu.infernal:        {description: "Amumu - Infernal",                 default: false}
+  lolmc.skin.masteryi.project:      {description: "Master Yi - PROJECT",              default: false}
+  lolmc.skin.masteryi.blood_moon:   {description: "Master Yi - Lune de Sang",         default: false}
+  lolmc.skin.leesin.god_fist:       {description: "Lee Sin - Poing de Dieu",          default: false}
+  lolmc.skin.annie.hextech:         {description: "Annie - Hextech",                  default: false}
+  lolmc.skin.annie.frostfire:       {description: "Annie - Givrefeu",                 default: false}
+  lolmc.skin.veigar.omega_squad:    {description: "Veigar - Escouade Oméga",          default: false}
+  lolmc.skin.zed.project:           {description: "Zed - PROJECT",                    default: false}
+  lolmc.skin.zed.death_sworn:       {description: "Zed - Serment de Mort",            default: false}
+  lolmc.skin.yasuo.true_damage:     {description: "Yasuo - True Damage",              default: false}
+  lolmc.skin.yasuo.blood_moon:      {description: "Yasuo - Lune de Sang",             default: false}
+  lolmc.skin.morgana.lunar_goddess: {description: "Morgana - Déesse Lunaire",         default: false}
+  lolmc.skin.leona.solar_eclipse:   {description: "Leona - Éclipse Solaire",          default: false}
+  lolmc.skin.blitzcrank.witch_craft:{description: "Blitzcrank - Sorcellerie",         default: false}
+  lolmc.skin.janna.hextech:         {description: "Janna - Hextech",                  default: false}
+  lolmc.skin.ashe.project:          {description: "Ashe - PROJECT",                   default: false}
+  lolmc.skin.ashe.cosmic:           {description: "Ashe - Cosmique",                  default: false}
+  lolmc.skin.sivir.snow_day:        {description: "Sivir - Jour de Neige",            default: false}
+  lolmc.skin.jinx.star_guardian:    {description: "Jinx - Gardienne des Étoiles",     default: false}
+  lolmc.skin.jinx.arcane:           {description: "Jinx - Arcane",                    default: false}
+  lolmc.skin.jinx.crime_city:       {description: "Jinx - Cité du Crime",             default: false}
+  lolmc.skin.missfortune.pool_party:{description: "Miss Fortune - Pool Party",        default: false}
+  lolmc.skin.missfortune.bullet_angel:{description: "Miss Fortune - Ange Armée",     default: false}
