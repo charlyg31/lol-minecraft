@@ -45,7 +45,7 @@ public class Jinx extends BaseChampion {
         setAbility(0,new AA()); setAbility(1,new Q());
         setAbility(2,new W()); setAbility(3,new E()); setAbility(4,new R());
         initSystems(516, 3.0, ResourceSystem.ResourceType.NONE, 0, 0.0);
-        setAutoAttackRange(6.0);
+        setAutoAttackRange(8.1);
     }
 
     static class AA extends BasicAttackAbility {
@@ -83,7 +83,7 @@ public class Jinx extends BaseChampion {
                 c.sendActionBar(Component.text("⚡ Mini-canons! Vitesse d'attaque", NamedTextColor.YELLOW));
                 c.addPotionEffect(new PotionEffect(PotionEffectType.HASTE, 40, 1, false, true));
                 var cm = LolPlugin.getInstance().getChampionManager();
-                if (cm.hasChampion(c)) cm.getChampion(c).setAutoAttackRange(6.0);
+                if (cm.hasChampion(c)) cm.getChampion(c).setAutoAttackRange(8.1);
             }
             c.getWorld().playSound(c.getLocation(), org.bukkit.Sound.ENTITY_FIREWORK_ROCKET_BLAST, 0.5f, fish ? 0.7f : 1.5f);
         }

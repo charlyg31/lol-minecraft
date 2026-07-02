@@ -29,7 +29,7 @@ public class Ashe extends BaseChampion {
         setAbility(0,new AA()); setAbility(1,new Q());
         setAbility(2,new W()); setAbility(3,new E()); setAbility(4,new R());
         initSystems(528, 3.0, ResourceSystem.ResourceType.MANA, 480, 11.0);
-        setAutoAttackRange(6.0);
+        setAutoAttackRange(9.2);
     }
 
     static class AA extends BasicAttackAbility {

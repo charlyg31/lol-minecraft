@@ -27,7 +27,7 @@ public class Annie extends BaseChampion {
         setAbility(0,new AA()); setAbility(1,new Q());
         setAbility(2,new W()); setAbility(3,new E()); setAbility(4,new R());
         initSystems(528, 5.5, ResourceSystem.ResourceType.MANA, 528, 11.0);
-        setAutoAttackRange(5.5);
+        setAutoAttackRange(9.6);
     }
 
     // ── API publique Tibbers ──────────────────────────────────────

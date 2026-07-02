@@ -24,7 +24,7 @@ public class Garen extends BaseChampion {
         super("garen", "Garen", ChampionRole.TOP,
             new ChampionStats(690,66,0,36,32,0.625,0,340,1.75,8.0));
         getStats().setGrowthStats(98.0,5.0,4.5,2.05,0.03650,0.50);
-        setAutoAttackRange(2.0);
+        setAutoAttackRange(2.7);
     }
     @Override protected void registerAbilities() {
         setAbility(0,new AA()); setAbility(1,new Q());
