@@ -1,5 +1,8 @@
 package fr.lolmc.game;
 
+import fr.lolmc.champion.skin.ChampionSkin;
+import fr.lolmc.champion.skin.SkinRegistry;
+
 import fr.lolmc.LolPlugin;
 import fr.lolmc.rune.RuneRegistry;
 import fr.lolmc.rune.RuneRegistry.Path;
@@ -103,6 +106,93 @@ public class ChampSelectGUI implements Listener {
         };
     }
 
+    // ── Menu Skins ───────────────────────────────────────────────
+
+    /**
+     * Ouvre le menu de sélection de skin pour un champion.
+     * Seuls les skins accessibles (permission OK) sont affichés.
+     * Retourne directement au lock si le champion n'a qu'un skin (base).
+     */
+    public void openSkinMenu(Player player, String champId) {
+        var accessible = SkinRegistry.getAccessible(champId, player);
+        var all = SkinRegistry.getAll(champId);
+
+        // Si seulement le skin de base → pas de menu, on passe directement
+        if (accessible.size() <= 1 && all.size() <= 1) {
+            // Informer ChampSelectManager que le skin de base est choisi
+            LolPlugin.getInstance().getChampSelectManager().onSkinChosen(player, champId, "base");
+            return;
+        }
+
+        // Construire l'inventaire
+        int rows = Math.max(2, (int) Math.ceil(all.size() / 9.0) + 1);
+        Inventory inv = Bukkit.createInventory(null, rows * 9,
+            Component.text(SKIN_TITLE + " — " + capitalize(champId), NamedTextColor.GOLD));
+
+        // Filler gris
+        ItemStack filler = fillerItem();
+        for (int i = 0; i < inv.getSize(); i++) inv.setItem(i, filler);
+
+        // Afficher TOUS les skins — ceux inaccessibles en gris avec cadenas
+        for (int i = 0; i < all.size(); i++) {
+            ChampionSkin skin = all.get(i);
+            boolean hasAccess = skin.hasAccess(player);
+            inv.setItem(i, skinIcon(skin, hasAccess));
+        }
+
+        // Bouton retour (avant-dernier slot) + lock (dernier)
+        int last = inv.getSize() - 1;
+        inv.setItem(last - 1, button(Material.ARROW,
+            Component.text("◀ Retour aux champions", NamedTextColor.YELLOW), ""));
+        inv.setItem(last, button(Material.LIME_DYE,
+            Component.text("✔ Skin de base", NamedTextColor.GREEN),
+            "Utiliser le skin de base"));
+
+        player.openInventory(inv);
+    }
+
+    private ItemStack skinIcon(ChampionSkin skin, boolean hasAccess) {
+        ItemStack item = new ItemStack(hasAccess ? skin.icon : Material.GRAY_DYE);
+        var meta = item.getItemMeta();
+        if (meta == null) return item;
+
+        if (hasAccess) {
+            meta.displayName(Component.text("🎨 " + skin.displayName, NamedTextColor.GOLD)
+                .decoration(TextDecoration.ITALIC, false));
+            meta.lore(List.of(
+                Component.text("Skin n°" + skin.skinNumber, NamedTextColor.GRAY)
+                    .decoration(TextDecoration.ITALIC, false),
+                Component.text("▶ Clic pour choisir", NamedTextColor.YELLOW)
+                    .decoration(TextDecoration.ITALIC, false)
+            ));
+        } else {
+            meta.displayName(Component.text("🔒 " + skin.displayName, NamedTextColor.DARK_GRAY)
+                .decoration(TextDecoration.ITALIC, false));
+            meta.lore(List.of(
+                Component.text("Permission requise:", NamedTextColor.GRAY)
+                    .decoration(TextDecoration.ITALIC, false),
+                Component.text(skin.getPermission(), NamedTextColor.RED)
+                    .decoration(TextDecoration.ITALIC, false)
+            ));
+        }
+        item.setItemMeta(meta);
+        return item;
+    }
+
+    private ItemStack fillerItem() {
+        ItemStack f = new ItemStack(Material.GRAY_STAINED_GLASS_PANE);
+        var m = f.getItemMeta();
+        if (m != null) { m.displayName(Component.text(" ").decoration(TextDecoration.ITALIC, false)); f.setItemMeta(m); }
+        return f;
+    }
+
+    public boolean isSkinMenu(Inventory inv) {
+        if (inv == null) return false;
+        var title = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
+            .plainText().serialize(inv.title() instanceof Component c ? c : Component.empty());
+        return title.startsWith("🎨 Choisir un skin");
+    }
+
     // ── Menu Runes ────────────────────────────────────────────────
 
     public void openRuneMenu(Player player) {
@@ -153,7 +243,10 @@ public class ChampSelectGUI implements Listener {
     @EventHandler
     public void onClick(InventoryClickEvent e) {
         Component title = e.getView().title();
-        if (!title.equals(CHAMP_TITLE) && !title.equals(RUNE_TITLE)) return;
+        String titleStr = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
+            .plainText().serialize(title);
+        if (!title.equals(CHAMP_TITLE) && !title.equals(RUNE_TITLE)
+                && !titleStr.startsWith("🎨 Choisir un skin")) return;
         e.setCancelled(true);
 
         if (!(e.getWhoClicked() instanceof Player player)) return;
@@ -173,6 +266,37 @@ public class ChampSelectGUI implements Listener {
             } else if (slot == 26) {
                 csm.lock(player);
                 player.closeInventory();
+            }
+        } else if (titleStr.startsWith("🎨 Choisir un skin")) {
+            // Extraire le champId du titre "🎨 Choisir un skin — garen"
+            String champId = titleStr.contains(" — ")
+                ? titleStr.substring(titleStr.indexOf(" — ") + 3).toLowerCase() : "garen";
+            int slot = e.getSlot();
+            int invSize = e.getView().getTopInventory().getSize();
+
+            // Bouton retour (avant-dernier) ou base (dernier)
+            if (slot == invSize - 2) {
+                // Retour au menu champion
+                openChampionMenu(player);
+                return;
+            }
+            if (slot == invSize - 1) {
+                // Skin de base
+                csm.onSkinChosen(player, champId, "base");
+                return;
+            }
+
+            // Clic sur un skin
+            var allSkins = fr.lolmc.champion.skin.SkinRegistry.getAll(champId);
+            if (slot < allSkins.size()) {
+                var skin = allSkins.get(slot);
+                if (skin.hasAccess(player)) {
+                    csm.onSkinChosen(player, champId, skin.id);
+                } else {
+                    player.sendActionBar(Component.text(
+                        "🔒 Permission requise : " + skin.getPermission(),
+                        NamedTextColor.RED));
+                }
             }
         } else if (title.equals(RUNE_TITLE)) {
             if (clicked.getType() == Material.ENCHANTED_BOOK) {
