@@ -149,6 +149,60 @@ public class FogOfWarManager {
                     viewer.hidePlayer(LolPlugin.getInstance(), target);
                 }
             }
+
+            // ── Sbires et monstres ennemis : cachés hors vision ──
+            updateEntityVision(viewer, players);
+        }
+    }
+
+    /**
+     * Cache les sbires ennemis hors de la vision de l'équipe du viewer.
+     * Les monstres de jungle neutres sont cachés au-delà de la portée de vision.
+     * Utilise Player#hideEntity / showEntity (Paper API).
+     */
+    private void updateEntityVision(Player viewer, java.util.List<Player> players) {
+        var world = viewer.getWorld();
+        var plugin = LolPlugin.getInstance();
+        var tm = teamManager;
+        var team = tm.getTeam(viewer);
+        if (team == null) return;
+
+        for (var entity : world.getLivingEntities()) {
+            if (entity instanceof Player) continue; // joueurs gérés au-dessus
+
+            boolean isMinion  = fr.lolmc.game.MinionManager.isMinion(entity);
+            boolean isMonster = fr.lolmc.game.JungleManager.isJungleMonster(entity);
+            if (!isMinion && !isMonster) continue; // ne toucher que nos entités de jeu
+
+            // Sbires alliés : toujours visibles
+            if (isMinion) {
+                var minionTeam = fr.lolmc.game.MinionManager.getMinionTeam(entity);
+                if (minionTeam == team) {
+                    viewer.showEntity(plugin, entity);
+                    continue;
+                }
+            }
+
+            // Entité ennemie/neutre : visible si un allié est à portée de vision
+            boolean visible = false;
+            for (Player ally : players) {
+                if (!ally.equals(viewer) && !tm.areAllies(viewer, ally)) continue;
+                if (!ally.getWorld().equals(world)) continue;
+                if (ally.getLocation().distanceSquared(entity.getLocation())
+                        <= visionRange * visionRange) {
+                    visible = true;
+                    break;
+                }
+            }
+            // Wards : une ward alliée proche révèle aussi
+            if (!visible) {
+                var wardMgr = plugin.getWardManager();
+                if (wardMgr != null && wardMgr.hasWardNear(team, entity.getLocation(), 12.0))
+                    visible = true;
+            }
+
+            if (visible) viewer.showEntity(plugin, entity);
+            else         viewer.hideEntity(plugin, entity);
         }
     }
 
