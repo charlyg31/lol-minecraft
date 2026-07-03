@@ -124,6 +124,71 @@ public class GameStructure {
     public double getCurrentHP()    { return currentHP; }
     public void respawn() { this.currentHP = this.maxHP; this.destroyed = false; this.currentPhaseIndex = 0; }
     public boolean isDestroyed()    { return destroyed; }
+
+    /**
+     * Met à jour la barre de vie de la structure (nametag ArmorStand).
+     *
+     * Fog of war : le nametag n'est visible que par les joueurs qui ont
+     * vision de la structure — l'équipe propriétaire toujours, l'équipe
+     * ennemie seulement si un de ses membres est à portée de vision.
+     * Un ennemi hors vision voit la structure (blocs) mais pas ses HP à jour,
+     * exactement comme dans LoL.
+     */
+    public void updateHealthBarNametag() {
+        if (center == null || center.getWorld() == null) return;
+        // Trouver l'ArmorStand taggé "structure" près du centre
+        for (var entity : center.getWorld().getNearbyEntities(center, 5, 6, 5)) {
+            if (!(entity instanceof org.bukkit.entity.ArmorStand as)) continue;
+            var pdc = as.getPersistentDataContainer();
+            var key = new org.bukkit.NamespacedKey(fr.lolmc.LolPlugin.getInstance(), "structure");
+            if (!pdc.has(key, org.bukkit.persistence.PersistentDataType.STRING)) continue;
+
+            String label = switch (type) {
+                case TURRET     -> "🗼";
+                case INHIBITOR  -> "💎";
+                case NEXUS      -> "🏰";
+                case NEXUS_BASE -> "🏰";
+            } + " " + (team == Team.BLUE ? "§9" : "§c");
+            fr.lolmc.util.HealthBar.apply(as, currentHP, maxHP, label);
+
+            // Fog of war : cacher le nametag aux ennemis hors vision
+            applyNametagVisibility(as);
+            return;
+        }
+    }
+
+    /** Cache/montre l'ArmorStand de la barre de vie selon la vision des joueurs. */
+    private void applyNametagVisibility(org.bukkit.entity.ArmorStand as) {
+        var plugin = fr.lolmc.LolPlugin.getInstance();
+        var tm = plugin.getTeamManager();
+        var fog = plugin.getFogOfWarManager();
+        double range = fog != null ? fog.getVisionRange() : 30.0;
+
+        for (var viewer : center.getWorld().getPlayers()) {
+            var viewerTeam = tm.getTeam(viewer);
+            // Équipe propriétaire (ou spectateur) : toujours visible
+            if (viewerTeam == null || viewerTeam == team) {
+                viewer.showEntity(plugin, as);
+                continue;
+            }
+            // Ennemi : visible si lui ou un allié est à portée de vision
+            boolean visible = false;
+            for (var ally : center.getWorld().getPlayers()) {
+                if (tm.getTeam(ally) != viewerTeam) continue;
+                if (ally.getLocation().distanceSquared(center) <= range * range) {
+                    visible = true; break;
+                }
+            }
+            // Ward ennemie proche = vision aussi
+            if (!visible) {
+                var wardMgr = plugin.getWardManager();
+                if (wardMgr != null && wardMgr.hasWardNear(viewerTeam, center, 12.0))
+                    visible = true;
+            }
+            if (visible) viewer.showEntity(plugin, as);
+            else         viewer.hideEntity(plugin, as);
+        }
+    }
     public double getHealthPercent(){ return (currentHP / maxHP) * 100.0; }
     public List<Phase> getPhases()  { return phases; }
 
