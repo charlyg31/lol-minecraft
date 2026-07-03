@@ -127,13 +127,27 @@ public class AnnouncementManager {
 
     /**
      * Envoie un ping à tous les membres de l'équipe du joueur.
+     * Le ping est placé à l'endroit VISÉ par le joueur (raycast 40 blocs),
+     * ou à sa position si rien n'est visé.
+     * Un marqueur visuel animé (colonne + anneau pulsant) apparaît 3s
+     * pour toute l'équipe.
      */
     public void sendPing(Player sender, PingType type) {
         var tm = LolPlugin.getInstance().getTeamManager();
         var team = tm.getTeam(sender);
         if (team == null) return;
 
-        Location loc = sender.getLocation();
+        // Position pingée = bloc visé (raycast) ou position du joueur
+        Location loc;
+        var rayResult = sender.rayTraceBlocks(40.0);
+        if (rayResult != null && rayResult.getHitBlock() != null) {
+            loc = rayResult.getHitBlock().getLocation().add(0.5, 1.0, 0.5);
+        } else {
+            loc = sender.getLocation();
+        }
+
+        // Marqueur visuel animé pendant 3s pour toute l'équipe
+        spawnPingMarker(loc, type, team);
         String phrase = switch (type) {
             case DANGER     -> "de danger";
             case ON_MY_WAY  -> "pour dire qu'il arrive";
@@ -157,6 +171,51 @@ public class AnnouncementManager {
             member.sendMessage(msg);
             member.playSound(member.getLocation(), org.bukkit.Sound.BLOCK_NOTE_BLOCK_BELL, 1f, pitch);
         }
+    }
+
+    /**
+     * Marqueur de ping animé : colonne de particules + anneau pulsant au sol,
+     * visible 3 secondes. Couleur selon le type de ping.
+     */
+    private void spawnPingMarker(Location loc, PingType type, fr.lolmc.team.TeamManager.Team team) {
+        org.bukkit.Color color = switch (type) {
+            case DANGER     -> org.bukkit.Color.fromRGB(255, 40, 40);
+            case ON_MY_WAY  -> org.bukkit.Color.fromRGB(40, 220, 80);
+            case MISSING    -> org.bukkit.Color.fromRGB(255, 220, 40);
+            case ASSIST     -> org.bukkit.Color.fromRGB(255, 160, 20);
+            case ENEMY      -> org.bukkit.Color.fromRGB(220, 20, 20);
+        };
+        var dust = new org.bukkit.Particle.DustOptions(color, 1.4f);
+
+        new org.bukkit.scheduler.BukkitRunnable() {
+            int ticks = 0;
+            @Override public void run() {
+                if (ticks >= 60) { cancel(); return; } // 3 secondes
+                var world = loc.getWorld();
+                if (world == null) { cancel(); return; }
+
+                // Colonne verticale (0 → 3 blocs)
+                for (double y = 0; y <= 3.0; y += 0.5) {
+                    world.spawnParticle(org.bukkit.Particle.DUST,
+                        loc.clone().add(0, y, 0), 1, 0.02, 0, 0.02, 0, dust);
+                }
+                // Anneau pulsant au sol (rayon oscille entre 0.8 et 1.5)
+                double pulse = 0.8 + 0.7 * Math.abs(Math.sin(ticks * 0.15));
+                int points = 10;
+                for (int i = 0; i < points; i++) {
+                    double angle = 2 * Math.PI * i / points + ticks * 0.1;
+                    world.spawnParticle(org.bukkit.Particle.DUST,
+                        loc.clone().add(Math.cos(angle) * pulse, 0.1, Math.sin(angle) * pulse),
+                        1, 0, 0, 0, 0, dust);
+                }
+                // Éclat au sommet toutes les 0.5s
+                if (ticks % 10 == 0) {
+                    world.spawnParticle(org.bukkit.Particle.END_ROD,
+                        loc.clone().add(0, 3.2, 0), 3, 0.1, 0.1, 0.1, 0.01);
+                }
+                ticks += 2;
+            }
+        }.runTaskTimer(LolPlugin.getInstance(), 0L, 2L);
     }
 
     /** Convertisseur de codes couleur legacy (§) vers Component. */

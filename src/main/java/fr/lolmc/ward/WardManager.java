@@ -281,6 +281,25 @@ public class WardManager {
 
     public int getActiveWardCount() { return wards.size(); }
 
+    /** Toutes les wards actives (pour minimap et fog of war). */
+    public java.util.List<Ward> getAllWards() { return new java.util.ArrayList<>(wards); }
+
+    /** True si une ward de cette équipe est à moins de radius blocs de la position. */
+    public boolean hasWardNear(Team team, Location loc, double radius) {
+        for (Ward w : wards) {
+            if (w.team != team) continue;
+            if (!w.location.getWorld().equals(loc.getWorld())) continue;
+            if (w.location.distanceSquared(loc) <= radius * radius) return true;
+        }
+        return false;
+    }
+
+    /** True si cette ward est révélée (pour la minimap). */
+    public boolean isRevealed(Ward ward) {
+        Long until = revealedWards.get(ward.entityId);
+        return until != null && until > System.currentTimeMillis();
+    }
+
     public void cleanup(UUID uuid) {
         revealedUntil.remove(uuid);
         revealedToTeam.remove(uuid);

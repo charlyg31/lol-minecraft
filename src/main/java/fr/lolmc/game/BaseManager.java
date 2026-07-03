@@ -75,8 +75,43 @@ public class BaseManager {
                 ticks++;
                 int secsLeft = RECALL_SECONDS - ticks / 20;
                 player.sendActionBar(Component.text("🌀 Recall... " + secsLeft + "s", NamedTextColor.AQUA));
+
+                // ── Recall visuel façon LoL : cercle rotatif + pilier ──
+                Location center = player.getLocation();
+                double progress = ticks / (double)(RECALL_SECONDS * 20); // 0 → 1
+                // Cercle au sol qui tourne (2 anneaux inversés)
+                double radius = 1.6;
+                int points = 12;
+                double rotation = ticks * 0.15; // vitesse de rotation
+                for (int i = 0; i < points; i++) {
+                    double angle1 = rotation + (2 * Math.PI * i / points);
+                    double angle2 = -rotation + (2 * Math.PI * i / points);
+                    Location p1 = center.clone().add(
+                        Math.cos(angle1) * radius, 0.1, Math.sin(angle1) * radius);
+                    Location p2 = center.clone().add(
+                        Math.cos(angle2) * (radius * 0.7), 0.1, Math.sin(angle2) * (radius * 0.7));
+                    player.getWorld().spawnParticle(Particle.DUST, p1, 1, 0, 0, 0, 0,
+                        new Particle.DustOptions(org.bukkit.Color.fromRGB(80, 180, 255), 1.0f));
+                    player.getWorld().spawnParticle(Particle.DUST, p2, 1, 0, 0, 0, 0,
+                        new Particle.DustOptions(org.bukkit.Color.fromRGB(150, 220, 255), 0.8f));
+                }
+                // Pilier de lumière qui monte avec la progression
+                double pillarHeight = 3.0 * progress;
+                for (double y = 0; y <= pillarHeight; y += 0.4) {
+                    player.getWorld().spawnParticle(Particle.END_ROD,
+                        center.clone().add(0, y, 0), 1, 0.05, 0, 0.05, 0.01);
+                }
+                // Spirale montante autour du joueur
+                double spiralAngle = ticks * 0.35;
+                double spiralY = (ticks % 30) / 30.0 * 2.5;
                 player.getWorld().spawnParticle(Particle.PORTAL,
-                        player.getLocation().add(0, 1, 0), 5, 0.3, 0.5, 0.3);
+                    center.clone().add(Math.cos(spiralAngle) * 0.8, spiralY,
+                                       Math.sin(spiralAngle) * 0.8), 2, 0, 0, 0, 0.02);
+                // Son de charge toutes les secondes
+                if (ticks % 20 == 0) {
+                    player.getWorld().playSound(center, Sound.BLOCK_BEACON_AMBIENT, 0.6f,
+                        1.0f + (float) progress * 0.5f);
+                }
 
                 if (ticks >= RECALL_SECONDS * 20) {
                     completeRecall(player);
@@ -105,7 +140,17 @@ public class BaseManager {
                 NamedTextColor.RED));
             return;
         }
+        // Explosion de particules au départ
+        Location departLoc = player.getLocation();
+        departLoc.getWorld().spawnParticle(Particle.FLASH, departLoc.clone().add(0, 1, 0), 1);
+        departLoc.getWorld().spawnParticle(Particle.END_ROD, departLoc.clone().add(0, 1, 0),
+            40, 0.5, 1.0, 0.5, 0.1);
+        departLoc.getWorld().playSound(departLoc, Sound.BLOCK_BEACON_DEACTIVATE, 1f, 1.4f);
+
         player.teleport(spawn);
+        // Effet d'arrivée
+        spawn.getWorld().spawnParticle(Particle.END_ROD, spawn.clone().add(0, 1, 0),
+            30, 0.5, 1.0, 0.5, 0.05);
         player.playSound(spawn, Sound.ENTITY_ENDERMAN_TELEPORT, 1f, 1f);
         player.sendActionBar(Component.text("✔ De retour à la base!", NamedTextColor.GREEN));
     }
