@@ -156,7 +156,15 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
             case "reload" -> {
                 LolPlugin.getInstance().reloadConfig();
                 fr.lolmc.util.Balance.load();
-                player.sendMessage(Component.text("✔ Config et équilibrage (champions.yml) rechargés.", NamedTextColor.GREEN));
+                // Recharger la portée du fog of war
+                var fog = LolPlugin.getInstance().getFogOfWarManager();
+                if (fog != null) fog.setVisionRange(
+                    LolPlugin.getInstance().getConfig().getDouble("fog.vision-range", 30.0));
+                // Recharger les skins
+                LolPlugin.getInstance().getManagerSkin().reload();
+                // Recharger l'échelle des portées AA
+                LolPlugin.getInstance().applyAAScaleFromConfig();
+                player.sendMessage(Component.text("✔ Config, équilibrage, fog, skins et portées rechargés.", NamedTextColor.GREEN));
             }
             case "select" -> {
                 var ids = new java.util.ArrayList<java.util.UUID>();

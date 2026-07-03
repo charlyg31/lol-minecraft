@@ -336,7 +336,7 @@ public class LolPlugin extends JavaPlugin {
         java.util.Map.entry("missfortune", 650.0)
     );
 
-    private void applyAAScaleFromConfig() {
+    public void applyAAScaleFromConfig() {
         double ratio = getConfig().getDouble("scale.lol-units-per-block", 65.0);
         for (var entry : LOL_AA_RANGES.entrySet()) {
             var champ = championManager.getPrototype(entry.getKey());
