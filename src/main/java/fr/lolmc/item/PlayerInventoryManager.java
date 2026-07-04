@@ -86,6 +86,8 @@ public class PlayerInventoryManager {
     }
 
     public LolItem[] getEquippedItems() { return equippedItems; }
+    public void clear() { java.util.Arrays.fill(equippedItems, null); }
+    public boolean hasItem(String itemId) { for (LolItem item : equippedItems) { if (item != null && item.getId().equals(itemId)) return true; } return false; }
 
     public int findFreeSlot() {
         for (int i = 0; i < 6; i++) if (equippedItems[i] == null) return i;

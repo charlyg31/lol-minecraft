@@ -56,7 +56,6 @@ public class PlayerSnapshot {
     public void restore(Player player) {
         if (championId == null) return;
         var cm = LolPlugin.getInstance().getChampionManager();
-        var tm = LolPlugin.getInstance().getTeamManager();
 
         // Remettre le champion
         cm.assignChampion(player, championId);
@@ -83,18 +82,14 @@ public class PlayerSnapshot {
         inv.clear();
         for (String itemId : itemIds) {
             var item = fr.lolmc.item.ItemRegistry.get(itemId);
-            if (item != null) inv.equipItem(item, champ.getStats(), champ.getHPSystem(), null);
+            if (item != null) inv.equipItem(player, champ, item);
         }
 
         // Sorts
-        try {
-            var s1 = fr.lolmc.game.SummonerSpellManager.Spell.valueOf(spell1);
-            var s2 = fr.lolmc.game.SummonerSpellManager.Spell.valueOf(spell2);
-            LolPlugin.getInstance().getSummonerSpellManager().setSpells(player, s1, s2);
-        } catch (IllegalArgumentException ignored) {}
+        LolPlugin.getInstance().getSummonerSpellManager().setSpells(player, spell1, spell2);
 
         // Hotbar
-        LolPlugin.getInstance().getHotbarManager().init(player, champ);
+        LolPlugin.getInstance().getHotbarManager().initPlayer(player, champ);
 
         player.sendMessage(net.kyori.adventure.text.Component.text(
             "✔ Champion " + championId + " niveau " + level + " restauré.",

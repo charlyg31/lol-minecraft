@@ -49,7 +49,7 @@ public class SkinManager {
         var hm = LolPlugin.getInstance().getHotbarManager();
         var cm = LolPlugin.getInstance().getChampionManager();
         if (hm != null && cm.hasChampion(player)) {
-            hm.refreshAllSlots(player, cm.getChampion(player));
+            hm.initPlayer(player, cm.getChampion(player));
         }
 
         // 3. Log

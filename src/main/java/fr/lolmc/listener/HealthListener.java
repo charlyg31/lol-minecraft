@@ -101,32 +101,15 @@ public class HealthListener implements Listener {
 
     @EventHandler
     public void onJoin(PlayerJoinEvent e) {
-        Player p = e.getPlayer();
-        // Reconnexion mid-game : restaurer l'état sauvegardé
-        var gm = LolPlugin.getInstance().getGameManager();
-        if (gm != null && gm.isGameRunning()) {
-            var snap = gm.getPlayerSnapshot(p.getUniqueId());
-            if (snap != null) {
-                // Attendre 1 tick que le joueur soit complètement connecté
-                new org.bukkit.scheduler.BukkitRunnable() {
-                    @Override public void run() {
-                        snap.restore(p);
-                        p.sendMessage(net.kyori.adventure.text.Component.text(
-                            "✔ Reconnexion — état restauré.", net.kyori.adventure.text.format.NamedTextColor.GREEN));
-                    }
-                }.runTaskLater(LolPlugin.getInstance(), 20L);
-                return;
-            }
-        }
-        Player p = e.getPlayer();
-        // Désactiver la regen naturelle de Minecraft
+        final Player p = e.getPlayer();
         p.setFoodLevel(20);
         p.setSaturation(20f);
         p.setExhaustion(0f);
 
-        // Reconnexion : un tick plus tard (joueur pleinement chargé pour le téléport)
+        // Reconnexion un tick plus tard pour s'assurer que le joueur est pleinement chargé
         new org.bukkit.scheduler.BukkitRunnable() {
-            @Override public void run() {
+            @Override
+            public void run() {
                 if (!p.isOnline()) return;
                 var plugin = LolPlugin.getInstance();
                 var gm = plugin.getGameManager();
@@ -134,20 +117,27 @@ public class HealthListener implements Listener {
                 var tm = plugin.getTeamManager();
                 java.util.UUID id = p.getUniqueId();
 
-                boolean canRejoin = gm.isRunning() && gm.isParticipant(id) && cm.hasChampion(p);
+                boolean canRejoin = gm.isRunning() && gm.isParticipant(id);
                 if (canRejoin) {
-                    // Restaurer le joueur dans SA partie (son champion/équipe/objets ont été gardés)
                     var team = gm.getParticipantTeam(id);
                     if (team != null && !tm.hasTeam(p)) tm.setTeam(p, team);
-                    var champ = cm.getChampion(p);
-                    try { plugin.getHotbarManager().renderPage(p, champ); } catch (Exception ignored) {}
-                    plugin.getMinimapManager().giveMinimap(p); // redonner la minimap en offhand
-                    var spawn = (team != null) ? plugin.getMapManager().getSpawn(team, 1) : null;
-                    if (spawn != null) p.teleport(spawn);
-                    p.sendMessage(net.kyori.adventure.text.Component.text(
-                            "🔄 Reconnecté à ta partie en cours.", net.kyori.adventure.text.format.NamedTextColor.GREEN));
+                    
+                    // Récupération et restauration complète du Snapshot
+                    var snap = gm.getPlayerSnapshot(id);
+                    if (snap != null) {
+                        snap.restore(p);
+                        p.sendMessage(net.kyori.adventure.text.Component.text(
+                                "✔ Reconnexion — Ton état de partie a été restauré !", net.kyori.adventure.text.format.NamedTextColor.GREEN));
+                    } else if (cm.hasChampion(p)) {
+                        var champ = cm.getChampion(p);
+                        try { plugin.getHotbarManager().renderPage(p, champ); } catch (Exception ignored) {}
+                        plugin.getMinimapManager().giveMinimap(p);
+                        var spawn = (team != null) ? plugin.getMapManager().getSpawn(team, 1) : null;
+                        if (spawn != null) p.teleport(spawn);
+                        p.sendMessage(net.kyori.adventure.text.Component.text(
+                                "🔄 Reconnecté à ta partie en cours.", net.kyori.adventure.text.format.NamedTextColor.GREEN));
+                    }
                 } else {
-                    // Pas de partie en cours pour ce joueur → ne pas le laisser sur la map
                     if (cm.hasChampion(p)) cm.removeChampion(p);
                     tm.removePlayer(id);
                     var world = plugin.getServer().getWorlds().get(0);
@@ -160,6 +150,7 @@ public class HealthListener implements Listener {
             }
         }.runTaskLater(LolPlugin.getInstance(), 1L);
     }
+
 
     // ── Respawn → réinitialiser HP et ressource ───────────────────
     @EventHandler

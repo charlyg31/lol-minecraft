@@ -161,7 +161,7 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
                 if (fog != null) fog.setVisionRange(
                     LolPlugin.getInstance().getConfig().getDouble("fog.vision-range", 30.0));
                 // Recharger les skins
-                LolPlugin.getInstance().getManagerSkin().reload();
+                LolPlugin.getInstance().getSkinManager().reload();
                 // Recharger l'échelle des portées AA
                 LolPlugin.getInstance().applyAAScaleFromConfig();
                 player.sendMessage(Component.text("✔ Config, équilibrage, fog, skins et portées rechargés.", NamedTextColor.GREEN));

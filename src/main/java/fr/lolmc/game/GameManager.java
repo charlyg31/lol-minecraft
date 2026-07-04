@@ -33,9 +33,12 @@ public class GameManager {
     public fr.lolmc.instance.GameInstance getGameInstance() { return gameInstance; }
 
     private boolean gameRunning = false;
-    private final java.util.Map<java.util.UUID, PlayerSnapshot> snapshots
+    private final java.util.Map<java.util.UUID, fr.lolmc.game.PlayerSnapshot> snapshots
         = new java.util.concurrent.ConcurrentHashMap<>();
     // Tâches BukkitTask stockées pour annulation explicite
+    public void saveSnapshot(org.bukkit.entity.Player player) { snapshots.put(player.getUniqueId(), new fr.lolmc.game.PlayerSnapshot(player)); }
+    public fr.lolmc.game.PlayerSnapshot getPlayerSnapshot(java.util.UUID uuid) { return snapshots.remove(uuid); }
+
     private org.bukkit.scheduler.BukkitTask timerTask;
     private org.bukkit.scheduler.BukkitTask passiveGoldTask;
     private org.bukkit.scheduler.BukkitTask respawnTask;
@@ -181,7 +184,7 @@ public class GameManager {
         // Tab scoreboard
         LolPlugin.getInstance().getTabScoreboard().stop();
         // Réinitialiser les skins
-        LolPlugin.getInstance().getManagerSkin().resetAll();
+        LolPlugin.getInstance().getSkinManager().resetAll();
         // FF reset
         LolPlugin.getInstance().getForfeitManager().reset();
         // Inhibiteurs en attente de respawn
@@ -225,6 +228,7 @@ public class GameManager {
     public fr.lolmc.team.TeamManager.Team getParticipantTeam(UUID id) { return participantTeam.get(id); }
 
     public boolean isRunning() { return gameRunning; }
+    public boolean isGameRunning() { return isRunning(); }
     public java.util.Set<java.util.UUID> getParticipants() { return participants; }
 
     public long getElapsedSeconds() {

@@ -173,7 +173,7 @@ public class MinimapManager implements Listener {
                 int y = w.getHighestBlockYAt(x, z);
                 var block = w.getBlockAt(x, y, z);
                 // Utiliser la couleur MapPalette du matériau
-                return org.bukkit.map.MapPalette.getColor(block.getType().createBlockData().hashCode() % 0xFF == 0
+                return org.bukkit.map.MapPalette.matchColor(block.getType().createBlockData().hashCode() % 0xFF == 0
                     ? java.awt.Color.GRAY : blockToColor(block.getType()));
             } catch (Exception e) {
                 return (byte) 0; // transparent/blanc si hors chunk
@@ -188,7 +188,7 @@ public class MinimapManager implements Listener {
                 case SAND, SANDSTONE                       -> new java.awt.Color(220, 200, 140);
                 case WATER                                 -> new java.awt.Color(50, 80, 180);
                 case LAVA                                  -> new java.awt.Color(220, 80, 20);
-                case WOOD, OAK_LOG, SPRUCE_LOG, BIRCH_LOG -> new java.awt.Color(100, 65, 30);
+                case OAK_LOG, SPRUCE_LOG, BIRCH_LOG -> new java.awt.Color(100, 65, 30);
                 case OAK_LEAVES, SPRUCE_LEAVES, BIRCH_LEAVES,
                      JUNGLE_LEAVES, ACACIA_LEAVES          -> new java.awt.Color(40, 120, 30);
                 case SNOW, SNOW_BLOCK                      -> new java.awt.Color(230, 240, 255);
@@ -235,11 +235,11 @@ public class MinimapManager implements Listener {
             var wm = LolPlugin.getInstance().getWardManager();
             if (wm != null && myTeam != null) {
                 for (var ward : wm.getAllWards()) {
-                    boolean isAlly = ward.getTeam() == myTeam;
+                    boolean isAlly = ward.team == myTeam;
                     boolean isRevealed = wm.isRevealed(ward);
                     if (isAlly || isRevealed) {
-                        MapCursor.Type wType = isAlly ? MapCursor.Type.GREEN_MARKER : MapCursor.Type.RED_MARKER;
-                        addCursor(cursors, ward.getLocation(), (byte)0, wType);
+                        MapCursor.Type wType = isAlly ? MapCursor.Type.FRAME : MapCursor.Type.RED_MARKER;
+                        addCursor(cursors, ward.location, (byte)0, wType);
                     }
                 }
             }

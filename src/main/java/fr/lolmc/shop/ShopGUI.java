@@ -1,5 +1,6 @@
 package fr.lolmc.shop;
 
+import fr.lolmc.LolPlugin;
 import fr.lolmc.item.ItemRegistry;
 import fr.lolmc.item.LolItem;
 import net.kyori.adventure.text.Component;

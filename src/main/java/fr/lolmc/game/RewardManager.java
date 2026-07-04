@@ -184,8 +184,7 @@ public class RewardManager {
             player.showTitle(net.kyori.adventure.title.Title.title(
                 net.kyori.adventure.text.Component.text("⬆ NIVEAU " + newLevel,
                     net.kyori.adventure.text.format.NamedTextColor.GOLD,
-                    net.kyori.adventure.text.format.Style.style(
-                        net.kyori.adventure.text.format.TextDecoration.BOLD)),
+                    net.kyori.adventure.text.format.TextDecoration.BOLD),
                 net.kyori.adventure.text.Component.text(
                     champ.getLevelSystem().getSkillPoints() + " point(s) — clique droit sur Q/W/E/R",
                     net.kyori.adventure.text.format.NamedTextColor.YELLOW),

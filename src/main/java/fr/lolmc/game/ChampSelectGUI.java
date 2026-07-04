@@ -35,8 +35,8 @@ public class ChampSelectGUI implements Listener {
     private static final Component RUNE_TITLE = Component.text("Choisis tes Runes", NamedTextColor.DARK_PURPLE)
             .decoration(TextDecoration.ITALIC, false);
 
-    private static final Component BAN_TITLE = Component.text("Bannissez un Champion", NamedTextColor.RED)
-            .decoration(TextDecoration.ITALIC, false);
+    private static final Component BAN_TITLE = Component.text("Bannissez un Champion", NamedTextColor.RED).decoration(TextDecoration.ITALIC, false);
+    private static final String SKIN_TITLE = "🎨 Choisir un skin";
 
     // Bans actifs (empêchés d'être sélectionnés)
     private static final java.util.Set<String> bannedChampions
@@ -187,10 +187,7 @@ public class ChampSelectGUI implements Listener {
     }
 
     public boolean isSkinMenu(Inventory inv) {
-        if (inv == null) return false;
-        var title = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
-            .plainText().serialize(inv.title() instanceof Component c ? c : Component.empty());
-        return title.startsWith("🎨 Choisir un skin");
+        return false;
     }
 
     // ── Menu Runes ────────────────────────────────────────────────

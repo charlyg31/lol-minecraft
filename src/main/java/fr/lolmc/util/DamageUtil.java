@@ -105,8 +105,8 @@ public class DamageUtil {
         var drm = LolPlugin.getInstance().getDeathRecapManager();
         if (drm != null && afterShield > 0 && attacker != null) {
             String src = attacker.getName();
-            String typ = dmgType == fr.lolmc.util.DamageUtil.Type.MAGICAL ? "magic"
-                       : dmgType == fr.lolmc.util.DamageUtil.Type.TRUE ? "true" : "physical";
+            String typ = type == fr.lolmc.util.DamageUtil.Type.MAGICAL ? "magic"
+                       : type == fr.lolmc.util.DamageUtil.Type.TRUE ? "true" : "physical";
             drm.record(victim.getUniqueId(), src, typ, afterShield);
         }
         // Passif Amumu : désormais géré via Toucher Maudit (applyCurse/onMagicHit)
