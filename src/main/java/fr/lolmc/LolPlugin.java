@@ -60,6 +60,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 public class LolPlugin extends JavaPlugin {
 
     private static LolPlugin instance;
+    private fr.lolmc.game.AutoAttackManager autoAttackManager;
     private ChampionManager championManager;
     private HeadManager headManager;
     private ChampionGUI championGUI;
@@ -242,7 +243,6 @@ public class LolPlugin extends JavaPlugin {
             getCommand("lola").setTabCompleter(lolCmd);
         }
         getServer().getPluginManager().registerEvents(lolCmd, this);
-        getServer().getPluginManager().registerEvents(
                 structureDamageListener = new fr.lolmc.listener.StructureDamageListener(mapManager, championManager, teamManager);
                 getServer().getPluginManager().registerEvents(structureDamageListener, this);
         getServer().getPluginManager().registerEvents(new fr.lolmc.listener.ChatListener(), this);

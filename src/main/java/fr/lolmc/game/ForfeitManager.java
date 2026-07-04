@@ -76,8 +76,7 @@ public class ForfeitManager {
                     }
                 }
             };
-            task.runTaskLater(LolPlugin.getInstance(), VOTE_TIMEOUT_S * 20L);
-            timers.put(team, task);
+            timers.put(team, task.runTaskLater(LolPlugin.getInstance(), VOTE_TIMEOUT_S * 20L));
         }
 
         Set<UUID> teamVotes = votes.get(team);

@@ -30,6 +30,7 @@ public class ChampSelectManager {
     // Choix de chaque joueur
     private final Map<UUID, String> chosenChampion = new HashMap<>();
     private final Map<UUID, RunePage> chosenRunes = new HashMap<>();
+    private final Map<UUID, String> chosenSkin = new HashMap<>();
     private final Map<UUID, String[]> chosenSpells = new HashMap<>(); // [spell1, spell2]
     private final Set<UUID> locked = new HashSet<>(); // joueurs ayant verrouillé
 
@@ -58,10 +59,6 @@ public class ChampSelectManager {
         if (gm != null) startSelection(gm.getParticipants());
     }
 
-    /** Appelé depuis ChampSelectGUI quand un joueur clique sur un champion en phase de ban. */
-    public void onBanClick(org.bukkit.entity.Player player, String championId) {
-        fr.lolmc.game.ChampSelectGUI.banChampion(championId);
-    }
 
     /** Surcharge avec mode ranked (pick+ban) ou normal (pick seul). */
     public void startSelection(Collection<UUID> players, boolean ranked) {
@@ -158,6 +155,7 @@ public class ChampSelectManager {
         chosenChampion.clear();
         chosenRunes.clear();
         chosenSpells.clear();
+        chosenSkin.clear();
         locked.clear();
         timeLeft = SELECT_DURATION;
 
@@ -278,7 +276,7 @@ public class ChampSelectManager {
 
             // Skin choisi
             String skinId = chosenSkin.getOrDefault(id, "base");
-            LolPlugin.getInstance().getManagerSkin().applySkin(p, champ, skinId);
+            LolPlugin.getInstance().getSkinManager().applySkin(p, champ, skinId);
 
             p.sendMessage(Component.text("⚔ Partie lancée avec " + champ
                 + " | Skin: " + skinId + " | Sorts: " + spells[0] + " + " + spells[1] + "!", NamedTextColor.GOLD));
@@ -305,4 +303,5 @@ public class ChampSelectManager {
     }
 
     public Phase getPhase() { return phase; }
+    public void onSkinChosen(Player p, String champId, String skinId) { chosenSkin.put(p.getUniqueId(), skinId); }
 }

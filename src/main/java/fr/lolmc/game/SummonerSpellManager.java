@@ -49,6 +49,8 @@ public class SummonerSpellManager {
 
     // Cooldowns par joueur et par sort : "uuid:SPELL" → timestamp de fin
     private final Map<String, Long> cooldowns = new HashMap<>();
+    private final Map<java.util.UUID, Spell[]> playerSpells = new java.util.HashMap<>();
+    public Spell[] getSpells(Player player) { return playerSpells.get(player.getUniqueId()); }
 
     public boolean isOnCooldown(Player player, Spell spell) {
         Long until = cooldowns.get(player.getUniqueId() + ":" + spell.name());
@@ -378,7 +380,7 @@ public class SummonerSpellManager {
         try {
             Spell s1 = Spell.valueOf(spell1.toUpperCase());
             Spell s2 = Spell.valueOf(spell2.toUpperCase());
-            // // assignSpells(player, s1, s2);
+            playerSpells.put(player.getUniqueId(), new Spell[]{s1, s2});
         } catch (IllegalArgumentException e) {
             LolPlugin.getInstance().getLogger().warning(
                 "[Bridge] Sorts invalides: " + spell1 + ", " + spell2);

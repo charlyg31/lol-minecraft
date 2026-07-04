@@ -159,6 +159,9 @@ public class LevelSystem {
     // ── Getters ───────────────────────────────────────────────────
 
     public int getLevel()          { return level; }
+    public int[] getAbilityRanks() { return this.abilityRanks; }
+    public void setAbilityRanks(int[] ranks) { if (ranks != null) System.arraycopy(ranks, 0, this.abilityRanks, 0, Math.min(ranks.length, this.abilityRanks.length)); }
+    public void setCurrentXP(double xp) { this.currentXP = xp; }
     public double getCurrentXP()   { return currentXP; }
     public double getXPToNext()    { return level >= MAX_LEVEL ? 0 : xpForLevel(level); }
     public int getSkillPoints()    { return skillPoints; }

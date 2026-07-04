@@ -1,5 +1,8 @@
 package fr.lolmc.listener;
 import fr.lolmc.util.Compat;
+import org.bukkit.Location;
+import fr.lolmc.game.AutoAttackManager;
+import fr.lolmc.game.GameStructure;
 
 import fr.lolmc.LolPlugin;
 import fr.lolmc.util.WorldContext;
@@ -304,12 +307,12 @@ public class AbilityListener implements Listener {
      * @return true si une structure a été attaquée
      */
     private boolean tryAttackStructure(Player caster) {
-        if (!manager.hasChampion(caster)) return;
+        if (!manager.hasChampion(caster)) return false;
         var champ = manager.getChampion(caster);
         double range = champ.getAutoAttackRange();
         var tm = LolPlugin.getInstance().getTeamManager();
         var mm = LolPlugin.getInstance().getMapManager();
-        if (mm == null) return;
+        if (mm == null) return false;
 
         GameStructure closest = null;
         double closestDist = Double.MAX_VALUE;
