@@ -73,22 +73,22 @@ public class JungleManager {
         RAPTOR       (EntityType.VEX,          400,  75,  50, 135, "none", 6, "🦅 Raptors"),     // 1 gros + 5 petits
         KRUG         (EntityType.SILVERFISH,   350,  70,  45, 135, "none", 2, "🪨 Krugs"),       // 1 gros + 1 petit (se divise)
         // ── Buffs ──
-        RED_BUFF     (EntityType.MAGMA_CUBE,   1100, 100, 90, 300, "red",  1, "🔴 Sanglepince"),
-        BLUE_BUFF    (EntityType.IRON_GOLEM,   1200, 100, 90, 300, "blue", 1, "🔵 Sentinelle bleue"),
+        RED_BUFF     (EntityType.MAGMA_CUBE,   1100,  90, 90, 300, "red",  1, "🔴 Sanglepince"),
+        BLUE_BUFF    (EntityType.IRON_GOLEM,   1200,  90, 90, 300, "blue", 1, "🔵 Sentinelle bleue"),
         // ── Crabe (rivière) ──
-        SCUTTLE_CRAB (EntityType.TURTLE,       400,  55,  40,  150,"none", 1, "🦀 Crabe Pillargot"),
+        SCUTTLE_CRAB (EntityType.TURTLE,       400,  55,  75,  150,"none", 1, "🦀 Crabe Pillargot"),
         // ── Dragons élémentaires (un seul à la fois sur la carte dans LoL) ──
-        DRAGON_INFERNAL (EntityType.RAVAGER,   3500, 150, 25, 300, "drake_infernal", 1, "🔥 Dragon Infernal"),
-        DRAGON_OCEAN    (EntityType.RAVAGER,   3500, 150, 25, 300, "drake_ocean",    1, "🌊 Dragon Océan"),
-        DRAGON_MOUNTAIN (EntityType.RAVAGER,   3500, 150, 25, 300, "drake_mountain", 1, "⛰ Dragon Montagne"),
-        DRAGON_CLOUD    (EntityType.RAVAGER,   3500, 150, 25, 300, "drake_cloud",    1, "☁ Dragon Foudre"),
-        DRAGON_CHEMTECH (EntityType.RAVAGER,   3500, 150, 25, 300, "drake_chemtech", 1, "☣ Dragon Chimtech"),
-        DRAGON_ELDER    (EntityType.RAVAGER,   5000, 200, 40, 360, "drake_elder",    1, "🐲 Dragon Ancien"),
+        DRAGON_INFERNAL (EntityType.RAVAGER,   3500,  25, 150, 300, "drake_infernal", 1, "🔥 Dragon Infernal"),
+        DRAGON_OCEAN    (EntityType.RAVAGER,   3500,  25, 150, 300, "drake_ocean",    1, "🌊 Dragon Océan"),
+        DRAGON_MOUNTAIN (EntityType.RAVAGER,   3500,  25, 150, 300, "drake_mountain", 1, "⛰ Dragon Montagne"),
+        DRAGON_CLOUD    (EntityType.RAVAGER,   3500,  25, 150, 300, "drake_cloud",    1, "☁ Dragon Foudre"),
+        DRAGON_CHEMTECH (EntityType.RAVAGER,   3500,  25, 150, 300, "drake_chemtech", 1, "☣ Dragon Chimtech"),
+        DRAGON_ELDER    (EntityType.RAVAGER,   5000,  25, 250, 360, "drake_elder",    1, "🐲 Dragon Ancien"),
         // ── Épiques de la fosse ──
         VOIDGRUB     (EntityType.SILVERFISH,    350,  50, 20,  0, "voidgrub", 3, "🐛 Nuée du Néant"),
         ATAKHAN      (EntityType.WARDEN,       9000, 250, 35,  0, "atakhan",  1, "🌺 Atakhan"),
         HERALD       (EntityType.RAVAGER,      4000, 200, 25,  0,  "none", 1, "👁 Héraut de la Faille"),
-        BARON        (EntityType.WARDEN,       8500, 300, 30, 420, "baron",1, "🪱 Baron Nashor");
+        BARON        (EntityType.WARDEN,       8500, 300, 30, 360, "baron",1, "🪱 Baron Nashor");
 
         public final EntityType entity;
         public final double maxHP;
@@ -188,15 +188,49 @@ public class JungleManager {
     // ══════════════════════════════════════════════════════════════
 
     /** Lance la jungle : fait apparaître tous les camps. */
+    // Tâches de premier spawn programmé (annulées au stop)
+    private final java.util.List<org.bukkit.scheduler.BukkitTask> initialSpawnTasks
+        = new java.util.ArrayList<>();
+
+    /** Délai de PREMIER spawn en secondes, fidèle LoL S15. */
+    private static int initialSpawnDelay(MonsterType type) {
+        return switch (type) {
+            case SCUTTLE_CRAB -> 210;   // 3:30
+            case DRAGON_INFERNAL, DRAGON_OCEAN, DRAGON_MOUNTAIN,
+                 DRAGON_CLOUD, DRAGON_CHEMTECH, DRAGON_ELDER -> 300; // 5:00
+            case VOIDGRUB     -> 360;   // 6:00
+            case HERALD       -> 960;   // 16:00
+            case ATAKHAN      -> 1200;  // 20:00
+            case BARON        -> 1500;  // 25:00
+            default           -> 90;    // camps + buffs : 1:30
+        };
+    }
+
     public void startJungle() {
         active = true;
         for (CampSpawn camp : camps.values()) {
-            spawnCamp(camp);
+            int delay = initialSpawnDelay(camp.type);
+            if (delay <= 0) { spawnCamp(camp); continue; }
+            // Chrono visible dans la BossBar pour les épiques
+            if (camp.type.isEpic())
+                epicRespawnAt.put(camp.type.name(), System.currentTimeMillis() + delay * 1000L);
+            final CampSpawn fc = camp;
+            var task = new BukkitRunnable() {
+                @Override public void run() {
+                    if (!active) return;
+                    epicRespawnAt.remove(fc.type.name());
+                    spawnCamp(fc);
+                }
+            }.runTaskLater(LolPlugin.getInstance(), delay * 20L);
+            initialSpawnTasks.add(task);
         }
     }
 
     public void stopJungle() {
         active = false;
+        for (var t : initialSpawnTasks) { if (t != null && !t.isCancelled()) t.cancel(); }
+        initialSpawnTasks.clear();
+        epicRespawnAt.clear();
         clearAllMonsters();
         hideAllRespawnTimers();
     }
