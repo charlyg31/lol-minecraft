@@ -153,11 +153,8 @@ public class Jinx extends BaseChampion {
             double baseDmg=baseMax[rr]*distMult+s.getFinalAD()*fr.lolmc.util.Balance.ratio("r_jinx","ad",1.3)*distMult;
 
             for(var __t : TargetingUtil.entitiesInRadius(c, main.getLocation(), 5.0)){
-                // CORRECTION : Utilisation de l'attribut GENERIC_MAX_HEALTH au lieu de getMaxHealth() déprécié
-                var maxHealthAttr = __t.getAttribute(fr.lolmc.util.Compat.maxHealth());
-                double maxHealth = maxHealthAttr != null ? maxHealthAttr.getValue() : 20.0;
-
-                double missingHP=maxHealth-__t.getHealth();
+                // PV manquants à l'échelle LoL (joueur=HPSystem, Baron=virtuel, sbire=vanilla)
+                double missingHP = TargetingUtil.getRealMaxHealth(__t) - TargetingUtil.getRealHealth(__t);
                 double dmg=baseDmg+missingHP*missPct[rr];
                 TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.PHYSICAL);
             }

@@ -136,8 +136,7 @@ public class Annie extends BaseChampion {
             if(target==null){c.sendActionBar(Component.text("Aucune cible",NamedTextColor.GRAY));return;}
             double[] base=fr.lolmc.util.Balance.base("q_annie",new double[]{80,125,170,215,260});
             double dmg=base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("q_annie","ap",0.80);
-            boolean kills=target.getHealth()-dmg<=0;
-            if(target instanceof Player __tp){var cm=LolPlugin.getInstance().getChampionManager();if(cm.hasChampion(__tp))kills=cm.getChampion(__tp).getHPSystem().getCurrentHP()-dmg<=0;}
+            boolean kills=TargetingUtil.getRealHealth(target)-dmg<=0;
             if(hasPyromancyStun(c.getUniqueId())){
                 var cc=LolPlugin.getInstance().getCCManager();
                 int lvl=LolPlugin.getInstance().getChampionManager().hasChampion(c)?LolPlugin.getInstance().getChampionManager().getChampion(c).getLevelSystem().getLevel():1;
