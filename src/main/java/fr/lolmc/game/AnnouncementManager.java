@@ -27,6 +27,7 @@ public class AnnouncementManager {
     private final java.util.Map<java.util.UUID, Integer> spreeStreak = new java.util.HashMap<>();
 
     private boolean firstBloodDone = false;
+    public boolean isFirstBloodDone() { return firstBloodDone; }
     // Série de kills par joueur (pour Double/Triple/Quadra/Penta)
     private final Map<UUID, Integer> killStreak = new HashMap<>();
     // Dernier kill (pour réinitialiser la série après un délai)

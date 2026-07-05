@@ -195,6 +195,22 @@ public class AbilityListener implements Listener {
 
     @EventHandler
     public void onInteract(PlayerInteractEvent e) {
+        // Œil du Héraut : clic droit → invoquer le Héraut
+        var item = e.getItem();
+        if (item != null && item.hasItemMeta() && item.getItemMeta()
+                .getPersistentDataContainer().has(
+                    new org.bukkit.NamespacedKey(LolPlugin.getInstance(), "herald_eye"),
+                    org.bukkit.persistence.PersistentDataType.BYTE)
+                && (e.getAction() == org.bukkit.event.block.Action.RIGHT_CLICK_AIR
+                 || e.getAction() == org.bukkit.event.block.Action.RIGHT_CLICK_BLOCK)) {
+            e.setCancelled(true);
+            var jm2 = LolPlugin.getInstance().getJungleManager();
+            if (jm2 != null && jm2.summonHerald(e.getPlayer())) {
+                item.setAmount(item.getAmount() - 1); // consommer l'Œil
+            }
+            return;
+        }
+
         Player caster = e.getPlayer();
         if (!manager.hasChampion(caster)) return;
         if (!fr.lolmc.util.WorldContext.isInGameWorld(caster)) return;

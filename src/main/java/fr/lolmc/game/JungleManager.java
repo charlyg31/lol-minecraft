@@ -316,7 +316,35 @@ public class JungleManager {
             // les camps rouge/bleu restent des buffs personnels.
             if (!type.buff.equals("none")) {
                 if (type.isEpic()) {
-                    applyTeamBuff(killer, type.buff);
+                    // Héraut : donner l'Œil du Héraut au tueur
+                    if (type == MonsterType.HERALD) {
+                        giveHeraldEye(killer);
+                    }
+                    String buffId = type.buff;
+                    // Atakhan : forme selon l'agressivité de la partie (kills totaux)
+                    if (type == MonsterType.ATAKHAN) {
+                        int totalKills = 0;
+                        var msb2 = LolPlugin.getInstance().getMatchScoreboard();
+                        if (msb2 != null)
+                            for (var st : msb2.getStats().values()) totalKills += st.kills;
+                        buffId = totalKills >= 15 ? "atakhan_voracious" : "atakhan";
+                    }
+                    applyTeamBuff(killer, buffId);
+                    // Bounty d'objectif (comeback) sur les épiques
+                    if (type.isEpic()) {
+                        var ktm = LolPlugin.getInstance().getTeamManager().getTeam(killer);
+                        if (ktm != null) {
+                            int objBounty = LolPlugin.getInstance().getRewardManager()
+                                .getObjectiveBounty(ktm);
+                            if (objBounty > 0) {
+                                LolPlugin.getInstance().getGoldManager()
+                                    .addGold(killer.getUniqueId(), objBounty);
+                                killer.sendActionBar(net.kyori.adventure.text.Component.text(
+                                    "💰 Bounty d'objectif +" + objBounty + " or (comeback)!",
+                                    net.kyori.adventure.text.format.NamedTextColor.GOLD));
+                            }
+                        }
+                    }
                     if (type.isDragon()) {
                         var dtm = LolPlugin.getInstance().getTeamManager();
                         var dteam = dtm.getTeam(killer);
@@ -396,15 +424,20 @@ public class JungleManager {
     // BUFFS (Rouge / Bleu / Baron)
     // ══════════════════════════════════════════════════════════════
 
+    // Tueur de l'objectif en cours d'application (pour les buffs qui le distinguent)
+    private Player currentObjectiveKiller = null;
+
     /** Applique un buff à TOUTE l'équipe du tueur (objectifs : Dragon, Baron, âme...). */
     private void applyTeamBuff(Player killer, String buff) {
         var tm = LolPlugin.getInstance().getTeamManager();
         var team = tm.getTeam(killer);
-        if (team == null) { applyBuff(killer, buff); return; }
+        currentObjectiveKiller = killer;
+        if (team == null) { applyBuff(killer, buff); currentObjectiveKiller = null; return; }
         for (UUID id : tm.getTeamMembers(team)) {
             Player m = LolPlugin.getInstance().getServer().getPlayer(id);
             if (m != null && m.isOnline()) applyBuff(m, buff);
         }
+        currentObjectiveKiller = null;
     }
 
     private void applyBuff(Player player, String buff) {
@@ -484,14 +517,60 @@ public class JungleManager {
                     champ.getStats().addBonusAP(-40);
                 }, 180);
             }
-            case "dragon_soul" -> {
-                // Âme du Dragon : bénédiction PERMANENTE d'équipe
-                champ.getStats().addBonusAD(20);
-                champ.getStats().addBonusAP(30);
-                champ.getStats().multiplyHP(1.08);
+            // ── Âmes du Dragon (permanentes, distinctes par élément) ──
+            // ── Atakhan Ruineux (partie calme) : buff équipe permanent ──
+            case "atakhan" -> {
+                champ.getStats().addBonusAD(15);
+                champ.getStats().addBonusAP(25);
+                champ.getStats().multiplyHP(1.05);
                 player.sendActionBar(Component.text(
-                        "🐉 ÂME DU DRAGON! Bénédiction permanente (+20 AD, +30 AP, +8% PV)",
-                        NamedTextColor.LIGHT_PURPLE));
+                    "🌺 ATAKHAN RUINEUX! +15 AD +25 AP +5% PV permanents", NamedTextColor.LIGHT_PURPLE));
+            }
+            // ── Atakhan Vorace (partie sanglante ≥15 kills) : résurrection + or ──
+            case "atakhan_voracious" -> {
+                boolean isKiller = player.equals(currentObjectiveKiller);
+                // Le tueur reçoit une résurrection unique (Pétales Sanglants)
+                var pmv = LolPlugin.getInstance().getPassiveManager();
+                if (pmv != null && isKiller) pmv.grantAtakhanRevive(player);
+                // Toute l'équipe : +150 or (pétales)
+                LolPlugin.getInstance().getGoldManager().addGold(player.getUniqueId(), 150);
+                player.sendActionBar(Component.text(
+                    isKiller ? "🌺 ATAKHAN VORACE! Résurrection + 150 or"
+                             : "🌺 ATAKHAN VORACE! +150 or (Pétales Sanglants)",
+                    NamedTextColor.DARK_RED));
+            }
+            case "dragon_soul_infernal" -> {
+                // Infernal : burst AoE — +AD/AP forts
+                champ.getStats().addBonusAD(30);
+                champ.getStats().addBonusAP(45);
+                player.sendActionBar(Component.text(
+                    "🔥 ÂME INFERNALE! +30 AD +45 AP permanents", NamedTextColor.RED));
+            }
+            case "dragon_soul_ocean" -> {
+                // Océan : régénération puissante
+                champ.getStats().addBonusAD(10);
+                champ.getStats().multiplyHP(1.05);
+                player.addPotionEffect(new PotionEffect(
+                    PotionEffectType.REGENERATION, Integer.MAX_VALUE, 1, false, false));
+                player.sendActionBar(Component.text(
+                    "🌊 ÂME OCÉANIQUE! Régénération permanente +5% PV", NamedTextColor.AQUA));
+            }
+            case "dragon_soul_mountain" -> {
+                // Montagne : bouclier + résistances
+                champ.getStats().addBonusArmor(25);
+                champ.getStats().addBonusMR(25);
+                champ.getStats().multiplyHP(1.10);
+                player.sendActionBar(Component.text(
+                    "⛰ ÂME MONTAGNEUSE! +25 Armure +25 RM +10% PV", NamedTextColor.GOLD));
+            }
+            case "dragon_soul_cloud", "dragon_soul_chemtech" -> {
+                // Nuage : vitesse de déplacement massive
+                champ.getStats().addBonusAD(15);
+                champ.getStats().addBonusAP(20);
+                player.addPotionEffect(new PotionEffect(
+                    PotionEffectType.SPEED, Integer.MAX_VALUE, 1, false, false));
+                player.sendActionBar(Component.text(
+                    "☁ ÂME DES NUAGES! +Vitesse permanente +15 AD +20 AP", NamedTextColor.WHITE));
             }
         }
         var hud = LolPlugin.getInstance().getHUDManager();
@@ -516,6 +595,105 @@ public class JungleManager {
     // ══════════════════════════════════════════════════════════════
     // HELPERS
     // ══════════════════════════════════════════════════════════════
+
+    /** Donne l'Œil du Héraut : clic droit → invoque un Héraut qui charge la tour. */
+    private void giveHeraldEye(Player killer) {
+        var eye = new org.bukkit.inventory.ItemStack(org.bukkit.Material.ENDER_EYE);
+        var meta = eye.getItemMeta();
+        meta.displayName(net.kyori.adventure.text.Component.text(
+            "👁 Œil du Héraut", net.kyori.adventure.text.format.NamedTextColor.LIGHT_PURPLE));
+        meta.lore(java.util.List.of(net.kyori.adventure.text.Component.text(
+            "Clic droit près d'une tour ennemie pour invoquer le Héraut",
+            net.kyori.adventure.text.format.NamedTextColor.GRAY)));
+        meta.getPersistentDataContainer().set(
+            new org.bukkit.NamespacedKey(LolPlugin.getInstance(), "herald_eye"),
+            org.bukkit.persistence.PersistentDataType.BYTE, (byte) 1);
+        eye.setItemMeta(meta);
+        killer.getInventory().addItem(eye);
+        killer.sendMessage(net.kyori.adventure.text.Component.text(
+            "👁 Tu as reçu l'Œil du Héraut! Clic droit près d'une tour ennemie.",
+            net.kyori.adventure.text.format.NamedTextColor.LIGHT_PURPLE));
+    }
+
+    /**
+     * Invoque un Héraut allié qui charge la tour ennemie la plus proche.
+     * Le Héraut inflige 400 dégâts à la structure puis meurt (comme LoL).
+     */
+    public boolean summonHerald(Player summoner) {
+        var tm = LolPlugin.getInstance().getTeamManager();
+        var team = tm.getTeam(summoner);
+        if (team == null) return false;
+        var mm = LolPlugin.getInstance().getMapManager();
+        if (mm == null) return false;
+
+        // Tour ennemie la plus proche (max 30 blocs)
+        fr.lolmc.game.GameStructure target = null;
+        double best = 30 * 30;
+        for (var s : mm.getStructures()) {
+            if (s.isDestroyed() || s.getTeam() == team) continue;
+            if (s.getType() != fr.lolmc.game.GameStructure.Type.TURRET) continue;
+            double d = s.getCenter().distanceSquared(summoner.getLocation());
+            if (d < best) { best = d; target = s; }
+        }
+        if (target == null) {
+            summoner.sendActionBar(net.kyori.adventure.text.Component.text(
+                "❌ Aucune tour ennemie à proximité (30 blocs)",
+                net.kyori.adventure.text.format.NamedTextColor.RED));
+            return false;
+        }
+
+        // Spawn du Héraut allié
+        var spawn = summoner.getLocation().clone().add(1, 0, 1);
+        var herald = (org.bukkit.entity.Ravager) spawn.getWorld()
+            .spawnEntity(spawn, org.bukkit.entity.EntityType.RAVAGER);
+        herald.customName(net.kyori.adventure.text.Component.text(
+            "👁 Héraut de la Faille", net.kyori.adventure.text.format.NamedTextColor.LIGHT_PURPLE));
+        herald.setCustomNameVisible(true);
+        var maxHpAttr = herald.getAttribute(fr.lolmc.util.Compat.maxHealth());
+        if (maxHpAttr != null) { maxHpAttr.setBaseValue(500); herald.setHealth(500); }
+
+        final var ft = target;
+        // Le Héraut charge : avance vers la tour, puis frappe pour 400
+        new org.bukkit.scheduler.BukkitRunnable() {
+            int ticks = 0;
+            @Override public void run() {
+                if (!herald.isValid() || ft.isDestroyed()) { 
+                    if (herald.isValid()) herald.remove();
+                    cancel(); return; 
+                }
+                ticks++;
+                if (ticks > 20 * 15) { herald.remove(); cancel(); return; } // timeout 15s
+                double dist = herald.getLocation().distance(ft.getCenter());
+                if (dist > 3.5) {
+                    herald.getPathfinder().moveTo(ft.getCenter(), 1.6);
+                } else {
+                    // CHARGE ! 400 dégâts à la structure puis mort du Héraut
+                    boolean phaseChanged = ft.takeDamage(400);
+                    ft.getCenter().getWorld().spawnParticle(
+                        org.bukkit.Particle.EXPLOSION_EMITTER, ft.getCenter().clone().add(0,1,0), 2);
+                    ft.getCenter().getWorld().playSound(ft.getCenter(),
+                        org.bukkit.Sound.ENTITY_GENERIC_EXPLODE, 1.5f, 0.7f);
+                    if (phaseChanged) mm.updateStructurePhase(ft);
+                    if (ft.isDestroyed()) {
+                        var sdl = LolPlugin.getInstance().getStructureDamageListener();
+                        // Détruire proprement via le flux normal
+                        LolPlugin.getInstance().getServer().broadcast(
+                            net.kyori.adventure.text.Component.text(
+                                "👁 Le Héraut a détruit une tourelle!",
+                                net.kyori.adventure.text.format.NamedTextColor.LIGHT_PURPLE));
+                    }
+                    herald.setHealth(0.01);
+                    herald.damage(1000); // mort du Héraut après la charge
+                    cancel();
+                }
+            }
+        }.runTaskTimer(LolPlugin.getInstance(), 0L, 5L);
+
+        summoner.sendActionBar(net.kyori.adventure.text.Component.text(
+            "👁 Héraut invoqué — il charge la tour!",
+            net.kyori.adventure.text.format.NamedTextColor.LIGHT_PURPLE));
+        return true;
+    }
 
     public int getVoidgrubKills(fr.lolmc.team.TeamManager.Team team) {
         return voidgrubKills.getOrDefault(team, 0);

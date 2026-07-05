@@ -63,6 +63,11 @@ public class SummonerSpellManager {
         return Math.max(0, (until - System.currentTimeMillis()) / 1000.0);
     }
 
+    /** Annule le cooldown d'un sort (remboursement TP interrompu). */
+    public void resetCooldown(Player player, Spell spell) {
+        cooldowns.remove(player.getUniqueId() + ":" + spell.name());
+    }
+
     private void triggerCooldown(Player player, Spell spell) {
         cooldowns.put(player.getUniqueId() + ":" + spell.name(),
                 System.currentTimeMillis() + spell.cooldownSeconds * 1000L);
@@ -191,6 +196,61 @@ public class SummonerSpellManager {
 
     // ── Téléportation : retour à la base (simplifié) ──
 
+    // UUID → tâche de TP en cours (canalisation interruptible)
+    private final java.util.Map<java.util.UUID, org.bukkit.scheduler.BukkitTask> channeling
+        = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** Interrompt la canalisation de TP (appelé quand le caster prend des dégâts/CC). */
+    public void interruptTeleport(Player caster) {
+        var task = channeling.remove(caster.getUniqueId());
+        if (task != null) {
+            task.cancel();
+            caster.sendActionBar(net.kyori.adventure.text.Component.text(
+                "❌ Téléportation interrompue!", net.kyori.adventure.text.format.NamedTextColor.RED));
+            caster.getWorld().playSound(caster.getLocation(),
+                org.bukkit.Sound.BLOCK_FIRE_EXTINGUISH, 1f, 0.8f);
+            // Rendre le CD (LoL rembourse partiellement) : reset le cooldown du TP
+            resetCooldown(caster, Spell.TELEPORT);
+        }
+    }
+
+    public boolean isChanneling(Player caster) {
+        return channeling.containsKey(caster.getUniqueId());
+    }
+
+    /**
+     * Canalise 4s avec particules, puis exécute l'action si non interrompu.
+     * Interruptible via interruptTeleport().
+     */
+    private void channelTeleport(Player caster, Runnable onComplete) {
+        // Annuler une canalisation précédente
+        var old = channeling.remove(caster.getUniqueId());
+        if (old != null) old.cancel();
+
+        var task = new org.bukkit.scheduler.BukkitRunnable() {
+            int ticks = 0;
+            @Override public void run() {
+                if (!caster.isOnline()) { channeling.remove(caster.getUniqueId()); cancel(); return; }
+                if (ticks >= 80) { // 4s écoulées → TP
+                    channeling.remove(caster.getUniqueId());
+                    cancel();
+                    onComplete.run();
+                    return;
+                }
+                // Cercle de canalisation violet autour du caster
+                double progress = ticks / 80.0;
+                double angle = ticks * 0.3;
+                var loc = caster.getLocation();
+                caster.getWorld().spawnParticle(org.bukkit.Particle.DUST,
+                    loc.clone().add(Math.cos(angle) * 1.2, 0.1 + progress * 2.0, Math.sin(angle) * 1.2),
+                    2, 0, 0, 0, 0,
+                    new org.bukkit.Particle.DustOptions(org.bukkit.Color.fromRGB(180, 80, 255), 1.2f));
+                ticks += 2;
+            }
+        }.runTaskTimer(LolPlugin.getInstance(), 0L, 2L);
+        channeling.put(caster.getUniqueId(), task);
+    }
+
     private boolean castTeleport(Player caster) {
         // LoL : TP vers une tourelle alliee, un sbire allié ou la base
         // On cherche la cible la plus proche dans la direction du regard
@@ -220,14 +280,12 @@ public class SummonerSpellManager {
                     caster.sendActionBar(net.kyori.adventure.text.Component.text(
                         "\uD83C\uDF00 Teleportation vers " + target.getType().name() + " dans 4s...",
                         net.kyori.adventure.text.format.NamedTextColor.AQUA));
-                    new org.bukkit.scheduler.BukkitRunnable() {
-                        @Override public void run() {
-                            if (caster.isOnline()) {
-                                caster.teleport(target.getCenter());
-                                caster.playSound(target.getCenter(), org.bukkit.Sound.ENTITY_ENDERMAN_TELEPORT, 1f, 1f);
-                            }
+                    channelTeleport(caster, () -> {
+                        if (caster.isOnline()) {
+                            caster.teleport(target.getCenter());
+                            caster.playSound(target.getCenter(), org.bukkit.Sound.ENTITY_ENDERMAN_TELEPORT, 1f, 1f);
                         }
-                    }.runTaskLater(LolPlugin.getInstance(), 80L); // 4s
+                    });
                     return true;
                 }
             }
@@ -250,12 +308,10 @@ public class SummonerSpellManager {
             if (minionTarget != null) {
                 final var ft = minionTarget;
                 caster.sendActionBar(Component.text("🌀 Téléportation → sbire allié dans 4s...", NamedTextColor.AQUA));
-                new org.bukkit.scheduler.BukkitRunnable() {
-                    @Override public void run() {
-                        if (caster.isOnline() && ft.isValid())
-                            caster.teleportAsync(ft.getLocation().add(0,0.1,0));
-                    }
-                }.runTaskLater(LolPlugin.getInstance(), 80L);
+                channelTeleport(caster, () -> {
+                    if (caster.isOnline() && ft.isValid())
+                        caster.teleportAsync(ft.getLocation().add(0,0.1,0));
+                });
                 return true;
             }
         }
@@ -265,14 +321,12 @@ public class SummonerSpellManager {
         if (base != null && caster.isOnline()) {
             caster.sendActionBar(net.kyori.adventure.text.Component.text(
                 "\uD83C\uDF00 Retour a la base dans 4s...", net.kyori.adventure.text.format.NamedTextColor.AQUA));
-            new org.bukkit.scheduler.BukkitRunnable() {
-                @Override public void run() {
-                    if (caster.isOnline()) {
-                        caster.teleport(base);
-                        caster.playSound(base, org.bukkit.Sound.ENTITY_ENDERMAN_TELEPORT, 1f, 1f);
-                    }
+            channelTeleport(caster, () -> {
+                if (caster.isOnline()) {
+                    caster.teleport(base);
+                    caster.playSound(base, org.bukkit.Sound.ENTITY_ENDERMAN_TELEPORT, 1f, 1f);
                 }
-            }.runTaskLater(LolPlugin.getInstance(), 80L);
+            });
             return true;
         }
         return false;

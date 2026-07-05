@@ -673,6 +673,30 @@ public class PassiveManager {
             // Simuler bouclier absorbant 1 dégât de sort (skip sort = annuler 1 dégât)
         }
 
+        // ── Atakhan Vorace : résurrection unique (avant GA) ──
+        if (state.atakhanRevive && hp.isDead() && !state.gaActive) {
+            state.atakhanRevive = false;
+            state.gaActive = true;
+            hp.setCurrentHP(1);
+            victim.showTitle(net.kyori.adventure.title.Title.title(
+                    net.kyori.adventure.text.Component.text("🌺"),
+                    net.kyori.adventure.text.Component.text("Pétales Sanglants — Résurrection 4s..."),
+                    net.kyori.adventure.title.Title.Times.times(
+                            java.time.Duration.ofMillis(250),
+                            java.time.Duration.ofMillis(3000),
+                            java.time.Duration.ofMillis(500))));
+            new BukkitRunnable() {
+                @Override public void run() {
+                    if (!victim.isOnline()) { state.gaActive = false; return; }
+                    hp.setCurrentHP(hp.getMaxHP() * 0.60);
+                    state.gaActive = false;
+                    victim.getWorld().spawnParticle(org.bukkit.Particle.CHERRY_LEAVES,
+                        victim.getLocation().add(0,1,0), 40, 0.5, 1, 0.5);
+                }
+            }.runTaskLater(LolPlugin.getInstance(), 80L);
+            return;
+        }
+
         // ── Guardian Angel: résurrection (300s CD) ──
         if (hasAnyItem(victim,"guardian_angel")
                 && hp.isDead()
@@ -1321,6 +1345,11 @@ public class PassiveManager {
         var st = getState(target);
         return st.antihealTargets.containsKey(target.getUniqueId())
             && st.antihealTargets.get(target.getUniqueId()) > System.currentTimeMillis();
+    }
+
+    /** Accorde une résurrection unique (Atakhan Vorace — Pétales Sanglants). */
+    public void grantAtakhanRevive(Player player) {
+        getState(player).atakhanRevive = true;
     }
 
     public boolean isReviving(java.util.UUID uuid) {
