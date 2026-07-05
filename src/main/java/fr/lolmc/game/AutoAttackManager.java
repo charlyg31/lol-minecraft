@@ -76,6 +76,64 @@ public class AutoAttackManager {
             attacker.sendActionBar(Component.text("🔓 Verrouillage annulé", NamedTextColor.GRAY));
     }
 
+    // ══════════════════════════════════════════════════════════
+    // MARQUEURS DE CIBLE (per-player : seul l'attaquant les voit)
+    //  Rouge : cible actuellement sous le viseur
+    //  Vert  : cible verrouillée (lock-on actif)
+    // ══════════════════════════════════════════════════════════
+    private org.bukkit.scheduler.BukkitTask visualsTask;
+
+    public void startVisuals() {
+        if (visualsTask != null && !visualsTask.isCancelled()) return;
+        visualsTask = new BukkitRunnable() {
+            int phase = 0;
+            @Override public void run() {
+                phase++;
+                var cm = LolPlugin.getInstance().getChampionManager();
+                for (Player viewer : fr.lolmc.util.WorldContext.getGamePlayers()) {
+                    if (!cm.hasChampion(viewer)) continue;
+                    if (viewer.getGameMode() == GameMode.SPECTATOR) continue;
+
+                    // Cible verrouillée → anneau VERT
+                    LivingEntity locked = null;
+                    UUID lockedId = lockedTargets.get(viewer.getUniqueId());
+                    if (lockedId != null && Bukkit.getEntity(lockedId)
+                            instanceof LivingEntity le && !le.isDead()
+                            && le.getWorld().equals(viewer.getWorld())) {
+                        locked = le;
+                        drawTargetRing(viewer, le, Color.fromRGB(60, 220, 90), phase);
+                    }
+
+                    // Cible sous le viseur → anneau ROUGE (si différente du lock)
+                    double range = cm.getChampion(viewer).getAutoAttackRange();
+                    LivingEntity aimed = fr.lolmc.util.TargetingUtil.getTargetedEnemy(viewer, range);
+                    if (aimed != null && !aimed.equals(locked)) {
+                        drawTargetRing(viewer, aimed, Color.fromRGB(230, 60, 60), phase);
+                    }
+                }
+            }
+        }.runTaskTimer(LolPlugin.getInstance(), 4L, 4L);
+    }
+
+    public void stopVisuals() {
+        if (visualsTask != null) { visualsTask.cancel(); visualsTask = null; }
+        lockedTargets.clear();
+    }
+
+    /** Petit anneau rotatif aux pieds de la cible, visible par le seul viewer. */
+    private void drawTargetRing(Player viewer, LivingEntity target, Color color, int phase) {
+        var dust = new Particle.DustOptions(color, 0.9f);
+        Location base = target.getLocation().add(0, 0.15, 0);
+        double r = 0.65;
+        double spin = phase * 0.35; // rotation lente
+        for (int i = 0; i < 4; i++) {
+            double a = spin + Math.PI / 2 * i;
+            viewer.spawnParticle(Particle.DUST,
+                base.clone().add(Math.cos(a) * r, 0, Math.sin(a) * r),
+                1, 0, 0, 0, 0, dust);
+        }
+    }
+
     private void startAutoFire() {
         if (autoFireTask != null && !autoFireTask.isCancelled()) return;
         autoFireTask = new BukkitRunnable() {
