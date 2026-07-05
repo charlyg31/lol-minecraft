@@ -39,6 +39,39 @@ import java.util.*;
 public class JungleManager {
     private static final java.util.Map<Object, String> dragonSoulType = new java.util.HashMap<>();
 
+    // ── Rotation des dragons (LoL) : 3 premiers élémentaires DIFFÉRENTS,
+    //    le 3e fige l'élément de la Faille ; après une âme → Elder ──
+    private final java.util.List<MonsterType> spawnedDragonElements = new java.util.ArrayList<>();
+    private MonsterType lockedDragonElement = null;
+
+    private static final MonsterType[] DRAGON_POOL = {
+        MonsterType.DRAGON_INFERNAL, MonsterType.DRAGON_OCEAN,
+        MonsterType.DRAGON_MOUNTAIN, MonsterType.DRAGON_CLOUD,
+        MonsterType.DRAGON_CHEMTECH
+    };
+
+    /** Prochain dragon à faire apparaître dans la fosse (règles LoL S15). */
+    private MonsterType nextDragonType() {
+        // Une équipe a l'âme → Dragon Ancien
+        for (int n : dragonsKilled.values()) {
+            if (n >= 4) return MonsterType.DRAGON_ELDER;
+        }
+        if (lockedDragonElement != null) return lockedDragonElement;
+        // Tirer un élément pas encore apparu
+        java.util.List<MonsterType> pool = new java.util.ArrayList<>();
+        for (MonsterType t : DRAGON_POOL)
+            if (!spawnedDragonElements.contains(t)) pool.add(t);
+        MonsterType pick = pool.get(new java.util.Random().nextInt(pool.size()));
+        spawnedDragonElements.add(pick);
+        if (spawnedDragonElements.size() == 3) {
+            lockedDragonElement = pick;
+            org.bukkit.Bukkit.broadcast(net.kyori.adventure.text.Component.text(
+                "🐉 La Faille se transforme : élément " + pick.displayName + " !",
+                net.kyori.adventure.text.format.NamedTextColor.LIGHT_PURPLE));
+        }
+        return pick;
+    }
+
     public static NamespacedKey KEY_MONSTER; // type du monstre
     public static NamespacedKey KEY_BUFF;    // buff accordé (red/blue/none)
     public static NamespacedKey KEY_GOLD;    // or individuel du mob
@@ -118,7 +151,7 @@ public class JungleManager {
     /** Un emplacement de camp configuré. */
     public static class CampSpawn {
         public final String id;
-        public final MonsterType type;
+        public MonsterType type; // mutable : la fosse du dragon change d'élément (rotation LoL)
         public final Location location;
         public final Set<UUID> liveEntities = new HashSet<>();  // toutes les entités du camp
         public long respawnAt = 0;        // timestamp de réapparition
@@ -231,11 +264,17 @@ public class JungleManager {
         for (var t : initialSpawnTasks) { if (t != null && !t.isCancelled()) t.cancel(); }
         initialSpawnTasks.clear();
         epicRespawnAt.clear();
+        spawnedDragonElements.clear();
+        lockedDragonElement = null;
+        dragonsKilled.clear();
+        dragonSoulType.clear();
         clearAllMonsters();
         hideAllRespawnTimers();
     }
 
     private void spawnCamp(CampSpawn camp) {
+        // Fosse du dragon : l'élément suit la rotation LoL
+        if (camp.type.isDragon()) camp.type = nextDragonType();
         MonsterType type = camp.type;
         Location loc = camp.location;
         if (loc.getWorld() == null) return;
@@ -475,7 +514,9 @@ public class JungleManager {
                             dragonSoulType.putIfAbsent(dteam, type.buff.replace("drake_", ""));
                             int n = dragonsKilled.merge(dteam, 1, Integer::sum);
                             if (n >= 4) {
-                                String soul = dragonSoulType.getOrDefault(dteam, "infernal");
+                                String soul = lockedDragonElement != null
+                                    ? lockedDragonElement.buff.replace("drake_", "")
+                                    : dragonSoulType.getOrDefault(dteam, "infernal");
                                 applyTeamBuff(killer, "dragon_soul_" + soul);
                                 LolPlugin.getInstance().getServer().broadcast(Component.text(
                                         "🐉 L'équipe de " + killer.getName() + " a obtenu l'ÂME DU DRAGON!",
