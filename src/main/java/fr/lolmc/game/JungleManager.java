@@ -101,27 +101,27 @@ public class JungleManager {
     public enum MonsterType {
         // ── Camps neutres (certains en groupes) ──
         // Format: entity, maxHP, gold, xp, respawnSec, buff, groupCount, displayName
-        GROMP        (EntityType.SLIME,        500,  80,  60, 135, "none", 1, "🐸 Gromp"),
-        MURKWOLF     (EntityType.WOLF,         450,  85,  55, 135, "none", 3, "🐺 Loups"),       // 1 gros + 2 petits
-        RAPTOR       (EntityType.VEX,          400,  75,  50, 135, "none", 6, "🦅 Raptors"),     // 1 gros + 5 petits
-        KRUG         (EntityType.SILVERFISH,   350,  70,  45, 135, "none", 2, "🪨 Krugs"),       // 1 gros + 1 petit (se divise)
+        GROMP        (EntityType.SLIME,        2050,  80,  60, 135, "none", 1, "🐸 Gromp"),
+        MURKWOLF     (EntityType.WOLF,         1300,  85,  55, 135, "none", 3, "🐺 Loups"),       // 1 gros + 2 petits
+        RAPTOR       (EntityType.VEX,          1000,  75,  50, 135, "none", 6, "🦅 Raptors"),     // 1 gros + 5 petits
+        KRUG         (EntityType.SILVERFISH,   1400,  70,  45, 135, "none", 2, "🪨 Krugs"),       // 1 gros + 1 petit (se divise)
         // ── Buffs ──
-        RED_BUFF     (EntityType.MAGMA_CUBE,   1100,  90, 90, 300, "red",  1, "🔴 Sanglepince"),
-        BLUE_BUFF    (EntityType.IRON_GOLEM,   1200,  90, 90, 300, "blue", 1, "🔵 Sentinelle bleue"),
+        RED_BUFF     (EntityType.MAGMA_CUBE,   2100,  90, 90, 300, "red",  1, "🔴 Sanglepince"),
+        BLUE_BUFF    (EntityType.IRON_GOLEM,   2100,  90, 90, 300, "blue", 1, "🔵 Sentinelle bleue"),
         // ── Crabe (rivière) ──
-        SCUTTLE_CRAB (EntityType.TURTLE,       400,  55,  75,  150,"none", 1, "🦀 Crabe Pillargot"),
+        SCUTTLE_CRAB (EntityType.TURTLE,       1216,  55,  75,  150,"none", 1, "🦀 Crabe Pillargot"),
         // ── Dragons élémentaires (un seul à la fois sur la carte dans LoL) ──
         DRAGON_INFERNAL (EntityType.RAVAGER,   3500,  25, 150, 300, "drake_infernal", 1, "🔥 Dragon Infernal"),
         DRAGON_OCEAN    (EntityType.RAVAGER,   3500,  25, 150, 300, "drake_ocean",    1, "🌊 Dragon Océan"),
         DRAGON_MOUNTAIN (EntityType.RAVAGER,   3500,  25, 150, 300, "drake_mountain", 1, "⛰ Dragon Montagne"),
         DRAGON_CLOUD    (EntityType.RAVAGER,   3500,  25, 150, 300, "drake_cloud",    1, "☁ Dragon Foudre"),
         DRAGON_CHEMTECH (EntityType.RAVAGER,   3500,  25, 150, 300, "drake_chemtech", 1, "☣ Dragon Chimtech"),
-        DRAGON_ELDER    (EntityType.RAVAGER,   5000,  25, 250, 360, "drake_elder",    1, "🐲 Dragon Ancien"),
+        DRAGON_ELDER    (EntityType.RAVAGER,   6400,  25, 250, 360, "drake_elder",    1, "🐲 Dragon Ancien"),
         // ── Épiques de la fosse ──
-        VOIDGRUB     (EntityType.SILVERFISH,    350,  50, 20,  0, "voidgrub", 3, "🐛 Nuée du Néant"),
-        ATAKHAN      (EntityType.WARDEN,       9000, 250, 35,  0, "atakhan",  1, "🌺 Atakhan"),
-        HERALD       (EntityType.RAVAGER,      4000, 200, 25,  0,  "none", 1, "👁 Héraut de la Faille"),
-        BARON        (EntityType.WARDEN,       8500, 300, 30, 360, "baron",1, "🪱 Baron Nashor");
+        VOIDGRUB     (EntityType.SILVERFISH,    550,  50, 20,  0, "voidgrub", 3, "🐛 Nuée du Néant"),
+        ATAKHAN      (EntityType.WARDEN,       12000, 250, 35,  0, "atakhan",  1, "🌺 Atakhan"),
+        HERALD       (EntityType.RAVAGER,      7125, 200, 25,  0,  "none", 1, "👁 Héraut de la Faille"),
+        BARON        (EntityType.WARDEN,       9000, 300, 30, 360, "baron",1, "🪱 Baron Nashor");
 
         public final EntityType entity;
         public final double maxHP;
@@ -813,10 +813,11 @@ public class JungleManager {
             "👁 Héraut de la Faille", net.kyori.adventure.text.format.NamedTextColor.LIGHT_PURPLE));
         herald.setCustomNameVisible(true);
         var maxHpAttr = herald.getAttribute(fr.lolmc.util.Compat.maxHealth());
-        if (maxHpAttr != null) { maxHpAttr.setBaseValue(500); herald.setHealth(500); }
+        if (maxHpAttr != null) { maxHpAttr.setBaseValue(1024); herald.setHealth(1024); }
+        fr.lolmc.util.VirtualHP.init(herald, 2000); // HP LoL du Heraut invoque
 
         final var ft = target;
-        // Le Héraut charge : avance vers la tour, puis frappe pour 400
+        // Le Héraut charge : avance vers la tour, puis frappe pour 1500
         new org.bukkit.scheduler.BukkitRunnable() {
             int ticks = 0;
             @Override public void run() {
@@ -831,7 +832,7 @@ public class JungleManager {
                     herald.getPathfinder().moveTo(ft.getCenter(), 1.6);
                 } else {
                     // CHARGE ! 400 dégâts à la structure puis mort du Héraut
-                    boolean phaseChanged = ft.takeDamage(400);
+                    boolean phaseChanged = ft.takeDamage(1500);
                     ft.getCenter().getWorld().spawnParticle(
                         org.bukkit.Particle.EXPLOSION_EMITTER, ft.getCenter().clone().add(0,1,0), 2);
                     ft.getCenter().getWorld().playSound(ft.getCenter(),
