@@ -64,15 +64,16 @@ public class Zed extends BaseChampion {
     static class AA extends BasicAttackAbility {
         AA(){super("zed",Material.IRON_SWORD,2.5f,DamageType.PHYSICAL);}
         @Override protected void onHit(Player c, ChampionStats s, org.bukkit.entity.LivingEntity tgt, double dmg){
-            var maxHealthAttr = tgt.getAttribute(fr.lolmc.util.Compat.maxHealth());
-            double maxHealth = maxHealthAttr != null ? maxHealthAttr.getValue() : 20.0;
+            // Échelle LoL réelle (joueur=HPSystem, Baron=virtuel, sbire=vanilla)
+            double realMax = TargetingUtil.getRealMaxHealth(tgt);
+            double realCur = TargetingUtil.getRealHealth(tgt);
 
-            if(tgt.getHealth() < maxHealth * 0.5){
+            if(realCur < realMax * 0.5){
                 // 5/7.5/10% PV max selon niveau (1/7/17) — LoL
                 var cm=LolPlugin.getInstance().getChampionManager();
                 int lvl=cm.hasChampion(c)?cm.getChampion(c).getLevelSystem().getLevel():1;
                 double pct = lvl>=17 ? 0.10 : (lvl>=7 ? 0.075 : 0.05);
-                double bonus = maxHealth * pct;
+                double bonus = realMax * pct;
                 TargetingUtil.dealDamage(c, tgt, bonus, TargetingUtil.DmgType.MAGICAL);
                 tgt.getWorld().spawnParticle(Particle.SMOKE,tgt.getLocation().add(0,1,0),8,0.3,0.5,0.3);
             }

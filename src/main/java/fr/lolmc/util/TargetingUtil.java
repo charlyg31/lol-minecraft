@@ -247,6 +247,20 @@ public final class TargetingUtil {
         return VirtualHP.has(target) ? VirtualHP.getCurrent(target) : target.getHealth();
     }
 
+    /** HP max réels à l'échelle LoL (pendant de getRealHealth). */
+    public static double getRealMaxHealth(LivingEntity target) {
+        if (target instanceof Player p) {
+            var cm = fr.lolmc.LolPlugin.getInstance().getChampionManager();
+            if (cm != null && cm.hasChampion(p))
+                return cm.getChampion(p).getHPSystem().getMaxHP();
+            var attr = p.getAttribute(Compat.maxHealth());
+            return attr != null ? attr.getValue() : 20.0;
+        }
+        if (VirtualHP.has(target)) return VirtualHP.getMax(target);
+        var attr = target.getAttribute(Compat.maxHealth());
+        return attr != null ? attr.getValue() : target.getMaxHealth();
+    }
+
     /** Applique des dégâts à toute une liste d'entités. */
     public static void dealDamageAll(Player caster, List<LivingEntity> targets, double amount, DmgType type) {
         for (LivingEntity t : targets) dealDamage(caster, t, amount, type);
