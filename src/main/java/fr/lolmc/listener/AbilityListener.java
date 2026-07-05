@@ -255,10 +255,11 @@ public class AbilityListener implements Listener {
         if (slot == 0) {
             var aam = LolPlugin.getInstance().getAutoAttackManager();
 
-            // 1. Joueur ennemi visé
+            // 1. Joueur ennemi visé → verrouillage (AA continues façon LoL)
             Player aimed = target != null ? target : getTargetedPlayer(caster);
             if (aimed != null) {
                 aam.tryAutoAttack(caster, aimed);
+                aam.lockTarget(caster, aimed);
                 return;
             }
 
@@ -266,13 +267,14 @@ public class AbilityListener implements Listener {
             org.bukkit.entity.LivingEntity entity = getTargetedEntity(caster);
             if (entity != null) {
                 boolean hit = aam.tryAutoAttackEntity(caster, entity);
-                if (hit) return;
+                if (hit) { aam.lockTarget(caster, entity); return; }
             }
 
-            // 3. Structure ennemie dans la portée AA
-            if (tryAttackStructure(caster)) return;
+            // 3. Structure ennemie dans la portée AA (annule le lock précédent)
+            if (tryAttackStructure(caster)) { aam.clearLock(caster); return; }
 
-            // 4. Rien visé — jouer l'animation dans le vide (ADC/Mage uniquement)
+            // 4. Rien visé — annule le lock (comme le Stop de LoL) + animation
+            aam.clearLock(caster);
             if (aam.canAutoAttack(caster)) {
                 var champ = manager.getChampion(caster);
                 var aaType = AutoAttackManager.getAAType(champ);
@@ -576,7 +578,9 @@ public class AbilityListener implements Listener {
         if (!"ability".equals(HotbarManager.getType(held))) return;
 
         if (slot == 0) {
-            LolPlugin.getInstance().getAutoAttackManager().tryAutoAttack(caster, target);
+            var aam2 = LolPlugin.getInstance().getAutoAttackManager();
+            aam2.tryAutoAttack(caster, target);
+            if (target != null) aam2.lockTarget(caster, target);
         } else if (slot >= 1 && slot <= 4) {
             // Le débounce est déjà appliqué en amont (onArmSwing / onLeftClick)
             manager.getChampion(caster).tryUseAbility(caster, slot, target);

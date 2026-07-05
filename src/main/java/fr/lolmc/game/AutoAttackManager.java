@@ -36,6 +36,59 @@ public class AutoAttackManager {
     // Dernière auto-attaque par joueur (pour respecter la cadence)
     private final Map<UUID, Long> lastAttack = new HashMap<>();
 
+    // ══════════════════════════════════════════════════════════
+    // LOCK-ON façon LoL : un clic verrouille la cible, puis les
+    // AA s'enchaînent automatiquement à la cadence d'attack speed
+    // tant que la cible reste à portée. Cliquer ailleurs change
+    // de cible ; cliquer dans le vide annule (comme le S de LoL).
+    // ══════════════════════════════════════════════════════════
+    private final Map<UUID, UUID> lockedTargets = new HashMap<>();
+    private org.bukkit.scheduler.BukkitTask autoFireTask;
+
+    /** Verrouille la cible : les AA continueront automatiquement. */
+    public void lockTarget(Player attacker, LivingEntity target) {
+        if (!LolPlugin.getInstance().getConfig().getBoolean("combat.aa-lock-on", true)) return;
+        lockedTargets.put(attacker.getUniqueId(), target.getUniqueId());
+        startAutoFire();
+    }
+
+    /** Annule le verrouillage (clic dans le vide, mort, changement de cible). */
+    public void clearLock(Player attacker) {
+        lockedTargets.remove(attacker.getUniqueId());
+    }
+
+    private void startAutoFire() {
+        if (autoFireTask != null && !autoFireTask.isCancelled()) return;
+        autoFireTask = new BukkitRunnable() {
+            @Override public void run() {
+                if (lockedTargets.isEmpty()) return;
+                var cm = LolPlugin.getInstance().getChampionManager();
+                var it = lockedTargets.entrySet().iterator();
+                while (it.hasNext()) {
+                    var e = it.next();
+                    Player attacker = Bukkit.getPlayer(e.getKey());
+                    if (attacker == null || !attacker.isOnline()
+                            || !cm.hasChampion(attacker)) { it.remove(); continue; }
+                    if (attacker.getGameMode() == GameMode.SPECTATOR) continue; // mort : lock en pause
+                    var ent = Bukkit.getEntity(e.getValue());
+                    if (!(ent instanceof LivingEntity target) || target.isDead()
+                            || !target.getWorld().equals(attacker.getWorld())) { it.remove(); continue; }
+                    if (target instanceof Player tp && (tp.getGameMode() == GameMode.SPECTATOR
+                            || !cm.hasChampion(tp))) { it.remove(); continue; }
+
+                    double range = cm.getChampion(attacker).getAutoAttackRange();
+                    double dist = attacker.getLocation().distance(target.getLocation());
+                    if (dist > range * 1.15) { it.remove(); continue; } // partie trop loin : lock perdu
+                    if (dist > range) continue;      // zone tampon (hystérésis LoL) : on attend
+                    if (!canAutoAttack(attacker)) continue; // cadence AS pas prête
+
+                    if (target instanceof Player tp) tryAutoAttack(attacker, tp);
+                    else tryAutoAttackEntity(attacker, target);
+                }
+            }
+        }.runTaskTimer(LolPlugin.getInstance(), 2L, 2L);
+    }
+
     // ════════════════════════════════════════════════════════
     // LOGIQUE PRINCIPALE
     // ════════════════════════════════════════════════════════
