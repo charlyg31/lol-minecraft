@@ -129,6 +129,16 @@ public class TurretManager {
      * (Détecté via le système de combat : un joueur ayant infligé des dégâts récemment.)
      */
     private Player findPriorityTarget(Location center, Team turretTeam) {
+        // Aggro de tour : un attaquant récent de champion est prioritaire absolu
+        var aggro = LolPlugin.getInstance().getAggroManager();
+        if (aggro != null) {
+            for (Player p : center.getWorld().getPlayers()) {
+                if (teamManager.getTeam(p) == turretTeam) continue;
+                if (!aggro.hasTurretAggro(p)) continue;
+                if (!inCylinder(center, p.getLocation())) continue;
+                return p; // retarget immédiat sur l'attaquant
+            }
+        }
         for (var entity : center.getWorld().getNearbyEntities(center, boxRange(), boxRange(), boxRange())) {
             if (!(entity instanceof Player p)) continue;
             if (!championManager.hasChampion(p)) continue;

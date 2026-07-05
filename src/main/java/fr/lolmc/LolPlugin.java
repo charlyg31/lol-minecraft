@@ -86,6 +86,7 @@ public class LolPlugin extends JavaPlugin {
     private DeathRecapManager deathRecapManager;
     private TabScoreboardManager tabScoreboardManager;
     private ForfeitManager forfeitManager;
+    private fr.lolmc.game.AggroManager aggroManager;
     private FeatManager featManager;
     private RewardManager rewardManager;
     private JungleManager jungleManager;
@@ -179,6 +180,7 @@ public class LolPlugin extends JavaPlugin {
         deathRecapManager = new DeathRecapManager();
         tabScoreboardManager = new TabScoreboardManager();
         forfeitManager = new ForfeitManager();
+        aggroManager = new fr.lolmc.game.AggroManager();
         featManager = new FeatManager();
         rewardManager = new RewardManager(championManager, goldManager);
         jungleManager = new JungleManager();
@@ -300,6 +302,7 @@ public class LolPlugin extends JavaPlugin {
     public DeathRecapManager getDeathRecapManager()  { return deathRecapManager; }
     public TabScoreboardManager getTabScoreboard()    { return tabScoreboardManager; }
     public ForfeitManager getForfeitManager()          { return forfeitManager; }
+    public fr.lolmc.game.AggroManager getAggroManager() { return aggroManager; }
     public FeatManager getFeatManager()          { return featManager; }
     public RewardManager getRewardManager()     { return rewardManager; }
     public JungleManager getJungleManager()     { return jungleManager; }

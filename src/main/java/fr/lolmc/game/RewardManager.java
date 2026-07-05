@@ -112,6 +112,28 @@ public class RewardManager {
                 String.format("+%d or  +%.0f XP", total, xpAmount), NamedTextColor.GOLD));
     }
 
+    // ── Bounty d'objectifs (comeback LoL) ────────────────────────
+
+    /**
+     * Bonus d'or si l'équipe attaquante est en retard (écart d'or global).
+     * LoL : les bounties d'objectifs s'activent quand une équipe domine.
+     * Retourne un bonus 0-250 selon l'écart (>=5000 or d'écart → max).
+     */
+    public int getObjectiveBounty(fr.lolmc.team.TeamManager.Team attackingTeam) {
+        var tm = LolPlugin.getInstance().getTeamManager();
+        long goldA = 0, goldB = 0;
+        for (var p : fr.lolmc.util.WorldContext.getGamePlayers()) {
+            var t = tm.getTeam(p);
+            if (t == null) continue;
+            int g = goldManager.getGold(p.getUniqueId());
+            if (t == attackingTeam) goldA += g; else goldB += g;
+        }
+        long deficit = goldB - goldA; // positif si l'attaquant est en retard
+        if (deficit < 2000) return 0;
+        // 2000 → 50 or, 5000+ → 250 or
+        return (int) Math.min(250, 50 + (deficit - 2000) * 200 / 3000);
+    }
+
     // ── Kill de champion ──────────────────────────────────────────
 
     public void onChampionKill(Player killer, Player victim) {
@@ -120,6 +142,11 @@ public class RewardManager {
         int victimStreak = killStreak.getOrDefault(victim.getUniqueId(), 0);
         int bounty = BOUNTY[Math.min(victimStreak, BOUNTY.length - 1)];
         int totalGold = GOLD_CHAMPION_KILL + bounty;
+        // First blood : 400 or au lieu de 300 (LoL)
+        var ann = LolPlugin.getInstance().getAnnouncementManager();
+        if (ann != null && !ann.isFirstBloodDone()) {
+            totalGold += 100; // 300 base + 100 = 400
+        }
         goldManager.addGold(killer.getUniqueId(), totalGold);
         grantXP(killer, XP_CHAMPION_KILL);
         // Reset streak de la victime, incrémenter celle du tueur
@@ -176,6 +203,24 @@ public class RewardManager {
 
     private void grantXP(Player player, double xp) {
         BaseChampion champ = championManager.getChampion(player);
+        // ── XP catch-up (LoL) : un joueur en retard sur le niveau moyen ──
+        // ── de la partie gagne un bonus d'XP progressif (jusqu'à +40%) ──
+        double avgLevel = 0; int counted = 0;
+        for (var op : fr.lolmc.util.WorldContext.getGamePlayers()) {
+            if (!championManager.hasChampion(op)) continue;
+            avgLevel += championManager.getChampion(op).getLevelSystem().getLevel();
+            counted++;
+        }
+        if (counted > 0) {
+            avgLevel /= counted;
+            int myLevel = champ.getLevelSystem().getLevel();
+            double behind = avgLevel - myLevel;
+            if (behind >= 1.0) {
+                // +20% par niveau de retard, plafonné à +40%
+                double bonus = Math.min(0.40, behind * 0.20);
+                xp *= (1.0 + bonus);
+            }
+        }
         int levelsGained = champ.getLevelSystem().addXP(xp);
         if (levelsGained > 0) {
             int newLevel = champ.getLevelSystem().getLevel();
@@ -205,6 +250,29 @@ public class RewardManager {
     }
     public void resetKillStreaks() { killStreak.clear(); gameStartMs = 0; }
 
+    /**
+     * Objective bounty (comeback LoL) : si l'équipe de l'attaquant a
+     * >3000 or de retard sur l'équipe adverse, les objectifs rapportent plus.
+     * @return bonus d'or (0 si pas de retard)
+     */
+    public int getObjectiveBounty(fr.lolmc.team.TeamManager.Team attackingTeam, int baseBonus) {
+        var tm = LolPlugin.getInstance().getTeamManager();
+        var gm = LolPlugin.getInstance().getGoldManager();
+        if (gm == null) return 0;
+        long teamGold = 0, enemyGold = 0;
+        for (var id : LolPlugin.getInstance().getGameManager().getParticipants()) {
+            var p = org.bukkit.Bukkit.getPlayer(id);
+            if (p == null) continue;
+            var t = tm.getTeam(p);
+            if (t == attackingTeam) teamGold += gm.getGold(id);
+            else if (t != null)     enemyGold += gm.getGold(id);
+        }
+        long deficit = enemyGold - teamGold;
+        if (deficit < 3000) return 0;
+        // Bounty proportionnel au retard, plafonné à 2× le bonus de base
+        return (int) Math.min(baseBonus * 2L, baseBonus * deficit / 6000L);
+    }
+
     /** Plaque de tourelle : +160 or avant 14min, max 5 par tour. */
     public void onTurretHit(Player attacker, GameStructure turret) {
         if (gameStartMs == 0) return;
@@ -221,10 +289,21 @@ public class RewardManager {
 
     /** Distribue l'or et l'XP quand une tourelle est détruite. */
     public void onTurretDestroyed(Player lastHit, fr.lolmc.team.TeamManager.Team attackingTeam, int turretIndex) {
+        // Bounty d'objectif (comeback) : bonus si l'équipe attaquante est en retard
+        int objBounty = getObjectiveBounty(attackingTeam);
+        if (objBounty > 0 && lastHit != null) {
+            goldManager.addGold(lastHit.getUniqueId(), objBounty);
+            lastHit.sendActionBar(net.kyori.adventure.text.Component.text(
+                "💰 Bounty d'objectif +" + objBounty + " or (comeback)!",
+                NamedTextColor.GOLD));
+        }
         int globalGold = switch (turretIndex) {
             case 1  -> GOLD_TURRET_T1_GLOBAL;
             case 2  -> GOLD_TURRET_T2_GLOBAL;
             default -> GOLD_TURRET_T3_GLOBAL;
+        // Comeback : bounty d'objectif si l'équipe est en retard
+        int comebackBonus = getObjectiveBounty(attackingTeam, 250);
+        if (comebackBonus > 0) globalGold += comebackBonus;
         };
         String teamName = attackingTeam == fr.lolmc.team.TeamManager.Team.BLUE ? "Bleue" : "Rouge";
         for (java.util.UUID id : LolPlugin.getInstance().getGameManager().getParticipants()) {

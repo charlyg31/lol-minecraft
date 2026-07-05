@@ -67,6 +67,23 @@ public class StructureDamageListener implements Listener {
             damage *= jm.getVoidgrubDamageBonus(playerTeam);
         }
 
+        // Anti-backdoor : structure fortifiée (-66% dégâts) si aucun sbire
+        // allié de l'attaquant n'est à moins de 12 blocs (règle LoL)
+        boolean minionNearby = false;
+        for (var ent : structure.getCenter().getWorld()
+                .getNearbyEntities(structure.getCenter(), 12, 8, 12)) {
+            if (ent instanceof org.bukkit.entity.LivingEntity le
+                    && fr.lolmc.game.MinionManager.isMinion(le)
+                    && fr.lolmc.game.MinionManager.getMinionTeam(le) == playerTeam) {
+                minionNearby = true; break;
+            }
+        }
+        if (!minionNearby) {
+            damage *= 0.34; // fortification -66%
+            player.sendActionBar(Component.text(
+                "🛡 Structure fortifiée (-66% sans sbires)", NamedTextColor.GRAY));
+        }
+
         // Plaques
         var tm = LolPlugin.getInstance().getTurretManager();
         String structKey = structure.getType().name() + "_" + structure.getTeam() + "_" + structure.getLane();

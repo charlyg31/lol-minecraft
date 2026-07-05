@@ -270,6 +270,11 @@ public class MinionManager {
                     }
                 }
 
+                // Aggro forcée en cours (champion attaqué) → ne pas retarget
+                if (fr.lolmc.game.AggroManager.hasMinionAggro(z)
+                        && z.getTarget() instanceof Player) {
+                    return; // garder la cible aggro pendant 3s
+                }
                 // Chercher un ennemi proche (sbire ou champion)
                 LivingEntity enemy = findNearbyEnemy(z, team);
                 // Chercher une tourelle/structure ennemie à portée

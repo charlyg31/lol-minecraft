@@ -58,6 +58,14 @@ public class DamageUtil {
     }
 
     public static void damage(Player attacker, Player victim, double rawAmount, boolean isAbility, Type type) {
+        // Aggro sbires + tour : mécanique de laning LoL
+        if (attacker != null && victim != null) {
+            var aggro = fr.lolmc.LolPlugin.getInstance().getAggroManager();
+            if (aggro != null) aggro.onChampionAttack(attacker, victim);
+            // Interrompre la canalisation de TP de la victime
+            var ssm = LolPlugin.getInstance().getSummonerSpellManager();
+            if (ssm != null && ssm.isChanneling(victim)) ssm.interruptTeleport(victim);
+        }
         ChampionManager cm = LolPlugin.getInstance().getChampionManager();
         if (cm == null || !cm.hasChampion(victim)) {
             victim.damage(rawAmount / 25.0); // fallback non-champion
