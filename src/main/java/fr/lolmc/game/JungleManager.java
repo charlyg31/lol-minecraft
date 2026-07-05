@@ -450,17 +450,17 @@ public class JungleManager {
                 // Buff Rouge : dégâts bonus + ralentissement sur les attaques (120s)
                 champ.getStats().addBonusAD(15);
                 player.sendActionBar(Component.text(
-                        "🔴 Buff Rouge! +dégâts et ralentissement sur tes attaques (2min)",
+                        "🔴 Buff Rouge! +dégâts et ralentissement sur tes attaques (90s)",
                         NamedTextColor.RED));
-                scheduleBuffRemoval(player, () -> champ.getStats().addBonusAD(-15), 120);
+                scheduleBuffRemoval(player, () -> champ.getStats().addBonusAD(-15), 90);
             }
             case "blue" -> {
                 // Buff Bleu : régén mana + réduction des cooldowns (120s)
                 champ.getStats().addBonusAbilityHaste(20);
                 player.sendActionBar(Component.text(
-                        "🔵 Buff Bleu! +20 hâte de compétence et régén ressource (2min)",
+                        "🔵 Buff Bleu! +20 hâte de compétence et régén ressource (90s)",
                         NamedTextColor.BLUE));
-                scheduleBuffRemoval(player, () -> champ.getStats().addBonusAbilityHaste(-20), 120);
+                scheduleBuffRemoval(player, () -> champ.getStats().addBonusAbilityHaste(-20), 90);
             }
             case "drake_infernal" -> {
                 champ.getStats().addBonusAD(8);
