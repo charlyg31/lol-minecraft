@@ -153,6 +153,10 @@ public class AutoAttackManager {
                     if (target instanceof Player tp && (tp.getGameMode() == GameMode.SPECTATOR
                             || !cm.hasChampion(tp))) { it.remove(); continue; }
 
+                    // Cible cachee par le fog/bush : pause (anti-wallhack),
+                    // l'auto-fire reprend si elle redevient visible
+                    if (!attacker.canSee(target)) continue;
+
                     double range = cm.getChampion(attacker).getAutoAttackRange();
                     double dist = attacker.getLocation().distance(target.getLocation());
                     if (dist > range * 1.15) { it.remove(); continue; } // partie trop loin : lock perdu

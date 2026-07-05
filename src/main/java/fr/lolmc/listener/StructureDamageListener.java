@@ -67,6 +67,14 @@ public class StructureDamageListener implements Listener {
             damage *= jm.getVoidgrubDamageBonus(playerTeam);
         }
 
+        // Fortification LoL : les tours externes (T1) prennent -50% de
+        // degats pendant les 5 premieres minutes
+        if (structure.getType() == fr.lolmc.game.GameStructure.Type.TURRET
+                && structure.getIndex() == 1
+                && LolPlugin.getInstance().getGameManager().getElapsedSeconds() < 300) {
+            damage *= 0.5;
+        }
+
         // Anti-backdoor : structure fortifiée (-66% dégâts) si aucun sbire
         // allié de l'attaquant n'est à moins de 12 blocs (règle LoL)
         boolean minionNearby = false;
