@@ -388,12 +388,18 @@ public class SummonerSpellManager {
                 }}.runTaskLater(LolPlugin.getInstance(), 40L);
             }
         }
-        double cur = target.getHealth();
+        // HP réels (virtuels si Baron/Elder/canon, sinon vanilla)
+        double cur = fr.lolmc.util.VirtualHP.has(target)
+            ? fr.lolmc.util.VirtualHP.getCurrent(target) : target.getHealth();
         if (smiteDamage >= cur) {
-            target.damage(cur + 100, caster);
+            if (fr.lolmc.util.VirtualHP.has(target))
+                fr.lolmc.util.VirtualHP.damage(target, cur + 100, caster);
+            else target.damage(cur + 100, caster);
             caster.sendActionBar(Component.text("⚔ Châtiment — EXÉCUTÉ!", NamedTextColor.GOLD));
         } else {
-            target.damage(smiteDamage, caster);
+            if (fr.lolmc.util.VirtualHP.has(target))
+                fr.lolmc.util.VirtualHP.damage(target, smiteDamage, caster);
+            else target.damage(smiteDamage, caster);
             caster.sendActionBar(Component.text("⚔ Châtiment! (" + (int) smiteDamage + ")", NamedTextColor.GOLD));
         }
         target.getWorld().spawnParticle(Particle.CRIT, target.getLocation().add(0,1,0), 20, 0.4, 0.4, 0.4);

@@ -102,15 +102,18 @@ public class AutoAttackManager {
         AAType type = getAAType(champ);
         playAnimation(attacker, target, type, crit);
 
-        double newHealth = Math.max(0, target.getHealth() - rawDamage);
-        target.setHealth(newHealth);
         target.playHurtAnimation(attacker.getLocation().getYaw());
-
-        // Mettre à jour la HealthBar au-dessus de l'entité
-        fr.lolmc.util.HealthBar.update(target, newHealth, target.getAttribute(
-            fr.lolmc.util.Compat.maxHealth()) != null
-            ? target.getAttribute(fr.lolmc.util.Compat.maxHealth()).getValue()
-            : target.getMaxHealth());
+        if (fr.lolmc.util.VirtualHP.has(target)) {
+            // Entité à HP virtuels (Baron, Elder, canon...) : dégâts virtuels
+            fr.lolmc.util.VirtualHP.damage(target, rawDamage, attacker);
+        } else {
+            double newHealth = Math.max(0, target.getHealth() - rawDamage);
+            target.setHealth(newHealth);
+            fr.lolmc.util.HealthBar.update(target, newHealth, target.getAttribute(
+                fr.lolmc.util.Compat.maxHealth()) != null
+                ? target.getAttribute(fr.lolmc.util.Compat.maxHealth()).getValue()
+                : target.getMaxHealth());
+        }
 
         var pm = LolPlugin.getInstance().getPassiveManager();
         if (pm != null) pm.onAutoAttackEntity(attacker, target);

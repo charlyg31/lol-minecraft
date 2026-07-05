@@ -224,7 +224,9 @@ public class JungleManager {
             int gold = isLarge ? type.gold : Math.max(5, type.gold / 4);
 
             var hpAttr = mob.getAttribute(Compat.maxHealth());
-            if (hpAttr != null) { hpAttr.setBaseValue(hp); mob.setHealth(hp); }
+            if (hpAttr != null) { hpAttr.setBaseValue(Math.min(hp, 1024.0)); mob.setHealth(Math.min(hp, 1024.0)); }
+            // HP virtuels au-delà de la limite Minecraft (Baron 8500, Atakhan 9000...)
+            if (hp > 1024.0) fr.lolmc.util.VirtualHP.init(mob, hp);
 
             String name = type.groupCount > 1
                     ? type.displayName + (isLarge ? " (Grand)" : " (Petit)")
@@ -910,7 +912,8 @@ public class JungleManager {
                 var pdc = le.getPersistentDataContainer();
                 pdc.set(KEY_MONSTER, org.bukkit.persistence.PersistentDataType.STRING, type.name());
                 var hpAttr = le.getAttribute(fr.lolmc.util.Compat.maxHealth());
-                if (hpAttr != null) { hpAttr.setBaseValue(type.maxHP); le.setHealth(type.maxHP); }
+                if (hpAttr != null) { hpAttr.setBaseValue(Math.min(type.maxHP, 1024.0)); le.setHealth(Math.min(type.maxHP, 1024.0)); }
+                if (type.maxHP > 1024.0) fr.lolmc.util.VirtualHP.init(le, type.maxHP);
                 liveMonsters.put(le.getUniqueId(), type);
                 // Apparence appliquée par applyMonsterAppearance si configurée
             }
