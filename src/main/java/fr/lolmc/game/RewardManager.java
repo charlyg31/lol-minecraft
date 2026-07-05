@@ -28,7 +28,7 @@ public class RewardManager {
     public static final int GOLD_TURRET_T2_GLOBAL = 750; // T2 intérieure
     public static final int GOLD_TURRET_T3_GLOBAL = 875; // T3 inhibiteur
     public static final int GOLD_TURRET_KILLER    = 150; // bonus last-hit
-    public static final int GOLD_TURRET_PLATE     = 160; // plaque (avant 14min)
+    public static final int GOLD_TURRET_PLATE     = 125; // plaque (avant 14min, LoL)
     public static final int TURRET_PLATE_MAX      = 5;
     public static final long TURRET_PLATE_DURATION = 14 * 60 * 1000L;
     // Inhibiteur
@@ -257,7 +257,7 @@ public class RewardManager {
         return (int) Math.min(baseBonus * 2L, baseBonus * deficit / 6000L);
     }
 
-    /** Plaque de tourelle : +160 or avant 14min, max 5 par tour. */
+    /** Plaque de tourelle : +125 or avant 14min, max 5 par tour. */
     public void onTurretHit(Player attacker, GameStructure turret) {
         if (gameStartMs == 0) return;
         if (System.currentTimeMillis() - gameStartMs > TURRET_PLATE_DURATION) return;

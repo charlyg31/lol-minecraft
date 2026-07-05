@@ -138,7 +138,12 @@ public class MinionManager {
                 // LoL : 3 sbires de mêlée puis 3 sbires à distance (mages)
                 // 3e vague = un sbire canon à la place du 1er caster
                     final MinionType type;
-                    if (wave % 3 == 0 && i == MINIONS_PER_WAVE / 2) {
+                    // Cadence canon LoL : toutes les 3 vagues avant 15min,
+                    // toutes les 2 entre 15 et 25min, chaque vague après 25min
+                    long elapsedS = LolPlugin.getInstance().getGameManager() != null
+                        ? LolPlugin.getInstance().getGameManager().getElapsedSeconds() : 0;
+                    int cannonEvery = elapsedS >= 25 * 60 ? 1 : (elapsedS >= 15 * 60 ? 2 : 3);
+                    if (wave % cannonEvery == 0 && i == MINIONS_PER_WAVE / 2) {
                         type = MinionType.CANNON;
                     } else {
                         type = (i < MINIONS_PER_WAVE / 2) ? MinionType.MELEE : MinionType.CASTER;
