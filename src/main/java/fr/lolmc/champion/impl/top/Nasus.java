@@ -62,7 +62,7 @@ public class Nasus extends BaseChampion {
             double[] bonus={40,60,80,100,120};
             int stacks=qStacks.getOrDefault(c.getUniqueId(),0);
             double dmg=s.getFinalAD()+bonus[getLevel()-1]+stacks;
-            boolean kills = tgt.getHealth()-dmg<=0;
+            boolean kills = TargetingUtil.getRealHealth(tgt)-dmg<=0;
             TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.PHYSICAL);
             // Stacks : +12 sur champion/gros monstre tué, +3 sinon (plafonné pour éviter un scaling infini)
             if(kills){
