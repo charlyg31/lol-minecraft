@@ -49,12 +49,31 @@ public class AutoAttackManager {
     public void lockTarget(Player attacker, LivingEntity target) {
         if (!LolPlugin.getInstance().getConfig().getBoolean("combat.aa-lock-on", true)) return;
         lockedTargets.put(attacker.getUniqueId(), target.getUniqueId());
+        String name = target instanceof Player p ? p.getName()
+            : net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
+                .plainText().serializeOr(target.customName(), target.getType().name());
+        attacker.sendActionBar(Component.text("🔒 " + name, NamedTextColor.YELLOW));
         startAutoFire();
     }
 
-    /** Annule le verrouillage (clic dans le vide, mort, changement de cible). */
+    /** True si ce joueur est déjà verrouillé sur cette cible. */
+    public boolean isLockedOn(Player attacker, LivingEntity target) {
+        return target.getUniqueId().equals(lockedTargets.get(attacker.getUniqueId()));
+    }
+
+    /**
+     * Toggle façon interrupteur : re-cliquer la MÊME cible coupe l'auto-fire
+     * (le clic porte quand même son attaque manuelle) ; une autre cible bascule.
+     */
+    public void toggleLock(Player attacker, LivingEntity target) {
+        if (isLockedOn(attacker, target)) clearLock(attacker);
+        else lockTarget(attacker, target);
+    }
+
+    /** Annule le verrouillage (re-clic, clic dans le vide, structure). */
     public void clearLock(Player attacker) {
-        lockedTargets.remove(attacker.getUniqueId());
+        if (lockedTargets.remove(attacker.getUniqueId()) != null)
+            attacker.sendActionBar(Component.text("🔓 Verrouillage annulé", NamedTextColor.GRAY));
     }
 
     private void startAutoFire() {
