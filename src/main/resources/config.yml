@@ -100,6 +100,15 @@ scale:
   lol-units-per-block: 65
 
 # ═══════════════════════════════════════════════════════
+# COMBAT
+# ═══════════════════════════════════════════════════════
+combat:
+  # Un clic sur une cible verrouille l'attaque : les AA s'enchaînent
+  # automatiquement à la cadence d'attack speed tant que la cible est
+  # à portée (comme le clic droit de LoL). Clic dans le vide = annuler.
+  aa-lock-on: true
+
+# ═══════════════════════════════════════════════════════
 # TOURELLES — portée d'attaque (mêmes valeurs pour toutes)
 # ═══════════════════════════════════════════════════════
 # Zone d'attaque en forme de CYLINDRE depuis le point de pose du schématique.
