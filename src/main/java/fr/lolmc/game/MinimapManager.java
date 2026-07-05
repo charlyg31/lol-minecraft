@@ -161,22 +161,20 @@ public class MinimapManager implements Listener {
                     int worldZ = centerZ + (pz - 64) * blocksPerPixel;
 
                     // Lire la couleur du bloc de surface
-                    byte color = getSurfaceColor(w, worldX, worldZ);
-                    canvas.setPixel(px, pz, color);
+                    java.awt.Color color = getSurfaceColor(w, worldX, worldZ);
+                    canvas.setPixelColor(px, pz, color);
                 }
             }
         }
 
-        /** Retourne la couleur MapColor du bloc de surface à (x, z). */
-        private byte getSurfaceColor(World w, int x, int z) {
+        /** Retourne la couleur du bloc de surface à (x, z). */
+        private java.awt.Color getSurfaceColor(World w, int x, int z) {
             try {
                 int y = w.getHighestBlockYAt(x, z);
                 var block = w.getBlockAt(x, y, z);
-                // Utiliser la couleur MapPalette du matériau
-                return org.bukkit.map.MapPalette.matchColor(block.getType().createBlockData().hashCode() % 0xFF == 0
-                    ? java.awt.Color.GRAY : blockToColor(block.getType()));
+                return blockToColor(block.getType());
             } catch (Exception e) {
-                return (byte) 0; // transparent/blanc si hors chunk
+                return java.awt.Color.DARK_GRAY; // hors chunk
             }
         }
 
