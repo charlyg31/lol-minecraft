@@ -46,10 +46,8 @@ public class MonsterPassiveListener implements Listener {
         MonsterType type = JungleManager.getMonsterType(mob);
         if (type == null) return;
 
-        // Buff Rouge : brûlure + ralentissement sur qui le frappe
-        if (type == MonsterType.RED_BUFF) {
-            MonsterAbilities.applyRedBuffDebuff(attacker);
-        }
+        // (LoL : les buffs ne punissent pas d'être frappés — la brûlure du
+        //  Rouge vient de sa capacité redSmash, pas d'une riposte passive)
     }
 
     /** Quand un monstre de jungle ou un sbire FRAPPE : déclenche son animation d'attaque. */

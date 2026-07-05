@@ -267,6 +267,10 @@ public class JungleManager {
                     : type.displayName;
             mob.customName(net.kyori.adventure.text.Component.text(name));
             mob.setCustomNameVisible(true);
+            if (type == MonsterType.KRUG && isLarge)
+                mob.getPersistentDataContainer().set(
+                    new org.bukkit.NamespacedKey(LolPlugin.getInstance(), "krug_large"),
+                    PersistentDataType.BYTE, (byte) 1);
             mob.setRemoveWhenFarAway(false);
             // Monstre passif : ne poursuit pas, reste à son camp (réveillé quand attaqué)
             if (mob instanceof Mob m) {
@@ -313,6 +317,69 @@ public class JungleManager {
     }
 
     /** Appelé quand un monstre meurt (depuis le listener). */
+    /** Petit Krug issu de la division du grand (35% HP, or/4). */
+    private void spawnKrugMini(CampSpawn camp, Location loc) {
+        MonsterType type = MonsterType.KRUG;
+        Entity entity = loc.getWorld().spawnEntity(loc, type.entity);
+        if (!(entity instanceof LivingEntity mob)) { entity.remove(); return; }
+        double hp = type.maxHP * 0.35;
+        var hpAttr = mob.getAttribute(Compat.maxHealth());
+        if (hpAttr != null) { hpAttr.setBaseValue(hp); mob.setHealth(hp); }
+        mob.customName(net.kyori.adventure.text.Component.text(type.displayName + " (Petit)"));
+        mob.setCustomNameVisible(true);
+        mob.setRemoveWhenFarAway(false);
+        if (mob instanceof Mob mo) { mo.setAware(false); mo.setTarget(null); }
+        var pdc = mob.getPersistentDataContainer();
+        pdc.set(KEY_MONSTER, PersistentDataType.STRING, type.name());
+        pdc.set(KEY_BUFF, PersistentDataType.STRING, type.buff);
+        pdc.set(KEY_GOLD, PersistentDataType.INTEGER, Math.max(5, type.gold / 4));
+        var speedAttr = mob.getAttribute(Compat.movementSpeed());
+        if (speedAttr != null) speedAttr.setBaseValue(0.15);
+        MobAppearance.makeInvisible(mob);
+        MobAppearance.setSilent(mob, true);
+        MobModel model = modelFor(type, false);
+        if (model != null) monsterDeco.put(mob.getUniqueId(), model.spawnOn(mob));
+        camp.liveEntities.add(mob.getUniqueId());
+        loc.getWorld().spawnParticle(Particle.BLOCK,
+            loc.clone().add(0, 0.5, 0), 15, 0.3, 0.3, 0.3,
+            Material.STONE.createBlockData());
+    }
+
+    /**
+     * Shrine du Crabe (LoL) : à sa mort, zone de vision (ward 60s pour
+     * l'équipe du tueur) + boost de vitesse aux alliés qui la traversent.
+     */
+    private void spawnScuttleShrine(Player killer, Location loc) {
+        var wm = LolPlugin.getInstance().getWardManager();
+        if (wm != null) wm.placeWard(killer, loc.clone().add(0, 0.5, 0), 60);
+        var team = LolPlugin.getInstance().getTeamManager().getTeam(killer);
+        new BukkitRunnable() {
+            int ticks = 0;
+            @Override public void run() {
+                if (ticks >= 60 * 20) { cancel(); return; }
+                // Anneau aqua discret
+                double a = ticks * 0.2;
+                for (int i = 0; i < 3; i++) {
+                    double ang = a + 2 * Math.PI * i / 3;
+                    loc.getWorld().spawnParticle(Particle.DUST,
+                        loc.clone().add(Math.cos(ang) * 2.5, 0.2, Math.sin(ang) * 2.5),
+                        1, 0, 0, 0, 0,
+                        new Particle.DustOptions(org.bukkit.Color.fromRGB(80, 200, 230), 1.0f));
+                }
+                // Boost MS aux alliés dans la zone
+                if (ticks % 20 == 0 && team != null) {
+                    for (Player p : loc.getWorld().getPlayers()) {
+                        if (LolPlugin.getInstance().getTeamManager().getTeam(p) != team) continue;
+                        if (p.getLocation().distanceSquared(loc) <= 2.5 * 2.5)
+                            p.addPotionEffect(new org.bukkit.potion.PotionEffect(
+                                org.bukkit.potion.PotionEffectType.SPEED, 40, 0, false, false));
+                    }
+                }
+                ticks += 4;
+            }
+        }.runTaskTimer(LolPlugin.getInstance(), 0L, 4L);
+    }
+
     public void onMonsterDeath(UUID entityId, Player killer) {
         MonsterType type = liveMonsters.remove(entityId);
         if (type == null) return;
@@ -332,6 +399,25 @@ public class JungleManager {
         for (CampSpawn c : camps.values()) {
             if (c.liveEntities.remove(entityId)) { camp = c; break; }
         }
+
+        Entity deadEnt = LolPlugin.getInstance().getServer().getEntity(entityId);
+        Location deathLoc = deadEnt != null ? deadEnt.getLocation()
+                : (camp != null ? camp.location : null);
+
+        // ── Krugs : le grand se divise en 2 petits (LoL) ──
+        if (type == MonsterType.KRUG && camp != null && deathLoc != null
+                && deadEnt != null && deadEnt.getPersistentDataContainer().has(
+                    new org.bukkit.NamespacedKey(LolPlugin.getInstance(), "krug_large"),
+                    PersistentDataType.BYTE)) {
+            for (int i = 0; i < 2; i++)
+                spawnKrugMini(camp, deathLoc.clone().add(i == 0 ? 0.8 : -0.8, 0, 0.4));
+        }
+
+        // ── Scuttle : shrine de vision + vitesse 60s pour l'équipe du tueur ──
+        if (type == MonsterType.SCUTTLE_CRAB && killer != null && deathLoc != null) {
+            spawnScuttleShrine(killer, deathLoc);
+        }
+
         if (camp != null && camp.liveEntities.isEmpty()) {
             // Tout le camp est nettoyé → programmer le respawn
             camp.respawnAt = System.currentTimeMillis() + type.respawnSeconds * 1000L;
