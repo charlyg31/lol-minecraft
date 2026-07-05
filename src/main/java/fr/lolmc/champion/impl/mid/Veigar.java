@@ -68,7 +68,7 @@ public class Veigar extends BaseChampion {
             int touched=0;
             for(var __t : hits){
                 if(touched>=2) break;
-                double hpBefore=__t.getHealth();
+                double hpBefore=TargetingUtil.getRealHealth(__t);
                 TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);
                 if(hpBefore-dmg<=0 && apStacks.getOrDefault(c.getUniqueId(),0) < MAX_AP_STACKS){
                     boolean big=(__t instanceof Player)||fr.lolmc.game.JungleManager.isJungleMonster(__t);

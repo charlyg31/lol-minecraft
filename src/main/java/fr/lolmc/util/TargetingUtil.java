@@ -213,13 +213,38 @@ public final class TargetingUtil {
                 case TRUE -> DamageUtil.Type.TRUE;
             };
             DamageUtil.damage(caster, victim, amount, true, dt);
+        } else if (VirtualHP.has(target)) {
+            // Entité à HP virtuels (Baron, Elder, canon...) : dégâts virtuels
+            VirtualHP.damage(target, amount, caster);
+            target.getWorld().spawnParticle(org.bukkit.Particle.CRIT,
+                    target.getLocation().add(0, 1, 0), 5, 0.3, 0.3, 0.3);
         } else {
             // Sbire ou monstre : dégât direct (pas de système de résistance LoL)
             double newHealth = Math.max(0, target.getHealth() - amount);
             target.setHealth(newHealth);
+            HealthBar.update(target, newHealth,
+                target.getAttribute(Compat.maxHealth()) != null
+                    ? target.getAttribute(Compat.maxHealth()).getValue()
+                    : target.getMaxHealth());
             target.getWorld().spawnParticle(org.bukkit.Particle.CRIT,
                     target.getLocation().add(0, 1, 0), 5, 0.3, 0.3, 0.3);
         }
+    }
+
+    /**
+     * HP réels à l'échelle LoL :
+     *  - Joueur : HPSystem (la vie vanilla n'est qu'un affichage proportionnel)
+     *  - Entité à HP virtuels (Baron, Elder, canon) : PDC
+     *  - Autre entité : vie vanilla (déjà à l'échelle LoL, ex. sbire 477)
+     */
+    public static double getRealHealth(LivingEntity target) {
+        if (target instanceof Player p) {
+            var cm = fr.lolmc.LolPlugin.getInstance().getChampionManager();
+            if (cm != null && cm.hasChampion(p))
+                return cm.getChampion(p).getHPSystem().getCurrentHP();
+            return p.getHealth();
+        }
+        return VirtualHP.has(target) ? VirtualHP.getCurrent(target) : target.getHealth();
     }
 
     /** Applique des dégâts à toute une liste d'entités. */

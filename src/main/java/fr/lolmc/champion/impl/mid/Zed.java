@@ -267,7 +267,7 @@ public class Zed extends BaseChampion {
             var dest=tgt.getLocation().clone().add(tgt.getLocation().getDirection().multiply(1.5));
             dest.setY(c.getLocation().getY());
             c.teleport(dest);
-            final double startHP=tgt.getHealth();
+            final double startHP=TargetingUtil.getRealHealth(tgt);
             if(tgt instanceof Player _tp)_tp.sendActionBar(Component.text("💀 MARQUE DE MORT — 3s...",NamedTextColor.DARK_RED));
             tgt.getWorld().spawnParticle(Particle.SMOKE,tgt.getLocation().add(0,1,0),20,0.5,1,0.5);
             double[] ampPct={0.25,0.40,0.55};
@@ -285,7 +285,7 @@ public class Zed extends BaseChampion {
             new BukkitRunnable(){
                 @Override public void run(){
                     if(tgt.isDead())return;
-                    double subis=Math.max(0, startHP - tgt.getHealth());
+                    double subis=Math.max(0, startHP - TargetingUtil.getRealHealth(tgt));
                     double dmg=ad*0.65 + subis*ampPct[rank];
                     tgt.getWorld().strikeLightningEffect(tgt.getLocation());
                     tgt.getWorld().spawnParticle(Particle.FLASH,tgt.getLocation().add(0,1,0),2);
