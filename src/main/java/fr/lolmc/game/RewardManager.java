@@ -114,26 +114,6 @@ public class RewardManager {
 
     // ── Bounty d'objectifs (comeback LoL) ────────────────────────
 
-    /**
-     * Bonus d'or si l'équipe attaquante est en retard (écart d'or global).
-     * LoL : les bounties d'objectifs s'activent quand une équipe domine.
-     * Retourne un bonus 0-250 selon l'écart (>=5000 or d'écart → max).
-     */
-    public int getObjectiveBounty(fr.lolmc.team.TeamManager.Team attackingTeam) {
-        var tm = LolPlugin.getInstance().getTeamManager();
-        long goldA = 0, goldB = 0;
-        for (var p : fr.lolmc.util.WorldContext.getGamePlayers()) {
-            var t = tm.getTeam(p);
-            if (t == null) continue;
-            int g = goldManager.getGold(p.getUniqueId());
-            if (t == attackingTeam) goldA += g; else goldB += g;
-        }
-        long deficit = goldB - goldA; // positif si l'attaquant est en retard
-        if (deficit < 2000) return 0;
-        // 2000 → 50 or, 5000+ → 250 or
-        return (int) Math.min(250, 50 + (deficit - 2000) * 200 / 3000);
-    }
-
     // ── Kill de champion ──────────────────────────────────────────
 
     public void onChampionKill(Player killer, Player victim) {
@@ -255,7 +235,8 @@ public class RewardManager {
      * >3000 or de retard sur l'équipe adverse, les objectifs rapportent plus.
      * @return bonus d'or (0 si pas de retard)
      */
-    public int getObjectiveBounty(fr.lolmc.team.TeamManager.Team attackingTeam, int baseBonus) {
+    public int getObjectiveBounty(fr.lolmc.team.TeamManager.Team attackingTeam) {
+        final int baseBonus = 125; // → bounty max 250 (2× base)
         var tm = LolPlugin.getInstance().getTeamManager();
         var gm = LolPlugin.getInstance().getGoldManager();
         if (gm == null) return 0;
@@ -301,9 +282,6 @@ public class RewardManager {
             case 1  -> GOLD_TURRET_T1_GLOBAL;
             case 2  -> GOLD_TURRET_T2_GLOBAL;
             default -> GOLD_TURRET_T3_GLOBAL;
-        // Comeback : bounty d'objectif si l'équipe est en retard
-        int comebackBonus = getObjectiveBounty(attackingTeam, 250);
-        if (comebackBonus > 0) globalGold += comebackBonus;
         };
         String teamName = attackingTeam == fr.lolmc.team.TeamManager.Team.BLUE ? "Bleue" : "Rouge";
         for (java.util.UUID id : LolPlugin.getInstance().getGameManager().getParticipants()) {
