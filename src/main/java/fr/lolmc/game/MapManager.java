@@ -29,7 +29,10 @@ public class MapManager {
     private final Map<String, Location> spawns = new HashMap<>();
 
     // HP par défaut selon le type
-    private static final double TURRET_HP = 3000;
+    // HP tours LoL : T1 5000, T2 5300, T3 5500
+    private static final double TURRET_T1_HP = 5000;
+    private static final double TURRET_T2_HP = 5300;
+    private static final double TURRET_T3_HP = 5500;
     private static final double INHIBITOR_HP = 4000;
     private static final double NEXUS_HP = 5000;
     private static final double NEXUS_BASE_HP = 5500;
@@ -186,7 +189,11 @@ public class MapManager {
             }
 
             double maxHP = switch (type) {
-                case TURRET -> TURRET_HP;
+                case TURRET -> switch (index) {
+                    case 1  -> TURRET_T1_HP;
+                    case 2  -> TURRET_T2_HP;
+                    default -> TURRET_T3_HP;
+                };
                 case INHIBITOR -> INHIBITOR_HP;
                 case NEXUS -> NEXUS_HP;
                 case NEXUS_BASE -> NEXUS_BASE_HP;

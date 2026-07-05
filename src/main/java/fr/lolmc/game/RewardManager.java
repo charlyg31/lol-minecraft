@@ -19,7 +19,7 @@ public class RewardManager {
 
     // Récompenses (proches de LoL)
     public static final int GOLD_MINION_MELEE = 21;   // sbire mêlée (valeur LoL exacte)
-    public static final int GOLD_MINION_CASTER = 17;  // sbire caster (valeur LoL exacte)
+    public static final int GOLD_MINION_CASTER = 14;  // sbire caster (valeur LoL exacte)
     public static final int GOLD_MINION_CANNON = 60;  // sbire canon/siège (60-90 selon temps)
     public static final int GOLD_CHAMPION_KILL = 300; // kill de base (valeur LoL)
     // Or global (distribué à toute l'équipe) pour destruction de structures
@@ -43,7 +43,10 @@ public class RewardManager {
     private final java.util.Map<String, Integer> turretPlates = new java.util.concurrent.ConcurrentHashMap<>();
     public static final int GOLD_ASSIST = 150;
 
-    public static final double XP_MINION = 60;
+    public static final double XP_MINION = 60;         // mêlée (LoL 60.45)
+    public static final double XP_MINION_CASTER = 30;  // caster (LoL 29.76)
+    public static final double XP_MINION_CANNON = 93;  // canon (LoL 93)
+    public static final double XP_MINION_SUPER  = 97;  // super-sbire
     public static final double XP_CHAMPION_KILL = 200;
     public static final double XP_ASSIST = 100;
 

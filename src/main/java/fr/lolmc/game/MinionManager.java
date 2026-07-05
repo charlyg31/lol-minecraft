@@ -46,7 +46,8 @@ public class MinionManager {
     private static final long WAVE_PERIOD      = 600L;   // 30s = 600 ticks
     private static final long FIRST_WAVE_DELAY = 1300L;  // 1:05 = 65s = 1300 ticks
     private static final int MINIONS_PER_WAVE = 6;
-    private static final double MINION_HP = 477;
+    private static final double MINION_HP = 477;        // mêlée (LoL 477)
+    private static final double CASTER_HP = 296;        // caster (LoL 296)
     private static final double CANNON_HP = 1257;
     private static final double MINION_SPEED = 0.25;
 
@@ -166,7 +167,8 @@ public class MinionManager {
             z.setShouldBurnInDay(false);
             // Empêcher le zombie de cibler les joueurs tout seul (IA vanilla)
             z.setTarget(null);
-            double safeHp = Math.min(MINION_HP, 1024.0);
+            double baseHp = (type == MinionType.CASTER) ? CASTER_HP : MINION_HP;
+            double safeHp = Math.min(baseHp, 1024.0);
             z.getAttribute(Compat.maxHealth()).setBaseValue(safeHp);
             z.setHealth(safeHp);
             z.getAttribute(Compat.movementSpeed()).setBaseValue(MINION_SPEED);

@@ -92,7 +92,13 @@ public class EntityDeathListener implements Listener {
                 int gold = "caster".equals(minionType) ? RewardManager.GOLD_MINION_CASTER
                          : "cannon".equals(minionType) ? RewardManager.GOLD_MINION_CANNON
                          : RewardManager.GOLD_MINION_MELEE;
-                rewardManager.onMinionKill(killer, gold, RewardManager.XP_MINION);
+                double xp = switch (minionType != null ? minionType : "melee") {
+                    case "caster" -> RewardManager.XP_MINION_CASTER;
+                    case "cannon" -> RewardManager.XP_MINION_CANNON;
+                    case "super"  -> RewardManager.XP_MINION_SUPER;
+                    default       -> RewardManager.XP_MINION;
+                };
+                rewardManager.onMinionKill(killer, gold, xp);
             }
             return;
         }
