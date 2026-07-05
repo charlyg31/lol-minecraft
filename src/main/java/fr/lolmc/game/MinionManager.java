@@ -202,6 +202,7 @@ public class MinionManager {
                 var hpAttr = minion.getAttribute(fr.lolmc.util.Compat.maxHealth());
                 double safeCannonHp = Math.min(CANNON_HP, 1024.0);
                 if (hpAttr != null) { hpAttr.setBaseValue(safeCannonHp); minion.setHealth(safeCannonHp); }
+                if (CANNON_HP > 1024.0) fr.lolmc.util.VirtualHP.init(minion, CANNON_HP);
             }
     }
 
