@@ -168,6 +168,8 @@ public class GameManager {
         }
         // Tab scoreboard
         LolPlugin.getInstance().getTabScoreboard().start();
+        // Marqueurs de cible (rouge visee / vert verrouillee)
+        LolPlugin.getInstance().getAutoAttackManager().startVisuals();
         // FF + death recap reset
         LolPlugin.getInstance().getForfeitManager().reset();
     }
@@ -183,6 +185,7 @@ public class GameManager {
         LolPlugin.getInstance().getFeatManager().reset();
         // Tab scoreboard
         LolPlugin.getInstance().getTabScoreboard().stop();
+        LolPlugin.getInstance().getAutoAttackManager().stopVisuals();
         // Réinitialiser les skins
         LolPlugin.getInstance().getSkinManager().resetAll();
         // FF reset
