@@ -259,7 +259,7 @@ public class AbilityListener implements Listener {
             Player aimed = target != null ? target : getTargetedPlayer(caster);
             if (aimed != null) {
                 aam.tryAutoAttack(caster, aimed);
-                aam.lockTarget(caster, aimed);
+                aam.toggleLock(caster, aimed);
                 return;
             }
 
@@ -267,7 +267,7 @@ public class AbilityListener implements Listener {
             org.bukkit.entity.LivingEntity entity = getTargetedEntity(caster);
             if (entity != null) {
                 boolean hit = aam.tryAutoAttackEntity(caster, entity);
-                if (hit) { aam.lockTarget(caster, entity); return; }
+                if (hit) { aam.toggleLock(caster, entity); return; }
             }
 
             // 3. Structure ennemie dans la portée AA (annule le lock précédent)
@@ -580,7 +580,7 @@ public class AbilityListener implements Listener {
         if (slot == 0) {
             var aam2 = LolPlugin.getInstance().getAutoAttackManager();
             aam2.tryAutoAttack(caster, target);
-            if (target != null) aam2.lockTarget(caster, target);
+            if (target != null) aam2.toggleLock(caster, target);
         } else if (slot >= 1 && slot <= 4) {
             // Le débounce est déjà appliqué en amont (onArmSwing / onLeftClick)
             manager.getChampion(caster).tryUseAbility(caster, slot, target);
