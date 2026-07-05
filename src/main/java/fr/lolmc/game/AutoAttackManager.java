@@ -43,12 +43,15 @@ public class AutoAttackManager {
     // de cible ; cliquer dans le vide annule (comme le S de LoL).
     // ══════════════════════════════════════════════════════════
     private final Map<UUID, UUID> lockedTargets = new HashMap<>();
+    private final Map<UUID, Long> lockSetAt = new HashMap<>();
+    private static final long TOGGLE_GRACE_MS = 500; // anti-spam du re-clic
     private org.bukkit.scheduler.BukkitTask autoFireTask;
 
     /** Verrouille la cible : les AA continueront automatiquement. */
     public void lockTarget(Player attacker, LivingEntity target) {
         if (!LolPlugin.getInstance().getConfig().getBoolean("combat.aa-lock-on", true)) return;
         lockedTargets.put(attacker.getUniqueId(), target.getUniqueId());
+        lockSetAt.put(attacker.getUniqueId(), System.currentTimeMillis());
         String name = target instanceof Player p ? p.getName()
             : net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
                 .plainText().serializeOr(target.customName(), target.getType().name());
@@ -66,12 +69,22 @@ public class AutoAttackManager {
      * (le clic porte quand même son attaque manuelle) ; une autre cible bascule.
      */
     public void toggleLock(Player attacker, LivingEntity target) {
-        if (isLockedOn(attacker, target)) clearLock(attacker);
-        else lockTarget(attacker, target);
+        if (isLockedOn(attacker, target)) {
+            // Spam-clic (reflexe Minecraft) : dans la fenetre de grace,
+            // le re-clic n'attaque qu'en manuel, le lock est CONSERVE
+            Long since = lockSetAt.get(attacker.getUniqueId());
+            long now = System.currentTimeMillis();
+            if (since != null && now - since < TOGGLE_GRACE_MS) {
+                lockSetAt.put(attacker.getUniqueId(), now); // fenetre glissante
+                return;
+            }
+            clearLock(attacker);
+        } else lockTarget(attacker, target);
     }
 
     /** Annule le verrouillage (re-clic, clic dans le vide, structure). */
     public void clearLock(Player attacker) {
+        lockSetAt.remove(attacker.getUniqueId());
         if (lockedTargets.remove(attacker.getUniqueId()) != null)
             attacker.sendActionBar(Component.text("🔓 Verrouillage annulé", NamedTextColor.GRAY));
     }
