@@ -44,7 +44,27 @@ public class ShopListener implements Listener {
     }
 
     /** Ouvre la boutique pour un joueur (appelable depuis /lol shop). */
-    public void openShop(Player player) { shopGUI.open(player); }
+    public void openShop(Player player) {
+        // LoL : la boutique n'est accessible qu'a la fontaine
+        var gm = LolPlugin.getInstance().getGameManager();
+        boolean baseOnly = LolPlugin.getInstance().getConfig()
+                .getBoolean("shop.base-only", true);
+        if (baseOnly && gm != null && gm.isGameRunning()
+                && fr.lolmc.util.WorldContext.isInGameWorld(player)) {
+            var team = LolPlugin.getInstance().getTeamManager().getTeam(player);
+            var mm = LolPlugin.getInstance().getMapManager();
+            org.bukkit.Location base = (team != null && mm != null) ? mm.getSpawn(team, 0) : null;
+            double radius = LolPlugin.getInstance().getConfig().getDouble("shop.base-radius", 15.0);
+            if (base == null || !base.getWorld().equals(player.getWorld())
+                    || base.distanceSquared(player.getLocation()) > radius * radius) {
+                player.sendMessage(net.kyori.adventure.text.Component.text(
+                    "🏪 La boutique n'est accessible qu'a la base !",
+                    net.kyori.adventure.text.format.NamedTextColor.RED));
+                return;
+            }
+        }
+        shopGUI.open(player);
+    }
 
     private final java.util.Set<java.util.UUID> awaitingSearch =
         java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());

@@ -102,6 +102,11 @@ scale:
 # ═══════════════════════════════════════════════════════
 # COMBAT
 # ═══════════════════════════════════════════════════════
+shop:
+  # LoL : achat uniquement a la fontaine. false = achat partout.
+  base-only: true
+  base-radius: 15.0
+
 combat:
   # Un clic sur une cible verrouille l'attaque : les AA s'enchaînent
   # automatiquement à la cadence d'attack speed tant que la cible est

@@ -106,6 +106,9 @@ public class LevelSystem {
 
         int maxRank = (slot == 4) ? 3 : 5; // R = 3 rangs max
         if (abilityRanks[slot] >= maxRank) return false;
+        // LoL : un sort de base ne peut depasser ceil(niveau/2)
+        // (rang 2 des le lvl 3, rang 3 au lvl 5, ... rang 5 au lvl 9)
+        if (slot != 4 && abilityRanks[slot] + 1 > (level + 1) / 2) return false;
 
         // R (ultime) : niveaux requis 6, 11, 16
         if (slot == 4) {
