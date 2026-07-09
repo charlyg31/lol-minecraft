@@ -81,6 +81,10 @@ public class PassiveManager {
                     for (var e : p.getNearbyEntities(8,8,8)) if (e instanceof Player ap && !LolPlugin.getInstance().getTeamManager().areEnemies(p,ap) && championManager.hasChampion(ap))
                         ap.addPotionEffect(new PotionEffect(PotionEffectType.HASTE,25,0,false,false));
                 }
+                // Warwick : Instinct de Chasse (révèle+traque les ennemis <50% HP)
+                if ("warwick".equals(ch.getId())) {
+                    fr.lolmc.champion.impl.jungle.Warwick.tickWarwickPassive(p);
+                }
                 // Rod of Ages : stacks croissants (simplifié, +20HP/20mana au fil du temps)
                 if (hasAnyItem(p,"rod_of_ages") && getState(p).rodStacks<10) {
                     if (System.currentTimeMillis()-getState(p).lastRodStack > 60000) { // 1 stack/minute
