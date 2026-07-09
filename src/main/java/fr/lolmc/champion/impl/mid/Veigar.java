@@ -20,7 +20,7 @@ import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.Vector;
 import java.util.*;
 
-public class Veigar extends BaseChampion {
+public class Veigar extends BaseChampion implements fr.lolmc.champion.base.StatefulChampion {
     public Veigar() {
         super("veigar", "Veigar", ChampionRole.MID,
                 new ChampionStats(550,52,0,18,30,0.625,0,340,5.5,6.0));
@@ -35,8 +35,8 @@ public class Veigar extends BaseChampion {
 
     public static final Map<UUID,Integer> apStacks=new java.util.concurrent.ConcurrentHashMap<>();
     private static final int MAX_AP_STACKS = 150;
-    public static void resetState(UUID id){ apStacks.remove(id); }
-    public static void resetAllState(){ apStacks.clear(); }
+    @Override public void resetState(UUID id){ apStacks.remove(id); }
+    @Override public void resetAllState(){ apStacks.clear(); }
 
     /** Passif Malfaisance : +AP permanent sur kill/assist de champion. */
     public static void onTakedown(java.util.UUID id) {

@@ -19,14 +19,14 @@ import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.Vector;
 import java.util.*;
 
-public class MissFortune extends BaseChampion {
+public class MissFortune extends BaseChampion implements fr.lolmc.champion.base.StatefulChampion {
     public MissFortune() {
         super("missfortune", "Miss Fortune", ChampionRole.ADC,
             new ChampionStats(640,52,0,28,30,0.656,0,325,5.5,3.8));
         getStats().setGrowthStats(103.0,3.0,4.5,1.30,0.03010,0.65);
     }
-    public static void resetState(java.util.UUID id) { lastTarget.remove(id); }
-    public static void resetAllState() { lastTarget.clear(); }
+    @Override public void resetState(java.util.UUID id) { lastTarget.remove(id); }
+    @Override public void resetAllState() { lastTarget.clear(); }
 
     @Override protected void registerAbilities() {
         setAbility(0,new AA()); setAbility(1,new Q());

@@ -1,67 +1,36 @@
 package fr.lolmc.util;
 
-import fr.lolmc.champion.impl.top.Nasus;
-import fr.lolmc.champion.impl.top.Darius;
-import fr.lolmc.champion.impl.top.Malphite;
-import fr.lolmc.champion.impl.mid.Annie;
-import fr.lolmc.champion.impl.mid.Veigar;
-import fr.lolmc.champion.impl.mid.Yasuo;
-import fr.lolmc.champion.impl.mid.Zed;
-import fr.lolmc.champion.impl.jungle.Amumu;
-import fr.lolmc.champion.impl.jungle.LeeSin;
-import fr.lolmc.champion.impl.jungle.MasterYi;
-import fr.lolmc.champion.impl.support.Blitzcrank;
-import fr.lolmc.champion.impl.support.Leona;
-import fr.lolmc.champion.impl.adc.Jinx;
-import fr.lolmc.champion.impl.adc.MissFortune;
-import fr.lolmc.champion.impl.adc.Sivir;
+import fr.lolmc.LolPlugin;
+import fr.lolmc.champion.base.BaseChampion;
+import fr.lolmc.champion.base.StatefulChampion;
 
 import java.util.UUID;
 
 /**
- * Point central de réinitialisation des états statiques des champions.
- * Appelé à la fin de chaque partie (resetAll) et à la déconnexion/
+ * Point central de rÃ©initialisation des Ã©tats statiques des champions.
+ * AppelÃ© Ã  la fin de chaque partie (resetAll) et Ã  la dÃ©connexion/
  * changement de champion d'un joueur (resetPlayer).
+ * <p>
+ * ItÃ¨re sur tous les champions enregistrÃ©s dans {@link fr.lolmc.manager.ChampionManager}
+ * et appelle resetState/resetAllState sur ceux qui implÃ©mentent
+ * {@link StatefulChampion} â aucune liste Ã  maintenir Ã  la main,
+ * donc aucun oubli possible pour un futur champion stateful.
  */
 public final class ChampionStateReset {
 
     private ChampionStateReset() {}
 
-    /** Réinitialise l'état d'un seul joueur (déconnexion, changement de champion). */
+    /** RÃ©initialise l'Ã©tat d'un seul joueur (dÃ©connexion, changement de champion). */
     public static void resetPlayer(UUID id) {
-        Nasus.resetState(id);
-        Darius.resetState(id);
-        Malphite.resetState(id);
-        Annie.resetState(id);
-        Veigar.resetState(id);
-        Yasuo.resetState(id);
-        Zed.resetState(id);
-        Amumu.resetState(id);
-        LeeSin.resetState(id);
-        MasterYi.resetState(id);
-        Blitzcrank.resetState(id);
-        Leona.resetState(id);
-        Jinx.resetState(id);
-        MissFortune.resetState(id);
-        Sivir.resetState(id);
+        for (BaseChampion champ : LolPlugin.getInstance().getChampionManager().getAllChampions()) {
+            if (champ instanceof StatefulChampion sc) sc.resetState(id);
+        }
     }
 
-    /** Réinitialise tout (fin de partie). */
+    /** RÃ©initialise tout (fin de partie). */
     public static void resetAll() {
-        Nasus.resetAllState();
-        Darius.resetAllState();
-        Malphite.resetAllState();
-        Annie.resetAllState();
-        Veigar.resetAllState();
-        Yasuo.resetAllState();
-        Zed.resetAllState();
-        Amumu.resetAllState();
-        LeeSin.resetAllState();
-        MasterYi.resetAllState();
-        Blitzcrank.resetAllState();
-        Leona.resetAllState();
-        Jinx.resetAllState();
-        MissFortune.resetAllState();
-        Sivir.resetAllState();
+        for (BaseChampion champ : LolPlugin.getInstance().getChampionManager().getAllChampions()) {
+            if (champ instanceof StatefulChampion sc) sc.resetAllState();
+        }
     }
 }

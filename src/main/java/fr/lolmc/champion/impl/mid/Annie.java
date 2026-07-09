@@ -17,7 +17,7 @@ import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
 import java.util.*;
 
-public class Annie extends BaseChampion {
+public class Annie extends BaseChampion implements fr.lolmc.champion.base.StatefulChampion {
     public Annie() {
         super("annie", "Annie", ChampionRole.MID,
                 new ChampionStats(560,50,0,23,30,0.610,0,335,6.25,5.5));
@@ -36,11 +36,11 @@ public class Annie extends BaseChampion {
     }
 
     // ── État statique ─────────────────────────────────────────────
-    private static final Map<UUID, org.bukkit.entity.PolarBear> activeTibbers  = new java.util.concurrent.ConcurrentHashMap<>();
-    private static final Map<UUID, Long>    rCooldowns  = new java.util.concurrent.ConcurrentHashMap<>();
-    private static final Map<UUID, Integer> pyroStacks  = new java.util.concurrent.ConcurrentHashMap<>();
+    private final Map<UUID, org.bukkit.entity.PolarBear> activeTibbers  = new java.util.concurrent.ConcurrentHashMap<>();
+    private final Map<UUID, Long>    rCooldowns  = new java.util.concurrent.ConcurrentHashMap<>();
+    private final Map<UUID, Integer> pyroStacks  = new java.util.concurrent.ConcurrentHashMap<>();
     // Enrage : UUID de Tibbers → timestamp fin enrage
-    private static final Map<UUID, Long>    enrageUntil = new java.util.concurrent.ConcurrentHashMap<>();
+    private final Map<UUID, Long>    enrageUntil = new java.util.concurrent.ConcurrentHashMap<>();
 
     // ── Pyromanie ─────────────────────────────────────────────────
     public static void onSpellCast(UUID id) {
@@ -55,13 +55,15 @@ public class Annie extends BaseChampion {
     }
 
     // ── Reset ─────────────────────────────────────────────────────
-    public static void resetState(UUID id) {
+    
+    public void resetState(UUID id) {
         var t = activeTibbers.remove(id);
         if (t != null && t.isValid()) t.remove();
         pyroStacks.remove(id);
         rCooldowns.remove(id);
     }
-    public static void resetAllState() {
+    
+    public void resetAllState() {
         activeTibbers.values().forEach(t -> { if (t != null && t.isValid()) t.remove(); });
         activeTibbers.clear(); pyroStacks.clear(); rCooldowns.clear(); enrageUntil.clear();
     }

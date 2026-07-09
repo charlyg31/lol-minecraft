@@ -19,7 +19,7 @@ import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.Vector;
 import java.util.*;
 
-public class Sivir extends BaseChampion {
+public class Sivir extends BaseChampion implements fr.lolmc.champion.base.StatefulChampion {
     public Sivir() {
         super("sivir", "Sivir", ChampionRole.ADC,
             new ChampionStats(600,58,0,26,30,0.625,0,335,5.0,3.2));
@@ -33,8 +33,8 @@ public class Sivir extends BaseChampion {
     }
 
     private static final java.util.Map<java.util.UUID, Boolean> ricochetActive = new java.util.concurrent.ConcurrentHashMap<>();
-    public static void resetState(java.util.UUID id) { ricochetActive.remove(id); }
-    public static void resetAllState()               { ricochetActive.clear(); }
+    @Override public void resetState(java.util.UUID id) { ricochetActive.remove(id); }
+    @Override public void resetAllState()               { ricochetActive.clear(); }
     public static void setRicochet(java.util.UUID id, boolean v) { ricochetActive.put(id, v); }
 
     static class AA extends BasicAttackAbility {

@@ -20,7 +20,7 @@ import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.Vector;
 import java.util.*;
 
-public class LeeSin extends BaseChampion {
+public class LeeSin extends BaseChampion implements fr.lolmc.champion.base.StatefulChampion {
     public LeeSin() {
         super("leesin", "Lee Sin", ChampionRole.JUNGLE,
                 new ChampionStats(645,68,0,36,32,0.651,0,345,1.25,7.5));
@@ -59,8 +59,8 @@ public class LeeSin extends BaseChampion {
     }
 
     private static final Map<UUID,UUID> sonicTarget=new java.util.concurrent.ConcurrentHashMap<>();
-    public static void resetState(UUID id){ sonicTarget.remove(id); flurryCharges.remove(id); }
-    public static void resetAllState(){ sonicTarget.clear(); flurryCharges.clear(); }
+    @Override public void resetState(UUID id){ sonicTarget.remove(id); flurryCharges.remove(id); }
+    @Override public void resetAllState(){ sonicTarget.clear(); flurryCharges.clear(); }
 
     static class Q extends BaseAbility {
         // onSpellCast appelé dans cast() pour activer Flurry

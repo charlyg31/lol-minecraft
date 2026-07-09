@@ -19,7 +19,7 @@ import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.Vector;
 import java.util.*;
 
-public class Leona extends BaseChampion {
+public class Leona extends BaseChampion implements fr.lolmc.champion.base.StatefulChampion {
     public Leona() {
         super("leona", "Leona", ChampionRole.SUPPORT,
             new ChampionStats(646,60,0,38,32,0.625,0,335,1.25,8.5));
@@ -36,8 +36,8 @@ public class Leona extends BaseChampion {
     // Un allié qui frappe un ennemi marqué inflige 35-80 dégâts magiques bonus.
     static final java.util.Map<java.util.UUID, Long> sunlightMark
         = new java.util.concurrent.ConcurrentHashMap<>();
-    public static void resetState(java.util.UUID id)  { sunlightMark.remove(id); }
-    public static void resetAllState()                 { sunlightMark.clear(); }
+    @Override public void resetState(java.util.UUID id)  { sunlightMark.remove(id); }
+    @Override public void resetAllState()                 { sunlightMark.clear(); }
     public static void applyMark(org.bukkit.entity.LivingEntity target) {
         sunlightMark.put(target.getUniqueId(), System.currentTimeMillis() + 3500L);
         target.getWorld().spawnParticle(org.bukkit.Particle.END_ROD,

@@ -19,7 +19,7 @@ import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.Vector;
 import java.util.*;
 
-public class Yasuo extends BaseChampion {
+public class Yasuo extends BaseChampion implements fr.lolmc.champion.base.StatefulChampion {
     public Yasuo() {
         super("yasuo", "Yasuo", ChampionRole.MID,
             new ChampionStats(590,60,0,30,32,0.697,0,345,1.75,6.5));
@@ -37,8 +37,8 @@ public class Yasuo extends BaseChampion {
 
     public static final Map<UUID,Integer> qCasts=new java.util.concurrent.ConcurrentHashMap<>();
     /** Reinitialise l'etat de ce joueur (fin de partie / deconnexion). */
-    public static void resetState(UUID id){ qCasts.remove(id); eStacks.remove(id); }
-    public static void resetAllState(){ qCasts.clear(); eStacks.clear(); }
+    @Override public void resetState(UUID id){ qCasts.remove(id); eStacks.remove(id); }
+    @Override public void resetAllState(){ qCasts.clear(); eStacks.clear(); }
 
     // Passif Voie du Vagabond : au double crit chance passif (déjà configuré via ChampionStats)
     // Passif Esprit du Vent : bouclier égal 100+50%AP quand Flow est plein
