@@ -36,11 +36,11 @@ public class Annie extends BaseChampion implements fr.lolmc.champion.base.Statef
     }
 
     // ── État statique ─────────────────────────────────────────────
-    private final Map<UUID, org.bukkit.entity.PolarBear> activeTibbers  = new java.util.concurrent.ConcurrentHashMap<>();
-    private final Map<UUID, Long>    rCooldowns  = new java.util.concurrent.ConcurrentHashMap<>();
-    private final Map<UUID, Integer> pyroStacks  = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final Map<UUID, org.bukkit.entity.PolarBear> activeTibbers  = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final Map<UUID, Long>    rCooldowns  = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final Map<UUID, Integer> pyroStacks  = new java.util.concurrent.ConcurrentHashMap<>();
     // Enrage : UUID de Tibbers → timestamp fin enrage
-    private final Map<UUID, Long>    enrageUntil = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final Map<UUID, Long>    enrageUntil = new java.util.concurrent.ConcurrentHashMap<>();
 
     // ── Pyromanie ─────────────────────────────────────────────────
     public static void onSpellCast(UUID id) {
