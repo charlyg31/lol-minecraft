@@ -13,25 +13,19 @@ import java.util.logging.Logger;
 
 /**
  * BridgeManager — communication cross-serveur via BungeeCord PluginMessage.
- *
  * Canal entrant "lolmc:bridge" : messages JSON du lobby vers le serveur de jeu.
  * Canal sortant "BungeeCord"   : connexion d'un joueur sur un autre serveur.
- *
  * Format des messages (JSON simple, sans dépendance externe) :
- *
  *   LOBBY → GAME:
  *     {"type":"QUEUE_JOIN","uuid":"...","name":"...","party":["uuid1","uuid2"],
  *      "runes":{"keystone":"conqueror","minors":["triumph",...]},
  *      "spell1":"FLASH","spell2":"IGNITE","elo":1200}
- *
  *     {"type":"QUEUE_LEAVE","uuid":"..."}
- *
  *   GAME → LOBBY:
  *     {"type":"QUEUE_STATUS","uuid":"...","status":"WAITING|FOUND|LEFT","queueSize":3}
  *     {"type":"GAME_START","players":["uuid1",...],"server":"lolmc-01"}
  *     {"type":"GAME_END","winner":"BLUE","duration":1847,"players":[
  *       {"uuid":"...","kills":5,"deaths":2,"assists":8}]}
- *
  * Activation dans config.yml :
  *   bridge:
  *     enabled: true

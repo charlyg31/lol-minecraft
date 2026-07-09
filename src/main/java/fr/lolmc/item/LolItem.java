@@ -18,6 +18,8 @@ import java.util.List;
  * Chaque item a des stats bonifiées et optionnellement un passif/actif.
  */
 public class LolItem {
+    /** Largeur (en caractères) du retour à la ligne des descriptions dans le lore. */
+    private static final int LORE_WRAP_WIDTH = 38;
 
     // ── Identité ──
     private final String id;
@@ -235,7 +237,7 @@ public class LolItem {
             lore.add(sep());
             lore.add(Component.text("Passif — " + passiveName + ":", NamedTextColor.GOLD)
                     .decoration(TextDecoration.ITALIC, false));
-            for (String line : wrap(passiveDescription, 38)) {
+            for (String line : fr.lolmc.util.TextWrapUtil.wrap(passiveDescription, LORE_WRAP_WIDTH)) {
                 lore.add(Component.text("  " + line, NamedTextColor.GRAY)
                         .decoration(TextDecoration.ITALIC, false));
             }
@@ -264,19 +266,6 @@ public class LolItem {
     }
 
     private String pct(double v) { return (int)(v * 100) + "%"; }
-
-    private List<String> wrap(String text, int w) {
-        List<String> lines = new ArrayList<>();
-        String[] words = text.split(" ");
-        StringBuilder cur = new StringBuilder();
-        for (String word : words) {
-            if (cur.length() + word.length() + 1 > w) { lines.add(cur.toString().trim()); cur = new StringBuilder(); }
-            cur.append(word).append(" ");
-        }
-        if (!cur.isEmpty()) lines.add(cur.toString().trim());
-        return lines;
-    }
-
     // ── Builder fluent ────────────────────────────────────────────
 
     public LolItem ad(double v)           { bonusAD = v;           return this; }

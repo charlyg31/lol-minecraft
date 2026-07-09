@@ -8,10 +8,8 @@ import org.bukkit.entity.Player;
 
 /**
  * Attaque de base réutilisable.
- *
  * Évite de redupliquer le même code d'AA dans chaque champion : ciblage
  * (cible visée si aucune fournie), dégâts = AD final, type physique/magique.
- *
  * Les champions ayant un passif d'attaque (ralentissement, soin, dégâts
  * bonus...) surchargent simplement {@link #onHit}.
  */
