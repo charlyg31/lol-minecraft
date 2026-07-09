@@ -5,11 +5,9 @@ import java.util.UUID;
 /**
  * Interface marquant un champion qui possède un état statique persistant
  * entre les tours (maps UUID → données).
- *
  * Toute classe implémentant cette interface DOIT être enregistrée dans
  * {@link fr.lolmc.util.ChampionStateReset} — le compilateur garantit que
  * les deux méthodes existent, ce qui élimine les oublis silencieux.
- *
  * Usage :
  * <pre>
  *   public class Veigar extends BaseChampion implements StatefulChampion {

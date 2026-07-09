@@ -19,7 +19,7 @@ import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.Vector;
 import java.util.*;
 
-public class Nasus extends BaseChampion {
+public class Nasus extends BaseChampion implements fr.lolmc.champion.base.StatefulChampion {
     public Nasus() {
         super("nasus", "Nasus", ChampionRole.TOP,
             new ChampionStats(631,67,0,34,32,0.638,0,350,1.25,9.0));
@@ -36,8 +36,8 @@ public class Nasus extends BaseChampion {
     public static final Map<UUID,Integer> qStacks=new java.util.concurrent.ConcurrentHashMap<>();
     private static final int MAX_Q_STACKS = 500; // plafond anti-scaling infini
     /** Réinitialise les stacks de ce joueur (fin de partie / déconnexion). */
-    public static void resetState(UUID id){ qStacks.remove(id); }
-    public static void resetAllState(){ qStacks.clear(); }
+    @Override public void resetState(UUID id){ qStacks.remove(id); }
+    @Override public void resetAllState(){ qStacks.clear(); }
 
     static class AA extends BasicAttackAbility {
         AA(){super("nasus",Material.BONE,2.5f,DamageType.PHYSICAL);}

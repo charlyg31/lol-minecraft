@@ -19,7 +19,7 @@ import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.Vector;
 import java.util.*;
 
-public class Malphite extends BaseChampion {
+public class Malphite extends BaseChampion implements fr.lolmc.champion.base.StatefulChampion {
     public Malphite() {
         super("malphite", "Malphite", ChampionRole.TOP,
             new ChampionStats(644,62,0,37,32,0.736,0,335,1.25,7.0));
@@ -34,8 +34,8 @@ public class Malphite extends BaseChampion {
 
     // Passif Granite Shield : bouclier 10% HP max, se recharge 10s hors combat
     private static final java.util.Map<java.util.UUID, Long> shieldCooldown = new java.util.concurrent.ConcurrentHashMap<>();
-    public static void resetState(java.util.UUID id)    { shieldCooldown.remove(id); thunderclapUntil.remove(id); }
-    public static void resetAllState()                   { shieldCooldown.clear(); thunderclapUntil.clear(); }
+    @Override public void resetState(java.util.UUID id)    { shieldCooldown.remove(id); thunderclapUntil.remove(id); }
+    @Override public void resetAllState()                   { shieldCooldown.clear(); thunderclapUntil.clear(); }
     public static void onDamageTaken(java.util.UUID id) { shieldCooldown.put(id, System.currentTimeMillis()); }
     public static void tickGraniteShield(org.bukkit.entity.Player p, fr.lolmc.champion.base.BaseChampion champ) {
         Long last = shieldCooldown.get(p.getUniqueId());

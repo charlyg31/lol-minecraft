@@ -19,15 +19,15 @@ import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.Vector;
 import java.util.*;
 
-public class MasterYi extends BaseChampion {
+public class MasterYi extends BaseChampion implements fr.lolmc.champion.base.StatefulChampion {
     public MasterYi() {
         super("masteryi", "Master Yi", ChampionRole.JUNGLE,
             new ChampionStats(669,68,0,33,32,0.679,0,355,1.25,7.0));
         getStats().setGrowthStats(100.0,3.3,4.3,2.05,0.02000,0.65);
         setAutoAttackRange(2.7);
     }
-    public static void resetState(java.util.UUID id) { aaCount.remove(id); }
-    public static void resetAllState() { aaCount.clear(); }
+    @Override public void resetState(java.util.UUID id) { aaCount.remove(id); }
+    @Override public void resetAllState() { aaCount.clear(); }
 
     @Override protected void registerAbilities() {
         setAbility(0,new AA()); setAbility(1,new Q());

@@ -20,7 +20,7 @@ import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.Vector;
 import java.util.*;
 
-public class Zed extends BaseChampion {
+public class Zed extends BaseChampion implements fr.lolmc.champion.base.StatefulChampion {
     public Zed() {
         super("zed", "Zed", ChampionRole.MID,
                 new ChampionStats(654,63,0,32,32,0.651,0,345,1.25,7.0));
@@ -36,9 +36,10 @@ public class Zed extends BaseChampion {
     // Gestion de l'ombre et des cooldowns manuels
     public static final Map<UUID,Location> shadows = new java.util.concurrent.ConcurrentHashMap<>();
     public static final Map<UUID, Long> wCooldowns = new java.util.concurrent.ConcurrentHashMap<>();
-    private static final Map<UUID, UUID> shadowEntities = new java.util.concurrent.ConcurrentHashMap<>();
+    private final Map<UUID, UUID> shadowEntities = new java.util.concurrent.ConcurrentHashMap<>();
 
-    public static void resetState(UUID id) {
+    
+    public void resetState(UUID id) {
         shadows.remove(id);
         wCooldowns.remove(id);
         UUID entityId = shadowEntities.remove(id);
@@ -53,7 +54,8 @@ public class Zed extends BaseChampion {
         Long until = wCooldowns.get(id);
         return until != null && until > System.currentTimeMillis();
     }
-    public static void resetAllState() {
+    
+    public void resetAllState() {
         for (UUID entityId : shadowEntities.values()) {
             org.bukkit.entity.Entity e = org.bukkit.Bukkit.getEntity(entityId);
             if (e != null) e.remove();

@@ -19,7 +19,7 @@ import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.Vector;
 import java.util.*;
 
-public class Darius extends BaseChampion {
+public class Darius extends BaseChampion implements fr.lolmc.champion.base.StatefulChampion {
     public Darius() {
         super("darius", "Darius", ChampionRole.TOP,
             new ChampionStats(652,64,0,37,32,0.625,0,340,1.75,10.0));
@@ -38,9 +38,9 @@ public class Darius extends BaseChampion {
         = new java.util.concurrent.ConcurrentHashMap<>();
     private static final java.util.Map<java.util.UUID, Long> bleedExpire
         = new java.util.concurrent.ConcurrentHashMap<>();
-    public static void resetState(java.util.UUID id) { bleedStacks.remove(id); bleedExpire.remove(id); }
+    @Override public void resetState(java.util.UUID id) { bleedStacks.remove(id); bleedExpire.remove(id); }
     public static int getBleedStacks(java.util.UUID vid) { return bleedStacks.getOrDefault(vid, 0); }
-    public static void resetAllState() { bleedStacks.clear(); bleedExpire.clear(); }
+    @Override public void resetAllState() { bleedStacks.clear(); bleedExpire.clear(); }
 
     public static void applyBleed(Player darius, org.bukkit.entity.LivingEntity victim, ChampionStats s) {
         java.util.UUID vid = victim.getUniqueId();

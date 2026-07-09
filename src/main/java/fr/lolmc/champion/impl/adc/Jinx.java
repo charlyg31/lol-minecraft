@@ -20,7 +20,7 @@ import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.Vector;
 import java.util.*;
 
-public class Jinx extends BaseChampion {
+public class Jinx extends BaseChampion implements fr.lolmc.champion.base.StatefulChampion {
     public Jinx() {
         super("jinx", "Jinx", ChampionRole.ADC,
                 new ChampionStats(630,59,0,26,30,0.625,0,325,5.25,3.8));
@@ -36,8 +36,8 @@ public class Jinx extends BaseChampion {
             "🎉 GET EXCITED! +175% vitesse 6s!", net.kyori.adventure.text.format.NamedTextColor.RED));
     }
 
-    public static void resetState(java.util.UUID id) { fishbonesMode.remove(id); }
-    public static void resetAllState()               { fishbonesMode.clear(); }
+    @Override public void resetState(java.util.UUID id) { fishbonesMode.remove(id); }
+    @Override public void resetAllState()               { fishbonesMode.clear(); }
     private static final java.util.Map<java.util.UUID, Boolean> fishbonesMode
         = new java.util.concurrent.ConcurrentHashMap<>();
 
