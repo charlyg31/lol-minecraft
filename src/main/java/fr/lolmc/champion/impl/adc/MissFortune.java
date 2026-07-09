@@ -6,17 +6,14 @@ import fr.lolmc.ability.base.BasicAttackAbility;
 import fr.lolmc.stats.ResourceSystem;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.stats.ChampionStats;
-import fr.lolmc.util.DamageUtil;
 import fr.lolmc.util.TargetingUtil;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.*;
-import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
-import org.bukkit.util.Vector;
 import java.util.*;
 
 public class MissFortune extends BaseChampion implements fr.lolmc.champion.base.StatefulChampion {
@@ -62,7 +59,7 @@ public class MissFortune extends BaseChampion implements fr.lolmc.champion.base.
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : tir sur 1 cible qui ricoche sur celle derrière. 1ère: 20-100+100%AD. 2ème: 20-80+85%AD +crit
             org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.0); if(tgt==null){c.sendActionBar(Component.text("🔫 Aucune cible",NamedTextColor.GRAY));return;}
-            double[] base=fr.lolmc.util.Balance.base("q_missfortune",new double[]{20,40,60,80,100});double d1=base[getLevel()-1]+s.getFinalAD()*1.0;
+            double[] base=fr.lolmc.util.Balance.base("q_missfortune",new double[]{20,40,60,80,100});double d1=base[getLevel()-1]+s.getFinalAD();
             TargetingUtil.dealDamage(c, tgt, d1, TargetingUtil.DmgType.PHYSICAL);
             // Ricochet : 2e cible la plus proche derrière la 1ère
             double[] base2={20,35,50,65,80};double d2=(base2[getLevel()-1]+s.getFinalAD()*0.85)*1.35;
@@ -160,7 +157,7 @@ public class MissFortune extends BaseChampion implements fr.lolmc.champion.base.
                     c.getWorld().playSound(c.getLocation(), Sound.ENTITY_FIREWORK_ROCKET_BLAST, 0.8f, 1.5f);
                     waves++;
                 }
-            }.runTaskTimer(LolPlugin.getInstance(),0L,Math.max(1L,(long)(60/totalWaves))); // étalé sur ~3s
+            }.runTaskTimer(LolPlugin.getInstance(),0L,Math.max(1L,(long)(60.0/totalWaves))); // étalé sur ~3s
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double perWave=s.getFinalAD()*fr.lolmc.util.Balance.ratio("r_missfortune","ad",0.75)+s.getFinalAP()*fr.lolmc.util.Balance.ratio("r_missfortune","ap",0.25);
