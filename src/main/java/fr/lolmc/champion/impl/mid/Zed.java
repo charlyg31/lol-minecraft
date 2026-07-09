@@ -36,7 +36,7 @@ public class Zed extends BaseChampion implements fr.lolmc.champion.base.Stateful
     // Gestion de l'ombre et des cooldowns manuels
     public static final Map<UUID,Location> shadows = new java.util.concurrent.ConcurrentHashMap<>();
     public static final Map<UUID, Long> wCooldowns = new java.util.concurrent.ConcurrentHashMap<>();
-    private final Map<UUID, UUID> shadowEntities = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final Map<UUID, UUID> shadowEntities = new java.util.concurrent.ConcurrentHashMap<>();
 
     
     public void resetState(UUID id) {
