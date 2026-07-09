@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/bungee-plugin/LolMC-Bungee.iml" filepath="$PROJECT_DIR$/bungee-plugin/LolMC-Bungee.iml" />
+      <module fileurl="file://$PROJECT_DIR$/lol-minecraft.iml" filepath="$PROJECT_DIR$/lol-minecraft.iml" />
+    </modules>
+  </component>
+</project>

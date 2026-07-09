@@ -210,6 +210,14 @@ public class GameManager {
             if (p.getGameMode() == org.bukkit.GameMode.SPECTATOR)
                 p.setGameMode(org.bukkit.GameMode.SURVIVAL);
         }
+
+        // Renvoyer les joueurs vers le lobby (BungeeCord), si configuré
+        var bridge = LolPlugin.getInstance().getBridgeManager();
+        if (bridge != null && bridge.isEnabled()) {
+            for (org.bukkit.entity.Player p : fr.lolmc.util.WorldContext.getGamePlayers()) {
+                bridge.sendPlayerToLobby(p);
+            }
+        }
     }
 
     /** Capture les joueurs présents (avec champion) comme participants de la partie. */
