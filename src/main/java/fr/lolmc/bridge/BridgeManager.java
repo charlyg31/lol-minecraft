@@ -6,6 +6,7 @@ import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.messaging.PluginMessageListener;
+import org.jspecify.annotations.NonNull;
 
 import java.io.*;
 import java.util.*;
@@ -76,7 +77,7 @@ public class BridgeManager implements PluginMessageListener {
     // ════════════════════════════════════════════════════════
 
     @Override
-    public void onPluginMessageReceived(String channel, Player unused, byte[] message) {
+    public void onPluginMessageReceived(String channel, @NonNull Player unused, byte @NonNull [] message) {
         if (!channel.equals(CHANNEL_IN)) return;
         String json = new String(message, java.nio.charset.StandardCharsets.UTF_8);
         Map<String, String> data = parseJson(json);
@@ -318,7 +319,24 @@ public class BridgeManager implements PluginMessageListener {
         if (json.startsWith("{")) json = json.substring(1);
         if (json.endsWith("}")) json = json.substring(0, json.length() - 1);
 
-        // Découper par les virgules de premier niveau (hors strings)
+        for (String pair : splitTopLevelPairs(json)) {
+            int colon = pair.indexOf(':');
+            if (colon < 0) continue;
+            String key = pair.substring(0, colon).trim().replace("\"", "");
+            String val = pair.substring(colon + 1).trim();
+            if (val.startsWith("\"") && val.endsWith("\""))
+                val = val.substring(1, val.length() - 1);
+            result.put(key, val);
+        }
+        return result;
+    }
+
+    /**
+     * Découpe un objet JSON aplati par ses virgules de premier niveau
+     * (en ignorant celles à l'intérieur d'un tableau/objet imbriqué ou d'une string),
+     * pour obtenir la liste brute des segments "clé":"valeur".
+     */
+    private static List<String> splitTopLevelPairs(String json) {
         List<String> pairs = new ArrayList<>();
         int depth = 0; boolean inStr = false; StringBuilder cur = new StringBuilder();
         for (char c : json.toCharArray()) {
@@ -331,17 +349,7 @@ public class BridgeManager implements PluginMessageListener {
             cur.append(c);
         }
         if (!cur.isEmpty()) pairs.add(cur.toString().trim());
-
-        for (String pair : pairs) {
-            int colon = pair.indexOf(':');
-            if (colon < 0) continue;
-            String key = pair.substring(0, colon).trim().replace("\"", "");
-            String val = pair.substring(colon + 1).trim();
-            if (val.startsWith("\"") && val.endsWith("\""))
-                val = val.substring(1, val.length() - 1);
-            result.put(key, val);
-        }
-        return result;
+        return pairs;
     }
 
     public void disable() {
