@@ -6,17 +6,13 @@ import fr.lolmc.ability.base.BasicAttackAbility;
 import fr.lolmc.stats.ResourceSystem;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.stats.ChampionStats;
-import fr.lolmc.util.DamageUtil;
 import fr.lolmc.util.TargetingUtil;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.*;
-import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
-import org.bukkit.scheduler.BukkitRunnable;
-import org.bukkit.util.Vector;
 import java.util.*;
 
 public class Ashe extends BaseChampion {
@@ -95,15 +91,21 @@ public class Ashe extends BaseChampion {
             int maxSteps = 80; // 40 blocs à 0.5 bloc/tick
             var tm = LolPlugin.getInstance().getTeamManager();
             var fogMgr = LolPlugin.getInstance().getFogOfWarManager();
+            var casterTeam = tm.getTeam(c);
             new org.bukkit.scheduler.BukkitRunnable() {
                 int step = 0;
-                org.bukkit.Location pos = start.clone();
+                final org.bukkit.Location pos = start.clone();
                 @Override public void run() {
                     if (step >= maxSteps || !c.isOnline()) { cancel(); return; }
                     pos.add(dir.clone().multiply(0.5));
                     // Particule faucon (END_ROD jaune-doré)
                     pos.getWorld().spawnParticle(org.bukkit.Particle.END_ROD,
                         pos, 1, 0.05, 0.05, 0.05, 0);
+                    // Révèle la zone survolée pour l'équipe d'Ashe pendant 0.5s
+                    // (fenêtre glissante qui suit le faucon le long de son trajet)
+                    if (fogMgr != null && casterTeam != null) {
+                        fogMgr.revealPoint(casterTeam, pos, 8.0, 10L);
+                    }
                     // Révéler les ennemis dans un rayon de 8 blocs
                     for (var nearby : pos.getWorld().getNearbyEntities(pos, 8, 4, 8)) {
                         if (nearby instanceof Player enemy
@@ -139,7 +141,7 @@ public class Ashe extends BaseChampion {
             double[] base=fr.lolmc.util.Balance.base("r_ashe",new double[]{200,400,600});int rr=Math.min(getLevel()-1,2);double dmg=base[rr]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("r_ashe","ap",1.2);
             var hits=TargetingUtil.skillshot(c, 25.0, 1.2, false); // s'arrête au 1er champion
             if(hits.isEmpty()){c.sendActionBar(Component.text("❄ Flèche tirée (aucune cible touchée)",NamedTextColor.AQUA));return;}
-            var main=hits.get(0);
+            var main=hits.getFirst();
             // Distance parcourue → durée du stun (1 à 3.5s = 20 à 70 ticks)
             double dist=c.getLocation().distance(main.getLocation());
             int stunTicks=(int)Math.min(70, 20+dist*2.5);

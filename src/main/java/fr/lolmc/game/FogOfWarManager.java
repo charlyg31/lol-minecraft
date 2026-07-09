@@ -26,6 +26,16 @@ public class FogOfWarManager {
     private org.bukkit.World scopedWorld = null;
     private org.bukkit.scheduler.BukkitTask fogTask = null;
 
+    /**
+     * Révélations ponctuelles (ex: Faucon d'Ashe) : une équipe voit temporairement
+     * une zone, indépendamment de la portée de vision normale.
+     * Nettoyées automatiquement à expiration dans updateVision().
+     */
+    private record RevealedPoint(org.bukkit.World world, double x, double y, double z,
+                                 double radiusSq, long expiresAtMillis) {}
+    private final java.util.Map<TeamManager.Team, java.util.List<RevealedPoint>> revealedPoints
+            = new java.util.concurrent.ConcurrentHashMap<>();
+
     public FogOfWarManager(TeamManager teamManager) {
         this.teamManager = teamManager;
         var config = LolPlugin.getInstance().getConfig();
@@ -87,7 +97,7 @@ public class FogOfWarManager {
      * (un sbire allié à portée révèle les ennemis proches).
      */
     private boolean revealedByAllyMinion(org.bukkit.entity.Player viewer,
-                                          org.bukkit.entity.Player target) {
+                                         org.bukkit.entity.Player target) {
         var tm = LolPlugin.getInstance().getTeamManager();
         var team = tm.getTeam(viewer);
         if (team == null) return false;
@@ -95,7 +105,7 @@ public class FogOfWarManager {
         for (var entity : target.getNearbyEntities(8, 4, 8)) {
             if (entity instanceof org.bukkit.entity.LivingEntity le && fr.lolmc.game.MinionManager.isMinion(le)) {
                 var minionTeam = fr.lolmc.game.MinionManager.getMinionTeam(
-                    (org.bukkit.entity.LivingEntity) entity);
+                        (org.bukkit.entity.LivingEntity) entity);
                 if (minionTeam == team) return true;
             }
         }
@@ -103,11 +113,12 @@ public class FogOfWarManager {
     }
 
     private void updateVision() {
+        cleanupExpiredReveals();
         var cm = LolPlugin.getInstance().getChampionManager();
         // Filtrer par monde si scoped (mode instance)
         java.util.Collection<org.bukkit.entity.Player> playerList =
-            (scopedWorld != null) ? scopedWorld.getPlayers()
-            : fr.lolmc.util.WorldContext.getGamePlayers();
+                (scopedWorld != null) ? scopedWorld.getPlayers()
+                        : fr.lolmc.util.WorldContext.getGamePlayers();
         var wardMgr = LolPlugin.getInstance().getWardManager();
         var bushMgr = LolPlugin.getInstance().getBushManager();
 
@@ -137,6 +148,13 @@ public class FogOfWarManager {
 
                 // Révélé par une ward → visible
                 if (wardMgr != null && wardMgr.isRevealed(target)) {
+                    viewer.showPlayer(LolPlugin.getInstance(), target);
+                    continue;
+                }
+
+                // Révélé par un effet ponctuel (Faucon d'Ashe, etc.) → visible
+                var viewerTeam = teamManager.getTeam(viewer);
+                if (viewerTeam != null && isRevealedByPoint(viewerTeam, target.getLocation())) {
                     viewer.showPlayer(LolPlugin.getInstance(), target);
                     continue;
                 }
@@ -200,6 +218,10 @@ public class FogOfWarManager {
                 if (wardMgr != null && wardMgr.hasWardNear(team, entity.getLocation(), 12.0))
                     visible = true;
             }
+            // Révélation ponctuelle (Faucon d'Ashe, etc.)
+            if (!visible && isRevealedByPoint(team, entity.getLocation())) {
+                visible = true;
+            }
 
             if (visible) viewer.showEntity(plugin, entity);
             else         viewer.hideEntity(plugin, entity);
@@ -226,4 +248,44 @@ public class FogOfWarManager {
     public void setVisionRange(double range) { this.visionRange = range; }
     public double getVisionRange() { return visionRange; }
     public boolean isEnabled() { return enabled; }
+
+    /**
+     * Révèle temporairement une zone pour une équipe (ex: Faucon d'Ashe,
+     * Œil du Héraut, tout effet de vision ponctuelle).
+     * @param team           équipe qui gagne la vision
+     * @param location       centre de la zone révélée
+     * @param radius         rayon en blocs
+     * @param durationTicks  durée avant expiration (20 ticks = 1s)
+     */
+    public void revealPoint(TeamManager.Team team, org.bukkit.Location location,
+                            double radius, long durationTicks) {
+        if (team == null || location.getWorld() == null) return;
+        long expiresAt = System.currentTimeMillis() + (durationTicks * 50L); // 1 tick = 50ms
+        revealedPoints.computeIfAbsent(team, k -> new java.util.concurrent.CopyOnWriteArrayList<>())
+                .add(new RevealedPoint(location.getWorld(), location.getX(), location.getY(),
+                        location.getZ(), radius * radius, expiresAt));
+    }
+
+    /** L'équipe a-t-elle une révélation ponctuelle active couvrant cette position ? */
+    private boolean isRevealedByPoint(TeamManager.Team team, org.bukkit.Location loc) {
+        var points = revealedPoints.get(team);
+        if (points == null || points.isEmpty()) return false;
+        long now = System.currentTimeMillis();
+        boolean found = false;
+        for (var p : points) {
+            if (p.expiresAtMillis() < now) continue; // expiré, nettoyé plus bas
+            if (!p.world().equals(loc.getWorld())) continue;
+            double dx = p.x() - loc.getX(), dy = p.y() - loc.getY(), dz = p.z() - loc.getZ();
+            if (dx*dx + dy*dy + dz*dz <= p.radiusSq()) { found = true; break; }
+        }
+        return found;
+    }
+
+    /** Purge les révélations ponctuelles expirées (appelé périodiquement dans updateVision). */
+    private void cleanupExpiredReveals() {
+        long now = System.currentTimeMillis();
+        for (var points : revealedPoints.values()) {
+            points.removeIf(p -> p.expiresAtMillis() < now);
+        }
+    }
 }
