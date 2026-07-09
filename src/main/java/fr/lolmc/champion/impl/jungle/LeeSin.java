@@ -6,13 +6,10 @@ import fr.lolmc.ability.base.BasicAttackAbility;
 import fr.lolmc.stats.ResourceSystem;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.stats.ChampionStats;
-import fr.lolmc.util.DamageUtil;
 import fr.lolmc.util.TargetingUtil;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.*;
-import org.bukkit.attribute.Attribute; // AJOUT : Import de l'attribut
-import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
@@ -95,7 +92,7 @@ public class LeeSin extends BaseChampion implements fr.lolmc.champion.base.State
             double[] base=fr.lolmc.util.Balance.base("q_leesin",new double[]{60,90,120,150,180});double dmg=base[getLevel()-1]+s.getFinalAD()*fr.lolmc.util.Balance.ratio("q_leesin","ad",0.9);
             var hits=TargetingUtil.skillshot(c, 12.0, 0.8, false);
             if(hits.isEmpty()){c.sendActionBar(Component.text("🌊 Onde Sonique manquée!",NamedTextColor.GRAY));return;}
-            var tgt=hits.get(0);
+            var tgt=hits.getFirst();
             TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.PHYSICAL);
             sonicTarget.put(c.getUniqueId(), tgt.getUniqueId());
             new BukkitRunnable(){@Override public void run(){sonicTarget.remove(c.getUniqueId());}}.runTaskLater(LolPlugin.getInstance(),60L);
@@ -129,7 +126,7 @@ public class LeeSin extends BaseChampion implements fr.lolmc.champion.base.State
             final Player fdest=dest; final double fsh=shield; final Player fc=c;
             new BukkitRunnable(){@Override public void run(){
                 if(cm.hasChampion(fc)) cm.getChampion(fc).getStats().addShield(-fsh);
-                if(fdest!=null && !fdest.equals(fc) && cm.hasChampion(fdest)) cm.getChampion(fdest).getStats().addShield(-fsh);
+                if(!fdest.equals(fc) && cm.hasChampion(fdest)) cm.getChampion(fdest).getStats().addShield(-fsh);
             }}.runTaskLater(LolPlugin.getInstance(), 40L);
             // Volonté de Fer : omnivamp 10/14/18/22/26% pendant 4s
             double[] omni={0.10,0.14,0.18,0.22,0.26};

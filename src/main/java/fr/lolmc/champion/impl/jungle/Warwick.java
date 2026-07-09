@@ -6,13 +6,10 @@ import fr.lolmc.ability.base.BasicAttackAbility;
 import fr.lolmc.stats.ResourceSystem;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.stats.ChampionStats;
-import fr.lolmc.util.DamageUtil;
 import fr.lolmc.util.TargetingUtil;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.*;
-import org.bukkit.attribute.Attribute; // AJOUT : Import de l'attribut
-import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
@@ -29,7 +26,7 @@ public class Warwick extends BaseChampion {
     }
     // Passif Instinct de Chasse : révèle les ennemis sous 50% HP dans un rayon de 25 blocs
     // Bonus de vitesse vers eux, fureur au combat contre eux
-    public static void tickWarwickPassive(Player ww, fr.lolmc.champion.base.BaseChampion champ) {
+    public static void tickWarwickPassive(Player ww) {
         var tm = LolPlugin.getInstance().getTeamManager();
         for (Player nearby : ww.getWorld().getPlayers()) {
             if (nearby.equals(ww)) continue;

@@ -6,16 +6,11 @@ import fr.lolmc.ability.base.BasicAttackAbility;
 import fr.lolmc.stats.ResourceSystem;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.stats.ChampionStats;
-import fr.lolmc.util.DamageUtil;
 import fr.lolmc.util.TargetingUtil;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.*;
-import org.bukkit.attribute.Attribute; // AJOUT : Import de l'attribut
-import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
-import org.bukkit.potion.PotionEffect;
-import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.Vector;
 import java.util.*;
@@ -61,7 +56,7 @@ public class Amumu extends BaseChampion implements fr.lolmc.champion.base.Statef
         @Override public void cast(Player c,ChampionStats s,Player t){
             var hits=TargetingUtil.skillshot(c, 12.0, 1.0, false);
             if(hits.isEmpty()){c.sendActionBar(Component.text("🧻 Bandage manqué!",NamedTextColor.GRAY));return;}
-            var tgt=hits.get(0);
+            var tgt=hits.getFirst();
             Location dest=tgt.getLocation().clone().subtract(tgt.getLocation().getDirection().multiply(1.5));
             dest.setY(c.getLocation().getY());
             c.teleport(dest);
