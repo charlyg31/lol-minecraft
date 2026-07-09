@@ -71,6 +71,7 @@ public class RoleQueueManager {
         inQueue.add(player.getUniqueId());
         player.sendMessage(Component.text(
                 "✔ En file d'attente (" + inQueue.size() + "/" + PLAYERS_PER_GAME + ")", NamedTextColor.GREEN));
+        notifyQueueStatus(player.getUniqueId(), "JOINED");
         tryFormGame();
         return true;
     }
@@ -78,6 +79,15 @@ public class RoleQueueManager {
     public void leaveQueue(Player player) {
         inQueue.remove(player.getUniqueId());
         player.sendMessage(Component.text("Sorti de la file.", NamedTextColor.YELLOW));
+        notifyQueueStatus(player.getUniqueId(), "LEFT");
+    }
+
+    /** Notifie le lobby (BungeeCord) du statut de queue d'un joueur, si activé. */
+    private void notifyQueueStatus(UUID uuid, String status) {
+        var bridge = LolPlugin.getInstance().getBridgeManager();
+        if (bridge != null && bridge.isEnabled()) {
+            bridge.notifyQueueStatus(uuid, status, inQueue.size());
+        }
     }
 
     public boolean isInQueue(UUID uuid) { return inQueue.contains(uuid); }

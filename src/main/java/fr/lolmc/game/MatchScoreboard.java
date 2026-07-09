@@ -141,6 +141,17 @@ public class MatchScoreboard {
         }
 
         persistResults(winner, tm);
+
+        // Notifier le lobby (BungeeCord) de la fin de partie
+        var bridge = LolPlugin.getInstance().getBridgeManager();
+        if (bridge != null && bridge.isEnabled()) {
+            long duration = LolPlugin.getInstance().getGameManager().getElapsedSeconds();
+            List<fr.lolmc.stats.persistence.PlayerStats> endStats = new ArrayList<>();
+            for (UUID id : stats.keySet()) {
+                endStats.add(new fr.lolmc.stats.persistence.PlayerStats(id, ""));
+            }
+            bridge.notifyGameEnd(winner.name(), duration, endStats);
+        }
     }
 
     private void persistResults(Team winner, fr.lolmc.team.TeamManager tm) {

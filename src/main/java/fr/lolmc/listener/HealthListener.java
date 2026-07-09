@@ -97,6 +97,8 @@ public class HealthListener implements Listener {
                 && LolPlugin.getInstance().getChampionManager().hasChampion(p)) {
             gm.saveSnapshot(p);
         }
+        var bridge = LolPlugin.getInstance().getBridgeManager();
+        if (bridge != null) bridge.cleanupPlayer(p.getUniqueId());
     }
 
     @EventHandler

@@ -366,8 +366,9 @@ public class BridgeManager implements PluginMessageListener {
      */
     public void sendPlayerToOrigin(org.bukkit.entity.Player player) {
         if (!enabled) return;
-        String server = originServers.remove(player.getUniqueId());
+        String server = getOriginServer(player.getUniqueId());
         if (server == null || server.isEmpty()) return;
+        originServers.remove(player.getUniqueId());
         sendPluginMessage(player, "Connect", server, null, null);
         log.info("[Bridge] " + player.getName() + " → retour sur " + server);
     }
