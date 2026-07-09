@@ -32,11 +32,13 @@ public abstract class BaseAbility {
 
     protected double resourceCost; // coût en mana/énergie par cast (0 = gratuit)
     protected double dynamicCooldownOverride = -1; // -1 = utiliser baseCooldown, sinon override (pour l'AA)
-    private final Map<UUID, Long> cooldowns = new HashMap<>();       // timestamp début
     private final Map<UUID, Long> cooldownEnds = new HashMap<>();    // timestamp fin (avec CDR appliqué)
 
     public enum AbilitySlot { AA, Q, W, E, R }
     public enum DamageType  { PHYSICAL, MAGICAL, TRUE, MIXED }
+
+    /** Largeur (en caractères) du retour à la ligne des descriptions dans le lore. */
+    private static final int LORE_WRAP_WIDTH = 38;
 
     public BaseAbility(String id, String name, Material icon, AbilitySlot slot,
                        double[] baseCooldown, double range, double aoeRadius,
@@ -85,7 +87,6 @@ public abstract class BaseAbility {
     public void triggerCooldown(Player player, ChampionStats stats) {
         long now = System.currentTimeMillis();
         double cd = getCurrentCooldown(stats); // avec CDR appliqué
-        cooldowns.put(player.getUniqueId(), now);
         cooldownEnds.put(player.getUniqueId(), now + (long)(cd * 1000));
     }
 
@@ -93,7 +94,6 @@ public abstract class BaseAbility {
     public void triggerCooldown(Player player) {
         long now = System.currentTimeMillis();
         double cd = getCurrentCooldown(null);
-        cooldowns.put(player.getUniqueId(), now);
         cooldownEnds.put(player.getUniqueId(), now + (long)(cd * 1000));
     }
 
@@ -139,8 +139,8 @@ public abstract class BaseAbility {
             double x = center.getX() + radius * Math.cos(angle);
             double z = center.getZ() + radius * Math.sin(angle);
             player.spawnParticle(Particle.DUST,
-                new Location(center.getWorld(), x, center.getY() + 0.1, z),
-                1, 0, 0, 0, 0, dust);
+                    new Location(center.getWorld(), x, center.getY() + 0.1, z),
+                    1, 0, 0, 0, 0, dust);
         }
     }
 
@@ -155,7 +155,7 @@ public abstract class BaseAbility {
         for (double d = 0.5; d <= dist; d += 0.5) {
             Location check = from.clone().add(dir.clone().multiply(d)).add(0, 0.1, 0);
             if (!check.getBlock().getType().isAir() ||
-                !check.clone().add(0, 1, 0).getBlock().getType().isAir()) {
+                    !check.clone().add(0, 1, 0).getBlock().getType().isAir()) {
                 return last;
             }
             last = check;
@@ -184,7 +184,7 @@ public abstract class BaseAbility {
 
         List<Component> lore = new ArrayList<>();
         lore.add(sep());
-        for (String line : wrap(getDynamicDescription(stats), 38))
+        for (String line : fr.lolmc.util.TextWrapUtil.wrap(getDynamicDescription(stats), LORE_WRAP_WIDTH))
             lore.add(Component.text(line, NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
         lore.add(sep());
         lore.add(stat("Cooldown", String.format("%.1fs", getCurrentCooldown(stats))));
@@ -213,18 +213,6 @@ public abstract class BaseAbility {
                 .decoration(TextDecoration.ITALIC, false)
                 .append(Component.text(val, NamedTextColor.WHITE).decoration(TextDecoration.ITALIC, false));
     }
-    private List<String> wrap(String text, int w) {
-        List<String> lines = new ArrayList<>();
-        String[] words = text.split(" ");
-        StringBuilder cur = new StringBuilder();
-        for (String word : words) {
-            if (cur.length() + word.length() + 1 > w) { lines.add(cur.toString().trim()); cur = new StringBuilder(); }
-            cur.append(word).append(" ");
-        }
-        if (!cur.isEmpty()) lines.add(cur.toString().trim());
-        return lines;
-    }
-
     // ─── Ressource ───────────────────────────────────────────────
     public double getResourceCost() { return fr.lolmc.util.Balance.cost(id, resourceCost); }
     public void setResourceCost(double cost) { this.resourceCost = cost; }
@@ -235,8 +223,7 @@ public abstract class BaseAbility {
     public String       getName()       { return name; }
     public AbilitySlot  getSlot()       { return slot; }
     public double       getRange()      { return range; }
-    public double       getAoeRadius()  { return aoeRadius; }
     public int          getLevel()      { return level; }
-    public void         setLevel(int l) { this.level = Math.max(1, Math.min(5, l)); }
+    public void         setLevel(int l) { this.level = Math.clamp(l, 1, 5); }
     public DamageType   getDamageType() { return damageType; }
 }
