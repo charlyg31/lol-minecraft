@@ -33,8 +33,8 @@ public abstract class BaseChampion {
     }
 
     protected void initSystems(double maxHP, double hpRegen,
-                                ResourceSystem.ResourceType resType,
-                                double maxResource, double resRegen) {
+                               ResourceSystem.ResourceType resType,
+                               double maxResource, double resRegen) {
         this.hpSystem = new HPSystem(maxHP, hpRegen);
         this.hpSystem.linkStats(this.stats); // lier pour GW
         this.resourceSystem = new ResourceSystem(resType, maxResource, resRegen);
@@ -43,12 +43,9 @@ public abstract class BaseChampion {
     protected abstract void registerAbilities();
 
     // ─── Inventaire ──────────────────────────────────────────────
-
-    public void applyInventory(Player player) {
-        for (int i = 0; i < 5; i++)
-            if (abilities[i] != null)
-                player.getInventory().setItem(i, abilities[i].buildItemStack(stats));
-    }
+    // (l'initialisation réelle passe par HotbarManager.initPlayer(), qui gère
+    //  le tagging PDC, Flash, items et pagination — applyInventory() était un
+    //  vestige d'une version antérieure, jamais appelé, retiré)
 
     public void refreshSlot(Player player, int slot) {
         if (slot < 0 || slot > 4 || abilities[slot] == null) return;
@@ -73,19 +70,19 @@ public abstract class BaseChampion {
             return;
         }
         fr.lolmc.util.DebugLogger.log("TryUseAbility", "sort=" + ability.getName()
-            + " slot=" + slot + " rang=" + levelSystem.getAbilityRank(slot)
-            + " unlocked=" + (slot==0 || levelSystem.isAbilityUnlocked(slot))
-            + " onCooldown=" + ability.isOnCooldown(caster));
+                + " slot=" + slot + " rang=" + levelSystem.getAbilityRank(slot)
+                + " unlocked=" + (slot==0 || levelSystem.isAbilityUnlocked(slot))
+                + " onCooldown=" + ability.isOnCooldown(caster));
 
         // Blocage par contrôle de foule : stun bloque tout, silence bloque les sorts (pas l'AA)
         var cc = LolPlugin.getInstance().getCCManager();
         if (cc != null) {
             boolean blocked = (slot == 0) ? cc.isStunned(caster.getUniqueId())
-                                          : !cc.canCastAbility(caster.getUniqueId());
+                    : !cc.canCastAbility(caster.getUniqueId());
             if (blocked) {
                 caster.sendActionBar(Component.text(
-                    cc.isStunned(caster.getUniqueId()) ? "💫 Étourdi — action impossible!" : "🔇 Réduit au silence!",
-                    NamedTextColor.YELLOW));
+                        cc.isStunned(caster.getUniqueId()) ? "💫 Étourdi — action impossible!" : "🔇 Réduit au silence!",
+                        NamedTextColor.YELLOW));
                 return;
             }
         }
@@ -93,15 +90,15 @@ public abstract class BaseChampion {
         // Le sort doit être débloqué (AA slot 0 toujours OK)
         if (slot >= 1 && !levelSystem.isAbilityUnlocked(slot)) {
             caster.sendActionBar(Component.text(
-                "🔒 " + ability.getName() + " pas encore débloqué (clique pour l'apprendre)",
-                NamedTextColor.GRAY));
+                    "🔒 " + ability.getName() + " pas encore débloqué (clique pour l'apprendre)",
+                    NamedTextColor.GRAY));
             return;
         }
 
         if (ability.isOnCooldown(caster)) {
             caster.sendActionBar(Component.text(
-                String.format("⏳ %s — %.1fs", ability.getName(), ability.getRemainingCooldown(caster)),
-                NamedTextColor.RED));
+                    String.format("⏳ %s — %.1fs", ability.getName(), ability.getRemainingCooldown(caster)),
+                    NamedTextColor.RED));
             return;
         }
 
@@ -116,10 +113,10 @@ public abstract class BaseChampion {
                     default     -> "ressource";
                 };
                 caster.sendActionBar(Component.text(
-                    String.format("❌ Pas assez de %s (%s: %.0f/%.0f)",
-                        resName, ability.getName(),
-                        resourceSystem.getCurrent(), resourceSystem.getMax()),
-                    NamedTextColor.RED));
+                        String.format("❌ Pas assez de %s (%s: %.0f/%.0f)",
+                                resName, ability.getName(),
+                                resourceSystem.getCurrent(), resourceSystem.getMax()),
+                        NamedTextColor.RED));
                 return;
             }
         }
@@ -133,7 +130,7 @@ public abstract class BaseChampion {
                 this instanceof fr.lolmc.champion.impl.mid.Zed
                         && slot == 2
                         && (fr.lolmc.champion.impl.mid.Zed.getShadowLocation(caster.getUniqueId()) != null
-                            || fr.lolmc.champion.impl.mid.Zed.isWOnCooldown(caster.getUniqueId()));
+                        || fr.lolmc.champion.impl.mid.Zed.isWOnCooldown(caster.getUniqueId()));
 
         if (!manualCooldown) {
             ability.triggerCooldown(caster, stats);
