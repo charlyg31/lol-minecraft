@@ -103,9 +103,6 @@ permissions:
   lolmc.champion.jinx:        {description: Jouer Jinx,         default: true}
   lolmc.champion.missfortune: {description: Jouer Miss Fortune, default: true}
 
-bungeecord: true
-soft-depend: [Multiverse-Core]
-
   # ── Skins de champions ─────────────────────────────────────────────
   lolmc.skin:
     description: Accès à tous les skins (donne tous les skins)
@@ -166,7 +163,7 @@ soft-depend: [Multiverse-Core]
   lolmc.skin.yasuo.blood_moon:      {description: "Yasuo - Lune de Sang",             default: false}
   lolmc.skin.morgana.lunar_goddess: {description: "Morgana - Déesse Lunaire",         default: false}
   lolmc.skin.leona.solar_eclipse:   {description: "Leona - Éclipse Solaire",          default: false}
-  lolmc.skin.blitzcrank.witch_craft:{description: "Blitzcrank - Sorcellerie",         default: false}
+  lolmc.skin.blitzcrank.witch_craft: {description: "Blitzcrank - Sorcellerie",         default: false}
   lolmc.skin.janna.hextech:         {description: "Janna - Hextech",                  default: false}
   lolmc.skin.ashe.project:          {description: "Ashe - PROJECT",                   default: false}
   lolmc.skin.ashe.cosmic:           {description: "Ashe - Cosmique",                  default: false}
@@ -174,5 +171,8 @@ soft-depend: [Multiverse-Core]
   lolmc.skin.jinx.star_guardian:    {description: "Jinx - Gardienne des Étoiles",     default: false}
   lolmc.skin.jinx.arcane:           {description: "Jinx - Arcane",                    default: false}
   lolmc.skin.jinx.crime_city:       {description: "Jinx - Cité du Crime",             default: false}
-  lolmc.skin.missfortune.pool_party:{description: "Miss Fortune - Pool Party",        default: false}
-  lolmc.skin.missfortune.bullet_angel:{description: "Miss Fortune - Ange Armée",     default: false}
+  lolmc.skin.missfortune.pool_party: {description: "Miss Fortune - Pool Party",        default: false}
+  lolmc.skin.missfortune.bullet_angel: {description: "Miss Fortune - Ange Armée",     default: false}
+
+bungeecord: true
+soft-depend: [Multiverse-Core]
