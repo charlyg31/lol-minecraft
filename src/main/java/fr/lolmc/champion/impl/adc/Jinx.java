@@ -6,18 +6,13 @@ import fr.lolmc.ability.base.BasicAttackAbility;
 import fr.lolmc.stats.ResourceSystem;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.stats.ChampionStats;
-import fr.lolmc.util.DamageUtil;
 import fr.lolmc.util.TargetingUtil;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.*;
-import org.bukkit.attribute.Attribute; // AJOUT : Import de l'attribut
-import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
-import org.bukkit.scheduler.BukkitRunnable;
-import org.bukkit.util.Vector;
 import java.util.*;
 
 public class Jinx extends BaseChampion implements fr.lolmc.champion.base.StatefulChampion {
@@ -53,7 +48,6 @@ public class Jinx extends BaseChampion implements fr.lolmc.champion.base.Statefu
         @Override protected void onHit(Player c, ChampionStats s, org.bukkit.entity.LivingEntity tgt, double dmg) {
             // Mode Fishbones : AoE autour de la cible principale (107% AD total réparti)
             if (fishbonesMode.getOrDefault(c.getUniqueId(), false)) {
-                var tm = LolPlugin.getInstance().getTeamManager();
                 for (var nearby : fr.lolmc.util.TargetingUtil.enemiesAround(c, 2.5)) {
                     if (nearby.equals(tgt)) continue; // cible principale déjà touchée
                     fr.lolmc.util.TargetingUtil.dealDamage(c, nearby,
@@ -98,7 +92,7 @@ public class Jinx extends BaseChampion implements fr.lolmc.champion.base.Statefu
             double[] base=fr.lolmc.util.Balance.base("w_jinx",new double[]{10,60,110,160,210});double dmg=base[getLevel()-1]+s.getFinalAD()*fr.lolmc.util.Balance.ratio("w_jinx","ad",1.4);
             var hits=TargetingUtil.skillshot(c, 14.0, 0.8, false);
             if(hits.isEmpty()){c.sendActionBar(Component.text("⚡ Zap manqué!",NamedTextColor.GRAY));return;}
-            var main=hits.get(0);
+            var main=hits.getFirst();
             TargetingUtil.dealDamage(c, main, dmg, TargetingUtil.DmgType.PHYSICAL);
             // Slow 40/50/60/70/80% selon rang (2s = 40 ticks)
             if(main instanceof Player __p){
@@ -145,7 +139,7 @@ public class Jinx extends BaseChampion implements fr.lolmc.champion.base.Statefu
         @Override public void cast(Player c,ChampionStats s,Player t){
             var hits=TargetingUtil.skillshot(c, 30.0, 1.2, false);
             if(hits.isEmpty()){c.sendActionBar(Component.text("🚀 Roquette tirée (aucune cible)",NamedTextColor.GRAY));return;}
-            var main=hits.get(0);
+            var main=hits.getFirst();
             double dist=c.getLocation().distance(main.getLocation());
             double distMult=Math.min(1.0, 0.1+dist*0.06);
             double[] baseMax={250,400,550};int rr=Math.min(getLevel()-1,2);
