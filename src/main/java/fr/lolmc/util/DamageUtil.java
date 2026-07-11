@@ -4,6 +4,7 @@ import fr.lolmc.LolPlugin;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.manager.ChampionManager;
 import fr.lolmc.stats.ChampionStats;
+import org.bukkit.Material;
 import org.bukkit.entity.Player;
 
 /**
@@ -38,8 +39,8 @@ public class DamageUtil {
             // Sbire ou monstre : dégât direct sur les PV (PAS de victim.damage() -> évite StackOverflow)
             double newHealth = Math.max(0, victim.getHealth() - rawAmount);
             victim.setHealth(newHealth);
-            victim.getWorld().spawnParticle(org.bukkit.Particle.CRIT,
-                    victim.getLocation().add(0, 1, 0), 4, 0.3, 0.3, 0.3);
+            fr.lolmc.util.VisualEffectUtil.impact(victim.getWorld(),
+                    victim.getLocation().add(0, 1, 0), Material.WHITE_STAINED_GLASS, 0.26f, 4L);
             if (newHealth <= 0 && attacker != null) {
                 // Laisser MC gérer la mort (drop d'or géré par EntityDeathListener)
                 victim.setHealth(0);

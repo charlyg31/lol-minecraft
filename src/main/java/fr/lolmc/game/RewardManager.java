@@ -6,6 +6,7 @@ import fr.lolmc.manager.ChampionManager;
 import fr.lolmc.shop.GoldManager;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import org.bukkit.Material;
 import org.bukkit.entity.Player;
 
 /**
@@ -221,8 +222,8 @@ public class RewardManager {
                     java.time.Duration.ofMillis(2500),
                     java.time.Duration.ofMillis(500))));
             player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 1f, 1.1f);
-            player.getWorld().spawnParticle(org.bukkit.Particle.TOTEM_OF_UNDYING,
-                player.getLocation().add(0,1,0), 40, 0.5, 0.8, 0.5);
+            fr.lolmc.util.VisualEffectUtil.impactBurst(player.getWorld(),
+                    player.getLocation().add(0,1,0), Material.YELLOW_STAINED_GLASS, 0.3f, 0.6, 12, 8L);
             // Faire clignoter les sorts désormais améliorables
             var listener = LolPlugin.getInstance().getAbilityListener();
             if (listener != null) listener.updateAbilityGlow(player, champ);

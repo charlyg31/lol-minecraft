@@ -15,7 +15,7 @@ import fr.lolmc.stats.ResourceSystem;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Location;
-import org.bukkit.Particle;
+import org.bukkit.Material;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffect;
@@ -193,7 +193,8 @@ public class PassiveManager {
             final Location iLoc=caster.getLocation().clone();
             new BukkitRunnable(){@Override public void run(){
                 for(var t:TargetingUtil.entitiesInRadius(caster,iLoc,3.5)){ if(t instanceof Player tp) tp.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,30,1,false,false)); }
-                iLoc.getWorld().spawnParticle(org.bukkit.Particle.SNOWFLAKE,iLoc.add(0,0.1,0),20,1.5,0,1.5);
+                fr.lolmc.util.VisualEffectUtil.impactBurst(iLoc.getWorld(), iLoc.add(0,0.1,0),
+                        Material.LIGHT_BLUE_STAINED_GLASS, 0.25f, 1.5, 6, 10L);
             }}.runTaskLater(LolPlugin.getInstance(),2L);
         }
         // ── Experimental Hexplate : après ultime → +30% AS + 15% MS 7s ──
@@ -268,7 +269,8 @@ public class PassiveManager {
                 spellbladeDmg = as.calcPhysicalDamage(as.getBaseAD() * 1.0, vs);
             if (spellbladeDmg > 0) {
                 vhp.takeDamage(spellbladeDmg);
-                attacker.getWorld().spawnParticle(Particle.ENCHANT, victim.getLocation().add(0,1,0), 10);
+                fr.lolmc.util.VisualEffectUtil.impact(attacker.getWorld(),
+                        victim.getLocation().add(0,1,0), Material.LIGHT_BLUE_STAINED_GLASS, 0.4f, 4L);
                 state.consumeSpellblade();
             }
         }
@@ -323,8 +325,8 @@ public class PassiveManager {
                         Player extraTarget = (Player) e;
                         if (championManager.hasChampion(extraTarget))
                             championManager.getChampion(extraTarget).getHPSystem().takeDamage(boltDmg);
-                        attacker.getWorld().spawnParticle(Particle.CRIT,
-                                extraTarget.getLocation().add(0,1,0), 5);
+                        fr.lolmc.util.VisualEffectUtil.impact(attacker.getWorld(),
+                                extraTarget.getLocation().add(0,1,0), Material.WHITE_STAINED_GLASS, 0.3f, 3L);
                     });
         }
 
@@ -404,8 +406,8 @@ public class PassiveManager {
 
         // ── Frostfire Gauntlet: zone de glace ralentissante sur AA ──
         if (hasAnyItem(attacker,"frostfire_gauntlet","frostfire")) {
-            victim.getWorld().spawnParticle(org.bukkit.Particle.SNOWFLAKE,
-                    victim.getLocation().add(0,0.5,0), 12, 1.0, 0.3, 1.0);
+            fr.lolmc.util.VisualEffectUtil.impactBurst(victim.getWorld(),
+                    victim.getLocation().add(0,0.5,0), Material.LIGHT_BLUE_STAINED_GLASS, 0.25f, 1.0, 5, 8L);
             LolPlugin.getInstance().getCCManager().slow(victim, 15, 40);
         }
 
@@ -431,8 +433,8 @@ public class PassiveManager {
                 // Bonus dégâts électriques sur la prochaine AA
                 DamageUtil.damage(attacker, victim,
                         as.getFinalAD() * 0.60, false, DamageUtil.Type.MAGICAL);
-                victim.getWorld().spawnParticle(org.bukkit.Particle.ELECTRIC_SPARK,
-                        victim.getLocation().add(0,1,0), 10, 0.5,0.5,0.5);
+                fr.lolmc.util.VisualEffectUtil.impactBurst(victim.getWorld(),
+                        victim.getLocation().add(0,1,0), Material.YELLOW_STAINED_GLASS, 0.22f, 0.5, 4, 5L);
             }
         }
 
@@ -694,8 +696,8 @@ public class PassiveManager {
                     if (!victim.isOnline()) { state.gaActive = false; return; }
                     hp.setCurrentHP(hp.getMaxHP() * 0.60);
                     state.gaActive = false;
-                    victim.getWorld().spawnParticle(org.bukkit.Particle.CHERRY_LEAVES,
-                        victim.getLocation().add(0,1,0), 40, 0.5, 1, 0.5);
+                    fr.lolmc.util.VisualEffectUtil.impactBurst(victim.getWorld(),
+                        victim.getLocation().add(0,1,0), Material.GOLD_BLOCK, 0.3f, 0.6, 10, 15L);
                 }
             }.runTaskLater(LolPlugin.getInstance(), 80L);
             return;
@@ -801,7 +803,8 @@ public class PassiveManager {
         if (hasAnyItem(killer,"stormsurge","stormsurge_nh")) {
             double ldmg = 300 + stats.getFinalAP()*0.25;
             for (var t : TargetingUtil.enemiesAround(killer, 6.0)) TargetingUtil.dealDamage(killer,t,ldmg,TargetingUtil.DmgType.MAGICAL);
-            killer.getWorld().spawnParticle(org.bukkit.Particle.ELECTRIC_SPARK, killer.getLocation().add(0,1,0), 30, 2,2,2);
+            fr.lolmc.util.VisualEffectUtil.impactBurst(killer.getWorld(),
+                    killer.getLocation().add(0,1,0), Material.YELLOW_STAINED_GLASS, 0.3f, 2.0, 8, 8L);
         }
         // ── Cryptbloom : kill/assist → zone qui soigne alliés ──
         if (hasAnyItem(killer,"cryptbloom")) {
@@ -835,7 +838,8 @@ public class PassiveManager {
         if (hasAnyItem(killer,"stormsurge","stormsurge_nh")) {
             double ld=300+stats.getFinalAP()*0.25;
             for(var t:TargetingUtil.enemiesAround(killer,6.0)) TargetingUtil.dealDamage(killer,t,ld,TargetingUtil.DmgType.MAGICAL);
-            killer.getWorld().spawnParticle(org.bukkit.Particle.ELECTRIC_SPARK,killer.getLocation().add(0,1,0),30,2,2,2);
+            fr.lolmc.util.VisualEffectUtil.impactBurst(killer.getWorld(),
+                    killer.getLocation().add(0,1,0), Material.YELLOW_STAINED_GLASS, 0.3f, 2.0, 8, 8L);
         }
         // ── Cryptbloom : kill → zone soin alliés 8% HP ──
         if (hasAnyItem(killer,"cryptbloom")) {
@@ -886,7 +890,8 @@ public class PassiveManager {
                     TargetingUtil.dealDamage(player, t, 100+champ.getStats().getFinalAP()*0.30, TargetingUtil.DmgType.MAGICAL);
                     var cc=LolPlugin.getInstance().getCCManager(); if(cc!=null) cc.root(t,40);
                 }
-                player.getWorld().spawnParticle(org.bukkit.Particle.SNOWFLAKE, player.getLocation().add(0,1,0), 30, 2,1,2);
+                fr.lolmc.util.VisualEffectUtil.impactBurst(player.getWorld(),
+                        player.getLocation().add(0,1,0), Material.LIGHT_BLUE_STAINED_GLASS, 0.28f, 2.0, 7, 8L);
                 player.sendActionBar(Component.text("❄ Everfrost! Enracine ennemis proches.",NamedTextColor.AQUA));
             }
             case "gargoyle_stoneplate" -> {
@@ -907,7 +912,8 @@ public class PassiveManager {
                     totalDmg+=d;
                 }
                 champ.getHPSystem().heal(totalDmg*0.15 + champ.getHPSystem().getMaxHP()*0.10);
-                player.getWorld().spawnParticle(org.bukkit.Particle.CRIT, player.getLocation().add(0,1,0), 20, 1.5,0.5,1.5);
+                fr.lolmc.util.VisualEffectUtil.impactBurst(player.getWorld(),
+                        player.getLocation().add(0,1,0), Material.RED_STAINED_GLASS, 0.28f, 1.5, 6, 8L);
                 player.sendActionBar(Component.text("🩸 Goredrinker! AoE + soin.",NamedTextColor.RED));
             }
             case "prowlers_claw" -> {
@@ -974,7 +980,8 @@ public class PassiveManager {
         player.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, 50, 255, false, false));
         player.setInvulnerable(true);
         player.sendActionBar(Component.text("⏱ Zhonya's actif! 2.5s", NamedTextColor.GOLD));
-        player.getWorld().spawnParticle(Particle.END_ROD, player.getLocation(), 20, 0.5, 1, 0.5);
+        fr.lolmc.util.VisualEffectUtil.impactBurst(player.getWorld(),
+                player.getLocation(), Material.GOLD_BLOCK, 0.25f, 0.5, 6, 10L);
         new BukkitRunnable() {
             @Override public void run() {
                 state.zhonyasActive = false;
@@ -1004,8 +1011,7 @@ public class PassiveManager {
         org.bukkit.Location cur = dashStart.clone();
         for (int si = 0; si < dashSteps; si++) {
             cur.add(dashStep);
-            player.getWorld().spawnParticle(Particle.END_ROD, cur.clone(), 2, 0.1, 0.1, 0.1, 0);
-            player.getWorld().spawnParticle(Particle.CRIT, cur.clone(), 1, 0.05, 0.05, 0.05, 0);
+            fr.lolmc.util.VisualEffectUtil.impact(player.getWorld(), cur.clone(), Material.WHITE_STAINED_GLASS, 0.18f, 3L);
         }
         player.teleport(dashSafe);
         player.getWorld().playSound(dashSafe, Sound.ENTITY_PHANTOM_FLAP, 1f, 1.5f);
@@ -1028,11 +1034,12 @@ public class PassiveManager {
                     if(pi>=ps){cancel();
                         if(championManager.hasChampion((Player)fe))
                             championManager.getChampion((Player)fe).getHPSystem().takeDamage(projDmg);
-                        fe.getLocation().getWorld().spawnParticle(Particle.FLASH,fe.getLocation().add(0,1,0),1);
+                        fr.lolmc.util.VisualEffectUtil.impact(fe.getLocation().getWorld(),
+                                fe.getLocation().add(0,1,0), Material.WHITE_STAINED_GLASS, 0.3f, 4L);
                         fe.getLocation().getWorld().playSound(fe.getLocation(), Sound.ENTITY_ARROW_HIT, 0.8f, 1.3f);
                         return;}
                     pc.add(pv);
-                    pc.getWorld().spawnParticle(Particle.CRIT,pc,2,0.05,0.05,0.05,0);
+                    fr.lolmc.util.VisualEffectUtil.impact(pc.getWorld(), pc.clone(), Material.WHITE_STAINED_GLASS, 0.15f, 2L);
                     pi++;
                 }
             }.runTaskTimer(LolPlugin.getInstance(),0L,1L);
@@ -1061,7 +1068,8 @@ public class PassiveManager {
         player.sendActionBar(Component.text("💫 Redemption lancé! (2.5s)", NamedTextColor.WHITE));
         new BukkitRunnable() {
             @Override public void run() {
-                healLoc.getWorld().spawnParticle(Particle.END_ROD, healLoc, 30, 3, 1, 3);
+                fr.lolmc.util.VisualEffectUtil.groundRing(healLoc.getWorld(), healLoc, 3.0,
+                        Material.WHITE_STAINED_GLASS, 20, 0.35f, 0.1f, 25L);
                 healLoc.getWorld().getNearbyEntities(healLoc, 5, 2, 5).stream()
                         .filter(e -> e instanceof Player)
                         .forEach(e -> {
@@ -1070,7 +1078,8 @@ public class PassiveManager {
                                 double heal = 250 + champ.getStats().getFinalAP() * 0.04;
                                 championManager.getChampion(ally).getHPSystem().heal(heal);
                                 hudManager.updateHUD(ally, championManager.getChampion(ally));
-                                ally.getWorld().spawnParticle(Particle.HEART, ally.getLocation().add(0,2,0), 5);
+                                fr.lolmc.util.VisualEffectUtil.impact(ally.getWorld(),
+                                        ally.getLocation().add(0,2,0), Material.PINK_STAINED_GLASS, 0.25f, 6L);
                             }
                         });
             }
@@ -1126,7 +1135,8 @@ public class PassiveManager {
                 .forEach(e -> {
                     if (championManager.hasChampion((Player)e)) {
                         championManager.getChampion((Player)e).getHPSystem().takeDamage(missileDmg);
-                        player.getWorld().spawnParticle(Particle.FIREWORK, e.getLocation().add(0,1,0), 10);
+                        fr.lolmc.util.VisualEffectUtil.impact(player.getWorld(),
+                                e.getLocation().add(0,1,0), Material.ORANGE_STAINED_GLASS, 0.4f, 5L);
                     }
                 });
         player.sendActionBar(Component.text("🚀 Rocketbelt!", NamedTextColor.RED));
@@ -1309,7 +1319,8 @@ public class PassiveManager {
                     cancel(); dotMap.remove(vid); return;
                 }
                 vc.getHPSystem().takeDamage(dmgPerSec);
-                victim.getWorld().spawnParticle(Particle.FLAME, victim.getLocation().add(0,1,0), 3, 0.3,0.3,0.3);
+                fr.lolmc.util.VisualEffectUtil.impact(victim.getWorld(),
+                        victim.getLocation().add(0,1,0), Material.ORANGE_STAINED_GLASS, 0.2f, 4L);
                 hudManager.updateHUD(victim, vc);
                 ticks++;
             }

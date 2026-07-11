@@ -62,8 +62,8 @@ public class Darius extends BaseChampion implements fr.lolmc.champion.base.State
                     Long exp = bleedExpire.get(vid);
                     if (exp == null || System.currentTimeMillis() > exp) { cancel(); return; }
                     fr.lolmc.util.DamageUtil.trueDamageEntity(darius, victim, dotDmg);
-                    victim.getWorld().spawnParticle(org.bukkit.Particle.DAMAGE_INDICATOR,
-                        victim.getLocation().add(0,1.5,0), 3, 0.3,0.3,0.3);
+                    fr.lolmc.util.VisualEffectUtil.impact(victim.getWorld(),
+                        victim.getLocation().add(0,1.5,0), Material.RED_STAINED_GLASS, 0.24f, 4L);
                     ticks++;
                 }
             }.runTaskTimer(LolPlugin.getInstance(), 20L, 20L);
@@ -111,7 +111,8 @@ public class Darius extends BaseChampion implements fr.lolmc.champion.base.State
                         hp.heal(missing*healPct);
                     }
                 }
-                c.getWorld().spawnParticle(Particle.SWEEP_ATTACK,c.getLocation().add(0,1,0),8,2.5,0.5,2.5);
+                fr.lolmc.util.VisualEffectUtil.groundRing(c.getWorld(),
+                        c.getLocation().add(0,1,0), 2.5, Material.RED_STAINED_GLASS, 16, 0.35f, 0.1f, 5L);
                 c.getWorld().playSound(c.getLocation(), Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 0.7f);
             }}.runTaskLater(LolPlugin.getInstance(), 15L);
         }
@@ -147,7 +148,8 @@ public class Darius extends BaseChampion implements fr.lolmc.champion.base.State
                     new BukkitRunnable(){@Override public void run(){wThis.setDynamicCooldown(-1);}}.runTaskLater(LolPlugin.getInstance(),1L);
                     c.sendActionBar(Component.text("🪓 Frappe Estropiante reset!",NamedTextColor.DARK_RED)); }
             }}.runTaskLater(LolPlugin.getInstance(),1L);
-            c.getWorld().spawnParticle(Particle.CRIT,tgt.getLocation().add(0,1,0),12);
+            fr.lolmc.util.VisualEffectUtil.impact(c.getWorld(),
+                    tgt.getLocation().add(0,1,0), Material.WHITE_STAINED_GLASS, 0.32f, 5L);
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_PLAYER_ATTACK_CRIT, 1f, 0.8f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
@@ -175,7 +177,8 @@ public class Darius extends BaseChampion implements fr.lolmc.champion.base.State
             // Animation : ligne de cône devant
             var dir=c.getEyeLocation().getDirection().normalize();
             for(double d=1; d<=5.5; d+=0.5){
-                c.getWorld().spawnParticle(Particle.CRIT,c.getEyeLocation().add(dir.clone().multiply(d)),3,0.4,0.4,0.4,0);
+                fr.lolmc.util.VisualEffectUtil.impact(c.getWorld(),
+                        c.getEyeLocation().add(dir.clone().multiply(d)), Material.WHITE_STAINED_GLASS, 0.2f, 3L);
             }
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_FISHING_BOBBER_THROW, 1f, 0.6f);
         }
@@ -200,7 +203,8 @@ public class Darius extends BaseChampion implements fr.lolmc.champion.base.State
             dest.setY(c.getLocation().getY());
             c.teleport(dest);
             tgt.getWorld().strikeLightningEffect(tgt.getLocation());
-            tgt.getWorld().spawnParticle(Particle.FLASH,tgt.getLocation().add(0,1,0),2);
+            fr.lolmc.util.VisualEffectUtil.impactBurst(tgt.getWorld(),
+                    tgt.getLocation().add(0,1,0), Material.RED_STAINED_GLASS, 0.4f, 0.6, 10, 10L);
             TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.TRUE);
             if(tgt instanceof Player _tp)_tp.sendMessage(Component.text("☠ GUILLOTINE NOXIENNE!",NamedTextColor.DARK_RED));
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_PLAYER_ATTACK_CRIT, 1.5f, 0.5f);

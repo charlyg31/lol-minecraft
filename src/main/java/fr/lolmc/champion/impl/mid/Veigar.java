@@ -94,14 +94,16 @@ public class Veigar extends BaseChampion implements fr.lolmc.champion.base.State
             resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             Location loc=TargetingUtil.getAimedGroundLocation(c, 9.0);
-            loc.getWorld().spawnParticle(Particle.ENCHANT,loc,30,2,2,2);
+            fr.lolmc.util.VisualEffectUtil.groundRing(loc.getWorld(), loc, 3.0,
+                    Material.PURPLE_STAINED_GLASS, 18, 0.35f, 0.1f, 25L);
             loc.getWorld().playSound(loc, Sound.ENTITY_ENDER_DRAGON_GROWL, 0.6f, 1.5f);
             new BukkitRunnable(){
                 @Override public void run(){
                     double[] base=fr.lolmc.util.Balance.base("w_veigar",new double[]{80,120,160,200,240});double dmg=base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("w_veigar","ap",1.0);
                     TargetingUtil.dealDamageAll(c,
                             TargetingUtil.entitiesInRadius(c, loc, 3.0), dmg, TargetingUtil.DmgType.MAGICAL);
-                    loc.getWorld().spawnParticle(Particle.EXPLOSION,loc,8,1.5,0,1.5);
+                    fr.lolmc.util.VisualEffectUtil.impactBurst(loc.getWorld(),
+                            loc, Material.PURPLE_STAINED_GLASS, 0.35f, 1.5, 10, 8L);
                     loc.getWorld().playSound(loc, Sound.ENTITY_GENERIC_EXPLODE, 1f, 0.8f);
                 }
             }.runTaskLater(LolPlugin.getInstance(),24L);
@@ -125,7 +127,8 @@ public class Veigar extends BaseChampion implements fr.lolmc.champion.base.State
             final int stunTicks=(int)(stunSec[getLevel()-1]*20);
             final int r=4;
             // Délai 0.5s (10 ticks) avant apparition de la cage — LoL
-            fcenter.getWorld().spawnParticle(Particle.WITCH, fcenter, 30, r, 0.5, r);
+            fr.lolmc.util.VisualEffectUtil.groundRing(fcenter.getWorld(), fcenter, r,
+                    Material.PURPLE_STAINED_GLASS, 20, 0.35f, 0.1f, 10L);
             new BukkitRunnable(){@Override public void run(){
                 List<org.bukkit.block.Block> cage=new ArrayList<>();
                 for(int dx=-r;dx<=r;dx++) for(int dz=-r;dz<=r;dz++) {
@@ -178,7 +181,8 @@ public class Veigar extends BaseChampion implements fr.lolmc.champion.base.State
             double missingPct=1.0-(tgt.getHealth()/maxHealth);
             double dmg=baseDmg*(1.0+missingPct);
             tgt.getWorld().strikeLightningEffect(tgt.getLocation());
-            tgt.getWorld().spawnParticle(Particle.FLASH,tgt.getLocation().add(0,1,0),3);
+            fr.lolmc.util.VisualEffectUtil.impactBurst(tgt.getWorld(),
+                    tgt.getLocation().add(0,1,0), Material.PURPLE_STAINED_GLASS, 0.42f, 0.6, 12, 10L);
             TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.MAGICAL);
             if(tgt instanceof Player _tp)_tp.sendMessage(Component.text("☠ EXPLOSION PRIMORDIALE!",NamedTextColor.DARK_PURPLE));
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_WITHER_SHOOT, 1.5f, 0.6f);

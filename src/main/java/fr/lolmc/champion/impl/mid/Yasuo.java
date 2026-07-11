@@ -123,7 +123,8 @@ public class Yasuo extends BaseChampion implements fr.lolmc.champion.base.Statef
             eStacks.merge(c.getUniqueId(),1,Integer::sum);
             // Reset stacks après 6s
             new BukkitRunnable(){@Override public void run(){eStacks.put(c.getUniqueId(),0);}}.runTaskLater(LolPlugin.getInstance(),120L);
-            c.getWorld().spawnParticle(Particle.SWEEP_ATTACK,dest.add(0,1,0),5);
+            fr.lolmc.util.VisualEffectUtil.impact(c.getWorld(),
+                    dest.add(0,1,0), Material.WHITE_STAINED_GLASS, 0.3f, 4L);
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 1.4f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
@@ -164,7 +165,8 @@ public class Yasuo extends BaseChampion implements fr.lolmc.champion.base.Statef
                 final var fstats=champ.getStats();
                 new BukkitRunnable(){@Override public void run(){ fstats.addBonusArmorPenPercent(-0.60); }}.runTaskLater(LolPlugin.getInstance(), 300L);
             }
-            c.getWorld().spawnParticle(Particle.SWEEP_ATTACK,c.getLocation().add(0,1,0),10,2,2,2);
+            fr.lolmc.util.VisualEffectUtil.groundRing(c.getWorld(),
+                    c.getLocation().add(0,1,0), 3.0, Material.WHITE_STAINED_GLASS, 20, 0.4f, 0.12f, 8L);
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_PLAYER_ATTACK_CRIT, 1.5f, 0.7f);
         }
         @Override public String getDynamicDescription(ChampionStats s){

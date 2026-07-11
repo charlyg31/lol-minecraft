@@ -98,7 +98,8 @@ public class Warwick extends BaseChampion {
             // Soin 90% des dégâts (LoL)
             var cm=LolPlugin.getInstance().getChampionManager();
             if(cm.hasChampion(c)) cm.getChampion(c).getHPSystem().heal(dmg*0.90);
-            c.getWorld().spawnParticle(Particle.HEART,c.getLocation().add(0,1,0),5,0.5,0.5,0.5);
+            fr.lolmc.util.VisualEffectUtil.impactBurst(c.getWorld(),
+                    c.getLocation().add(0,1,0), Material.PINK_STAINED_GLASS, 0.25f, 0.5, 6, 6L);
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_WOLF_GROWL, 1f, 0.7f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
@@ -135,7 +136,8 @@ public class Warwick extends BaseChampion {
                             __p.sendActionBar(Component.text("😱 Peur! (Hurlement Primal)",NamedTextColor.DARK_RED));
                         }
                     }
-                    c.getWorld().spawnParticle(Particle.SONIC_BOOM,c.getLocation().add(0,1,0),2,2,0.5,2);
+                    fr.lolmc.util.VisualEffectUtil.impact(c.getWorld(),
+                            c.getLocation().add(0,1,0), Material.GRAY_STAINED_GLASS, 0.5f, 6L);
                     c.getWorld().playSound(c.getLocation(), Sound.ENTITY_WOLF_GROWL, 1.5f, 0.6f);
                 }
             }.runTaskLater(LolPlugin.getInstance(),30L);
@@ -165,7 +167,8 @@ public class Warwick extends BaseChampion {
                 __p.sendActionBar(Component.text("🐺 EMPRISE INFINIE! Supprimé 1.5s!",NamedTextColor.DARK_RED));
             }
             tgt.setVelocity(new Vector(0,0.2,0));
-            c.getWorld().spawnParticle(Particle.HEART,c.getLocation().add(0,1,0),10,1,1,1);
+            fr.lolmc.util.VisualEffectUtil.impactBurst(c.getWorld(),
+                    c.getLocation().add(0,1,0), Material.PINK_STAINED_GLASS, 0.3f, 1.0, 10, 8L);
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_WOLF_GROWL, 1.5f, 0.5f);
         }
         @Override public String getDynamicDescription(ChampionStats s){

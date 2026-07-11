@@ -2,7 +2,7 @@ package fr.lolmc.team;
 
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Color;
-import org.bukkit.Particle;
+import org.bukkit.Material;
 import org.bukkit.entity.Player;
 
 import java.util.HashMap;
@@ -32,8 +32,9 @@ public class TeamManager {
             return this == BLUE ? RED : BLUE;
         }
 
-        public Particle.DustOptions dust() {
-            return new Particle.DustOptions(particleColor, 2.0f);
+        /** Bloc coloré correspondant à l'équipe (remplace l'ancien dust() de particules). */
+        public org.bukkit.Material blockColor() {
+            return this == BLUE ? org.bukkit.Material.BLUE_STAINED_GLASS : org.bukkit.Material.RED_STAINED_GLASS;
         }
     }
 

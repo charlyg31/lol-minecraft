@@ -4,7 +4,7 @@ import fr.lolmc.LolPlugin;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Location;
-import org.bukkit.Particle;
+import org.bukkit.Material;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 import org.bukkit.util.Vector;
@@ -52,9 +52,11 @@ public class FlashManager {
         }
 
         // Effets visuels et sonores
-        from.getWorld().spawnParticle(Particle.PORTAL, from.add(0, 1, 0), 30, 0.3, 0.5, 0.3);
+        fr.lolmc.util.VisualEffectUtil.impactBurst(from.getWorld(),
+                from.add(0, 1, 0), Material.LIGHT_BLUE_STAINED_GLASS, 0.28f, 0.4, 8, 6L);
         player.teleport(dest);
-        dest.getWorld().spawnParticle(Particle.PORTAL, dest.clone().add(0, 1, 0), 30, 0.3, 0.5, 0.3);
+        fr.lolmc.util.VisualEffectUtil.impactBurst(dest.getWorld(),
+                dest.clone().add(0, 1, 0), Material.LIGHT_BLUE_STAINED_GLASS, 0.28f, 0.4, 8, 6L);
         player.playSound(dest, Sound.ENTITY_ENDERMAN_TELEPORT, 1f, 1.2f);
 
         cooldowns.put(player.getUniqueId(), System.currentTimeMillis());

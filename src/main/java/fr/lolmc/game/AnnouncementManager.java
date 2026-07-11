@@ -9,6 +9,7 @@ import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.title.Title;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.entity.Player;
 
 import java.time.Duration;
@@ -179,40 +180,69 @@ public class AnnouncementManager {
      * visible 3 secondes. Couleur selon le type de ping.
      */
     private void spawnPingMarker(Location loc, PingType type, fr.lolmc.team.TeamManager.Team team) {
-        org.bukkit.Color color = switch (type) {
-            case DANGER     -> org.bukkit.Color.fromRGB(255, 40, 40);
-            case ON_MY_WAY  -> org.bukkit.Color.fromRGB(40, 220, 80);
-            case MISSING    -> org.bukkit.Color.fromRGB(255, 220, 40);
-            case ASSIST     -> org.bukkit.Color.fromRGB(255, 160, 20);
-            case ENEMY      -> org.bukkit.Color.fromRGB(220, 20, 20);
+        org.bukkit.Material block = switch (type) {
+            case DANGER     -> Material.RED_STAINED_GLASS;
+            case ON_MY_WAY  -> Material.LIME_STAINED_GLASS;
+            case MISSING    -> Material.YELLOW_STAINED_GLASS;
+            case ASSIST     -> Material.ORANGE_STAINED_GLASS;
+            case ENEMY      -> Material.RED_STAINED_GLASS;
         };
-        var dust = new org.bukkit.Particle.DustOptions(color, 1.4f);
+        var world = loc.getWorld();
+        if (world == null) return;
+        var tm = LolPlugin.getInstance().getTeamManager();
+
+        // 7 segments de colonne + 10 points d'anneau, visibles UNIQUEMENT
+        // par l'équipe du sender (le ping était par erreur public en particules).
+        var displays = new java.util.ArrayList<org.bukkit.entity.BlockDisplay>(18);
+        for (int i = 0; i < 18; i++) {
+            var d = world.spawn(loc, org.bukkit.entity.BlockDisplay.class, disp -> {
+                disp.setBlock(block.createBlockData());
+                disp.setBrightness(new org.bukkit.entity.Display.Brightness(15, 15));
+                disp.setPersistent(false);
+                disp.setInterpolationDuration(2);
+                disp.setInterpolationDelay(0);
+                float size = 0.16f;
+                disp.setTransformation(new org.bukkit.util.Transformation(
+                        new org.joml.Vector3f(-size / 2f, -size / 2f, -size / 2f),
+                        new org.joml.Quaternionf(),
+                        new org.joml.Vector3f(size, size, size),
+                        new org.joml.Quaternionf()));
+            });
+            d.setVisibleByDefault(false);
+            displays.add(d);
+        }
+        for (UUID memberId : tm.getTeamMembers(team)) {
+            Player member = Bukkit.getPlayer(memberId);
+            if (member != null && member.isOnline())
+                for (var d : displays) member.showEntity(LolPlugin.getInstance(), d);
+        }
 
         new org.bukkit.scheduler.BukkitRunnable() {
             int ticks = 0;
             @Override public void run() {
-                if (ticks >= 60) { cancel(); return; } // 3 secondes
-                var world = loc.getWorld();
-                if (world == null) { cancel(); return; }
+                if (ticks >= 60) {
+                    for (var d : displays) if (!d.isDead()) d.remove();
+                    cancel(); return;
+                } // 3 secondes
 
-                // Colonne verticale (0 → 3 blocs)
-                for (double y = 0; y <= 3.0; y += 0.5) {
-                    world.spawnParticle(org.bukkit.Particle.DUST,
-                        loc.clone().add(0, y, 0), 1, 0.02, 0, 0.02, 0, dust);
+                // Colonne verticale (0 → 3 blocs) : displays[0..6]
+                for (int i = 0; i < 7; i++) {
+                    double y = i * 0.5;
+                    displays.get(i).teleport(loc.clone().add(0, y, 0));
                 }
-                // Anneau pulsant au sol (rayon oscille entre 0.8 et 1.5)
+                // Anneau pulsant au sol (rayon oscille entre 0.8 et 1.5) : displays[7..16]
                 double pulse = 0.8 + 0.7 * Math.abs(Math.sin(ticks * 0.15));
                 int points = 10;
                 for (int i = 0; i < points; i++) {
                     double angle = 2 * Math.PI * i / points + ticks * 0.1;
-                    world.spawnParticle(org.bukkit.Particle.DUST,
-                        loc.clone().add(Math.cos(angle) * pulse, 0.1, Math.sin(angle) * pulse),
-                        1, 0, 0, 0, 0, dust);
+                    displays.get(7 + i).teleport(loc.clone().add(
+                            Math.cos(angle) * pulse, 0.1, Math.sin(angle) * pulse));
                 }
-                // Éclat au sommet toutes les 0.5s
+                // Éclat au sommet toutes les 0.5s : displays[17]
                 if (ticks % 10 == 0) {
-                    world.spawnParticle(org.bukkit.Particle.END_ROD,
-                        loc.clone().add(0, 3.2, 0), 3, 0.1, 0.1, 0.1, 0.01);
+                    displays.get(17).teleport(loc.clone().add(0, 3.2, 0));
+                } else {
+                    displays.get(17).teleport(loc.clone().add(0, -256, 0)); // caché entre les éclats
                 }
                 ticks += 2;
             }

@@ -3,7 +3,7 @@ package fr.lolmc.game;
 import fr.lolmc.LolPlugin;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
-import org.bukkit.Particle;
+import org.bukkit.Material;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffect;
@@ -55,7 +55,8 @@ public class CCManager {
         stunUntil.merge(target.getUniqueId(), until, Math::max);
         silenceUntil.merge(target.getUniqueId(), until, Math::max); // un stun empêche aussi les sorts
         immobilize(target, ticks);
-        target.getWorld().spawnParticle(Particle.CRIT, target.getLocation().add(0, 2.2, 0), 10, 0.3, 0.1, 0.3);
+        fr.lolmc.util.VisualEffectUtil.impact(target.getWorld(),
+                target.getLocation().add(0, 2.2, 0), Material.YELLOW_STAINED_GLASS, 0.28f, 5L);
         if (target instanceof Player p)
             p.sendActionBar(Component.text("💫 Étourdi!", NamedTextColor.YELLOW));
     }

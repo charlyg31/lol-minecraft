@@ -77,7 +77,8 @@ public class ConsumableManager {
                 if (ticks >= 15 || !player.isOnline()) { cancel(); cleanPotion(player); return; }
                 hp.heal(healPerTick);
                 hudManager.updateHUD(player, champ);
-                player.getWorld().spawnParticle(Particle.HEART, player.getLocation().add(0,1,0), 1, 0.3, 0.3, 0.3);
+                fr.lolmc.util.VisualEffectUtil.impact(player.getWorld(),
+                        player.getLocation().add(0,1,0), Material.PINK_STAINED_GLASS, 0.2f, 4L);
                 ticks++;
             }
         };
@@ -247,7 +248,8 @@ public class ConsumableManager {
             @Override public void run() {
                 org.bukkit.entity.Entity ent = org.bukkit.Bukkit.getEntity(wardEntityId);
                 if (ent != null) {
-                    ent.getWorld().spawnParticle(Particle.SMOKE, ent.getLocation().add(0,0.3,0), 6, 0.2,0.2,0.2);
+                    fr.lolmc.util.VisualEffectUtil.impact(ent.getWorld(),
+                            ent.getLocation().add(0,0.3,0), Material.GRAY_STAINED_GLASS, 0.24f, 5L);
                     ent.remove();
                 }
             }

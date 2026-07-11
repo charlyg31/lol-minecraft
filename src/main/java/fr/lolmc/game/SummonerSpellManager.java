@@ -6,7 +6,8 @@ import fr.lolmc.util.DamageUtil;
 import fr.lolmc.util.LolUnits;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
-import org.bukkit.Particle;
+import org.bukkit.Material;
+import org.bukkit.Location;
 import org.bukkit.Sound;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
@@ -129,7 +130,8 @@ public class SummonerSpellManager {
             @Override public void run() {
                 if (ticks >= 5 || target.isDead() || !target.isOnline()) { cancel(); return; }
                 DamageUtil.damage(caster, target, perTick, true, DamageUtil.Type.TRUE);
-                target.getWorld().spawnParticle(Particle.FLAME, target.getLocation().add(0,1,0), 8, 0.3, 0.5, 0.3);
+                fr.lolmc.util.VisualEffectUtil.impact(target.getWorld(),
+                        target.getLocation().add(0,1,0), Material.ORANGE_STAINED_GLASS, 0.22f, 4L);
                 ticks++;
             }
         }.runTaskTimer(LolPlugin.getInstance(), 0L, 20L);
@@ -149,7 +151,8 @@ public class SummonerSpellManager {
         double healAmount = 75 + 15 * level; // approximation LoL
         champ.getHPSystem().heal(healAmount);
         caster.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 20, 1, false, true));
-        caster.getWorld().spawnParticle(Particle.HEART, caster.getLocation().add(0,1,0), 10, 0.5, 0.5, 0.5);
+        fr.lolmc.util.VisualEffectUtil.impactBurst(caster.getWorld(),
+                caster.getLocation().add(0,1,0), Material.PINK_STAINED_GLASS, 0.25f, 0.5, 6, 6L);
         caster.sendActionBar(Component.text("💚 Soin! +" + (int) healAmount + " PV", NamedTextColor.GREEN));
         var hud = LolPlugin.getInstance().getHUDManager();
         if (hud != null) hud.updateHUD(caster, champ);
@@ -165,7 +168,8 @@ public class SummonerSpellManager {
         int level = champ.getLevelSystem().getLevel();
         double shield = 100 + 20 * level;
         champ.getStats().addShield(shield);
-        caster.getWorld().spawnParticle(Particle.END_ROD, caster.getLocation().add(0,1,0), 15, 0.5, 0.8, 0.5);
+        fr.lolmc.util.VisualEffectUtil.impactBurst(caster.getWorld(),
+                caster.getLocation().add(0,1,0), Material.YELLOW_STAINED_GLASS, 0.3f, 0.6, 8, 8L);
         caster.sendActionBar(Component.text("🛡 Bouclier! +" + (int) shield, NamedTextColor.YELLOW));
         // Le bouclier disparaît après 2s (comme LoL)
         new org.bukkit.scheduler.BukkitRunnable() {
@@ -199,10 +203,14 @@ public class SummonerSpellManager {
     // UUID → tâche de TP en cours (canalisation interruptible)
     private final java.util.Map<java.util.UUID, org.bukkit.scheduler.BukkitTask> channeling
         = new java.util.concurrent.ConcurrentHashMap<>();
+    /** BlockDisplay de la canalisation de TP en cours, par joueur. */
+    private final java.util.Map<java.util.UUID, org.bukkit.entity.BlockDisplay> channelDisplays
+        = new java.util.concurrent.ConcurrentHashMap<>();
 
     /** Interrompt la canalisation de TP (appelé quand le caster prend des dégâts/CC). */
     public void interruptTeleport(Player caster) {
         var task = channeling.remove(caster.getUniqueId());
+        removeChannelDisplay(caster);
         if (task != null) {
             task.cancel();
             caster.sendActionBar(net.kyori.adventure.text.Component.text(
@@ -212,6 +220,28 @@ public class SummonerSpellManager {
             // Rendre le CD (LoL rembourse partiellement) : reset le cooldown du TP
             resetCooldown(caster, Spell.TELEPORT);
         }
+    }
+
+    /** Crée le BlockDisplay public (visible par tous) de canalisation de TP. */
+    private org.bukkit.entity.BlockDisplay spawnChannelBlock(Location loc) {
+        return loc.getWorld().spawn(loc, org.bukkit.entity.BlockDisplay.class, disp -> {
+            disp.setBlock(Material.PURPLE_STAINED_GLASS.createBlockData());
+            disp.setBrightness(new org.bukkit.entity.Display.Brightness(15, 15));
+            disp.setPersistent(false);
+            disp.setInterpolationDuration(2);
+            disp.setInterpolationDelay(0);
+            float size = 0.22f;
+            disp.setTransformation(new org.bukkit.util.Transformation(
+                    new org.joml.Vector3f(-size / 2f, -size / 2f, -size / 2f),
+                    new org.joml.Quaternionf(),
+                    new org.joml.Vector3f(size, size, size),
+                    new org.joml.Quaternionf()));
+        });
+    }
+
+    private void removeChannelDisplay(Player caster) {
+        var d = channelDisplays.remove(caster.getUniqueId());
+        if (d != null && !d.isDead()) d.remove();
     }
 
     public boolean isChanneling(Player caster) {
@@ -230,21 +260,21 @@ public class SummonerSpellManager {
         var task = new org.bukkit.scheduler.BukkitRunnable() {
             int ticks = 0;
             @Override public void run() {
-                if (!caster.isOnline()) { channeling.remove(caster.getUniqueId()); cancel(); return; }
+                if (!caster.isOnline()) { channeling.remove(caster.getUniqueId()); removeChannelDisplay(caster); cancel(); return; }
                 if (ticks >= 80) { // 4s écoulées → TP
                     channeling.remove(caster.getUniqueId());
+                    removeChannelDisplay(caster);
                     cancel();
                     onComplete.run();
                     return;
                 }
-                // Cercle de canalisation violet autour du caster
+                // Cercle de canalisation violet autour du caster (point qui monte en spirale)
                 double progress = ticks / 80.0;
                 double angle = ticks * 0.3;
                 var loc = caster.getLocation();
-                caster.getWorld().spawnParticle(org.bukkit.Particle.DUST,
-                    loc.clone().add(Math.cos(angle) * 1.2, 0.1 + progress * 2.0, Math.sin(angle) * 1.2),
-                    2, 0, 0, 0, 0,
-                    new org.bukkit.Particle.DustOptions(org.bukkit.Color.fromRGB(180, 80, 255), 1.2f));
+                var display = channelDisplays.computeIfAbsent(caster.getUniqueId(),
+                        k -> spawnChannelBlock(loc));
+                display.teleport(loc.clone().add(Math.cos(angle) * 1.2, 0.1 + progress * 2.0, Math.sin(angle) * 1.2));
                 ticks += 2;
             }
         }.runTaskTimer(LolPlugin.getInstance(), 0L, 2L);
@@ -359,7 +389,8 @@ public class SummonerSpellManager {
                 ec.getHPSystem().takeDamage(dmg);
                 enemyTarget.sendActionBar(Component.text("💀 Châtiment ennemi! -600", NamedTextColor.RED));
                 caster.sendActionBar(Component.text("⚔ Châtiment → " + enemyTarget.getName() + "!", NamedTextColor.RED));
-                caster.getWorld().spawnParticle(Particle.CRIT, enemyTarget.getLocation().add(0,1,0), 20, 0.4,0.4,0.4);
+                fr.lolmc.util.VisualEffectUtil.impactBurst(caster.getWorld(),
+                        enemyTarget.getLocation().add(0,1,0), Material.RED_STAINED_GLASS, 0.3f, 0.4, 8, 6L);
                 return true;
             }
         }
@@ -402,7 +433,8 @@ public class SummonerSpellManager {
             else target.damage(smiteDamage, caster);
             caster.sendActionBar(Component.text("⚔ Châtiment! (" + (int) smiteDamage + ")", NamedTextColor.GOLD));
         }
-        target.getWorld().spawnParticle(Particle.CRIT, target.getLocation().add(0,1,0), 20, 0.4, 0.4, 0.4);
+        fr.lolmc.util.VisualEffectUtil.impactBurst(target.getWorld(),
+                target.getLocation().add(0,1,0), Material.RED_STAINED_GLASS, 0.3f, 0.4, 8, 6L);
         return true;
     }
 
@@ -413,7 +445,8 @@ public class SummonerSpellManager {
         caster.removePotionEffect(PotionEffectType.WEAKNESS);
         caster.removePotionEffect(PotionEffectType.BLINDNESS);
         // Réduit aussi la durée des CC futurs (non modélisé en détail)
-        caster.getWorld().spawnParticle(Particle.TOTEM_OF_UNDYING, caster.getLocation().add(0,1,0), 20, 0.5, 0.5, 0.5);
+        fr.lolmc.util.VisualEffectUtil.impactBurst(caster.getWorld(),
+                caster.getLocation().add(0,1,0), Material.LIGHT_BLUE_STAINED_GLASS, 0.3f, 0.5, 8, 8L);
         caster.sendActionBar(Component.text("✨ Purification!", NamedTextColor.AQUA));
         return true;
     }
@@ -423,7 +456,8 @@ public class SummonerSpellManager {
     private boolean castGhost(Player caster) {
         // Ghost dure ~10s avec boost de vitesse croissant
         caster.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 200, 1, false, true));
-        caster.getWorld().spawnParticle(Particle.CLOUD, caster.getLocation(), 15, 0.5, 0.2, 0.5);
+        fr.lolmc.util.VisualEffectUtil.impactBurst(caster.getWorld(),
+                caster.getLocation(), Material.WHITE_STAINED_GLASS, 0.3f, 0.5, 6, 8L);
         caster.sendActionBar(Component.text("👻 Fantôme! Vitesse accrue (10s)", NamedTextColor.WHITE));
         return true;
     }

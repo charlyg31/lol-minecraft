@@ -372,8 +372,8 @@ public class MinionManager {
             MobAnimator.triggerAttack(minion.getUniqueId());
             // Animation : le sbire "frappe" + particule
             minion.swingMainHand();
-            target.getWorld().spawnParticle(org.bukkit.Particle.CRIT,
-                    target.clone().add(0.5, 1, 0.5), 5, 0.3, 0.3, 0.3);
+            fr.lolmc.util.VisualEffectUtil.impact(target.getWorld(),
+                    target.clone().add(0.5, 1, 0.5), Material.WHITE_STAINED_GLASS, 0.26f, 3L);
             boolean phaseChanged = structure.takeDamage(MINION_DAMAGE_TO_TURRET);
             if (phaseChanged) {
                 LolPlugin.getInstance().getMapManager().updateStructurePhase(structure);

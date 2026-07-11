@@ -69,7 +69,8 @@ public class Ashe extends BaseChampion {
             // Animation : flèches en éventail devant
             var dir=c.getEyeLocation().getDirection().normalize();
             for(double d=1; d<=8; d+=0.7){
-                c.getWorld().spawnParticle(Particle.CRIT,c.getEyeLocation().add(dir.clone().multiply(d)),2,1.2,0.3,1.2,0);
+                fr.lolmc.util.VisualEffectUtil.impact(c.getWorld(),
+                        c.getEyeLocation().add(dir.clone().multiply(d)), Material.WHITE_STAINED_GLASS, 0.2f, 3L);
             }
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_ARROW_SHOOT, 1f, 1.2f);
         }
@@ -92,15 +93,29 @@ public class Ashe extends BaseChampion {
             var tm = LolPlugin.getInstance().getTeamManager();
             var fogMgr = LolPlugin.getInstance().getFogOfWarManager();
             var casterTeam = tm.getTeam(c);
+            var hawkDisplay = start.getWorld().spawn(start, org.bukkit.entity.BlockDisplay.class, disp -> {
+                disp.setBlock(Material.YELLOW_STAINED_GLASS.createBlockData());
+                disp.setBrightness(new org.bukkit.entity.Display.Brightness(15, 15));
+                disp.setPersistent(false);
+                disp.setInterpolationDuration(1);
+                disp.setInterpolationDelay(0);
+                float size = 0.22f;
+                disp.setTransformation(new org.bukkit.util.Transformation(
+                        new org.joml.Vector3f(-size / 2f, -size / 2f, -size / 2f),
+                        new org.joml.Quaternionf(),
+                        new org.joml.Vector3f(size, size, size),
+                        new org.joml.Quaternionf()));
+            });
             new org.bukkit.scheduler.BukkitRunnable() {
                 int step = 0;
                 final org.bukkit.Location pos = start.clone();
                 @Override public void run() {
-                    if (step >= maxSteps || !c.isOnline()) { cancel(); return; }
+                    if (step >= maxSteps || !c.isOnline()) {
+                        if (!hawkDisplay.isDead()) hawkDisplay.remove();
+                        cancel(); return;
+                    }
                     pos.add(dir.clone().multiply(0.5));
-                    // Particule faucon (END_ROD jaune-doré)
-                    pos.getWorld().spawnParticle(org.bukkit.Particle.END_ROD,
-                        pos, 1, 0.05, 0.05, 0.05, 0);
+                    hawkDisplay.teleport(pos);
                     // Révèle la zone survolée pour l'équipe d'Ashe pendant 0.5s
                     // (fenêtre glissante qui suit le faucon le long de son trajet)
                     if (fogMgr != null && casterTeam != null) {
@@ -121,7 +136,10 @@ public class Ashe extends BaseChampion {
                     }
                     step++;
                     // S'arrêter sur un bloc solide
-                    if (pos.getBlock().getType().isSolid()) { cancel(); }
+                    if (pos.getBlock().getType().isSolid()) {
+                        if (!hawkDisplay.isDead()) hawkDisplay.remove();
+                        cancel();
+                    }
                 }
             }.runTaskTimer(LolPlugin.getInstance(), 0L, 1L);
             c.sendActionBar(Component.text("🦅 Faucon envoyé!", NamedTextColor.YELLOW));
@@ -157,7 +175,8 @@ public class Ashe extends BaseChampion {
                 TargetingUtil.dealDamage(c, __t, dmg*0.5, TargetingUtil.DmgType.MAGICAL);
                 if(__t instanceof Player __p2)__p2.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,60,2,false,true));
             }
-            main.getWorld().spawnParticle(Particle.END_ROD,main.getLocation().add(0,1,0),30,1.5,1,1.5);
+            fr.lolmc.util.VisualEffectUtil.groundRing(main.getWorld(),
+                    main.getLocation().add(0,1,0), 1.5, Material.LIGHT_BLUE_STAINED_GLASS, 14, 0.3f, 0.1f, 8L);
             main.getWorld().playSound(main.getLocation(), Sound.BLOCK_GLASS_BREAK, 1.5f, 0.8f);
         }
         @Override public String getDynamicDescription(ChampionStats s){

@@ -58,7 +58,8 @@ public class Malphite extends BaseChampion implements fr.lolmc.champion.base.Sta
                 double coneDmg = bonus[Math.min(wlvl-1,4)] + s.getFinalAP()*0.15;
                 for (var e : TargetingUtil.enemiesAround(c, 3.0))
                     TargetingUtil.dealDamage(c, e, coneDmg, TargetingUtil.DmgType.PHYSICAL);
-                c.getWorld().spawnParticle(Particle.CRIT, tgt.getLocation().add(0,1,0), 8, 0.5,0.5,0.5);
+                fr.lolmc.util.VisualEffectUtil.impact(c.getWorld(),
+                        tgt.getLocation().add(0,1,0), Material.STONE, 0.3f, 4L);
             }
         }
     }
@@ -77,8 +78,8 @@ public class Malphite extends BaseChampion implements fr.lolmc.champion.base.Sta
             int slowAmp=(qrank>=3)?2:1; // ~30-50% via amplifier
             if(tgt instanceof Player __p) __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,60,slowAmp,false,true));
             c.addPotionEffect(new PotionEffect(PotionEffectType.SPEED,60,slowAmp,false,true)); // vol de vitesse 3s
-            tgt.getWorld().spawnParticle(Particle.BLOCK,tgt.getLocation().add(0,1,0),15,0.3,0.3,0.3,
-                Material.STONE.createBlockData());
+            fr.lolmc.util.VisualEffectUtil.impactBurst(tgt.getWorld(),
+                    tgt.getLocation().add(0,1,0), Material.STONE, 0.28f, 0.3, 6, 5L);
             c.getWorld().playSound(c.getLocation(), Sound.BLOCK_STONE_BREAK, 1f, 0.8f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
@@ -98,7 +99,8 @@ public class Malphite extends BaseChampion implements fr.lolmc.champion.base.Sta
             // Active : 6s (120 ticks) d'attaques renforcées en cône
             thunderclapUntil.put(c.getUniqueId(), System.currentTimeMillis()+6000L);
             c.sendActionBar(Component.text("⚡ Coup de Tonnerre actif (6s)!",NamedTextColor.YELLOW));
-            c.getWorld().spawnParticle(Particle.EXPLOSION,c.getLocation().add(0,0.5,0),3,1,0.2,1);
+            fr.lolmc.util.VisualEffectUtil.impact(c.getWorld(),
+                    c.getLocation().add(0,0.5,0), Material.STONE, 0.4f, 5L);
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_LIGHTNING_BOLT_THUNDER, 0.6f, 1.5f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
@@ -120,7 +122,8 @@ public class Malphite extends BaseChampion implements fr.lolmc.champion.base.Sta
                 if(__t instanceof Player __p)
                     __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,60,0,false,true)); // ralentit AS 3s
             }
-            c.getWorld().spawnParticle(Particle.BLOCK,c.getLocation(),25,2,0,2,Material.STONE.createBlockData());
+            fr.lolmc.util.VisualEffectUtil.impactBurst(c.getWorld(),
+                    c.getLocation(), Material.STONE, 0.32f, 2.0, 10, 8L);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] eBase={60,95,130,165,200};
@@ -146,7 +149,8 @@ public class Malphite extends BaseChampion implements fr.lolmc.champion.base.Sta
                 if(__t instanceof Player __p)
                     __p.sendActionBar(Component.text("🪨 KNOCKUP + STUN Malphite!",NamedTextColor.DARK_GRAY));
             }
-            c.getWorld().spawnParticle(Particle.EXPLOSION,c.getLocation(),5,1,0,1);
+            fr.lolmc.util.VisualEffectUtil.impactBurst(c.getWorld(),
+                    c.getLocation(), Material.STONE, 0.45f, 1.0, 10, 8L);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] baseR={200,300,400};int rr=Math.min(getLevel()-1,2);

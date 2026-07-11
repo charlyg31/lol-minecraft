@@ -11,6 +11,7 @@ import fr.lolmc.team.TeamManager.Team;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -211,7 +212,8 @@ public class StructureDamageListener implements Listener {
 
         // Effet visuel de destruction
         Location c = structure.getCenter().clone().add(0.5, 1, 0.5);
-        c.getWorld().spawnParticle(org.bukkit.Particle.EXPLOSION_EMITTER, c, 3, 1, 1, 1);
+        fr.lolmc.util.VisualEffectUtil.impactBurst(c.getWorld(),
+                c, Material.GRAY_STAINED_GLASS, 0.45f, 1.0, 14, 10L);
         c.getWorld().playSound(c, Sound.ENTITY_GENERIC_EXPLODE, 1f, 1f);
 
         // ── Victoire si Nexus principal détruit ──

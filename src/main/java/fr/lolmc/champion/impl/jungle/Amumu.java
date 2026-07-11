@@ -94,7 +94,8 @@ public class Amumu extends BaseChampion implements fr.lolmc.champion.base.Statef
                         TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);
                         onMagicHit(c, __t, dmg);
                     }
-                    c.getWorld().spawnParticle(Particle.FALLING_WATER,c.getLocation().add(0,1,0),10,2,0.5,2);
+                    fr.lolmc.util.VisualEffectUtil.groundRing(c.getWorld(),
+                            c.getLocation().add(0,1,0), 2.0, Material.GRAY_STAINED_GLASS, 14, 0.3f, 0.1f, 6L);
                     ticks++;
                 }
             }.runTaskTimer(LolPlugin.getInstance(),0L,10L);
@@ -115,7 +116,8 @@ public class Amumu extends BaseChampion implements fr.lolmc.champion.base.Statef
                 TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);
                 onMagicHit(c, __t, dmg);
             }
-            c.getWorld().spawnParticle(Particle.ANGRY_VILLAGER,c.getLocation().add(0,1,0),12,1.5,0.5,1.5);
+            fr.lolmc.util.VisualEffectUtil.impactBurst(c.getWorld(),
+                    c.getLocation().add(0,1,0), Material.GRAY_STAINED_GLASS, 0.3f, 1.5, 8, 8L);
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_VILLAGER_NO, 1f, 0.7f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
@@ -138,7 +140,8 @@ public class Amumu extends BaseChampion implements fr.lolmc.champion.base.Statef
                 fr.lolmc.LolPlugin.getInstance().getCCManager().stun(__t, 30);
                 if(__t instanceof Player __p) __p.sendActionBar(Component.text("⛓ MALÉDICTION DE LA MOMIE! Stun 1.5s",NamedTextColor.DARK_PURPLE));
             }
-            c.getWorld().spawnParticle(Particle.END_ROD,c.getLocation().add(0,1,0),30,3,1,3);
+            fr.lolmc.util.VisualEffectUtil.groundRing(c.getWorld(),
+                    c.getLocation().add(0,1,0), 3.0, Material.PURPLE_STAINED_GLASS, 20, 0.35f, 0.1f, 12L);
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_WITHER_SPAWN, 1f, 1.5f);
         }
         @Override public String getDynamicDescription(ChampionStats s){

@@ -97,7 +97,8 @@ public class LeeSin extends BaseChampion implements fr.lolmc.champion.base.State
             sonicTarget.put(c.getUniqueId(), tgt.getUniqueId());
             new BukkitRunnable(){@Override public void run(){sonicTarget.remove(c.getUniqueId());}}.runTaskLater(LolPlugin.getInstance(),60L);
             if(tgt instanceof Player _tp)_tp.sendActionBar(Component.text("🌊 Onde Sonique! (recast pour dash)",NamedTextColor.YELLOW));
-            c.getWorld().spawnParticle(Particle.SONIC_BOOM,tgt.getLocation().add(0,1,0),1);
+            fr.lolmc.util.VisualEffectUtil.impact(c.getWorld(),
+                    tgt.getLocation().add(0,1,0), Material.LIGHT_GRAY_STAINED_GLASS, 0.4f, 5L);
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_WARDEN_SONIC_BOOM, 0.6f, 1.5f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
@@ -159,7 +160,8 @@ public class LeeSin extends BaseChampion implements fr.lolmc.champion.base.State
                     __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,80,slowAmp,false,true)); // decay 4s
                 }
             }
-            c.getWorld().spawnParticle(Particle.SONIC_BOOM,c.getLocation().add(0,1,0),3,2,0.5,2);
+            fr.lolmc.util.VisualEffectUtil.impactBurst(c.getWorld(),
+                    c.getLocation().add(0,1,0), Material.LIGHT_GRAY_STAINED_GLASS, 0.4f, 2.0, 8, 6L);
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_RAVAGER_ROAR, 1f, 1.2f);
         }
         @Override public String getDynamicDescription(ChampionStats s){

@@ -5,6 +5,7 @@ import fr.lolmc.game.JungleManager;
 import fr.lolmc.game.MinionManager;
 import fr.lolmc.team.TeamManager.Team;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.util.Vector;
@@ -122,22 +123,31 @@ public final class TargetingUtil {
             if (isEnemy(caster, e)) candidates.add(e);
         }
 
-        // Avancer le long de la ligne par pas de 0.5 bloc
+        // Avancer le long de la ligne par pas de 0.5 bloc (détection pure,
+        // sans rendu à chaque pas — un seul BlockDisplay étiré est posé
+        // après coup sur toute la distance effective, cf. plus bas).
         double step = 0.5;
+        double stopDist = range;
         for (double d = 0; d <= range; d += step) {
             Location point = start.clone().add(dir.clone().multiply(d));
             // Mur ? on arrête
-            if (point.getBlock().getType().isSolid()) break;
-            // Particule de trajectoire
-            point.getWorld().spawnParticle(org.bukkit.Particle.CRIT, point, 1, 0, 0, 0, 0);
+            if (point.getBlock().getType().isSolid()) { stopDist = d; break; }
             // Ennemi touché ?
             for (var e : candidates) {
                 if (hit.contains(e)) continue;
                 if (e.getLocation().add(0, 1, 0).distance(point) <= width + 0.5) {
                     hit.add(e);
-                    if (!pierce) return hit; // s'arrête au premier
+                    if (!pierce) { stopDist = d; break; }
                 }
             }
+            if (!pierce && !hit.isEmpty()) break;
+        }
+
+        // Un seul BlockDisplay fin et étiré sur toute la trajectoire effective
+        // (remplace l'ancienne trainée de 15-20 particules/entités par tir).
+        if (stopDist > 0.1) {
+            fr.lolmc.util.VisualEffectUtil.skillshotLine(start, dir, stopDist,
+                    Material.WHITE_STAINED_GLASS, (float) Math.min(width, 1.0), 4L);
         }
         return hit;
     }
@@ -216,8 +226,8 @@ public final class TargetingUtil {
         } else if (VirtualHP.has(target)) {
             // Entité à HP virtuels (Baron, Elder, canon...) : dégâts virtuels
             VirtualHP.damage(target, amount, caster);
-            target.getWorld().spawnParticle(org.bukkit.Particle.CRIT,
-                    target.getLocation().add(0, 1, 0), 5, 0.3, 0.3, 0.3);
+            fr.lolmc.util.VisualEffectUtil.impact(target.getWorld(),
+                    target.getLocation().add(0, 1, 0), Material.WHITE_STAINED_GLASS, 0.28f, 4L);
         } else {
             // Sbire ou monstre : dégât direct (pas de système de résistance LoL)
             double newHealth = Math.max(0, target.getHealth() - amount);
@@ -226,8 +236,8 @@ public final class TargetingUtil {
                 target.getAttribute(Compat.maxHealth()) != null
                     ? target.getAttribute(Compat.maxHealth()).getValue()
                     : target.getMaxHealth());
-            target.getWorld().spawnParticle(org.bukkit.Particle.CRIT,
-                    target.getLocation().add(0, 1, 0), 5, 0.3, 0.3, 0.3);
+            fr.lolmc.util.VisualEffectUtil.impact(target.getWorld(),
+                    target.getLocation().add(0, 1, 0), Material.WHITE_STAINED_GLASS, 0.28f, 4L);
         }
     }
 
