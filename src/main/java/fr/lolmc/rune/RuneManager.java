@@ -6,6 +6,7 @@ import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.util.DamageUtil;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
@@ -474,8 +475,8 @@ public class RuneManager {
                 // AA ralentit 30% + crée des zones gelées
                 if (!isAbility) {
                     LolPlugin.getInstance().getCCManager().slow(victim, 30, 40);
-                    victim.getWorld().spawnParticle(org.bukkit.Particle.SNOWFLAKE,
-                        victim.getLocation().add(0,1,0), 8, 0.5, 0.5, 0.5);
+                    fr.lolmc.util.VisualEffectUtil.impactBurst(victim.getWorld(),
+                            victim.getLocation().add(0,1,0), Material.LIGHT_BLUE_STAINED_GLASS, 0.24f, 0.5, 6, 6L);
                     attacker.sendActionBar(Component.text("❄ Augment Glacial!", NamedTextColor.AQUA));
                 }
             }

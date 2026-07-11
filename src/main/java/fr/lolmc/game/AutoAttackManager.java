@@ -90,11 +90,20 @@ public class AutoAttackManager {
     }
 
     // ══════════════════════════════════════════════════════════
-    // MARQUEURS DE CIBLE (per-player : seul l'attaquant les voit)
-    //  Rouge : cible actuellement sous le viseur
+    // ══════════════════════════════════════════════════════════
+    //  Anneau visuel de ciblage/lock : BlockDisplay au lieu de
+    //  particules (invisibles si le joueur les désactive en options).
+    //  Chaque anneau n'est visible QUE pour son viewer (showEntity),
+    //  ce qui permet naturellement 2 couleurs différentes pour 2
+    //  joueurs regardant la même cible (l'un locke, l'autre non).
     //  Vert  : cible verrouillée (lock-on actif)
+    //  Rouge : cible actuellement sous le viseur
     // ══════════════════════════════════════════════════════════
     private org.bukkit.scheduler.BukkitTask visualsTask;
+
+    /** Anneaux actifs par (viewer, cible) : 4 BlockDisplay formant les points cardinaux. */
+    private final Map<UUID, Map<UUID, java.util.List<org.bukkit.entity.BlockDisplay>>> ringDisplays
+            = new HashMap<>();
 
     public void startVisuals() {
         if (visualsTask != null && !visualsTask.isCancelled()) return;
@@ -105,7 +114,12 @@ public class AutoAttackManager {
                 var cm = LolPlugin.getInstance().getChampionManager();
                 for (Player viewer : fr.lolmc.util.WorldContext.getGamePlayers()) {
                     if (!cm.hasChampion(viewer)) continue;
-                    if (viewer.getGameMode() == GameMode.SPECTATOR) continue;
+                    if (viewer.getGameMode() == GameMode.SPECTATOR) {
+                        clearRingsFor(viewer);
+                        continue;
+                    }
+
+                    UUID stillValid1 = null, stillValid2 = null;
 
                     // Cible verrouillée → anneau VERT
                     LivingEntity locked = null;
@@ -115,6 +129,7 @@ public class AutoAttackManager {
                             && le.getWorld().equals(viewer.getWorld())) {
                         locked = le;
                         drawTargetRing(viewer, le, Color.fromRGB(60, 220, 90), phase);
+                        stillValid1 = le.getUniqueId();
                     }
 
                     // Cible sous le viseur → anneau ROUGE (si différente du lock)
@@ -122,7 +137,12 @@ public class AutoAttackManager {
                     LivingEntity aimed = fr.lolmc.util.TargetingUtil.getTargetedEnemy(viewer, range);
                     if (aimed != null && !aimed.equals(locked)) {
                         drawTargetRing(viewer, aimed, Color.fromRGB(230, 60, 60), phase);
+                        stillValid2 = aimed.getUniqueId();
                     }
+
+                    // Nettoyer les anneaux de ce viewer qui ne correspondent plus
+                    // à la cible lockée ni à la cible visée actuelles.
+                    pruneRingsFor(viewer, stillValid1, stillValid2);
                 }
             }
         }.runTaskTimer(LolPlugin.getInstance(), 4L, 4L);
@@ -131,19 +151,91 @@ public class AutoAttackManager {
     public void stopVisuals() {
         if (visualsTask != null) { visualsTask.cancel(); visualsTask = null; }
         lockedTargets.clear();
+        for (UUID viewerId : new java.util.ArrayList<>(ringDisplays.keySet())) {
+            var v = Bukkit.getPlayer(viewerId);
+            if (v != null) clearRingsFor(v); else removeAllRingsRaw(viewerId);
+        }
+        ringDisplays.clear();
     }
 
-    /** Petit anneau rotatif aux pieds de la cible, visible par le seul viewer. */
+    /** Retire tous les anneaux d'un viewer (déconnexion, mode spectateur). */
+    private void clearRingsFor(Player viewer) {
+        var byTarget = ringDisplays.remove(viewer.getUniqueId());
+        if (byTarget == null) return;
+        for (var displays : byTarget.values()) {
+            for (var d : displays) if (d != null && !d.isDead()) d.remove();
+        }
+    }
+
+    /** Comme clearRingsFor, mais sans avoir besoin du Player en ligne (fallback cleanup). */
+    private void removeAllRingsRaw(UUID viewerId) {
+        var byTarget = ringDisplays.remove(viewerId);
+        if (byTarget == null) return;
+        for (var displays : byTarget.values()) {
+            for (var d : displays) if (d != null && !d.isDead()) d.remove();
+        }
+    }
+
+    /** Retire les anneaux du viewer dont la cible n'est plus lockée/visée. */
+    private void pruneRingsFor(Player viewer, UUID keepA, UUID keepB) {
+        var byTarget = ringDisplays.get(viewer.getUniqueId());
+        if (byTarget == null) return;
+        var it = byTarget.entrySet().iterator();
+        while (it.hasNext()) {
+            var entry = it.next();
+            UUID targetId = entry.getKey();
+            if (!targetId.equals(keepA) && !targetId.equals(keepB)) {
+                for (var d : entry.getValue()) if (d != null && !d.isDead()) d.remove();
+                it.remove();
+            }
+        }
+    }
+
+    /**
+     * Anneau rotatif aux pieds de la cible, visible par le seul viewer.
+     * Réutilise 4 BlockDisplay persistants (créés au premier appel pour
+     * cette paire viewer/cible, puis simplement repositionnés).
+     */
     private void drawTargetRing(Player viewer, LivingEntity target, Color color, int phase) {
-        var dust = new Particle.DustOptions(color, 0.9f);
+        var byTarget = ringDisplays.computeIfAbsent(viewer.getUniqueId(), k -> new HashMap<>());
+        var displays = byTarget.get(target.getUniqueId());
+
+        if (displays == null) {
+            displays = new java.util.ArrayList<>(4);
+            for (int i = 0; i < 4; i++) {
+                var d = target.getWorld().spawn(target.getLocation(), org.bukkit.entity.BlockDisplay.class, disp -> {
+                    disp.setBlock(Material.LIME_STAINED_GLASS.createBlockData()); // couleur ajustée juste après
+                    disp.setBrightness(new org.bukkit.entity.Display.Brightness(15, 15));
+                    disp.setPersistent(false);
+                    disp.setInterpolationDuration(4);
+                    disp.setInterpolationDelay(0);
+                    disp.setVisibleByDefault(false);
+                });
+                viewer.showEntity(LolPlugin.getInstance(), d);
+                displays.add(d);
+            }
+            byTarget.put(target.getUniqueId(), displays);
+        }
+
+        // Couleur selon vert/rouge (approximation via un bloc de verre teinté proche)
+        Material blockColor = (color.getGreen() > color.getRed())
+                ? Material.LIME_STAINED_GLASS : Material.RED_STAINED_GLASS;
+
         Location base = target.getLocation().add(0, 0.15, 0);
         double r = 0.65;
         double spin = phase * 0.35; // rotation lente
+        float size = 0.18f;
         for (int i = 0; i < 4; i++) {
             double a = spin + Math.PI / 2 * i;
-            viewer.spawnParticle(Particle.DUST,
-                base.clone().add(Math.cos(a) * r, 0, Math.sin(a) * r),
-                1, 0, 0, 0, 0, dust);
+            Location pos = base.clone().add(Math.cos(a) * r, 0, Math.sin(a) * r);
+            var d = displays.get(i);
+            if (d.getBlock().getMaterial() != blockColor) d.setBlock(blockColor.createBlockData());
+            d.teleport(pos);
+            d.setTransformation(new org.bukkit.util.Transformation(
+                    new org.joml.Vector3f(-size / 2f, 0f, -size / 2f),
+                    new org.joml.Quaternionf(),
+                    new org.joml.Vector3f(size, size, size),
+                    new org.joml.Quaternionf()));
         }
     }
 
@@ -312,30 +404,31 @@ public class AutoAttackManager {
     }
 
     /**
-     * MÊLÉE : slash SWEEP + impact CRIT au contact.
-     * Ligne de particules courte du poignet vers la cible pour simuler le swing.
+     * MÊLÉE : slash + impact au contact.
+     * Ligne de BlockDisplay courts du poignet vers la cible pour simuler le swing.
+     * Visible par tous (contrairement au lock, ceci est un effet public de combat).
      */
     private void playMeleeAnimation(Player attacker, LivingEntity target, boolean crit) {
         Location impactLoc = target.getLocation().add(0, 1, 0);
         World world = attacker.getWorld();
 
-        // Ligne de swing (poignet → cible)
+        // Ligne de swing (poignet → cible) : petits blocs éphémères qui
+        // apparaissent puis disparaissent en quelques ticks.
         Vector dir = impactLoc.toVector()
                 .subtract(attacker.getEyeLocation().toVector()).normalize();
         Location start = attacker.getEyeLocation().add(dir.clone().multiply(0.5));
         double dist = start.distance(impactLoc);
-        for (double d = 0; d < Math.min(dist, 2.5); d += 0.3) {
-            world.spawnParticle(Particle.SWEEP_ATTACK,
-                    start.clone().add(dir.clone().multiply(d)), 1, 0, 0, 0, 0);
+        for (double d = 0; d < Math.min(dist, 2.5); d += 0.5) {
+            spawnBrief(world, start.clone().add(dir.clone().multiply(d)),
+                    Material.WHITE_STAINED_GLASS, 0.15f, 3L);
         }
 
         // Impact
-        world.spawnParticle(Particle.SWEEP_ATTACK, impactLoc, 3, 0.2, 0.2, 0.2, 0);
+        spawnBrief(world, impactLoc, crit ? Material.ORANGE_STAINED_GLASS : Material.WHITE_STAINED_GLASS,
+                crit ? 0.35f : 0.22f, crit ? 5L : 3L);
         if (crit) {
-            world.spawnParticle(Particle.CRIT, impactLoc, 12, 0.3, 0.3, 0.3, 0.1);
             world.playSound(attacker.getLocation(), Sound.ENTITY_PLAYER_ATTACK_CRIT, 0.8f, 1.1f);
         } else {
-            world.spawnParticle(Particle.CRIT, impactLoc, 4, 0.2, 0.2, 0.2, 0.05);
             world.playSound(attacker.getLocation(), Sound.ENTITY_PLAYER_ATTACK_STRONG, 0.8f, 1.0f);
         }
     }
@@ -362,23 +455,32 @@ public class AutoAttackManager {
         Vector step = end.toVector().subtract(start.toVector())
                 .normalize().multiply(totalDist / totalSteps);
 
-        // Couleur de l'orbe : bleu-violet magique
-        Particle.DustOptions mageDust = new Particle.DustOptions(
-                Color.fromRGB(120, 60, 255), 1.2f);
-        Particle.DustOptions trailDust = new Particle.DustOptions(
-                Color.fromRGB(200, 130, 255), 0.8f);
+        // Orbe magique : petite sphère (bloc violet) qui voyage réellement
+        // vers la cible via ItemDisplay, au lieu d'une traînée de particules.
+        var orb = world.spawn(start, org.bukkit.entity.ItemDisplay.class, disp -> {
+            disp.setItemStack(new org.bukkit.inventory.ItemStack(Material.PURPLE_STAINED_GLASS));
+            disp.setBrightness(new org.bukkit.entity.Display.Brightness(15, 15));
+            disp.setPersistent(false);
+            disp.setInterpolationDuration(2);
+            disp.setInterpolationDelay(0);
+            float s = 0.35f;
+            disp.setTransformation(new org.bukkit.util.Transformation(
+                    new org.joml.Vector3f(-s / 2f, -s / 2f, -s / 2f),
+                    new org.joml.Quaternionf(),
+                    new org.joml.Vector3f(s, s, s),
+                    new org.joml.Quaternionf()));
+        });
 
         new BukkitRunnable() {
             int step_ = 0;
             Location current = start.clone();
             @Override public void run() {
                 if (step_ >= totalSteps) {
+                    orb.remove();
                     // Impact
-                    world.spawnParticle(Particle.ENCHANTED_HIT, end, 15, 0.4, 0.4, 0.4, 0.1);
-                    world.spawnParticle(Particle.DUST, end, 8, 0.3, 0.3, 0.3, 0, mageDust);
-                    world.spawnParticle(Particle.WITCH, end, 6, 0.3, 0.5, 0.3, 0.1);
+                    spawnBrief(world, end, Material.PURPLE_STAINED_GLASS, 0.6f, 4L);
+                    spawnBrief(world, end, Material.MAGENTA_STAINED_GLASS, 0.35f, 3L);
                     if (crit) {
-                        world.spawnParticle(Particle.FLASH, end, 1);
                         world.playSound(end, Sound.ENTITY_GENERIC_EXPLODE, 0.3f, 1.8f);
                     } else {
                         world.playSound(end, Sound.ENTITY_BLAZE_HURT, 0.5f, 1.4f);
@@ -387,11 +489,7 @@ public class AutoAttackManager {
                     return;
                 }
                 current.add(step);
-                // Noyau de l'orbe
-                world.spawnParticle(Particle.DUST, current, 2, 0.05, 0.05, 0.05, 0, mageDust);
-                // Traînée
-                world.spawnParticle(Particle.DUST, current, 1, 0.1, 0.1, 0.1, 0, trailDust);
-                world.spawnParticle(Particle.WITCH, current, 1, 0.05, 0.05, 0.05, 0.02);
+                orb.teleport(current);
                 step_++;
             }
         }.runTaskTimer(LolPlugin.getInstance(), 0L, 1L);
@@ -417,20 +515,30 @@ public class AutoAttackManager {
         Vector step = end.toVector().subtract(start.toVector())
                 .normalize().multiply(totalDist / totalSteps);
 
-        Particle.DustOptions whiteDust = new Particle.DustOptions(
-                Color.fromRGB(255, 240, 180), 0.7f);
+        // Tête du projectile : petit bloc clair qui voyage réellement
+        var head = world.spawn(start, org.bukkit.entity.ItemDisplay.class, disp -> {
+            disp.setItemStack(new org.bukkit.inventory.ItemStack(Material.WHITE_STAINED_GLASS));
+            disp.setBrightness(new org.bukkit.entity.Display.Brightness(15, 15));
+            disp.setPersistent(false);
+            disp.setInterpolationDuration(1);
+            disp.setInterpolationDelay(0);
+            float s = 0.22f;
+            disp.setTransformation(new org.bukkit.util.Transformation(
+                    new org.joml.Vector3f(-s / 2f, -s / 2f, -s / 2f),
+                    new org.joml.Quaternionf(),
+                    new org.joml.Vector3f(s, s, s),
+                    new org.joml.Quaternionf()));
+        });
 
         new BukkitRunnable() {
             int step_ = 0;
             Location current = start.clone();
             @Override public void run() {
                 if (step_ >= totalSteps) {
+                    head.remove();
                     // Impact
-                    world.spawnParticle(Particle.CRIT, end, crit ? 16 : 6,
-                            0.25, 0.25, 0.25, 0.08);
-                    world.spawnParticle(Particle.DUST, end, 4, 0.1, 0.1, 0.1, 0, whiteDust);
+                    spawnBrief(world, end, Material.WHITE_STAINED_GLASS, crit ? 0.5f : 0.3f, crit ? 4L : 2L);
                     if (crit) {
-                        world.spawnParticle(Particle.LARGE_SMOKE, end, 4, 0.2, 0.2, 0.2, 0.02);
                         world.playSound(end, Sound.ENTITY_ARROW_HIT_PLAYER, 0.7f, 0.8f);
                     } else {
                         world.playSound(end, Sound.ENTITY_ARROW_HIT, 0.6f, 1.1f);
@@ -439,10 +547,7 @@ public class AutoAttackManager {
                     return;
                 }
                 current.add(step);
-                // Tête du projectile
-                world.spawnParticle(Particle.CRIT, current, 1, 0, 0, 0, 0);
-                // Traînée légère
-                world.spawnParticle(Particle.DUST, current, 1, 0.03, 0.03, 0.03, 0, whiteDust);
+                head.teleport(current);
                 step_++;
             }
         }.runTaskTimer(LolPlugin.getInstance(), 0L, 1L);
@@ -490,5 +595,30 @@ public class AutoAttackManager {
 
     public void cleanup(UUID uuid) {
         lastAttack.remove(uuid);
+    }
+
+    /**
+     * Fait apparaître un BlockDisplay bref (impact ponctuel) qui se retire
+     * de lui-même après [lifetimeTicks]. Visible par tous les joueurs proches
+     * (visibilité par défaut normale, pas de showEntity/hideEntity ici).
+     */
+    private void spawnBrief(World world, Location loc, Material block, float size, long lifetimeTicks) {
+        var d = world.spawn(loc, org.bukkit.entity.BlockDisplay.class, disp -> {
+            disp.setBlock(block.createBlockData());
+            disp.setBrightness(new org.bukkit.entity.Display.Brightness(15, 15));
+            disp.setPersistent(false);
+            disp.setInterpolationDuration(2);
+            disp.setInterpolationDelay(0);
+            disp.setTransformation(new org.bukkit.util.Transformation(
+                    new org.joml.Vector3f(-size / 2f, -size / 2f, -size / 2f),
+                    new org.joml.Quaternionf(),
+                    new org.joml.Vector3f(size, size, size),
+                    new org.joml.Quaternionf()));
+        });
+        new BukkitRunnable() {
+            @Override public void run() {
+                if (!d.isDead()) d.remove();
+            }
+        }.runTaskLater(LolPlugin.getInstance(), lifetimeTicks);
     }
 }

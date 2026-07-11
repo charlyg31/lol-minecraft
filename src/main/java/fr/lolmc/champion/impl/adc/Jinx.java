@@ -25,8 +25,8 @@ public class Jinx extends BaseChampion implements fr.lolmc.champion.base.Statefu
     public static void getExcited(Player jinx) {
         jinx.addPotionEffect(new org.bukkit.potion.PotionEffect(
             org.bukkit.potion.PotionEffectType.SPEED, 120, 4, false, true)); // 6s vitesse
-        jinx.getWorld().spawnParticle(org.bukkit.Particle.FIREWORK,
-            jinx.getLocation().add(0,1,0), 15, 0.5,0.5,0.5);
+        fr.lolmc.util.VisualEffectUtil.impactBurst(jinx.getWorld(),
+            jinx.getLocation().add(0,1,0), Material.RED_STAINED_GLASS, 0.28f, 0.5, 8, 8L);
         jinx.sendActionBar(net.kyori.adventure.text.Component.text(
             "🎉 GET EXCITED! +175% vitesse 6s!", net.kyori.adventure.text.format.NamedTextColor.RED));
     }
@@ -53,8 +53,8 @@ public class Jinx extends BaseChampion implements fr.lolmc.champion.base.Statefu
                     fr.lolmc.util.TargetingUtil.dealDamage(c, nearby,
                         dmg * 0.87, fr.lolmc.util.TargetingUtil.DmgType.PHYSICAL);
                 }
-                tgt.getWorld().spawnParticle(org.bukkit.Particle.EXPLOSION,
-                    tgt.getLocation().add(0,0.5,0), 3, 0.5,0.2,0.5);
+                fr.lolmc.util.VisualEffectUtil.impact(tgt.getWorld(),
+                    tgt.getLocation().add(0,0.5,0), Material.ORANGE_STAINED_GLASS, 0.3f, 4L);
             }
         }
     }
@@ -99,7 +99,8 @@ public class Jinx extends BaseChampion implements fr.lolmc.champion.base.Statefu
                 int slowAmp=Math.min(4, 1+getLevel()/2);
                 __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,40,slowAmp,false,true));
             }
-            main.getWorld().spawnParticle(Particle.ELECTRIC_SPARK,main.getLocation().add(0,1,0),15,0.5,0.5,0.5);
+            fr.lolmc.util.VisualEffectUtil.impactBurst(main.getWorld(),
+                    main.getLocation().add(0,1,0), Material.YELLOW_STAINED_GLASS, 0.25f, 0.5, 6, 6L);
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_FIREWORK_ROCKET_BLAST, 1f, 1.4f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
@@ -122,8 +123,10 @@ public class Jinx extends BaseChampion implements fr.lolmc.champion.base.Statefu
                     __p.sendActionBar(Component.text("🦷 ENRACINÉ par les Croque-Flammes!",NamedTextColor.RED));
                 }
             }
-            loc.getWorld().spawnParticle(Particle.FLAME,loc,30,3,0.3,3,0.02);
-            loc.getWorld().spawnParticle(Particle.LAVA,loc,10,3,0.2,3);
+            fr.lolmc.util.VisualEffectUtil.groundRing(loc.getWorld(), loc, 4.0,
+                    Material.ORANGE_STAINED_GLASS, 18, 0.35f, 0.1f, 10L);
+            fr.lolmc.util.VisualEffectUtil.impactBurst(loc.getWorld(),
+                    loc, Material.MAGMA_BLOCK, 0.28f, 2.0, 6, 8L);
             c.getWorld().playSound(loc, Sound.ENTITY_BLAZE_SHOOT, 1f, 1f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
@@ -152,8 +155,8 @@ public class Jinx extends BaseChampion implements fr.lolmc.champion.base.Statefu
                 double dmg=baseDmg+missingHP*missPct[rr];
                 TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.PHYSICAL);
             }
-            main.getWorld().spawnParticle(Particle.EXPLOSION,main.getLocation(),8,2,1,2);
-            main.getWorld().spawnParticle(Particle.FLAME,main.getLocation(),50,3,2,3,0.1);
+            fr.lolmc.util.VisualEffectUtil.impactBurst(main.getWorld(),
+                    main.getLocation(), Material.ORANGE_STAINED_GLASS, 0.45f, 2.5, 16, 10L);
             main.getWorld().playSound(main.getLocation(), Sound.ENTITY_GENERIC_EXPLODE, 2f, 0.6f);
             if(main instanceof Player _tp)_tp.sendMessage(Component.text("🚀 SUPER MÉGA ROQUETTE DE LA MORT!",NamedTextColor.RED));
         }

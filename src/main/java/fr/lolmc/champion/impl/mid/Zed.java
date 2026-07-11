@@ -77,7 +77,8 @@ public class Zed extends BaseChampion implements fr.lolmc.champion.base.Stateful
                 double pct = lvl>=17 ? 0.10 : (lvl>=7 ? 0.075 : 0.05);
                 double bonus = realMax * pct;
                 TargetingUtil.dealDamage(c, tgt, bonus, TargetingUtil.DmgType.MAGICAL);
-                tgt.getWorld().spawnParticle(Particle.SMOKE,tgt.getLocation().add(0,1,0),8,0.3,0.5,0.3);
+                fr.lolmc.util.VisualEffectUtil.impact(tgt.getWorld(),
+                        tgt.getLocation().add(0,1,0), Material.GRAY_STAINED_GLASS, 0.25f, 4L);
             }
         }
     }
@@ -133,8 +134,10 @@ public class Zed extends BaseChampion implements fr.lolmc.champion.base.Stateful
                     // Déclencher le CD après l'échange
                     wCooldowns.put(uuid, now + (long)(realCooldowns[rank] * 1000));
                     c.sendActionBar(Component.text("👤 Échange avec l'ombre !", NamedTextColor.DARK_GRAY));
-                    c.getWorld().spawnParticle(Particle.SMOKE, shadowLoc, 15, 0.5, 1, 0.5);
-                    c.getWorld().spawnParticle(Particle.SMOKE, c.getLocation(), 15, 0.5, 1, 0.5);
+                    fr.lolmc.util.VisualEffectUtil.impactBurst(c.getWorld(),
+                            shadowLoc, Material.GRAY_STAINED_GLASS, 0.3f, 0.5, 6, 6L);
+                    fr.lolmc.util.VisualEffectUtil.impactBurst(c.getWorld(),
+                            c.getLocation(), Material.GRAY_STAINED_GLASS, 0.3f, 0.5, 6, 6L);
                     // Téléporter le joueur à la position de l'ombre
                     Location dest = shadowLoc.clone();
                     dest.setYaw(c.getLocation().getYaw());
@@ -182,7 +185,8 @@ public class Zed extends BaseChampion implements fr.lolmc.champion.base.Stateful
                             as.getScoreboardTags().add("zed_shadow");
                         });
                 shadowEntities.put(uuid, shadowStand.getUniqueId());
-                c.getWorld().spawnParticle(Particle.SMOKE, shadowLoc, 20, 0.5, 1, 0.5);
+                fr.lolmc.util.VisualEffectUtil.impactBurst(c.getWorld(),
+                        shadowLoc, Material.GRAY_STAINED_GLASS, 0.32f, 0.5, 8, 8L);
                 c.getWorld().playSound(shadowLoc, Sound.ENTITY_ENDERMAN_TELEPORT, 0.8f, 1.5f);
                 c.sendActionBar(Component.text("👤 Ombre créée ! Re-cast pour échanger de place.", NamedTextColor.DARK_GRAY));
 
@@ -237,7 +241,8 @@ public class Zed extends BaseChampion implements fr.lolmc.champion.base.Stateful
                 }
             }
 
-            c.getWorld().spawnParticle(Particle.SWEEP_ATTACK,c.getLocation().add(0,1,0),6,2,0.5,2);
+            fr.lolmc.util.VisualEffectUtil.groundRing(c.getWorld(),
+                    c.getLocation(), 2.0, Material.GRAY_STAINED_GLASS, 14, 0.35f, 0.1f, 5L);
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 0.9f);
 
             if (shadows.containsKey(c.getUniqueId())) {
@@ -250,7 +255,8 @@ public class Zed extends BaseChampion implements fr.lolmc.champion.base.Stateful
                                 __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 30, rank, false, true));
                         }
                     }
-                    shadowLoc.getWorld().spawnParticle(Particle.SWEEP_ATTACK, shadowLoc.clone().add(0,1,0), 6, 2, 0.5, 2);
+                    fr.lolmc.util.VisualEffectUtil.groundRing(shadowLoc.getWorld(),
+                            shadowLoc, 2.0, Material.GRAY_STAINED_GLASS, 14, 0.35f, 0.1f, 5L);
                     shadowLoc.getWorld().playSound(shadowLoc, Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 0.9f);
                 }
             }
@@ -272,7 +278,8 @@ public class Zed extends BaseChampion implements fr.lolmc.champion.base.Stateful
             c.teleport(dest);
             final double startHP=TargetingUtil.getRealHealth(tgt);
             if(tgt instanceof Player _tp)_tp.sendActionBar(Component.text("💀 MARQUE DE MORT — 3s...",NamedTextColor.DARK_RED));
-            tgt.getWorld().spawnParticle(Particle.SMOKE,tgt.getLocation().add(0,1,0),20,0.5,1,0.5);
+            fr.lolmc.util.VisualEffectUtil.impactBurst(tgt.getWorld(),
+                    tgt.getLocation().add(0,1,0), Material.RED_STAINED_GLASS, 0.28f, 0.5, 8, 8L);
             double[] ampPct={0.25,0.40,0.55};
             int rank=Math.min(getLevel()-1,2);
             double ad=s.getFinalAD();
@@ -280,7 +287,8 @@ public class Zed extends BaseChampion implements fr.lolmc.champion.base.Stateful
             Location shadowRLoc = tgt.getLocation().clone().subtract(
                     c.getLocation().toVector().subtract(tgt.getLocation().toVector()).normalize().multiply(2.0));
             shadowRLoc.setY(tgt.getLocation().getY());
-            tgt.getWorld().spawnParticle(Particle.SMOKE, shadowRLoc.add(0,1,0), 15, 0.5,1,0.5);
+            fr.lolmc.util.VisualEffectUtil.impactBurst(tgt.getWorld(),
+                    shadowRLoc.add(0,1,0), Material.GRAY_STAINED_GLASS, 0.28f, 0.5, 6, 8L);
             // L'ombre lance Q (shuriken) et E (taillade) depuis sa position
             double shadowQDmg = ad * 0.65; // Q de l'ombre
             double shadowEDmg = ad * 0.49; // E de l'ombre (70% du E réel)
@@ -291,7 +299,8 @@ public class Zed extends BaseChampion implements fr.lolmc.champion.base.Stateful
                     double subis=Math.max(0, startHP - TargetingUtil.getRealHealth(tgt));
                     double dmg=ad*0.65 + subis*ampPct[rank];
                     tgt.getWorld().strikeLightningEffect(tgt.getLocation());
-                    tgt.getWorld().spawnParticle(Particle.FLASH,tgt.getLocation().add(0,1,0),2);
+                    fr.lolmc.util.VisualEffectUtil.impactBurst(tgt.getWorld(),
+                            tgt.getLocation().add(0,1,0), Material.RED_STAINED_GLASS, 0.4f, 0.6, 10, 10L);
                     TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.TRUE);
                     if(tgt instanceof Player _tp)_tp.sendMessage(Component.text("☠ DÉTONATION! Marque de Mort",NamedTextColor.DARK_RED));
                     // Ombre miroir : lance Q puis E sur les ennemis proches
@@ -301,7 +310,8 @@ public class Zed extends BaseChampion implements fr.lolmc.champion.base.Stateful
                     for (var nearTgt : TargetingUtil.entitiesInRadius(c, shadowFinalLoc.clone().subtract(0,1,0), 4.0)) {
                         TargetingUtil.dealDamage(c, nearTgt, shadowEDmg, TargetingUtil.DmgType.PHYSICAL);
                     }
-                    shadowFinalLoc.getWorld().spawnParticle(Particle.FLASH, shadowFinalLoc, 2);
+                    fr.lolmc.util.VisualEffectUtil.impactBurst(shadowFinalLoc.getWorld(),
+                            shadowFinalLoc, Material.GRAY_STAINED_GLASS, 0.35f, 0.5, 8, 8L);
                 }
             }.runTaskLater(LolPlugin.getInstance(),60L);
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 1f, 0.7f);

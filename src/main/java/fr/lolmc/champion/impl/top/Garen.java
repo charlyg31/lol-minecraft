@@ -61,7 +61,8 @@ public class Garen extends BaseChampion {
             // +35% vitesse pendant 4s (80 ticks) — LoL
             c.addPotionEffect(new PotionEffect(PotionEffectType.SPEED,80,1,false,true));
             if(tgt instanceof Player _tp)_tp.sendActionBar(Component.text("⚠ Silence — Garen Q",NamedTextColor.RED));
-            c.getWorld().spawnParticle(Particle.SWEEP_ATTACK,tgt.getLocation().add(0,1,0),3);
+            fr.lolmc.util.VisualEffectUtil.impact(c.getWorld(),
+                    tgt.getLocation().add(0,1,0), Material.WHITE_STAINED_GLASS, 0.3f, 4L);
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_PLAYER_ATTACK_CRIT, 1f, 1f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
@@ -82,7 +83,8 @@ public class Garen extends BaseChampion {
             c.addPotionEffect(new PotionEffect(PotionEffectType.ABSORPTION,40,1,false,true));
             // Ténacité (immunité aux ralentissements 0.75s) via nettoyage
             c.removePotionEffect(PotionEffectType.SLOWNESS);
-            c.getWorld().spawnParticle(Particle.ENCHANTED_HIT,c.getLocation().add(0,1,0),20,0.5,1,0.5);
+            fr.lolmc.util.VisualEffectUtil.impactBurst(c.getWorld(),
+                    c.getLocation().add(0,1,0), Material.YELLOW_STAINED_GLASS, 0.3f, 0.5, 8, 8L);
             c.getWorld().playSound(c.getLocation(), Sound.ITEM_SHIELD_BLOCK, 1f, 1.2f);
             c.sendActionBar(Component.text("🛡 Courage actif!",NamedTextColor.GOLD));
         }
@@ -114,7 +116,8 @@ public class Garen extends BaseChampion {
                         if(single) dmg*=1.33;
                         TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.PHYSICAL);
                     }
-                    c.getWorld().spawnParticle(Particle.SWEEP_ATTACK,c.getLocation().add(0,1,0),3,1.5,0.3,1.5);
+                    fr.lolmc.util.VisualEffectUtil.groundRing(c.getWorld(),
+                            c.getLocation().add(0,1,0), 1.8, Material.WHITE_STAINED_GLASS, 12, 0.3f, 0.1f, 4L);
                     c.getWorld().playSound(c.getLocation(), Sound.ENTITY_PLAYER_ATTACK_SWEEP, 0.5f, 1.2f);
                     hits++;
                 }
@@ -149,7 +152,8 @@ public class Garen extends BaseChampion {
                 if((ftgt instanceof Player && cm.hasChampion((Player)ftgt))){var hp=cm.getChampion((Player)ftgt).getHPSystem();missingHP=hp.getMaxHP()-hp.getCurrentHP();}
                 double dmg=base[fr_]+missingHP*0.25;
                 ftgt.getWorld().strikeLightningEffect(ftgt.getLocation());
-                ftgt.getWorld().spawnParticle(Particle.FLASH,ftgt.getLocation().add(0,1,0),3);
+                fr.lolmc.util.VisualEffectUtil.impactBurst(ftgt.getWorld(),
+                        ftgt.getLocation().add(0,1,0), Material.WHITE_STAINED_GLASS, 0.4f, 0.6, 12, 10L);
                 TargetingUtil.dealDamage(c, ftgt, dmg, TargetingUtil.DmgType.TRUE);
                 if(ftgt instanceof Player _tp)_tp.sendMessage(Component.text("☠ DEMACIA! Exécution de Garen!",NamedTextColor.DARK_RED));
             }}.runTaskLater(LolPlugin.getInstance(), 10L);

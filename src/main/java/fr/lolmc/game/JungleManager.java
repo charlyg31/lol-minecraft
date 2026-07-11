@@ -380,9 +380,8 @@ public class JungleManager {
         MobModel model = modelFor(type, false);
         if (model != null) monsterDeco.put(mob.getUniqueId(), model.spawnOn(mob));
         camp.liveEntities.add(mob.getUniqueId());
-        loc.getWorld().spawnParticle(Particle.BLOCK,
-            loc.clone().add(0, 0.5, 0), 15, 0.3, 0.3, 0.3,
-            Material.STONE.createBlockData());
+        fr.lolmc.util.VisualEffectUtil.impactBurst(loc.getWorld(),
+            loc.clone().add(0, 0.5, 0), Material.STONE, 0.25f, 0.3, 5, 6L);
     }
 
     /**
@@ -393,18 +392,35 @@ public class JungleManager {
         var wm = LolPlugin.getInstance().getWardManager();
         if (wm != null) wm.placeWard(killer, loc.clone().add(0, 0.5, 0), 60);
         var team = LolPlugin.getInstance().getTeamManager().getTeam(killer);
+        var shrineDisplays = new java.util.ArrayList<org.bukkit.entity.BlockDisplay>(3);
+        for (int i = 0; i < 3; i++) {
+            shrineDisplays.add(loc.getWorld().spawn(loc, org.bukkit.entity.BlockDisplay.class, disp -> {
+                disp.setBlock(Material.LIGHT_BLUE_STAINED_GLASS.createBlockData());
+                disp.setBrightness(new org.bukkit.entity.Display.Brightness(15, 15));
+                disp.setPersistent(false);
+                disp.setInterpolationDuration(3);
+                disp.setInterpolationDelay(0);
+                float size = 0.2f;
+                disp.setTransformation(new org.bukkit.util.Transformation(
+                        new org.joml.Vector3f(-size / 2f, 0f, -size / 2f),
+                        new org.joml.Quaternionf(),
+                        new org.joml.Vector3f(size, size, size),
+                        new org.joml.Quaternionf()));
+            }));
+        }
         new BukkitRunnable() {
             int ticks = 0;
             @Override public void run() {
-                if (ticks >= 60 * 20) { cancel(); return; }
+                if (ticks >= 60 * 20) {
+                    for (var d : shrineDisplays) if (!d.isDead()) d.remove();
+                    cancel(); return;
+                }
                 // Anneau aqua discret
                 double a = ticks * 0.2;
                 for (int i = 0; i < 3; i++) {
                     double ang = a + 2 * Math.PI * i / 3;
-                    loc.getWorld().spawnParticle(Particle.DUST,
-                        loc.clone().add(Math.cos(ang) * 2.5, 0.2, Math.sin(ang) * 2.5),
-                        1, 0, 0, 0, 0,
-                        new Particle.DustOptions(org.bukkit.Color.fromRGB(80, 200, 230), 1.0f));
+                    shrineDisplays.get(i).teleport(loc.clone().add(
+                            Math.cos(ang) * 2.5, 0.2, Math.sin(ang) * 2.5));
                 }
                 // Boost MS aux alliés dans la zone
                 if (ticks % 20 == 0 && team != null) {
@@ -665,14 +681,29 @@ public class JungleManager {
                 player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 180 * 20, 0, false, true));
                 player.sendActionBar(Component.text(
                         "🪱 Buff du Baron! +24 AD +40 AP (3min)", NamedTextColor.LIGHT_PURPLE));
-                // Particules violettes autour du joueur pendant 180s
+                // Marqueur violet autour du joueur pendant 180s (visible par tous, comme en LoL)
+                var baronDisplay = player.getWorld().spawn(player.getLocation().add(0,1,0),
+                        org.bukkit.entity.BlockDisplay.class, disp -> {
+                    disp.setBlock(Material.PURPLE_STAINED_GLASS.createBlockData());
+                    disp.setBrightness(new org.bukkit.entity.Display.Brightness(15, 15));
+                    disp.setPersistent(false);
+                    disp.setInterpolationDuration(3);
+                    disp.setInterpolationDelay(0);
+                    float size = 0.3f;
+                    disp.setTransformation(new org.bukkit.util.Transformation(
+                            new org.joml.Vector3f(-size / 2f, -size / 2f, -size / 2f),
+                            new org.joml.Quaternionf(),
+                            new org.joml.Vector3f(size, size, size),
+                            new org.joml.Quaternionf()));
+                });
                 new BukkitRunnable() {
                     int ticks = 0;
                     @Override public void run() {
-                        if (ticks >= 180*20/10 || !player.isOnline()) { cancel(); return; }
-                        player.getWorld().spawnParticle(org.bukkit.Particle.DUST,
-                            player.getLocation().add(0,1,0), 5, 0.4,0.6,0.4, 0,
-                            new org.bukkit.Particle.DustOptions(org.bukkit.Color.fromRGB(128,0,128), 1.2f));
+                        if (ticks >= 180*20/10 || !player.isOnline()) {
+                            if (!baronDisplay.isDead()) baronDisplay.remove();
+                            cancel(); return;
+                        }
+                        baronDisplay.teleport(player.getLocation().add(0,1,0));
                         ticks++;
                     }
                 }.runTaskTimer(LolPlugin.getInstance(), 0L, 10L);
@@ -834,8 +865,8 @@ public class JungleManager {
                 } else {
                     // CHARGE ! 400 dégâts à la structure puis mort du Héraut
                     boolean phaseChanged = ft.takeDamage(1500);
-                    ft.getCenter().getWorld().spawnParticle(
-                        org.bukkit.Particle.EXPLOSION_EMITTER, ft.getCenter().clone().add(0,1,0), 2);
+                    fr.lolmc.util.VisualEffectUtil.impactBurst(ft.getCenter().getWorld(),
+                        ft.getCenter().clone().add(0,1,0), Material.GRAY_STAINED_GLASS, 0.4f, 1.0, 10, 8L);
                     ft.getCenter().getWorld().playSound(ft.getCenter(),
                         org.bukkit.Sound.ENTITY_GENERIC_EXPLODE, 1.5f, 0.7f);
                     if (phaseChanged) mm.updateStructurePhase(ft);

@@ -113,35 +113,21 @@ public abstract class BaseAbility {
         this.dynamicCooldownOverride = Math.max(0.1, seconds);
     }
 
-    // ─── Affichage portée (particules visibles uniquement pour le caster) ──
+    // ─── Affichage portée (le rendu réel se fait dans AbilityListener,
+    //     qui gère le cycle de vie des BlockDisplay par-joueur) ──────
 
-    public void displayRangeForPlayer(Player player) {
+    /** Rayon de la zone d'effet, ou 0 si le sort n'en a pas. */
+    public double getAoeRadius() { return aoeRadius; }
+
+    /** Centre de la zone d'effet visée par ce joueur (ou null si aoeRadius == 0). */
+    public Location getAoeTargetFor(Player player) {
+        if (aoeRadius <= 0) return null;
         Location eye = player.getEyeLocation();
-
-        // Cercle de portée
-        drawCircle(player, eye, range, Color.WHITE);
-
-        // Zone d'effet là où le joueur regarde
-        if (aoeRadius > 0) {
-            org.bukkit.block.Block tb = player.getTargetBlockExact((int) Math.min(range, 64));
-            Location target = tb != null ? tb.getLocation() : null;
-            if (target == null)
-                target = eye.clone().add(player.getLocation().getDirection().multiply(range));
-            drawCircle(player, target, aoeRadius, Color.fromRGB(255, 100, 0));
-        }
-    }
-
-    private void drawCircle(Player player, Location center, double radius, Color color) {
-        int points = Math.max(32, (int)(radius * 8));
-        Particle.DustOptions dust = new Particle.DustOptions(color, 1.0f);
-        for (int i = 0; i < points; i++) {
-            double angle = 2 * Math.PI * i / points;
-            double x = center.getX() + radius * Math.cos(angle);
-            double z = center.getZ() + radius * Math.sin(angle);
-            player.spawnParticle(Particle.DUST,
-                    new Location(center.getWorld(), x, center.getY() + 0.1, z),
-                    1, 0, 0, 0, 0, dust);
-        }
+        org.bukkit.block.Block tb = player.getTargetBlockExact((int) Math.min(range, 64));
+        Location target = tb != null ? tb.getLocation() : null;
+        if (target == null)
+            target = eye.clone().add(player.getLocation().getDirection().multiply(range));
+        return target;
     }
 
     // ─── Téléportation sécurisée (s'arrête avant les murs) ───────

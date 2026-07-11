@@ -1,6 +1,7 @@
 package fr.lolmc.listener;
 import fr.lolmc.util.Compat;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import fr.lolmc.game.AutoAttackManager;
 import fr.lolmc.game.GameStructure;
 
@@ -28,6 +29,9 @@ import fr.lolmc.team.TeamManager.Team;
 public class AbilityListener implements Listener {
 
     private final ChampionManager manager;
+    /** Anneaux de portée ("range"/"aoe") par joueur, chacun une liste de segments. */
+    private final java.util.Map<java.util.UUID, java.util.Map<String, java.util.List<org.bukkit.entity.BlockDisplay>>> rangeDisplays
+            = new java.util.concurrent.ConcurrentHashMap<>();
 
     public AbilityListener(ChampionManager manager) {
         this.manager = manager;
@@ -36,8 +40,13 @@ public class AbilityListener implements Listener {
             @Override public void run() {
                 for (Player p : WorldContext.getGamePlayers()) {
                     if (!manager.hasChampion(p)) continue;
-                    if (LolPlugin.getInstance().getHotbarManager().getPage(p) != 1) continue;
-                    manager.getChampion(p).displayRangeIfHoldingAbility(p);
+                    if (LolPlugin.getInstance().getHotbarManager().getPage(p) != 1) {
+                        clearRangeDisplays(p);
+                        continue;
+                    }
+                    var ability = manager.getChampion(p).getHeldAbility(p);
+                    if (ability == null) { clearRangeDisplays(p); continue; }
+                    updateRangeDisplay(p, ability);
                 }
             }
         }.runTaskTimer(LolPlugin.getInstance(), 0L, 2L);
@@ -52,6 +61,40 @@ public class AbilityListener implements Listener {
                 }
             }
         }.runTaskTimer(LolPlugin.getInstance(), 0L, 5L);
+    }
+
+    /**
+     * Met à jour (ou crée) les 2 anneaux de portée d'un joueur : un pour la
+     * portée du sort (blanc), un pour la zone d'effet visée (orange), si le
+     * sort en a une. Visible uniquement par le joueur lui-même.
+     */
+    private void updateRangeDisplay(Player player, fr.lolmc.ability.base.BaseAbility ability) {
+        var rings = rangeDisplays.computeIfAbsent(player.getUniqueId(), k -> {
+            var m = new java.util.HashMap<String, java.util.List<org.bukkit.entity.BlockDisplay>>();
+            m.put("range", fr.lolmc.util.VisualEffectUtil.createPrivateRing(
+                    player, player.getLocation(), org.bukkit.Material.WHITE_STAINED_GLASS, 16, 0.15f));
+            m.put("aoe", fr.lolmc.util.VisualEffectUtil.createPrivateRing(
+                    player, player.getLocation(), org.bukkit.Material.ORANGE_STAINED_GLASS, 16, 0.15f));
+            return m;
+        });
+
+        fr.lolmc.util.VisualEffectUtil.repositionRing(rings.get("range"), player.getEyeLocation(), ability.getRange());
+
+        double aoe = ability.getAoeRadius();
+        if (aoe > 0) {
+            var target = ability.getAoeTargetFor(player);
+            fr.lolmc.util.VisualEffectUtil.repositionRing(rings.get("aoe"), target, aoe);
+        } else {
+            for (var d : rings.get("aoe")) d.teleport(player.getLocation().add(0, -256, 0));
+        }
+    }
+
+    /** Retire les anneaux de portée d'un joueur (changement de page/slot sans sort). */
+    private void clearRangeDisplays(Player player) {
+        var rings = rangeDisplays.remove(player.getUniqueId());
+        if (rings == null) return;
+        for (var list : rings.values())
+            for (var d : list) if (d != null && !d.isDead()) d.remove();
     }
 
     /**

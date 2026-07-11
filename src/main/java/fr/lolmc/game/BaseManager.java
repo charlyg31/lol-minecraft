@@ -8,7 +8,7 @@ import fr.lolmc.team.TeamManager.Team;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Location;
-import org.bukkit.Particle;
+import org.bukkit.Material;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
@@ -29,6 +29,8 @@ public class BaseManager {
     private final Map<UUID, BukkitRunnable> activeRecalls = new HashMap<>();
     // Position de recall mémorisée au début de la canalisation
     private final Map<UUID, Location> recallStartLoc = new HashMap<>();
+    /** BlockDisplay de l'animation de recall en cours, par joueur (12 anneau ext + 12 anneau int + pilier). */
+    private final Map<UUID, java.util.List<org.bukkit.entity.BlockDisplay>> recallDisplays = new HashMap<>();
 
     private static final int RECALL_SECONDS = 8;
     // Fontaine : 10 000 vrais dégâts/s sur les ennemis dans la zone
@@ -79,7 +81,11 @@ public class BaseManager {
                 // ── Recall visuel façon LoL : cercle rotatif + pilier ──
                 Location center = player.getLocation();
                 double progress = ticks / (double)(RECALL_SECONDS * 20); // 0 → 1
-                // Cercle au sol qui tourne (2 anneaux inversés)
+
+                var displays = recallDisplays.computeIfAbsent(player.getUniqueId(),
+                        k -> initRecallDisplays(player));
+
+                // Cercle au sol qui tourne (2 anneaux inversés) : displays[0..23]
                 double radius = 1.6;
                 int points = 12;
                 double rotation = ticks * 0.15; // vitesse de rotation
@@ -90,23 +96,26 @@ public class BaseManager {
                         Math.cos(angle1) * radius, 0.1, Math.sin(angle1) * radius);
                     Location p2 = center.clone().add(
                         Math.cos(angle2) * (radius * 0.7), 0.1, Math.sin(angle2) * (radius * 0.7));
-                    player.getWorld().spawnParticle(Particle.DUST, p1, 1, 0, 0, 0, 0,
-                        new Particle.DustOptions(org.bukkit.Color.fromRGB(80, 180, 255), 1.0f));
-                    player.getWorld().spawnParticle(Particle.DUST, p2, 1, 0, 0, 0, 0,
-                        new Particle.DustOptions(org.bukkit.Color.fromRGB(150, 220, 255), 0.8f));
+                    displays.get(i).teleport(p1);
+                    displays.get(points + i).teleport(p2);
                 }
-                // Pilier de lumière qui monte avec la progression
+                // Pilier de lumière qui monte avec la progression : displays[24..30] (7 segments)
                 double pillarHeight = 3.0 * progress;
-                for (double y = 0; y <= pillarHeight; y += 0.4) {
-                    player.getWorld().spawnParticle(Particle.END_ROD,
-                        center.clone().add(0, y, 0), 1, 0.05, 0, 0.05, 0.01);
+                int pillarSlots = 7;
+                for (int i = 0; i < pillarSlots; i++) {
+                    var d = displays.get(2 * points + i);
+                    double y = pillarHeight * (i + 1) / pillarSlots;
+                    if (y <= pillarHeight) {
+                        d.teleport(center.clone().add(0, y, 0));
+                    } else {
+                        d.teleport(center.clone().add(0, -256, 0)); // pas encore atteint : caché
+                    }
                 }
-                // Spirale montante autour du joueur
+                // Spirale montante autour du joueur : displays[31]
                 double spiralAngle = ticks * 0.35;
                 double spiralY = (ticks % 30) / 30.0 * 2.5;
-                player.getWorld().spawnParticle(Particle.PORTAL,
-                    center.clone().add(Math.cos(spiralAngle) * 0.8, spiralY,
-                                       Math.sin(spiralAngle) * 0.8), 2, 0, 0, 0, 0.02);
+                displays.get(2 * points + pillarSlots).teleport(center.clone().add(
+                        Math.cos(spiralAngle) * 0.8, spiralY, Math.sin(spiralAngle) * 0.8));
                 // Son de charge toutes les secondes
                 if (ticks % 20 == 0) {
                     player.getWorld().playSound(center, Sound.BLOCK_BEACON_AMBIENT, 0.6f,
@@ -140,19 +149,20 @@ public class BaseManager {
                 NamedTextColor.RED));
             return;
         }
-        // Explosion de particules au départ
+        // Explosion de départ au moment de la téléportation
         Location departLoc = player.getLocation();
-        departLoc.getWorld().spawnParticle(Particle.FLASH, departLoc.clone().add(0, 1, 0), 1);
-        departLoc.getWorld().spawnParticle(Particle.END_ROD, departLoc.clone().add(0, 1, 0),
-            40, 0.5, 1.0, 0.5, 0.1);
+        fr.lolmc.util.VisualEffectUtil.impactBurst(departLoc.getWorld(),
+                departLoc.clone().add(0, 1, 0), Material.LIGHT_BLUE_STAINED_GLASS, 0.4f, 0.6, 10, 8L);
         departLoc.getWorld().playSound(departLoc, Sound.BLOCK_BEACON_DEACTIVATE, 1f, 1.4f);
 
         player.teleport(spawn);
         // Effet d'arrivée
-        spawn.getWorld().spawnParticle(Particle.END_ROD, spawn.clone().add(0, 1, 0),
-            30, 0.5, 1.0, 0.5, 0.05);
+        fr.lolmc.util.VisualEffectUtil.impactBurst(spawn.getWorld(),
+                spawn.clone().add(0, 1, 0), Material.LIGHT_BLUE_STAINED_GLASS, 0.35f, 0.5, 8, 6L);
         player.playSound(spawn, Sound.ENTITY_ENDERMAN_TELEPORT, 1f, 1f);
         player.sendActionBar(Component.text("✔ De retour à la base!", NamedTextColor.GREEN));
+
+        removeRecallDisplays(player);
     }
 
     public void cancelRecall(Player player, String reason) {
@@ -160,8 +170,51 @@ public class BaseManager {
         if (task != null) {
             task.cancel();
             recallStartLoc.remove(player.getUniqueId());
+            removeRecallDisplays(player);
             player.sendActionBar(Component.text("✖ " + reason, NamedTextColor.RED));
         }
+    }
+
+    /**
+     * Crée les 32 BlockDisplay de l'animation de recall (12 anneau ext,
+     * 12 anneau int, 7 segments de pilier, 1 spirale). Visibles par tous
+     * les joueurs proches (recall = effet public en LoL).
+     */
+    private java.util.List<org.bukkit.entity.BlockDisplay> initRecallDisplays(Player player) {
+        var list = new java.util.ArrayList<org.bukkit.entity.BlockDisplay>(32);
+        Location loc = player.getLocation();
+        for (int i = 0; i < 12; i++) {
+            list.add(makeRecallBlock(loc, Material.LIGHT_BLUE_STAINED_GLASS, 0.18f));
+        }
+        for (int i = 0; i < 12; i++) {
+            list.add(makeRecallBlock(loc, Material.BLUE_STAINED_GLASS, 0.15f));
+        }
+        for (int i = 0; i < 7; i++) {
+            list.add(makeRecallBlock(loc, Material.WHITE_STAINED_GLASS, 0.14f));
+        }
+        list.add(makeRecallBlock(loc, Material.PURPLE_STAINED_GLASS, 0.2f));
+        return list;
+    }
+
+    private org.bukkit.entity.BlockDisplay makeRecallBlock(Location loc, Material block, float size) {
+        return loc.getWorld().spawn(loc, org.bukkit.entity.BlockDisplay.class, disp -> {
+            disp.setBlock(block.createBlockData());
+            disp.setBrightness(new org.bukkit.entity.Display.Brightness(15, 15));
+            disp.setPersistent(false);
+            disp.setInterpolationDuration(2);
+            disp.setInterpolationDelay(0);
+            disp.setTransformation(new org.bukkit.util.Transformation(
+                    new org.joml.Vector3f(-size / 2f, -size / 2f, -size / 2f),
+                    new org.joml.Quaternionf(),
+                    new org.joml.Vector3f(size, size, size),
+                    new org.joml.Quaternionf()));
+        });
+    }
+
+    private void removeRecallDisplays(Player player) {
+        var list = recallDisplays.remove(player.getUniqueId());
+        if (list == null) return;
+        for (var d : list) if (d != null && !d.isDead()) d.remove();
     }
 
     /** Appelé quand le joueur prend des dégâts → interrompt le recall. */
@@ -198,8 +251,8 @@ public class BaseManager {
                         // Soigne 5% PV max par seconde
                         champ.getHPSystem().heal(maxHP * 0.05);
                         champ.getResourceSystem().fill(); // ressource pleine à la base
-                        p.getWorld().spawnParticle(Particle.HEART,
-                                p.getLocation().add(0, 1.5, 0), 1, 0.3, 0.3, 0.3);
+                        fr.lolmc.util.VisualEffectUtil.impact(p.getWorld(),
+                                p.getLocation().add(0, 1.5, 0), Material.PINK_STAINED_GLASS, 0.25f, 8L);
                         var hud = LolPlugin.getInstance().getHUDManager();
                         if (hud != null) hud.updateHUD(p, champ);
                     }
@@ -212,5 +265,9 @@ public class BaseManager {
         BukkitRunnable task = activeRecalls.remove(uuid);
         if (task != null) task.cancel();
         recallStartLoc.remove(uuid);
+        var list = recallDisplays.remove(uuid);
+        if (list != null) {
+            for (var d : list) if (d != null && !d.isDead()) d.remove();
+        }
     }
 }

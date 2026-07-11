@@ -71,7 +71,8 @@ public class Nasus extends BaseChampion implements fr.lolmc.champion.base.Statef
                 if(qStacks.get(c.getUniqueId()) > MAX_Q_STACKS) qStacks.put(c.getUniqueId(), MAX_Q_STACKS);
                 c.sendActionBar(Component.text("💀 Stacks Q: "+qStacks.get(c.getUniqueId()),NamedTextColor.GOLD));
             }
-            c.getWorld().spawnParticle(Particle.SWEEP_ATTACK,tgt.getLocation().add(0,1,0),5);
+            fr.lolmc.util.VisualEffectUtil.impact(c.getWorld(),
+                    tgt.getLocation().add(0,1,0), Material.YELLOW_STAINED_GLASS, 0.3f, 4L);
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_SKELETON_HURT, 1f, 0.6f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
@@ -94,7 +95,8 @@ public class Nasus extends BaseChampion implements fr.lolmc.champion.base.Statef
                     if(sec>=5 || tgt.isDead()){cancel();return;}
                     int amp=2+sec; // amplifier croît -> ralentissement de plus en plus fort
                     tgt.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,25,Math.min(amp,6),false,true));
-                    tgt.getWorld().spawnParticle(Particle.WITCH,tgt.getLocation().add(0,1,0),8,0.4,0.8,0.4);
+                    fr.lolmc.util.VisualEffectUtil.impact(tgt.getWorld(),
+                            tgt.getLocation().add(0,1,0), Material.GRAY_STAINED_GLASS, 0.26f, 8L);
                     sec++;
                 }
             }.runTaskTimer(LolPlugin.getInstance(),0L,20L);
@@ -132,7 +134,8 @@ public class Nasus extends BaseChampion implements fr.lolmc.champion.base.Statef
                         if(__t instanceof Player __p)
                             __p.addPotionEffect(new PotionEffect(PotionEffectType.WEAKNESS,40,1,false,true)); // -armure
                     }
-                    loc.getWorld().spawnParticle(Particle.SOUL_FIRE_FLAME,loc,15,3,0.3,3,0.02);
+                    fr.lolmc.util.VisualEffectUtil.impactBurst(loc.getWorld(),
+                            loc, Material.YELLOW_STAINED_GLASS, 0.3f, 3.0, 8, 15L);
                     sec++;
                 }
             }.runTaskTimer(LolPlugin.getInstance(),0L,20L);

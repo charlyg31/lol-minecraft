@@ -44,8 +44,8 @@ public class MasterYi extends BaseChampion implements fr.lolmc.champion.base.Sta
                 aaCount.put(c.getUniqueId(), 0);
                 // Double Frappe : 2e coup = 50% AD vrai dégâts
                 DamageUtil.trueDamageEntity(c, tgt, s.getFinalAD() * 0.50);
-                c.getWorld().spawnParticle(org.bukkit.Particle.CRIT,
-                    tgt.getLocation().add(0,1.5,0), 8, 0.3,0.3,0.3);
+                fr.lolmc.util.VisualEffectUtil.impact(c.getWorld(),
+                        tgt.getLocation().add(0,1.5,0), Material.WHITE_STAINED_GLASS, 0.28f, 4L);
                 c.sendActionBar(Component.text("⚔⚔ Double Frappe!", NamedTextColor.YELLOW));
             }
         }
@@ -61,7 +61,8 @@ public class MasterYi extends BaseChampion implements fr.lolmc.champion.base.Sta
             c.teleport(dest);
             double[] base=fr.lolmc.util.Balance.base("q_masteryi",new double[]{20,45,70,95,120});double dmg=base[getLevel()-1]+s.getFinalAD()*0.40;
             TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.PHYSICAL);
-            c.getWorld().spawnParticle(Particle.CRIT,tgt.getLocation(),10,0.5,0.5,0.5);
+            fr.lolmc.util.VisualEffectUtil.impactBurst(c.getWorld(),
+                    tgt.getLocation(), Material.WHITE_STAINED_GLASS, 0.25f, 0.5, 6, 5L);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] base={20,45,70,95,120};

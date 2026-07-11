@@ -46,7 +46,8 @@ public class MissFortune extends BaseChampion implements fr.lolmc.champion.base.
                 double lovePct=0.49+(1.05-0.49)*((lvl-1)/17.0); // interpolation 49%→105%
                 double bonusDmg = s.getFinalAD() * lovePct;
                 fr.lolmc.util.TargetingUtil.dealDamage(c, tgt, bonusDmg, fr.lolmc.util.TargetingUtil.DmgType.PHYSICAL);
-                c.getWorld().spawnParticle(org.bukkit.Particle.HEART, tgt.getLocation().add(0,1.5,0), 3, 0.3, 0.3, 0.3);
+                fr.lolmc.util.VisualEffectUtil.impact(c.getWorld(),
+                        tgt.getLocation().add(0,1.5,0), Material.PINK_STAINED_GLASS, 0.25f, 5L);
                 lastTarget.put(c.getUniqueId(), tgt.getUniqueId());
             }
         }
@@ -71,9 +72,11 @@ public class MissFortune extends BaseChampion implements fr.lolmc.champion.base.
             }
             if(second!=null){
                 TargetingUtil.dealDamage(c, second, d2, TargetingUtil.DmgType.PHYSICAL);
-                second.getWorld().spawnParticle(Particle.CRIT,second.getLocation().add(0,1,0),8);
+                fr.lolmc.util.VisualEffectUtil.impact(second.getWorld(),
+                        second.getLocation().add(0,1,0), Material.WHITE_STAINED_GLASS, 0.25f, 4L);
             }
-            tgt.getWorld().spawnParticle(Particle.CRIT,tgt.getLocation().add(0,1,0),10,0.3,0.3,0.3);
+            fr.lolmc.util.VisualEffectUtil.impact(tgt.getWorld(),
+                    tgt.getLocation().add(0,1,0), Material.WHITE_STAINED_GLASS, 0.3f, 4L);
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_FIREWORK_ROCKET_BLAST, 1f, 1.5f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
@@ -104,7 +107,8 @@ public class MissFortune extends BaseChampion implements fr.lolmc.champion.base.
             // Total 70/100/130/160/190 sur 8 ticks + 120% AP total (15% AP/tick)
             double[] totalBase={70,100,130,160,190};
             double perTick=totalBase[getLevel()-1]/8.0+s.getFinalAP()*0.15;
-            loc.getWorld().spawnParticle(Particle.ENCHANT,loc,20,3,0.2,3);
+            fr.lolmc.util.VisualEffectUtil.groundRing(loc.getWorld(), loc, 3.5,
+                    Material.PURPLE_STAINED_GLASS, 18, 0.35f, 0.1f, 40L);
             new BukkitRunnable(){
                 int ticks=0;
                 @Override public void run(){
@@ -114,7 +118,8 @@ public class MissFortune extends BaseChampion implements fr.lolmc.champion.base.
                         if(__t instanceof Player __p)
                             __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,10,2,false,true));
                     }
-                    loc.getWorld().spawnParticle(Particle.CRIT,loc,15,3,0.2,3);
+                    fr.lolmc.util.VisualEffectUtil.impactBurst(loc.getWorld(),
+                            loc, Material.PURPLE_STAINED_GLASS, 0.2f, 3.0, 5, 5L);
                     ticks++;
                 }
             }.runTaskTimer(LolPlugin.getInstance(),0L,5L); // toutes les 0.25s
@@ -152,7 +157,8 @@ public class MissFortune extends BaseChampion implements fr.lolmc.champion.base.
                     // Animation : balles en éventail devant
                     var dir=c.getEyeLocation().getDirection().normalize();
                     for(double d=1; d<=9; d+=1){
-                        c.getWorld().spawnParticle(Particle.CRIT,c.getEyeLocation().add(dir.clone().multiply(d)),3,1.5,0.3,1.5,0);
+                        fr.lolmc.util.VisualEffectUtil.impact(c.getWorld(),
+                                c.getEyeLocation().add(dir.clone().multiply(d)), Material.WHITE_STAINED_GLASS, 0.2f, 3L);
                     }
                     c.getWorld().playSound(c.getLocation(), Sound.ENTITY_FIREWORK_ROCKET_BLAST, 0.8f, 1.5f);
                     waves++;

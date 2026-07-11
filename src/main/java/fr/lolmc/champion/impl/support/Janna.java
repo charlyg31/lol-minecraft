@@ -81,7 +81,8 @@ public class Janna extends BaseChampion {
                 __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,60,2,false,true)); // slow 3s
             // Janna gagne aussi de la vitesse (passif Zéphyr)
             c.addPotionEffect(new PotionEffect(PotionEffectType.SPEED,40,1,false,true));
-            tgt.getWorld().spawnParticle(Particle.CLOUD,tgt.getLocation().add(0,1,0),12,0.5,0.5,0.5);
+            fr.lolmc.util.VisualEffectUtil.impactBurst(tgt.getWorld(),
+                    tgt.getLocation().add(0,1,0), Material.WHITE_STAINED_GLASS, 0.28f, 0.5, 8, 6L);
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_PHANTOM_AMBIENT, 1f, 1.4f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
@@ -103,7 +104,8 @@ public class Janna extends BaseChampion {
             if(cm.hasChampion(dest)) cm.getChampion(dest).getStats().addShield(shield);
             dest.addPotionEffect(new PotionEffect(PotionEffectType.ABSORPTION,100,1,false,true));
             dest.addPotionEffect(new PotionEffect(PotionEffectType.STRENGTH,100,0,false,true)); // AD bonus
-            dest.getWorld().spawnParticle(Particle.ENCHANTED_HIT,dest.getLocation().add(0,1,0),15,0.5,1,0.5);
+            fr.lolmc.util.VisualEffectUtil.impactBurst(dest.getWorld(),
+                    dest.getLocation().add(0,1,0), Material.LIGHT_BLUE_STAINED_GLASS, 0.3f, 0.5, 8, 6L);
             dest.sendActionBar(Component.text("🌀 Œil de la Tempête! Bouclier "+(int)shield,NamedTextColor.AQUA));
             c.getWorld().playSound(c.getLocation(), Sound.BLOCK_BEACON_ACTIVATE, 0.7f, 1.8f);
         }
@@ -139,7 +141,8 @@ public class Janna extends BaseChampion {
                         if(ent instanceof Player ally && !ally.equals(c) && cm.hasChampion(ally))
                             cm.getChampion(ally).getHPSystem().heal(healPerTick);
                     }
-                    c.getWorld().spawnParticle(Particle.HEART,c.getLocation().add(0,1,0),5,2,0.5,2);
+                    fr.lolmc.util.VisualEffectUtil.impactBurst(c.getWorld(),
+                            c.getLocation().add(0,1,0), Material.PINK_STAINED_GLASS, 0.25f, 2.0, 5, 8L);
                     ticks++;
                 }
             }.runTaskTimer(LolPlugin.getInstance(),0L,10L);

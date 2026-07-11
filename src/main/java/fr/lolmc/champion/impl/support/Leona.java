@@ -40,8 +40,8 @@ public class Leona extends BaseChampion implements fr.lolmc.champion.base.Statef
     @Override public void resetAllState()                 { sunlightMark.clear(); }
     public static void applyMark(org.bukkit.entity.LivingEntity target) {
         sunlightMark.put(target.getUniqueId(), System.currentTimeMillis() + 3500L);
-        target.getWorld().spawnParticle(org.bukkit.Particle.END_ROD,
-            target.getLocation().add(0,2,0), 3, 0.2,0.2,0.2);
+        fr.lolmc.util.VisualEffectUtil.impact(target.getWorld(),
+            target.getLocation().add(0,2,0), Material.YELLOW_STAINED_GLASS, 0.24f, 5L);
     }
     public static boolean consumeMark(org.bukkit.entity.LivingEntity target) {
         Long exp = sunlightMark.get(target.getUniqueId());
@@ -72,7 +72,8 @@ public class Leona extends BaseChampion implements fr.lolmc.champion.base.Statef
                 __p.sendActionBar(Component.text("☀ STUN 1s — Bouclier de l'Aube!",NamedTextColor.YELLOW));
             }
             applyMark(tgt); // marque Lumière du Soleil
-            c.getWorld().spawnParticle(Particle.END_ROD,tgt.getLocation().add(0,1,0),8,0.3,0.3,0.3);
+            fr.lolmc.util.VisualEffectUtil.impact(c.getWorld(),
+                    tgt.getLocation().add(0,1,0), Material.YELLOW_STAINED_GLASS, 0.3f, 5L);
             c.getWorld().playSound(c.getLocation(), Sound.ITEM_SHIELD_BLOCK, 1f, 0.8f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
@@ -104,8 +105,8 @@ public class Leona extends BaseChampion implements fr.lolmc.champion.base.Statef
                         TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);
                         hit=true;
                     }
-                    c.getWorld().spawnParticle(Particle.FLASH,c.getLocation().add(0,1,0),2);
-                    c.getWorld().spawnParticle(Particle.END_ROD,c.getLocation().add(0,1,0),25,2.5,1,2.5);
+                    fr.lolmc.util.VisualEffectUtil.impactBurst(c.getWorld(),
+                            c.getLocation().add(0,1,0), Material.YELLOW_STAINED_GLASS, 0.35f, 2.5, 12, 8L);
                     // Si touché un ennemi, garde les bonus 3s de plus
                     if(hit){
                         c.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE,60,2,false,true));
@@ -155,7 +156,8 @@ public class Leona extends BaseChampion implements fr.lolmc.champion.base.Statef
                 __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,10,10,false,true)); // root 0.5s
                 __p.sendActionBar(Component.text("⚔ Enraciné — Lame du Zénith!",NamedTextColor.YELLOW));
             }
-            c.getWorld().spawnParticle(Particle.END_ROD,dest.add(0,1,0),5,1,0,1);
+            fr.lolmc.util.VisualEffectUtil.impact(c.getWorld(),
+                    dest.add(0,1,0), Material.YELLOW_STAINED_GLASS, 0.28f, 4L);
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 0.8f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
@@ -172,7 +174,8 @@ public class Leona extends BaseChampion implements fr.lolmc.champion.base.Statef
             // LoL : zone au sol visée, 150/250/350 + 100% AP. Centre = STUN, extérieur = ralentit 80%
             Location loc=TargetingUtil.getAimedGroundLocation(c, 10.0);
             double[] base=fr.lolmc.util.Balance.base("r_leona",new double[]{150,250,350});int r=Math.min(getLevel()-1,2);double dmg=base[r]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("r_leona","ap",1.0);
-            loc.getWorld().spawnParticle(Particle.END_ROD,loc,15,2,0.2,2);
+            fr.lolmc.util.VisualEffectUtil.groundRing(loc.getWorld(), loc, aoeRadius,
+                    Material.YELLOW_STAINED_GLASS, 20, 0.4f, 0.12f, 15L);
             new BukkitRunnable(){
                 @Override public void run(){
                     for(var __t : TargetingUtil.entitiesInRadius(c, loc, 4.0)){
@@ -189,8 +192,8 @@ public class Leona extends BaseChampion implements fr.lolmc.champion.base.Statef
                             }
                         }
                     }
-                    loc.getWorld().spawnParticle(Particle.FLASH,loc,3);
-                    loc.getWorld().spawnParticle(Particle.END_ROD,loc,40,3,1,3);
+                    fr.lolmc.util.VisualEffectUtil.impactBurst(loc.getWorld(),
+                            loc, Material.YELLOW_STAINED_GLASS, 0.4f, 3.0, 16, 10L);
                     loc.getWorld().playSound(loc, Sound.ENTITY_GENERIC_EXPLODE, 1.5f, 1f);
                 }
             }.runTaskLater(LolPlugin.getInstance(),13L); // délai 0.625s

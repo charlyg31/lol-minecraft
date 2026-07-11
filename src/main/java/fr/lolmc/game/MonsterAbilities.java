@@ -6,7 +6,7 @@ import fr.lolmc.util.DamageUtil;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Location;
-import org.bukkit.Particle;
+import org.bukkit.Material;
 import org.bukkit.Sound;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
@@ -116,7 +116,8 @@ public class MonsterAbilities {
                 .subtract(threat.getLocation().toVector()).normalize().multiply(0.8);
         away.setY(0.1);
         crab.setVelocity(away);
-        crab.getWorld().spawnParticle(Particle.SPLASH, crab.getLocation(), 10, 0.3, 0.3, 0.3);
+        fr.lolmc.util.VisualEffectUtil.impactBurst(crab.getWorld(),
+                crab.getLocation(), Material.LIGHT_BLUE_STAINED_GLASS, 0.2f, 0.3, 5, 6L);
         return false; // pas de cooldown (fuite continue)
     }
 
@@ -124,7 +125,8 @@ public class MonsterAbilities {
 
     private boolean redSmash(LivingEntity mob, List<Player> targets) {
         Location c = mob.getLocation();
-        c.getWorld().spawnParticle(Particle.LAVA, c, 20, 1.5, 0.5, 1.5);
+        fr.lolmc.util.VisualEffectUtil.impactBurst(c.getWorld(),
+                c, Material.MAGMA_BLOCK, 0.3f, 1.5, 7, 10L);
         c.getWorld().playSound(c, Sound.ENTITY_BLAZE_SHOOT, 1f, 0.8f);
         for (Player p : targets) {
             if (p.getLocation().distance(c) <= 4) {
@@ -144,7 +146,8 @@ public class MonsterAbilities {
             @Override public void run() {
                 if (ticks >= 3 || victim.isDead() || !victim.isOnline()) { cancel(); return; }
                 DamageUtil.damage(null, victim, 12, true, DamageUtil.Type.TRUE);
-                victim.getWorld().spawnParticle(Particle.FLAME, victim.getLocation().add(0,1,0), 5, 0.2, 0.4, 0.2);
+                fr.lolmc.util.VisualEffectUtil.impact(victim.getWorld(),
+                        victim.getLocation().add(0,1,0), Material.ORANGE_STAINED_GLASS, 0.22f, 4L);
                 ticks++;
             }
         }.runTaskTimer(LolPlugin.getInstance(), 0L, 20L);
@@ -154,7 +157,7 @@ public class MonsterAbilities {
 
     private boolean blueManaBurn(LivingEntity mob, Player target) {
         Location from = mob.getEyeLocation();
-        shootProjectile(from, target.getLocation().add(0,1,0), Particle.SOUL_FIRE_FLAME);
+        shootProjectile(from, target.getLocation().add(0,1,0), Material.ORANGE_STAINED_GLASS);
         DamageUtil.damage(null, target, 35, true, DamageUtil.Type.MAGICAL);
         // Brûle la ressource (mana/énergie)
         if (LolPlugin.getInstance().getChampionManager().hasChampion(target)) {
@@ -169,7 +172,8 @@ public class MonsterAbilities {
 
     private boolean baronNuke(LivingEntity mob, List<Player> targets) {
         Location c = mob.getLocation();
-        c.getWorld().spawnParticle(Particle.SONIC_BOOM, c.clone().add(0,1,0), 1);
+        fr.lolmc.util.VisualEffectUtil.impact(c.getWorld(),
+                c.clone().add(0,1,0), Material.PURPLE_STAINED_GLASS, 0.8f, 8L);
         c.getWorld().playSound(c, Sound.ENTITY_WARDEN_SONIC_BOOM, 1f, 1f);
         for (Player p : targets) {
             double dist = p.getLocation().distance(c);
@@ -209,12 +213,12 @@ public class MonsterAbilities {
         Location origin = dragon.getEyeLocation();
         Vector facing = origin.getDirection();
         Sound sound = Sound.ENTITY_ENDER_DRAGON_SHOOT;
-        Particle breathParticle = dragonParticle(type);
+        Material breathBlock = dragonBlockColor(type);
 
         // Tracer le cône de souffle
         for (double d = 1; d <= 8; d += 0.5) {
             Location point = origin.clone().add(facing.clone().multiply(d));
-            point.getWorld().spawnParticle(breathParticle, point, 8, 0.5, 0.5, 0.5, 0.02);
+            fr.lolmc.util.VisualEffectUtil.impact(point.getWorld(), point, breathBlock, 0.3f, 3L);
         }
         origin.getWorld().playSound(origin, sound, 1f, 1f);
 
@@ -267,7 +271,8 @@ public class MonsterAbilities {
 
     private boolean neutralSmash(LivingEntity mob, List<Player> targets) {
         Location c = mob.getLocation();
-        c.getWorld().spawnParticle(Particle.CRIT, c, 8, 0.5, 0.2, 0.5);
+        fr.lolmc.util.VisualEffectUtil.impactBurst(c.getWorld(),
+                c, Material.WHITE_STAINED_GLASS, 0.2f, 0.5, 4, 6L);
         for (Player p : targets) {
             if (p.getLocation().distance(c) <= 2.5) {
                 DamageUtil.damage(null, p, 20, true, DamageUtil.Type.PHYSICAL);
@@ -280,24 +285,24 @@ public class MonsterAbilities {
     // HELPERS
     // ══════════════════════════════════════════════════════════════
 
-    private void shootProjectile(Location from, Location to, Particle particle) {
+    private void shootProjectile(Location from, Location to, Material block) {
         Vector dir = to.toVector().subtract(from.toVector()).normalize();
         double dist = from.distance(to);
         for (double d = 0; d < dist; d += 0.4) {
             Location point = from.clone().add(dir.clone().multiply(d));
-            from.getWorld().spawnParticle(particle, point, 2, 0.05, 0.05, 0.05, 0);
+            fr.lolmc.util.VisualEffectUtil.impact(from.getWorld(), point, block, 0.2f, 2L);
         }
     }
 
-    private Particle dragonParticle(MonsterType type) {
+    private Material dragonBlockColor(MonsterType type) {
         return switch (type) {
-            case DRAGON_INFERNAL -> Particle.FLAME;
-            case DRAGON_OCEAN -> Particle.SPLASH;
-            case DRAGON_MOUNTAIN -> Particle.CRIT;
-            case DRAGON_CLOUD -> Particle.CLOUD;
-            case DRAGON_CHEMTECH -> Particle.SNEEZE;
-            case DRAGON_ELDER -> Particle.SOUL_FIRE_FLAME;
-            default -> Particle.FLAME;
+            case DRAGON_INFERNAL -> Material.ORANGE_STAINED_GLASS;
+            case DRAGON_OCEAN -> Material.LIGHT_BLUE_STAINED_GLASS;
+            case DRAGON_MOUNTAIN -> Material.BROWN_STAINED_GLASS;
+            case DRAGON_CLOUD -> Material.WHITE_STAINED_GLASS;
+            case DRAGON_CHEMTECH -> Material.LIME_STAINED_GLASS;
+            case DRAGON_ELDER -> Material.PURPLE_STAINED_GLASS;
+            default -> Material.ORANGE_STAINED_GLASS;
         };
     }
 

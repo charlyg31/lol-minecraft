@@ -55,7 +55,8 @@ public class Morgana extends BaseChampion {
             DamageUtil.abilityDamageMagicEntity(c, tgt, dmg);
             tgt.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,40,10,false,true));
             if(tgt instanceof Player _tp)_tp.sendActionBar(Component.text("🕸 Root 2s — Morgana Q!",NamedTextColor.DARK_PURPLE));
-            c.getWorld().spawnParticle(Particle.WITCH,tgt.getLocation(),10,0.5,0.5,0.5);
+            fr.lolmc.util.VisualEffectUtil.impactBurst(c.getWorld(),
+                    tgt.getLocation(), Material.PURPLE_STAINED_GLASS, 0.28f, 0.5, 8, 6L);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             return String.format("%.0f dégâts + root 2s (80+90%%AP).",80+s.getFinalAP()*fr.lolmc.util.Balance.ratio("q_morgana","ap",0.9));
@@ -83,7 +84,8 @@ public class Morgana extends BaseChampion {
                         double dmg=baseTick*(1.0+missingPct); // jusqu'à x2 sur cible basse vie
                         TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);
                     }
-                    loc.getWorld().spawnParticle(Particle.WITCH,loc,5,2,0,2);
+                    fr.lolmc.util.VisualEffectUtil.impactBurst(loc.getWorld(),
+                            loc, Material.PURPLE_STAINED_GLASS, 0.22f, 2.0, 5, 6L);
                     tick+=10; // tick toutes les 0.5s (LoL)
                 }
             }.runTaskTimer(LolPlugin.getInstance(),0L,10L);
@@ -129,7 +131,8 @@ public class Morgana extends BaseChampion {
                     __p.sendActionBar(Component.text("⛓ STUN Morgana R!",NamedTextColor.DARK_PURPLE));
                 }
             }
-            c.getWorld().spawnParticle(Particle.END_ROD,c.getLocation(),20,3,1,3);
+            fr.lolmc.util.VisualEffectUtil.groundRing(c.getWorld(),
+                    c.getLocation(), 3.0, Material.PURPLE_STAINED_GLASS, 20, 0.35f, 0.1f, 12L);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] rBase={150,225,300};

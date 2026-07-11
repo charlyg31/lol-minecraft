@@ -9,7 +9,7 @@ import fr.lolmc.team.TeamManager.Team;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Location;
-import org.bukkit.Particle;
+import org.bukkit.Material;
 import org.bukkit.Sound;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
@@ -236,12 +236,10 @@ public class TurretManager {
     private void shootBeam(Location from, Location to) {
         var dir = to.toVector().subtract(from.toVector()).normalize();
         double dist = from.distance(to);
-        for (double d = 0; d < dist; d += 0.5) {
-            Location point = from.clone().add(dir.clone().multiply(d));
-            from.getWorld().spawnParticle(Particle.CRIT, point, 2, 0.05, 0.05, 0.05, 0);
-        }
+        fr.lolmc.util.VisualEffectUtil.skillshotLine(from, dir, dist,
+                Material.WHITE_STAINED_GLASS, 0.12f, 4L);
         from.getWorld().playSound(from, Sound.ENTITY_ARROW_SHOOT, 0.6f, 0.8f);
-        to.getWorld().spawnParticle(Particle.EXPLOSION, to, 1);
+        fr.lolmc.util.VisualEffectUtil.impact(to.getWorld(), to, Material.WHITE_STAINED_GLASS, 0.3f, 4L);
     }
 
     public double getTurretRange() { return attackRadius; }

@@ -7,7 +7,7 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
-import org.bukkit.Particle;
+import org.bukkit.Material;
 import org.bukkit.Sound;
 import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.Entity;
@@ -30,6 +30,8 @@ public class WardManager {
     private final List<Ward> wards = new ArrayList<>();
     private final Map<UUID, Long> revealedUntil = new HashMap<>();
     private final Map<UUID, Team> revealedToTeam = new HashMap<>();
+    /** BlockDisplay du faisceau de révélation par joueur révélé (10 segments + 6 anneau). */
+    private final Map<UUID, java.util.List<org.bukkit.entity.BlockDisplay>> beamDisplays = new HashMap<>();
     // Wards révélées aux ennemis : UUID entité → timestamp fin de révélation
     private final Map<UUID, Long> revealedWards = new HashMap<>();
 
@@ -107,7 +109,8 @@ public class WardManager {
             if (w.location.distance(center) > radius) continue;
             applyWardVisibility(w, true);
             revealedWards.put(w.entityId, System.currentTimeMillis() + durMs);
-            center.getWorld().spawnParticle(Particle.CRIT, w.location.clone().add(0,0.5,0), 10, 0.3,0.3,0.3);
+            fr.lolmc.util.VisualEffectUtil.impact(center.getWorld(),
+                    w.location.clone().add(0,0.5,0), Material.WHITE_STAINED_GLASS, 0.28f, 5L);
             count++;
         }
         return count;
@@ -161,7 +164,8 @@ public class WardManager {
 
     private void removeWardEntity(Ward w) {
         if (w.location.getWorld() != null)
-            w.location.getWorld().spawnParticle(Particle.SMOKE, w.location.clone().add(0,0.5,0), 15, 0.3,0.3,0.3);
+            fr.lolmc.util.VisualEffectUtil.impact(w.location.getWorld(),
+                    w.location.clone().add(0,0.5,0), Material.GRAY_STAINED_GLASS, 0.26f, 5L);
         if (w.entityId != null) {
             Entity ent = Bukkit.getEntity(w.entityId);
             if (ent != null) ent.remove();
@@ -227,8 +231,9 @@ public class WardManager {
         new BukkitRunnable() {
             @Override public void run() {
                 long now = System.currentTimeMillis();
+                var expired = new java.util.ArrayList<UUID>();
                 for (Map.Entry<UUID, Long> entry : revealedUntil.entrySet()) {
-                    if (now > entry.getValue()) continue;
+                    if (now > entry.getValue()) { expired.add(entry.getKey()); continue; }
                     Player revealed = Bukkit.getPlayer(entry.getKey());
                     if (revealed == null || !revealed.isOnline()) continue;
                     Team viewerTeam = revealedToTeam.get(entry.getKey());
@@ -237,39 +242,67 @@ public class WardManager {
                     if (revealedTeam == null) continue;
                     drawBeam(revealed, revealedTeam, viewerTeam);
                 }
+                for (UUID id : expired) {
+                    revealedUntil.remove(id);
+                    revealedToTeam.remove(id);
+                    removeBeamDisplays(id);
+                }
             }
         }.runTaskTimer(LolPlugin.getInstance(), 0L, 2L);
     }
 
+    /**
+     * Faisceau de révélation, visible uniquement par l'équipe qui a détecté
+     * (viewerTeam). 10 segments verticaux fixes + un point d'anneau tournant.
+     */
     private void drawBeam(Player revealed, Team revealedTeam, Team viewerTeam) {
         Location base = revealed.getLocation();
-        Particle.DustOptions dust = new Particle.DustOptions(revealedTeam.particleColor, 3.0f);
-        List<Location> points = new ArrayList<>();
-        for (double y = 2.5; y <= 12.0; y += 0.25) {
-            points.add(base.clone().add(0, y, 0));
-            points.add(base.clone().add(0.25, y, 0));
-            points.add(base.clone().add(-0.25, y, 0));
-            points.add(base.clone().add(0, y, 0.25));
-            points.add(base.clone().add(0, y, -0.25));
-        }
-        for (double r : new double[]{0.6, 1.0}) {
-            int cnt = r > 0.8 ? 20 : 14;
-            for (int i = 0; i < cnt; i++) {
-                double a = 2 * Math.PI * i / cnt;
-                points.add(base.clone().add(Math.cos(a)*r, 2.4, Math.sin(a)*r));
+        var displays = beamDisplays.get(revealed.getUniqueId());
+
+        if (displays == null) {
+            displays = new java.util.ArrayList<>(11);
+            for (int i = 0; i < 11; i++) {
+                var d = base.getWorld().spawn(base, org.bukkit.entity.BlockDisplay.class, disp -> {
+                    disp.setBlock(revealedTeam.blockColor().createBlockData());
+                    disp.setBrightness(new org.bukkit.entity.Display.Brightness(15, 15));
+                    disp.setPersistent(false);
+                    disp.setInterpolationDuration(3);
+                    disp.setInterpolationDelay(0);
+                    float size = 0.16f;
+                    disp.setTransformation(new org.bukkit.util.Transformation(
+                            new org.joml.Vector3f(-size / 2f, -size / 2f, -size / 2f),
+                            new org.joml.Quaternionf(),
+                            new org.joml.Vector3f(size, size, size),
+                            new org.joml.Quaternionf()));
+                });
+                d.setVisibleByDefault(false);
+                displays.add(d);
             }
+            beamDisplays.put(revealed.getUniqueId(), displays);
         }
+
+        // 10 segments verticaux (2.5 → 12.0 blocs de haut)
+        for (int i = 0; i < 10; i++) {
+            double y = 2.5 + i * (9.5 / 9.0);
+            displays.get(i).teleport(base.clone().add(0, y, 0));
+        }
+        // Anneau tournant à la base du faisceau
         double spin = (System.currentTimeMillis() % 2000L) / 2000.0 * 2 * Math.PI;
-        for (int i = 0; i < 8; i++) {
-            double a = spin + 2 * Math.PI * i / 8;
-            points.add(base.clone().add(Math.cos(a)*0.8, 6.0, Math.sin(a)*0.8));
-        }
+        displays.get(10).teleport(base.clone().add(Math.cos(spin) * 0.8, 2.4, Math.sin(spin) * 0.8));
+
+        // Visibilité par-viewer : uniquement les joueurs de viewerTeam
         for (UUID viewerId : teamManager.getTeamMembers(viewerTeam)) {
             Player viewer = Bukkit.getPlayer(viewerId);
             if (viewer == null || !viewer.isOnline() || !viewer.getWorld().equals(revealed.getWorld())) continue;
-            for (Location point : points)
-                viewer.spawnParticle(Particle.DUST, point, 2, 0.05, 0.05, 0.05, 0, dust);
+            for (var d : displays) viewer.showEntity(LolPlugin.getInstance(), d);
         }
+    }
+
+    /** Retire les BlockDisplay du faisceau d'un joueur (fin de révélation). */
+    private void removeBeamDisplays(UUID revealedId) {
+        var displays = beamDisplays.remove(revealedId);
+        if (displays == null) return;
+        for (var d : displays) if (d != null && !d.isDead()) d.remove();
     }
 
     // ── Helpers ───────────────────────────────────────────────────

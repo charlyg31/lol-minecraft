@@ -191,8 +191,8 @@ public class PlantManager implements Listener {
         picker.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 40, 0, false, true));
         picker.sendActionBar(Component.text("🍯 Fruit de Miel : soigné mais ralenti.", NamedTextColor.GOLD));
         if (p.location.getWorld() != null)
-            p.location.getWorld().spawnParticle(org.bukkit.Particle.FALLING_HONEY,
-                    p.location, 30, 0.5, 0.5, 0.5, 0.05);
+            fr.lolmc.util.VisualEffectUtil.impactBurst(p.location.getWorld(),
+                    p.location, Material.HONEY_BLOCK, 0.28f, 0.5, 8, 8L);
     }
 
     private void applyBlast(Plant p, Player picker) {
@@ -206,7 +206,8 @@ public class PlantManager implements Listener {
             pl.setVelocity(away);
         }
         picker.sendActionBar(Component.text("💥 Cône Explosif : propulsion !", NamedTextColor.RED));
-        c.getWorld().spawnParticle(org.bukkit.Particle.EXPLOSION, c, 1);
+        fr.lolmc.util.VisualEffectUtil.impactBurst(c.getWorld(),
+                c, Material.ORANGE_STAINED_GLASS, 0.35f, 0.8, 10, 6L);
         c.getWorld().playSound(c, org.bukkit.Sound.ENTITY_GENERIC_EXPLODE, 1f, 1.3f);
     }
 

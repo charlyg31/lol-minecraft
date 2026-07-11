@@ -79,7 +79,8 @@ public class Annie extends BaseChampion implements fr.lolmc.champion.base.Statef
         if (spAttr != null) spAttr.setBaseValue(0.57); // 0.38 × 1.5
         var dmgAttr = t.getAttribute(fr.lolmc.util.Compat.attackDamage());
         if (dmgAttr != null) dmgAttr.setBaseValue(dmgAttr.getBaseValue() * 1.5);
-        t.getWorld().spawnParticle(Particle.FLAME, t.getLocation().add(0,1,0), 30, 1,1,1,0.1);
+        fr.lolmc.util.VisualEffectUtil.impactBurst(t.getWorld(),
+                t.getLocation().add(0,1,0), Material.ORANGE_STAINED_GLASS, 0.32f, 1.0, 10, 8L);
         t.getWorld().playSound(t.getLocation(), Sound.ENTITY_POLAR_BEAR_WARNING, 2f, 0.5f);
         // Remettre les stats normales après 5s
         new BukkitRunnable() { @Override public void run() {
@@ -120,7 +121,8 @@ public class Annie extends BaseChampion implements fr.lolmc.champion.base.Statef
             tibbers.getPathfinder().moveTo(dest, 1.4);
             annie.sendActionBar(Component.text("🐻 Tibbers → déplacement!", NamedTextColor.GOLD));
         }
-        dest.getWorld().spawnParticle(Particle.FLAME, dest.clone().add(0,0.1,0), 12, 0.5,0,0.5,0.02);
+        fr.lolmc.util.VisualEffectUtil.impactBurst(dest.getWorld(),
+                dest.clone().add(0,0.1,0), Material.ORANGE_STAINED_GLASS, 0.2f, 0.5, 4, 5L);
     }
 
     // ── Sorts ─────────────────────────────────────────────────────
@@ -151,7 +153,8 @@ public class Annie extends BaseChampion implements fr.lolmc.champion.base.Statef
                 var cm=LolPlugin.getInstance().getChampionManager();
                 if(cm.hasChampion(c)&&cm.getChampion(c).getResourceSystem()!=null)cm.getChampion(c).getResourceSystem().addCurrent(60);
             }
-            target.getWorld().spawnParticle(Particle.FLAME,target.getLocation().add(0,1,0),20,0.5,0.5,0.5,0.1);
+            fr.lolmc.util.VisualEffectUtil.impactBurst(target.getWorld(),
+                    target.getLocation().add(0,1,0), Material.ORANGE_STAINED_GLASS, 0.28f, 0.5, 7, 6L);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] base=fr.lolmc.util.Balance.base("q_annie",new double[]{80,125,170,215,260});
@@ -176,7 +179,7 @@ public class Annie extends BaseChampion implements fr.lolmc.champion.base.Statef
             var dir=c.getEyeLocation().getDirection().normalize();
             for(double d=1;d<=6;d+=0.5){
                 var p=c.getEyeLocation().add(dir.clone().multiply(d));
-                c.getWorld().spawnParticle(Particle.FLAME,p,8,0.6,0.4,0.6,0.02);
+                fr.lolmc.util.VisualEffectUtil.impact(c.getWorld(), p, Material.ORANGE_STAINED_GLASS, 0.3f, 3L);
             }
         }
         @Override public String getDynamicDescription(ChampionStats s){
@@ -255,8 +258,10 @@ public class Annie extends BaseChampion implements fr.lolmc.champion.base.Statef
                     if (cc != null) cc.stun(le, pyroStunTicks(lvl));
                 }
             }
-            ground.getWorld().spawnParticle(Particle.LAVA,  ground, 40, 3,1,3);
-            ground.getWorld().spawnParticle(Particle.FLAME, ground, 80, 3,1.5,3,0.1);
+            fr.lolmc.util.VisualEffectUtil.groundRing(ground.getWorld(), ground, 3.0,
+                    Material.ORANGE_STAINED_GLASS, 24, 0.4f, 0.12f, 10L);
+            fr.lolmc.util.VisualEffectUtil.impactBurst(ground.getWorld(),
+                    ground, Material.MAGMA_BLOCK, 0.3f, 3.0, 10, 10L);
             ground.getWorld().playSound(ground, Sound.ENTITY_BLAZE_SHOOT, 1.5f, 0.6f);
             if (pyroActive) ground.getWorld().playSound(ground, Sound.ENTITY_POLAR_BEAR_WARNING, 2f, 0.5f);
 
@@ -307,7 +312,8 @@ public class Annie extends BaseChampion implements fr.lolmc.champion.base.Statef
                     // ── Mort ou expiration ──
                     if (!tibbers.isValid() || ticks >= 90 || !c.isOnline()) {
                         if (tibbers.isValid()) {
-                            tibbers.getWorld().spawnParticle(Particle.FLAME,tibbers.getLocation().add(0,1,0),30,1,1,1,0.05);
+                            fr.lolmc.util.VisualEffectUtil.impactBurst(tibbers.getWorld(),
+                                    tibbers.getLocation().add(0,1,0), Material.ORANGE_STAINED_GLASS, 0.3f, 1.0, 10, 8L);
                             tibbers.remove();
                         }
                         activeTibbers.remove(uuid);
@@ -353,9 +359,10 @@ public class Annie extends BaseChampion implements fr.lolmc.champion.base.Statef
                     }
 
                     // ── 3. Aura de feu (toutes les 0.5s) ──
-                    tLoc.getWorld().spawnParticle(Particle.FLAME, tLoc.clone().add(0,1,0),
-                            enraged ? 20 : 12, 0.6,0.7,0.6, enraged ? 0.06 : 0.03);
-                    if (enraged) tLoc.getWorld().spawnParticle(Particle.LAVA, tLoc.clone().add(0,1,0), 5, 0.5,0.5,0.5);
+                    fr.lolmc.util.VisualEffectUtil.impact(tLoc.getWorld(), tLoc.clone().add(0,1,0),
+                            Material.ORANGE_STAINED_GLASS, enraged ? 0.4f : 0.28f, 8L);
+                    if (enraged) fr.lolmc.util.VisualEffectUtil.impact(tLoc.getWorld(),
+                            tLoc.clone().add(0,1,0), Material.MAGMA_BLOCK, 0.3f, 8L);
 
                     // Dégâts aura (toutes les 2 ticks = 1s pour ne pas flood)
                     if (ticks % 2 == 0) {

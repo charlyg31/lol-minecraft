@@ -143,12 +143,13 @@ public abstract class BaseChampion {
         refreshSlot(caster, slot);
     }
 
-    // ─── Affichage portée ─────────────────────────────────────────
+    // ─── Affichage portée (le rendu réel se fait dans AbilityListener) ──
 
-    public void displayRangeIfHoldingAbility(Player player) {
+    /** Sort actuellement tenu par ce joueur, ou null si le slot n'a pas de sort. */
+    public fr.lolmc.ability.base.BaseAbility getHeldAbility(Player player) {
         int slot = player.getInventory().getHeldItemSlot();
-        if (slot < 1 || slot > 4) return; // slot 0 = AA, pas d'affichage
-        if (abilities[slot] != null) abilities[slot].displayRangeForPlayer(player);
+        if (slot < 1 || slot > 4) return null; // slot 0 = AA, pas d'affichage
+        return abilities[slot];
     }
 
     // ─── Getters ─────────────────────────────────────────────────

@@ -44,7 +44,8 @@ public class Sivir extends BaseChampion implements fr.lolmc.champion.base.Statef
             for (var e : fr.lolmc.util.TargetingUtil.enemiesAround(c, 5.0)) {
                 if (e.equals(tgt) || bounces >= 8) continue; // jusqu'à 8 rebonds (LoL)
                 fr.lolmc.util.TargetingUtil.dealDamage(c, e, dmg * 0.60, fr.lolmc.util.TargetingUtil.DmgType.PHYSICAL);
-                e.getWorld().spawnParticle(org.bukkit.Particle.CRIT, e.getLocation().add(0,1,0), 3, 0.2,0.2,0.2);
+                fr.lolmc.util.VisualEffectUtil.impact(e.getWorld(),
+                        e.getLocation().add(0,1,0), Material.WHITE_STAINED_GLASS, 0.22f, 3L);
                 bounces++;
             }
         }
@@ -62,9 +63,11 @@ public class Sivir extends BaseChampion implements fr.lolmc.champion.base.Statef
             new BukkitRunnable(){@Override public void run(){
                 if(tgt.isDead())return;
                 DamageUtil.abilityDamageEntity(c, tgt, dmg);
-                c.getWorld().spawnParticle(Particle.CRIT,tgt.getLocation(),5);
+                fr.lolmc.util.VisualEffectUtil.impact(c.getWorld(),
+                        tgt.getLocation(), Material.WHITE_STAINED_GLASS, 0.25f, 4L);
             }}.runTaskLater(LolPlugin.getInstance(),15L);
-            c.getWorld().spawnParticle(Particle.CRIT,tgt.getLocation(),10);
+            fr.lolmc.util.VisualEffectUtil.impact(c.getWorld(),
+                    tgt.getLocation(), Material.WHITE_STAINED_GLASS, 0.3f, 4L);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] base={60,105,150,195,240};double d=base[getLevel()-1]+s.getFinalAD();
