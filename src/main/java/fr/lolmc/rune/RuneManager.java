@@ -531,7 +531,7 @@ public class RuneManager {
         }
         // Relentless Hunter : +5 MS hors combat par champion unique tué (max +45 à 8 stacks)
         if (page.has("relentless_hunter")) {
-            var kills = relentlessKills.computeIfAbsent(player.getUniqueId(), k -> new java.util.HashSet<>());
+            var kills = relentlessKills.computeIfAbsent(player.getUniqueId(), _ -> new java.util.HashSet<>());
             // Ajouter la victime si on peut l'identifier
             var cm2 = LolPlugin.getInstance().getChampionManager();
             // On cherche la cible dans les entités proches (approximation)

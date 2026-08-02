@@ -408,7 +408,7 @@ public class ConsumableManager {
     }
 
     private void setActivePotion(Player player, BukkitRunnable task) {
-        activePotions.computeIfAbsent(player.getUniqueId(), k -> new ArrayList<>()).add(task);
+        activePotions.computeIfAbsent(player.getUniqueId(), _ -> new ArrayList<>()).add(task);
     }
 
     private void cleanPotion(Player player) {

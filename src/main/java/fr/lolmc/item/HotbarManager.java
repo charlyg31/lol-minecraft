@@ -417,7 +417,7 @@ public class HotbarManager {
     private final Map<UUID, List<String>> consumables = new HashMap<>();
 
     public void addConsumable(Player player, String consId) {
-        consumables.computeIfAbsent(player.getUniqueId(), k -> new ArrayList<>()).add(consId);
+        consumables.computeIfAbsent(player.getUniqueId(), _ -> new ArrayList<>()).add(consId);
     }
     public List<String> getConsumables(Player player) {
         return consumables.getOrDefault(player.getUniqueId(), new ArrayList<>());

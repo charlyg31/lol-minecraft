@@ -24,7 +24,7 @@ public class DeathRecapManager {
 
     /** Enregistre un dégât sur une victime. */
     public void record(UUID victim, String source, String type, double amount) {
-        List<DamageEntry> entries = recentDamage.computeIfAbsent(victim, k -> new ArrayList<>());
+        List<DamageEntry> entries = recentDamage.computeIfAbsent(victim, _ -> new ArrayList<>());
         entries.add(new DamageEntry(source, type, amount, System.currentTimeMillis()));
         // Garder seulement les 5 dernières secondes
         long cutoff = System.currentTimeMillis() - RECAP_WINDOW_MS;
