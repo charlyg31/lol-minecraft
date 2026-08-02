@@ -239,13 +239,13 @@ public class AbilityPreview {
                                 Location origin, Vector dir, double length, double width) {
         int idx = startIdx;
         if (idx >= displays.size()) return idx;
-        positionLine(displays.get(idx++), origin, dir, length, LINE_THICKNESS);
+        positionLine(displays.get(idx++), origin, dir, length);
 
         if (width > 1.0 && idx + 1 < displays.size()) {
             Vector side = new Vector(-dir.getZ(), 0, dir.getX()).normalize();
             double half = width / 2.0;
-            positionLine(displays.get(idx++), origin.clone().add(side.clone().multiply(half)), dir, length, LINE_THICKNESS);
-            positionLine(displays.get(idx++), origin.clone().add(side.clone().multiply(-half)), dir, length, LINE_THICKNESS);
+            positionLine(displays.get(idx++), origin.clone().add(side.clone().multiply(half)), dir, length);
+            positionLine(displays.get(idx++), origin.clone().add(side.clone().multiply(-half)), dir, length);
         }
         return idx;
     }
@@ -262,7 +262,7 @@ public class AbilityPreview {
      * Positionne et étire un BlockDisplay pour qu'il forme une ligne fine de
      * [length] blocs, partant de [origin] dans la direction [dir].
      */
-    private void positionLine(BlockDisplay display, Location origin, Vector dir, double length, float thickness) {
+    private void positionLine(BlockDisplay display, Location origin, Vector dir, double length) {
         // Téléportation à l'origine de la ligne (coin du bloc = point de départ)
         display.teleport(origin);
 
@@ -275,8 +275,8 @@ public class AbilityPreview {
         // Le bloc est étiré sur Z (profondeur) pour former la longueur de la ligne,
         // fin sur X/Y. La translation recentre le bloc sur la ligne (X/Y) tout en
         // gardant Z=0 (le coin de départ correspond à l'origine du skillshot).
-        Vector3f translation = new Vector3f(-thickness / 2f, -thickness / 2f, 0f);
-        Vector3f scale = new Vector3f(thickness, thickness, (float) length);
+        Vector3f translation = new Vector3f(-LINE_THICKNESS / 2f, -LINE_THICKNESS / 2f, 0f);
+        Vector3f scale = new Vector3f(LINE_THICKNESS, LINE_THICKNESS, (float) length);
 
         display.setTransformation(new Transformation(translation, rot, scale, new Quaternionf()));
     }

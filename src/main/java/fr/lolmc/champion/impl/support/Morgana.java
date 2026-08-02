@@ -11,18 +11,16 @@ import fr.lolmc.util.TargetingUtil;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.*;
-import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
-import org.bukkit.util.Vector;
 import java.util.*;
 
 public class Morgana extends BaseChampion {
     public Morgana() {
         super("morgana", "Morgana", ChampionRole.SUPPORT,
-            new ChampionStats(630,56,0,25,30,0.625,0,335,4.5,5.5));
+                new ChampionStats(630,56,0,25,30,0.625,0,335,4.5,5.5));
         getStats().setGrowthStats(104.0,3.5,4.5,1.30,0.01530,0.55);
     }
     @Override protected void registerAbilities() {
@@ -47,7 +45,7 @@ public class Morgana extends BaseChampion {
 
     static class Q extends BaseAbility {
         Q(){super("q_morgana","Filet des Ombres",Material.LEAD,AbilitySlot.Q,
-            new double[]{11,10.5,10,9.5,9},20,0,DamageType.MAGICAL);
+                new double[]{11,10.5,10,9.5,9},20,0,DamageType.MAGICAL);
             resourceCost = 50;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
@@ -65,7 +63,7 @@ public class Morgana extends BaseChampion {
 
     static class W extends BaseAbility {
         W(){super("w_morgana","Emprisonnement Torturé",Material.NETHERRACK,AbilitySlot.W,
-            new double[]{12,12,12,12,12},20,4,DamageType.MAGICAL);
+                new double[]{12,12,12,12,12},20,4,DamageType.MAGICAL);
             resourceCost = 25;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
@@ -98,7 +96,7 @@ public class Morgana extends BaseChampion {
 
     static class E extends BaseAbility {
         E(){super("e_morgana","Bouclier Noir",Material.BLACK_STAINED_GLASS,AbilitySlot.E,
-            new double[]{26,24,22,20,18},0,0,DamageType.TRUE);
+                new double[]{26,24,22,20,18},0,0,DamageType.TRUE);
             resourceCost = 80;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // Bouclier Noir : protège un allié (ou soi), absorbe les dégâts magiques + immunité CC tant qu'il tient
@@ -120,7 +118,7 @@ public class Morgana extends BaseChampion {
 
     static class R extends BaseAbility {
         R(){super("r_morgana","Chaînes de la Corruption",Material.IRON_NUGGET,AbilitySlot.R,
-            new double[]{110,100,90},20,5,DamageType.MAGICAL);
+                new double[]{110,100,90},20,5,DamageType.MAGICAL);
             resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             double[] rBase={150,225,300};double dmg=rBase[Math.min(getLevel()-1,2)]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("r_morgana","ap",0.7);

@@ -55,14 +55,14 @@ public class Annie extends BaseChampion implements fr.lolmc.champion.base.Statef
     }
 
     // ── Reset ─────────────────────────────────────────────────────
-    
+
     public void resetState(UUID id) {
         var t = activeTibbers.remove(id);
         if (t != null && t.isValid()) t.remove();
         pyroStacks.remove(id);
         rCooldowns.remove(id);
     }
-    
+
     public void resetAllState() {
         activeTibbers.values().forEach(t -> { if (t != null && t.isValid()) t.remove(); });
         activeTibbers.clear(); pyroStacks.clear(); rCooldowns.clear(); enrageUntil.clear();
@@ -101,7 +101,6 @@ public class Annie extends BaseChampion implements fr.lolmc.champion.base.Statef
     // ── Contrôle Tibbers (clic gauche avec R en main) ─────────────
     public static void onTibbersControl(Player annie, org.bukkit.entity.PolarBear tibbers) {
         Location aimed = TargetingUtil.getAimedGroundLocation(annie, 20.0);
-        if (aimed == null) aimed = annie.getLocation().add(annie.getLocation().getDirection().multiply(10));
         final Location dest = aimed.clone();
 
         // Ennemi proche du point visé ?
@@ -242,7 +241,6 @@ public class Annie extends BaseChampion implements fr.lolmc.champion.base.Statef
             double[] base = fr.lolmc.util.Balance.base("r_annie",new double[]{150,275,400});
             double dmg = base[r]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("r_annie","ap",0.75);
             var ground = TargetingUtil.getAimedGroundLocation(c,7.0);
-            if (ground == null) ground = c.getLocation();
 
             // Stun Pyromanie à l'invocation si chargé
             boolean pyroActive = hasPyromancyStun(uuid);
@@ -253,9 +251,9 @@ public class Annie extends BaseChampion implements fr.lolmc.champion.base.Statef
                 TargetingUtil.dealDamage(c, e, dmg, TargetingUtil.DmgType.MAGICAL);
                 e.setFireTicks(60);
                 // Stun Pyromanie sur tous les ennemis de la zone d'invocation
-                if (pyroActive && e instanceof org.bukkit.entity.LivingEntity le) {
+                if (pyroActive) {
                     var cc = LolPlugin.getInstance().getCCManager();
-                    if (cc != null) cc.stun(le, pyroStunTicks(lvl));
+                    if (cc != null) cc.stun(e, pyroStunTicks(lvl));
                 }
             }
             fr.lolmc.util.VisualEffectUtil.groundRing(ground.getWorld(), ground, 3.0,
@@ -271,13 +269,17 @@ public class Annie extends BaseChampion implements fr.lolmc.champion.base.Statef
             org.bukkit.entity.PolarBear tibbers = spawnLoc.getWorld().spawn(spawnLoc, org.bukkit.entity.PolarBear.class, bear -> {
                 bear.customName(Component.text("🔥 Tibbers", NamedTextColor.RED));
                 bear.setCustomNameVisible(true);
-                bear.setVisualFire(true);
+                bear.setVisualFire(net.kyori.adventure.util.TriState.TRUE);
                 bear.setRemoveWhenFarAway(false);
                 bear.setInvulnerable(false);
                 // HP
                 var hp = bear.getAttribute(fr.lolmc.util.Compat.maxHealth());
-                if (hp != null) hp.setBaseValue(200.0 + finalAP*0.5);
-                bear.setHealth(bear.getAttribute(fr.lolmc.util.Compat.maxHealth()).getValue());
+                if (hp != null) {
+                    hp.setBaseValue(200.0 + finalAP*0.5);
+                    bear.setHealth(hp.getValue());
+                } else {
+                    bear.setHealth(200.0 + finalAP*0.5);
+                }
                 // Vitesse
                 var sp = bear.getAttribute(fr.lolmc.util.Compat.movementSpeed());
                 if (sp != null) sp.setBaseValue(0.38);
@@ -301,8 +303,8 @@ public class Annie extends BaseChampion implements fr.lolmc.champion.base.Statef
             }
 
             c.sendActionBar(Component.text(pyroActive
-                    ? "🔥 TIBBERS + STUN DE PYROMANIE!"
-                    : "🔥 TIBBERS INVOQUÉ! R ou clic gauche pour contrôler.",
+                            ? "🔥 TIBBERS + STUN DE PYROMANIE!"
+                            : "🔥 TIBBERS INVOQUÉ! R ou clic gauche pour contrôler.",
                     NamedTextColor.RED));
 
             // ── Boucle de vie (toutes les 10 ticks = 0.5s pour plus de réactivité) ──
@@ -335,7 +337,7 @@ public class Annie extends BaseChampion implements fr.lolmc.champion.base.Statef
                         if (dist > 22.0) {
                             // Trop loin → TP derrière Annie
                             Location returnLoc = c.getLocation().clone().subtract(
-                                c.getLocation().getDirection().normalize().multiply(1.5));
+                                    c.getLocation().getDirection().normalize().multiply(1.5));
                             returnLoc.setY(c.getLocation().getY());
                             tibbers.teleportAsync(returnLoc);
                             c.sendActionBar(Component.text("🐻 Tibbers revient!",NamedTextColor.GOLD));
@@ -371,8 +373,8 @@ public class Annie extends BaseChampion implements fr.lolmc.champion.base.Statef
                             if (!(entity instanceof org.bukkit.entity.LivingEntity target)) continue;
                             if (entity.equals(c) || entity.equals(tibbers)) continue;
                             TargetingUtil.dealDamage(c, target, auraDmg, TargetingUtil.DmgType.MAGICAL);
-                            target.setVisualFire(true);
-                            new BukkitRunnable(){@Override public void run(){target.setVisualFire(false);}}.runTaskLater(LolPlugin.getInstance(),60L);
+                            target.setVisualFire(net.kyori.adventure.util.TriState.TRUE);
+                            new BukkitRunnable(){@Override public void run(){target.setVisualFire(net.kyori.adventure.util.TriState.FALSE);}}.runTaskLater(LolPlugin.getInstance(),60L);
                         }
                     }
 

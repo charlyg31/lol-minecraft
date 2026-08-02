@@ -119,6 +119,10 @@ public class PassiveManager {
         if (!championManager.hasChampion(caster)) return;
         ItemState state = getState(caster);
         BaseChampion champ = championManager.getChampion(caster);
+        // Annie : Pyromanie (stun tous les 4 sorts)
+        if ("annie".equals(champ.getId())) {
+            fr.lolmc.champion.impl.mid.Annie.onSpellCast(caster.getUniqueId());
+        }
         // ── Sudden Impact : +12 létalité/+9 pén. magique pendant 5s (une seule instance active) ──
         var runePageSI = LolPlugin.getInstance().getRuneManager();
         long __siExpire = getState(caster).antihealTargets.getOrDefault(
