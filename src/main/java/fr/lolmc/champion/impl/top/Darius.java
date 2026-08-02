@@ -6,12 +6,10 @@ import fr.lolmc.ability.base.BasicAttackAbility;
 import fr.lolmc.stats.ResourceSystem;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.stats.ChampionStats;
-import fr.lolmc.util.DamageUtil;
 import fr.lolmc.util.TargetingUtil;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.*;
-import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
@@ -42,7 +40,7 @@ public class Darius extends BaseChampion implements fr.lolmc.champion.base.State
     public static int getBleedStacks(java.util.UUID vid) { return bleedStacks.getOrDefault(vid, 0); }
     @Override public void resetAllState() { bleedStacks.clear(); bleedExpire.clear(); }
 
-    public static void applyBleed(Player darius, org.bukkit.entity.LivingEntity victim, ChampionStats s) {
+    public static void applyBleed(Player darius, org.bukkit.entity.LivingEntity victim) {
         java.util.UUID vid = victim.getUniqueId();
         int stacks = Math.min(5, bleedStacks.merge(vid, 1, Integer::sum));
         bleedExpire.put(vid, System.currentTimeMillis() + 5000L);
@@ -50,7 +48,7 @@ public class Darius extends BaseChampion implements fr.lolmc.champion.base.State
         if (victim instanceof Player vp)
             vp.sendActionBar(net.kyori.adventure.text.Component.text(
                 "🩸 Hémorragie " + stacks + "/5", net.kyori.adventure.text.format.NamedTextColor.DARK_RED));
-        if (stacks >= 5) {
+        if (stacks == 5) {
             // Noxian Might : vrais dégâts pendant 5s
             int lvl = LolPlugin.getInstance().getChampionManager().hasChampion(darius)
                 ? LolPlugin.getInstance().getChampionManager().getChampion(darius).getLevelSystem().getLevel() : 1;
@@ -76,7 +74,7 @@ public class Darius extends BaseChampion implements fr.lolmc.champion.base.State
     static class AA extends BasicAttackAbility {
         AA(){super("darius",Material.IRON_AXE,2.5f,DamageType.PHYSICAL);}
         @Override protected void onHit(Player c, ChampionStats s, org.bukkit.entity.LivingEntity tgt, double dmg) {
-            applyBleed(c, tgt, s);
+            applyBleed(c, tgt);
         }
     }
 
@@ -133,7 +131,7 @@ public class Darius extends BaseChampion implements fr.lolmc.champion.base.State
             double[] adMult={1.40,1.45,1.50,1.55,1.60};
             double dmg=s.getFinalAD()*adMult[getLevel()-1];
             TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.PHYSICAL);
-            applyBleed(c, tgt, s); // applique un stack d'Hémorragie
+            applyBleed(c, tgt); // applique un stack d'Hémorragie
             // Ralentit 90% pendant 1s (20 ticks)
             if(tgt instanceof Player __p){
                 __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,20,4,false,true));

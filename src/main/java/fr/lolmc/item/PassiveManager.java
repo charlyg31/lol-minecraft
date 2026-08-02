@@ -85,6 +85,14 @@ public class PassiveManager {
                 if ("warwick".equals(ch.getId())) {
                     fr.lolmc.champion.impl.jungle.Warwick.tickWarwickPassive(p);
                 }
+                // Malphite : Bouclier de Granite (recharge hors dégâts 10s)
+                if ("malphite".equals(ch.getId())) {
+                    fr.lolmc.champion.impl.top.Malphite.tickGraniteShield(p, ch);
+                }
+                // Garen : Détermination (regen HP hors combat)
+                if ("garen".equals(ch.getId())) {
+                    fr.lolmc.champion.impl.top.Garen.tickGarenPassive(ch);
+                }
                 // Janna : Grâce de la Tempête (vitesse de déplacement bonus = 8% AS)
                 if ("janna".equals(ch.getId())) {
                     fr.lolmc.champion.impl.support.Janna.tickJannaPassive(ch);
