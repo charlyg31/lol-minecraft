@@ -69,7 +69,7 @@ public class AbilityListener implements Listener {
      * sort en a une. Visible uniquement par le joueur lui-même.
      */
     private void updateRangeDisplay(Player player, fr.lolmc.ability.base.BaseAbility ability) {
-        var rings = rangeDisplays.computeIfAbsent(player.getUniqueId(), k -> {
+        var rings = rangeDisplays.computeIfAbsent(player.getUniqueId(), _ -> {
             var m = new java.util.HashMap<String, java.util.List<org.bukkit.entity.BlockDisplay>>();
             m.put("range", fr.lolmc.util.VisualEffectUtil.createPrivateRing(
                     player, player.getLocation(), org.bukkit.Material.WHITE_STAINED_GLASS, 16, 0.15f));
@@ -106,7 +106,7 @@ public class AbilityListener implements Listener {
     private final java.util.Map<java.util.UUID, int[]> cdShown = new java.util.HashMap<>();
 
     private void updateCooldownDisplay(Player player, BaseChampion champ) {
-        int[] shown = cdShown.computeIfAbsent(player.getUniqueId(), k -> new int[]{-1, -1, -1, -1, -1});
+        int[] shown = cdShown.computeIfAbsent(player.getUniqueId(), _ -> new int[]{-1, -1, -1, -1, -1});
         for (int slot = 1; slot <= 4; slot++) {
             var ability = champ.getAbility(slot);
             if (ability == null) continue;

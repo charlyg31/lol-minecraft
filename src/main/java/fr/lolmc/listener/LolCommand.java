@@ -226,7 +226,7 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
 
         if (subCommand.equals("pos1")) {
             Location loc = player.getLocation().getBlock().getLocation();
-            Location[] sel = schematicSelections.computeIfAbsent(uuid, k -> new Location[2]);
+            Location[] sel = schematicSelections.computeIfAbsent(uuid, _ -> new Location[2]);
             sel[0] = loc;
             player.sendMessage(Component.text("✔ Position 1 définie à tes pieds : " + loc.getBlockX() + ", " + loc.getBlockY() + ", " + loc.getBlockZ(), NamedTextColor.GREEN));
             return;
@@ -234,7 +234,7 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
 
         if (subCommand.equals("pos2")) {
             Location loc = player.getLocation().getBlock().getLocation();
-            Location[] sel = schematicSelections.computeIfAbsent(uuid, k -> new Location[2]);
+            Location[] sel = schematicSelections.computeIfAbsent(uuid, _ -> new Location[2]);
             sel[1] = loc;
             player.sendMessage(Component.text("✔ Position 2 définie à tes pieds : " + loc.getBlockX() + ", " + loc.getBlockY() + ", " + loc.getBlockZ(), NamedTextColor.GREEN));
             return;

@@ -117,7 +117,7 @@ public class SkinRegistry {
 
     private static void register(String id, String champId, String name,
                                   int num, Material icon, String perm) {
-        registry.computeIfAbsent(champId, k -> new ArrayList<>())
+        registry.computeIfAbsent(champId, _ -> new ArrayList<>())
             .add(new ChampionSkin(id, champId, name, num, icon, perm));
     }
 

@@ -67,7 +67,7 @@ public class RewardManager {
     /** Enregistre un dégât infligé par [attacker] sur [victim] (appelé depuis DamageUtil). */
     public void recordDamage(java.util.UUID attacker, java.util.UUID victim) {
         damageContrib
-            .computeIfAbsent(victim, k -> new java.util.concurrent.ConcurrentHashMap<>())
+            .computeIfAbsent(victim, _ -> new java.util.concurrent.ConcurrentHashMap<>())
             .put(attacker, System.currentTimeMillis());
     }
 

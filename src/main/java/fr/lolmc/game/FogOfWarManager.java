@@ -261,7 +261,7 @@ public class FogOfWarManager {
                             double radius, long durationTicks) {
         if (team == null || location.getWorld() == null) return;
         long expiresAt = System.currentTimeMillis() + (durationTicks * 50L); // 1 tick = 50ms
-        revealedPoints.computeIfAbsent(team, k -> new java.util.concurrent.CopyOnWriteArrayList<>())
+        revealedPoints.computeIfAbsent(team, _ -> new java.util.concurrent.CopyOnWriteArrayList<>())
                 .add(new RevealedPoint(location.getWorld(), location.getX(), location.getY(),
                         location.getZ(), radius * radius, expiresAt));
     }

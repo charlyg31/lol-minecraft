@@ -197,7 +197,7 @@ public class AutoAttackManager {
      * cette paire viewer/cible, puis simplement repositionnés).
      */
     private void drawTargetRing(Player viewer, LivingEntity target, Color color, int phase) {
-        var byTarget = ringDisplays.computeIfAbsent(viewer.getUniqueId(), k -> new HashMap<>());
+        var byTarget = ringDisplays.computeIfAbsent(viewer.getUniqueId(), _ -> new HashMap<>());
         var displays = byTarget.get(target.getUniqueId());
 
         if (displays == null) {

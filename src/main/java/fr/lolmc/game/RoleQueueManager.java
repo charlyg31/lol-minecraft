@@ -47,7 +47,7 @@ public class RoleQueueManager {
     }
 
     public void toggleRole(Player player, Role role) {
-        Set<Role> roles = preferredRoles.computeIfAbsent(player.getUniqueId(), k -> new HashSet<>());
+        Set<Role> roles = preferredRoles.computeIfAbsent(player.getUniqueId(), _ -> new HashSet<>());
         if (roles.contains(role)) {
             roles.remove(role);
             player.sendActionBar(Component.text("➖ " + role.displayName + " retiré", NamedTextColor.YELLOW));

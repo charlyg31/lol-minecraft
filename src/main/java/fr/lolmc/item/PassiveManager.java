@@ -129,7 +129,7 @@ public class PassiveManager {
     }
 
     public ItemState getState(Player player) {
-        return states.computeIfAbsent(player.getUniqueId(), k -> new ItemState());
+        return states.computeIfAbsent(player.getUniqueId(), _ -> new ItemState());
     }
 
     // ════════════════════════════════════════════════════════

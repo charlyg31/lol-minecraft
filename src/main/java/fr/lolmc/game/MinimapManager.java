@@ -75,7 +75,7 @@ public class MinimapManager implements Listener {
     // ──────────────────────────────────────────────────────────────
     public void registerPing(TeamManager.Team team, Location loc) {
         if (team == null || loc == null) return;
-        pings.computeIfAbsent(team, k -> new ArrayList<>())
+        pings.computeIfAbsent(team, _ -> new ArrayList<>())
              .add(new Ping(loc.clone(), System.currentTimeMillis() + PING_DURATION_MS));
     }
 
