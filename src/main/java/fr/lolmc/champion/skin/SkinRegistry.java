@@ -6,11 +6,9 @@ import java.util.*;
 
 /**
  * Registre de tous les skins disponibles.
- *
  * Ajouter un skin :
  *   register(new ChampionSkin("steel_legion", "garen", "Légion d'Acier",
  *       1, Material.IRON_CHESTPLATE, "lolmc.skin.garen.steel_legion"));
- *
  * Le skin de base (skinNumber=0, permission=null) est toujours enregistré
  * automatiquement pour chaque champion.
  */
@@ -145,7 +143,7 @@ public class SkinRegistry {
     /** Récupère un skin par son ID. */
     public static ChampionSkin get(String champId, String skinId) {
         return registry.getOrDefault(champId, List.of()).stream()
-            .filter(s -> s.id.equals(skinId)).findFirst().orElse(null);
+            .filter(s -> s.id().equals(skinId)).findFirst().orElse(null);
     }
 
     /** True si ce champion a des skins au-delà du skin de base. */
