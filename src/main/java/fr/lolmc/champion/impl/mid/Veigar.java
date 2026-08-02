@@ -6,18 +6,12 @@ import fr.lolmc.ability.base.BasicAttackAbility;
 import fr.lolmc.stats.ResourceSystem;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.stats.ChampionStats;
-import fr.lolmc.util.DamageUtil;
 import fr.lolmc.util.TargetingUtil;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.*;
-import org.bukkit.attribute.Attribute; // AJOUT : Import de l'attribut
-import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
-import org.bukkit.potion.PotionEffect;
-import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
-import org.bukkit.util.Vector;
 import java.util.*;
 
 public class Veigar extends BaseChampion implements fr.lolmc.champion.base.StatefulChampion {
@@ -120,7 +114,6 @@ public class Veigar extends BaseChampion implements fr.lolmc.champion.base.State
             resourceCost = 80;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             Location center=TargetingUtil.getAimedGroundLocation(c, 7.0);
-            if(center==null) center=c.getLocation();
             final Location fcenter=center.clone();
             // Stun selon le rang : 1.5/1.75/2/2.25/2.5s
             double[] stunSec={1.5,1.75,2.0,2.25,2.5};
