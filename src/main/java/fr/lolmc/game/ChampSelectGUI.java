@@ -118,7 +118,7 @@ public class ChampSelectGUI implements Listener {
         var all = SkinRegistry.getAll(champId);
 
         // Si seulement le skin de base → pas de menu, on passe directement
-        if (accessible.size() <= 1 && all.size() <= 1) {
+        if (accessible.size() <= 1 && !SkinRegistry.hasSkins(champId)) {
             // Informer ChampSelectManager que le skin de base est choisi
             LolPlugin.getInstance().getChampSelectManager().onSkinChosen(player, champId, "base");
             return;
@@ -144,8 +144,10 @@ public class ChampSelectGUI implements Listener {
         int last = inv.getSize() - 1;
         inv.setItem(last - 1, button(Material.ARROW,
             Component.text("◀ Retour aux champions", NamedTextColor.YELLOW), ""));
+        var baseSkin = SkinRegistry.getBase(champId);
+        String baseLabel = baseSkin != null ? baseSkin.displayName() : "Skin de base";
         inv.setItem(last, button(Material.LIME_DYE,
-            Component.text("✔ Skin de base", NamedTextColor.GREEN),
+            Component.text("✔ " + baseLabel, NamedTextColor.GREEN),
             "Utiliser le skin de base"));
 
         player.openInventory(inv);
