@@ -6,12 +6,10 @@ import fr.lolmc.ability.base.BasicAttackAbility;
 import fr.lolmc.stats.ResourceSystem;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.stats.ChampionStats;
-import fr.lolmc.util.DamageUtil;
 import fr.lolmc.util.TargetingUtil;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.*;
-import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
@@ -32,11 +30,8 @@ public class Janna extends BaseChampion {
         setAutoAttackRange(8.5);
     }
 
-    static class AA extends BasicAttackAbility {
-        AA(){super("janna",Material.FEATHER,5.5f,DamageType.MAGICAL);}
-
     // Passif Grâce de la Tempête : vitesse de deplacement bonus = 8% AS
-    public static void tickJannaPassive(org.bukkit.entity.Player p, fr.lolmc.champion.base.BaseChampion champ) {
+    public static void tickJannaPassive(fr.lolmc.champion.base.BaseChampion champ) {
         double asBonus = champ.getStats().getFinalAttackSpeed() * 0.08;
         // Appliqué chaque tick de regen via HUDManager
         champ.getStats().addBonusMoveSpeed(asBonus);
@@ -44,6 +39,9 @@ public class Janna extends BaseChampion {
             @Override public void run(){ champ.getStats().addBonusMoveSpeed(-asBonus); }
         }.runTaskLater(fr.lolmc.LolPlugin.getInstance(), 100L);
     }
+
+    static class AA extends BasicAttackAbility {
+        AA(){super("janna",Material.FEATHER,5.5f,DamageType.MAGICAL);}
     }
 
     static class Q extends BaseAbility {

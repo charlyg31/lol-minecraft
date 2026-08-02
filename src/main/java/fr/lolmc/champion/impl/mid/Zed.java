@@ -6,12 +6,10 @@ import fr.lolmc.ability.base.BasicAttackAbility;
 import fr.lolmc.stats.ResourceSystem;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.stats.ChampionStats;
-import fr.lolmc.util.DamageUtil;
 import fr.lolmc.util.TargetingUtil;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.*;
-import org.bukkit.attribute.Attribute;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffect;
@@ -91,7 +89,7 @@ public class Zed extends BaseChampion implements fr.lolmc.champion.base.Stateful
             double[] baseFirst={80,120,160,200,240};
             double[] baseNext={48,72,96,120,144};
             int rank=getLevel()-1;
-            double dmgFirst=baseFirst[rank]+s.getFinalAD()*1.0;
+            double dmgFirst=baseFirst[rank]+s.getFinalAD();
             double dmgNext=baseNext[rank]+s.getFinalAD()*0.6;
             var hits=TargetingUtil.skillshot(c, 12.0, 1.0, true);
             boolean first=true;
@@ -176,12 +174,10 @@ public class Zed extends BaseChampion implements fr.lolmc.champion.base.Stateful
                             as.customName(Component.text("👤 Ombre de Zed", NamedTextColor.DARK_GRAY));
                             // Armure en cuir noir
                             var eq = as.getEquipment();
-                            if (eq != null) {
-                                eq.setHelmet(blackLeather(org.bukkit.Material.LEATHER_HELMET));
-                                eq.setChestplate(blackLeather(org.bukkit.Material.LEATHER_CHESTPLATE));
-                                eq.setLeggings(blackLeather(org.bukkit.Material.LEATHER_LEGGINGS));
-                                eq.setBoots(blackLeather(org.bukkit.Material.LEATHER_BOOTS));
-                            }
+                            eq.setHelmet(blackLeather(org.bukkit.Material.LEATHER_HELMET));
+                            eq.setChestplate(blackLeather(org.bukkit.Material.LEATHER_CHESTPLATE));
+                            eq.setLeggings(blackLeather(org.bukkit.Material.LEATHER_LEGGINGS));
+                            eq.setBoots(blackLeather(org.bukkit.Material.LEATHER_BOOTS));
                             as.getScoreboardTags().add("zed_shadow");
                         });
                 shadowEntities.put(uuid, shadowStand.getUniqueId());

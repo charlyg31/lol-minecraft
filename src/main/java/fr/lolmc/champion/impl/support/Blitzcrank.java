@@ -6,16 +6,13 @@ import fr.lolmc.ability.base.BasicAttackAbility;
 import fr.lolmc.stats.ResourceSystem;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.stats.ChampionStats;
-import fr.lolmc.util.DamageUtil;
 import fr.lolmc.util.TargetingUtil;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.*;
-import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
-import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.Vector;
 import java.util.*;
 
@@ -64,7 +61,7 @@ public class Blitzcrank extends BaseChampion implements fr.lolmc.champion.base.S
             // LoL : SKILLSHOT signature. Attrape le 1er ennemi, 110-310 + 120% AP, stun + tire vers Blitz
             var hits=TargetingUtil.skillshot(c, 12.0, 1.0, false);
             if(hits.isEmpty()){c.sendActionBar(Component.text("🪝 Grappin manqué!",NamedTextColor.GRAY));return;}
-            var tgt=hits.get(0);
+            var tgt=hits.getFirst();
             double[] base=fr.lolmc.util.Balance.base("q_blitzcrank",new double[]{110,160,210,260,310});double dmg=base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("q_blitzcrank","ap",1.5);
             // Animation : une seule ligne étirée qui suit le grappin (au lieu
             // d'une trainée de particules répétée à chaque tick).
