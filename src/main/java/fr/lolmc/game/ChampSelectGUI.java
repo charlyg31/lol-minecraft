@@ -152,21 +152,21 @@ public class ChampSelectGUI implements Listener {
     }
 
     private ItemStack skinIcon(ChampionSkin skin, boolean hasAccess) {
-        ItemStack item = new ItemStack(hasAccess ? skin.icon : Material.GRAY_DYE);
+        ItemStack item = new ItemStack(hasAccess ? skin.icon() : Material.GRAY_DYE);
         var meta = item.getItemMeta();
         if (meta == null) return item;
 
         if (hasAccess) {
-            meta.displayName(Component.text("🎨 " + skin.displayName, NamedTextColor.GOLD)
+            meta.displayName(Component.text("🎨 " + skin.displayName(), NamedTextColor.GOLD)
                 .decoration(TextDecoration.ITALIC, false));
             meta.lore(List.of(
-                Component.text("Skin n°" + skin.skinNumber, NamedTextColor.GRAY)
+                Component.text("Skin n°" + skin.skinNumber(), NamedTextColor.GRAY)
                     .decoration(TextDecoration.ITALIC, false),
                 Component.text("▶ Clic pour choisir", NamedTextColor.YELLOW)
                     .decoration(TextDecoration.ITALIC, false)
             ));
         } else {
-            meta.displayName(Component.text("🔒 " + skin.displayName, NamedTextColor.DARK_GRAY)
+            meta.displayName(Component.text("🔒 " + skin.displayName(), NamedTextColor.DARK_GRAY)
                 .decoration(TextDecoration.ITALIC, false));
             meta.lore(List.of(
                 Component.text("Permission requise:", NamedTextColor.GRAY)
@@ -288,7 +288,7 @@ public class ChampSelectGUI implements Listener {
             if (slot < allSkins.size()) {
                 var skin = allSkins.get(slot);
                 if (skin.hasAccess(player)) {
-                    csm.onSkinChosen(player, champId, skin.id);
+                    csm.onSkinChosen(player, champId, skin.id());
                 } else {
                     player.sendActionBar(Component.text(
                         "🔒 Permission requise : " + skin.getPermission(),
