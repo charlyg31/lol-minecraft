@@ -6,17 +6,14 @@ import fr.lolmc.ability.base.BasicAttackAbility;
 import fr.lolmc.stats.ResourceSystem;
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.stats.ChampionStats;
-import fr.lolmc.util.DamageUtil;
 import fr.lolmc.util.TargetingUtil;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.*;
-import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
-import org.bukkit.util.Vector;
 import java.util.*;
 
 public class Nasus extends BaseChampion implements fr.lolmc.champion.base.StatefulChampion {
@@ -159,8 +156,10 @@ public class Nasus extends BaseChampion implements fr.lolmc.champion.base.Statef
             c.addPotionEffect(new PotionEffect(PotionEffectType.HEALTH_BOOST,300,2,false,true));
             c.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE,300,1,false,true));
             c.sendActionBar(Component.text("☀ Furie des Sables! (15s, Q -50%% CD)",NamedTextColor.GOLD));
-            // Réduction CD du Q de 50%% pendant la durée
+            // Bonus HP réel (300/450/600 selon rang), jamais appliqué auparavant
             var cm=LolPlugin.getInstance().getChampionManager();
+            if (cm.hasChampion(c)) cm.getChampion(c).getStats().addBonusHP(hpBonus[rank]);
+            // Réduction CD du Q de 50%% pendant la durée
             final BaseAbility qAbil = cm.hasChampion(c) ? cm.getChampion(c).getAbility(1) : null;
             if(qAbil!=null) qAbil.setDynamicCooldown(Math.max(0.5, qAbil.getCurrentCooldown(s)*0.5));
             new BukkitRunnable(){
@@ -168,6 +167,7 @@ public class Nasus extends BaseChampion implements fr.lolmc.champion.base.Statef
                 @Override public void run(){
                     if(tick>=300){
                         if(qAbil!=null) qAbil.setDynamicCooldown(-1); // restaurer CD normal
+                        if(cm.hasChampion(c)) cm.getChampion(c).getStats().addBonusHP(-hpBonus[rank]);
                         cancel();return;
                     }
                     for(var __t : TargetingUtil.entitiesInRadius(c, c.getLocation(), 3)){
