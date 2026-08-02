@@ -85,6 +85,18 @@ public class PassiveManager {
                 if ("warwick".equals(ch.getId())) {
                     fr.lolmc.champion.impl.jungle.Warwick.tickWarwickPassive(p);
                 }
+                // Janna : Grâce de la Tempête (vitesse de déplacement bonus = 8% AS)
+                if ("janna".equals(ch.getId())) {
+                    fr.lolmc.champion.impl.support.Janna.tickJannaPassive(ch);
+                }
+                // Blitzcrank : Statique Mana (bouclier d'urgence sous 20% HP)
+                if ("blitzcrank".equals(ch.getId())) {
+                    fr.lolmc.champion.impl.support.Blitzcrank.tickStaticShield(p, ch);
+                }
+                // Yasuo : Esprit du Vent (bouclier quand Flow plein)
+                if ("yasuo".equals(ch.getId())) {
+                    fr.lolmc.champion.impl.mid.Yasuo.tickWindShield(p, ch);
+                }
                 // Rod of Ages : stacks croissants (simplifié, +20HP/20mana au fil du temps)
                 if (hasAnyItem(p,"rod_of_ages") && getState(p).rodStacks<10) {
                     if (System.currentTimeMillis()-getState(p).lastRodStack > 60000) { // 1 stack/minute
