@@ -166,6 +166,24 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
                 LolPlugin.getInstance().applyAAScaleFromConfig();
                 player.sendMessage(Component.text("✔ Config, équilibrage, fog, skins et portées rechargés.", NamedTextColor.GREEN));
             }
+            case "permcheck" -> {
+                // Diagnostic : les permissions de skins déclarées dans le code
+                // (SkinRegistry) sont-elles bien présentes dans plugin.yml ?
+                var declared = fr.lolmc.champion.skin.SkinRegistry.getAllPermissions();
+                var pm = LolPlugin.getInstance().getServer().getPluginManager();
+                int missing = 0;
+                for (String perm : declared) {
+                    if (pm.getPermission(perm) == null) {
+                        player.sendMessage(Component.text("⚠ Permission absente de plugin.yml : " + perm,
+                            NamedTextColor.RED));
+                        missing++;
+                    }
+                }
+                player.sendMessage(Component.text(
+                    "✔ Vérification terminée : " + declared.size() + " permission(s) de skin dans le code, "
+                        + missing + " manquante(s) dans plugin.yml.",
+                    missing == 0 ? NamedTextColor.GREEN : NamedTextColor.YELLOW));
+            }
             case "select" -> {
                 var ids = new java.util.ArrayList<java.util.UUID>();
                 for (var pl : LolPlugin.getInstance().getServer().getOnlinePlayers()) {
@@ -844,6 +862,7 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
             {"/lol testgame",                "Lancer une partie test"},
             {"/lol debug on|off",            "Activer/désactiver le debug"},
             {"/lol reload",                  "Recharger champions.yml"},
+            {"/lol permcheck",                "Vérifier les permissions de skin vs plugin.yml"},
         };
         for (String[] cmd : cmds) {
             player.sendMessage(Component.text("§e" + cmd[0] + " §7— " + cmd[1]));
