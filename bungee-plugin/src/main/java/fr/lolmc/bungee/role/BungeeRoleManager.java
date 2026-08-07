@@ -24,7 +24,9 @@ public class BungeeRoleManager {
 
     private void load() {
         try {
-            if (!dataFile.exists()) dataFile.createNewFile();
+            if (!dataFile.exists() && !dataFile.createNewFile()) {
+                plugin.getLogger().warning("Impossible de créer roles_data.yml.");
+            }
             data = ConfigurationProvider.getProvider(YamlConfiguration.class).load(dataFile);
         } catch (IOException e) {
             plugin.getLogger().warning("Erreur chargement roles: " + e.getMessage());

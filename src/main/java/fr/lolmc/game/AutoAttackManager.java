@@ -348,10 +348,9 @@ public class AutoAttackManager {
         } else {
             double newHealth = Math.max(0, target.getHealth() - rawDamage);
             target.setHealth(newHealth);
-            fr.lolmc.util.HealthBar.update(target, newHealth, target.getAttribute(
-                fr.lolmc.util.Compat.maxHealth()) != null
-                ? target.getAttribute(fr.lolmc.util.Compat.maxHealth()).getValue()
-                : target.getMaxHealth());
+            var maxHpAttr = target.getAttribute(fr.lolmc.util.Compat.maxHealth());
+            double maxHp = maxHpAttr != null ? maxHpAttr.getValue() : 20.0;
+            fr.lolmc.util.HealthBar.update(target, newHealth, maxHp);
         }
 
         var pm = LolPlugin.getInstance().getPassiveManager();
@@ -554,7 +553,7 @@ public class AutoAttackManager {
 
         // Son de tir immédiat
         world.playSound(attacker.getLocation(),
-                crit ? Sound.ENTITY_ARROW_SHOOT : Sound.ENTITY_ARROW_SHOOT, 0.8f,
+                crit ? Sound.ENTITY_PLAYER_ATTACK_CRIT : Sound.ENTITY_ARROW_SHOOT, crit ? 1.0f : 0.8f,
                 crit ? 0.9f : 1.1f);
     }
 

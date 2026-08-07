@@ -143,8 +143,8 @@ public class BungeeMessageListener implements Listener {
         for (String pair : json.split(",(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)")) {
             String[] kv = pair.split(":", 2);
             if (kv.length == 2) {
-                String k = kv[0].trim().replaceAll("\"", "");
-                String v = kv[1].trim().replaceAll("\"", "");
+                String k = kv[0].trim().replace("\"", "");
+                String v = kv[1].trim().replace("\"", "");
                 map.put(k, v);
             }
         }

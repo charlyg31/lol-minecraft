@@ -219,7 +219,7 @@ public class LolPlugin extends JavaPlugin {
         passiveManager = new PassiveManager(championManager, hudManager, shopListener);
         consumableManager = new ConsumableManager(championManager, hudManager);
 
-        ItemRegistry.all();
+        ItemRegistry.ensureLoaded();
         headManager     = new HeadManager(this);
         championGUI     = new ChampionGUI(championManager, headManager);
         guiListener     = new GUIListener(championGUI, championManager, headManager, hudManager);
@@ -236,13 +236,15 @@ public class LolPlugin extends JavaPlugin {
     private void registerCommands() {
         // Seules deux commandes : /lol (joueurs) et /lola (admins)
         var lolCmd = new LolCommand(mapManager, roadManager);
-        if (getCommand("l") != null) {
-            getCommand("l").setExecutor(lolCmd);
-            getCommand("l").setTabCompleter(lolCmd);
+        var cmdL = getCommand("l");
+        if (cmdL != null) {
+            cmdL.setExecutor(lolCmd);
+            cmdL.setTabCompleter(lolCmd);
         }
-        if (getCommand("lola") != null) {
-            getCommand("lola").setExecutor(lolCmd);
-            getCommand("lola").setTabCompleter(lolCmd);
+        var cmdLola = getCommand("lola");
+        if (cmdLola != null) {
+            cmdLola.setExecutor(lolCmd);
+            cmdLola.setTabCompleter(lolCmd);
         }
         getServer().getPluginManager().registerEvents(lolCmd, this);
                 structureDamageListener = new fr.lolmc.listener.StructureDamageListener(mapManager, championManager, teamManager);
@@ -258,7 +260,7 @@ public class LolPlugin extends JavaPlugin {
         if (gameManager != null && gameManager.isRunning()) gameManager.stopGame();
         if (minionManager != null) minionManager.stopWaves();
         if (jungleManager != null) jungleManager.stopJungle();
-        if (turretManager != null && turretManager instanceof fr.lolmc.game.TurretManager tm) tm.stopTasks();
+        if (turretManager != null) turretManager.stopTasks();
         if (passiveManager != null) passiveManager.stopTasks();
         if (gameManager != null) gameManager.stopSystems();
         // ── 2. Nettoyage des états par joueur ────────────────────────────────

@@ -95,6 +95,19 @@ public abstract class BaseAbility {
         cooldownEnds.put(player.getUniqueId(), now + (long)(cd * 1000));
     }
 
+    /**
+     * Réduit le cooldown actif de ce sort pour ce joueur d'un nombre de
+     * secondes donné (jamais sous le temps présent). Sans effet si le sort
+     * n'est pas actuellement en recharge.
+     */
+    public void reduceCooldown(Player player, double seconds) {
+        Long end = cooldownEnds.get(player.getUniqueId());
+        if (end == null) return; // pas en cooldown, rien à réduire
+        long now = System.currentTimeMillis();
+        long newEnd = Math.max(now, end - (long)(seconds * 1000));
+        cooldownEnds.put(player.getUniqueId(), newEnd);
+    }
+
     public double getCurrentCooldown(ChampionStats stats) {
         // Si override dynamique (ex: AA dont le CD dépend de l'AS en jeu)
         if (dynamicCooldownOverride > 0) return dynamicCooldownOverride;

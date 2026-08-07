@@ -21,10 +21,6 @@
             <url>https://repo.papermc.io/repository/maven-public/</url>
         </repository>
         <repository>
-            <id>enginehub</id>
-            <url>https://maven.enginehub.org/repo/</url>
-        </repository>
-        <repository>
             <id>onarandombox</id>
             <url>https://repo.onarandombox.com/content/groups/public/</url>
         </repository>
@@ -35,18 +31,6 @@
             <groupId>io.papermc.paper</groupId>
             <artifactId>paper-api</artifactId>
             <version>[26.1.2.build,)</version>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>com.fastasyncworldedit</groupId>
-            <artifactId>FastAsyncWorldEdit-Core</artifactId>
-            <version>2.11.2</version>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>com.fastasyncworldedit</groupId>
-            <artifactId>FastAsyncWorldEdit-Bukkit</artifactId>
-            <version>2.11.2</version>
             <scope>provided</scope>
         </dependency>
         <!-- Multiverse-Core (optionnel, soft-depend) -->
