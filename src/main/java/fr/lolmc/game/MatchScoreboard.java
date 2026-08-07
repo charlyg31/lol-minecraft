@@ -82,8 +82,9 @@ public class MatchScoreboard {
             var ms = stats.get(id);
             if (ms == null) continue;
             var cm = LolPlugin.getInstance().getChampionManager();
-            String champName = cm.hasChampion(Bukkit.getPlayer(id))
-                ? cm.getChampion(Bukkit.getPlayer(id)).getDisplayName() : "?";
+            var scoreboardPlayer = Bukkit.getPlayer(id);
+            String champName = (scoreboardPlayer != null && cm.hasChampion(scoreboardPlayer))
+                ? cm.getChampion(scoreboardPlayer).getDisplayName() : "?";
             lines.add(Component.text(String.format(
                 "  %-8s %-8s %5d %5d %5d %5d %8d %8d",
                 ms.name.length() > 8 ? ms.name.substring(0,8) : ms.name,

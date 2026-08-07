@@ -173,7 +173,13 @@ public class JungleManager {
         KEY_GOLD = new NamespacedKey(LolPlugin.getInstance(), "jungle_gold");
         this.jungleFile = new File(LolPlugin.getInstance().getDataFolder(), "jungle.yml");
         if (!jungleFile.exists()) {
-            try { jungleFile.createNewFile(); } catch (Exception ignored) {}
+            try {
+                if (!jungleFile.createNewFile()) {
+                    LolPlugin.getInstance().getLogger().warning("Impossible de créer jungle.yml.");
+                }
+            } catch (Exception e) {
+                LolPlugin.getInstance().getLogger().warning("Échec de création de jungle.yml : " + e.getMessage());
+            }
         }
         this.config = YamlConfiguration.loadConfiguration(jungleFile);
         load();
@@ -1078,7 +1084,9 @@ public class JungleManager {
         if (section == null) return;
         for (String id : section.getKeys(false)) {
             String path = "camps." + id + ".";
-            var world = LolPlugin.getInstance().getServer().getWorld(config.getString(path + "world"));
+            String worldName = config.getString(path + "world");
+            if (worldName == null) continue;
+            var world = LolPlugin.getInstance().getServer().getWorld(worldName);
             if (world == null) continue;
             MonsterType type = MonsterType.valueOf(config.getString(path + "type"));
             Location loc = new Location(world,
@@ -1102,15 +1110,13 @@ public class JungleManager {
         try {
             MonsterType type = MonsterType.valueOf(monsterTypeName.toUpperCase());
             var entity = loc.getWorld().spawn(loc, org.bukkit.entity.Zombie.class);
-            if (entity instanceof org.bukkit.entity.LivingEntity le) {
-                var pdc = le.getPersistentDataContainer();
-                pdc.set(KEY_MONSTER, org.bukkit.persistence.PersistentDataType.STRING, type.name());
-                var hpAttr = le.getAttribute(fr.lolmc.util.Compat.maxHealth());
-                if (hpAttr != null) { hpAttr.setBaseValue(Math.min(type.maxHP, 1024.0)); le.setHealth(Math.min(type.maxHP, 1024.0)); }
-                if (type.maxHP > 1024.0) fr.lolmc.util.VirtualHP.init(le, type.maxHP);
-                liveMonsters.put(le.getUniqueId(), type);
-                // Apparence appliquée par applyMonsterAppearance si configurée
-            }
+            var pdc = entity.getPersistentDataContainer();
+            pdc.set(KEY_MONSTER, org.bukkit.persistence.PersistentDataType.STRING, type.name());
+            var hpAttr = entity.getAttribute(fr.lolmc.util.Compat.maxHealth());
+            if (hpAttr != null) { hpAttr.setBaseValue(Math.min(type.maxHP, 1024.0)); entity.setHealth(Math.min(type.maxHP, 1024.0)); }
+            if (type.maxHP > 1024.0) fr.lolmc.util.VirtualHP.init(entity, type.maxHP);
+            liveMonsters.put(entity.getUniqueId(), type);
+            // Apparence appliquée par applyMonsterAppearance si configurée
         } catch (IllegalArgumentException e) {
             LolPlugin.getInstance().getLogger().warning("Monster inconnu: " + monsterTypeName);
         }

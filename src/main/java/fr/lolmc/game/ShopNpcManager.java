@@ -30,7 +30,13 @@ public class ShopNpcManager implements Listener {
         KEY_SHOP_NPC = new NamespacedKey(LolPlugin.getInstance(), "shop_npc");
         this.npcFile = new File(LolPlugin.getInstance().getDataFolder(), "npcs.yml");
         if (!npcFile.exists()) {
-            try { npcFile.createNewFile(); } catch (Exception ignored) {}
+            try {
+                if (!npcFile.createNewFile()) {
+                    LolPlugin.getInstance().getLogger().warning("Impossible de créer npcs.yml.");
+                }
+            } catch (Exception e) {
+                LolPlugin.getInstance().getLogger().warning("Échec de création de npcs.yml : " + e.getMessage());
+            }
         }
         this.config = org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(npcFile);
     }

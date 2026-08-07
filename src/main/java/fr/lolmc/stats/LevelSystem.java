@@ -114,7 +114,6 @@ public class LevelSystem {
         if (slot == 4) {
             int currentR = abilityRanks[4];
             int[] requiredLevels = {6, 11, 16};
-            if (currentR >= requiredLevels.length) return false;
             if (level < requiredLevels[currentR]) return false;
         }
 
@@ -144,7 +143,6 @@ public class LevelSystem {
         if (slot == 4) {
             int[] req = {6, 11, 16};
             int cur = abilityRanks[4];
-            if (cur >= req.length) return false;
             return level >= req[cur];
         }
         return true;

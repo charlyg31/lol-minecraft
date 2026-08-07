@@ -27,14 +27,14 @@ public class EntityDeathListener implements Listener {
     /** XP de proximité : quand un sbire meurt, tous les champions alliés dans 14 blocs reçoivent de l'XP. */
     @EventHandler
     public void onMinionDeath(EntityDeathEvent e) {
-        if (!(e.getEntity() instanceof org.bukkit.entity.LivingEntity le)) return;
+        org.bukkit.entity.LivingEntity le = e.getEntity();
         if (!fr.lolmc.game.MinionManager.isMinion(le)) return;
         fr.lolmc.team.TeamManager.Team minionTeam = fr.lolmc.game.MinionManager.getMinionTeam(le);
         if (minionTeam == null) return;
 
         // XP pour les champions ennemis proches (rayon 14 blocs comme LoL)
         // On exclut le killer (il reçoit son XP via onMinionKill)
-        Player killer = e.getEntity().getKiller();
+        Player killer = le.getKiller();
         for (Player p : le.getWorld().getPlayers()) {
             if (p.equals(killer)) continue; // le killer a déjà son XP
             if (!championManager.hasChampion(p)) continue;
@@ -118,8 +118,9 @@ public class EntityDeathListener implements Listener {
                 if (assistant != null && assistant.isOnline()
                         && championManager.hasChampion(assistant)) {
                     LolPlugin.getInstance().getGoldManager().addGold(aid, fr.lolmc.game.RewardManager.GOLD_ASSIST);
+                    rewardManager.grantProximityXP(assistant, fr.lolmc.game.RewardManager.XP_ASSIST);
                     assistant.sendActionBar(net.kyori.adventure.text.Component.text(
-                        String.format("🤝 ASSIST! +%d or", fr.lolmc.game.RewardManager.GOLD_ASSIST),
+                        String.format("🤝 ASSIST! +%d or +%.0f XP", fr.lolmc.game.RewardManager.GOLD_ASSIST, fr.lolmc.game.RewardManager.XP_ASSIST),
                         net.kyori.adventure.text.format.NamedTextColor.YELLOW));
                     LolPlugin.getInstance().getMatchScoreboard().addAssist(assistant);
                     LolPlugin.getInstance().getRuneManager().onTakedown(assistant);
@@ -131,7 +132,7 @@ public class EntityDeathListener implements Listener {
                 && championManager.hasChampion(victim)) {
             rewardManager.onChampionKill(killer, victim);
             // Annonce (Premier Sang, multi-kills)
-            LolPlugin.getInstance().getAnnouncementManager().announceKill(killer, victim);
+            LolPlugin.getInstance().getAnnouncementManager().announceKill(killer);
             LolPlugin.getInstance().getAnnouncementManager().onPlayerDeath(victim);
             // MasterYi Highlander reset sur kill
             var killerChamp = championManager.getChampion(killer);
@@ -160,6 +161,9 @@ public class EntityDeathListener implements Listener {
                     fr.lolmc.game.FeatManager.Feat.FIRST_BLOOD, killerTeam, killer);
             // Timer de respawn
             LolPlugin.getInstance().getGameManager().onPlayerDeath(victim);
+            // Consommables : annule les potions de soin en cours à la mort
+            var cm = LolPlugin.getInstance().getConsumableManager();
+            if (cm != null) cm.onPlayerDeath(victim);
             // Runes : Triomphe, Absorption (soin/or sur takedown)
             LolPlugin.getInstance().getRuneManager().onTakedown(killer);
         }

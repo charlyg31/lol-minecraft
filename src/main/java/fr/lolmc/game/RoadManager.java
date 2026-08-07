@@ -51,7 +51,13 @@ public class RoadManager {
     public RoadManager() {
         this.roadFile = new File(LolPlugin.getInstance().getDataFolder(), "roads.yml");
         if (!roadFile.exists()) {
-            try { roadFile.createNewFile(); } catch (Exception ignored) {}
+            try {
+                if (!roadFile.createNewFile()) {
+                    LolPlugin.getInstance().getLogger().warning("Impossible de créer roads.yml.");
+                }
+            } catch (Exception e) {
+                LolPlugin.getInstance().getLogger().warning("Échec de création de roads.yml : " + e.getMessage());
+            }
         }
         this.config = YamlConfiguration.loadConfiguration(roadFile);
         load();

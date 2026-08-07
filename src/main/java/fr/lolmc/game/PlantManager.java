@@ -118,8 +118,7 @@ public class PlantManager implements Listener {
                 p.type == PlantType.HONEYFRUIT ? NamedTextColor.GOLD
                         : p.type == PlantType.BLASTCONE ? NamedTextColor.RED
                         : NamedTextColor.AQUA));
-        if (stand.getEquipment() != null)
-            stand.getEquipment().setHelmet(new ItemStack(p.type.icon));
+        stand.getEquipment().setHelmet(new ItemStack(p.type.icon));
         stand.getScoreboardTags().add("lol_plant");
         p.markerId = stand.getUniqueId();
     }

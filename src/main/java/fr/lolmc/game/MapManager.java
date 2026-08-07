@@ -44,7 +44,13 @@ public class MapManager {
         this.schematics = schematics;
         this.mapFile = new File(LolPlugin.getInstance().getDataFolder(), "map.yml");
         if (!mapFile.exists()) {
-            try { mapFile.createNewFile(); } catch (Exception ignored) {}
+            try {
+                if (!mapFile.createNewFile()) {
+                    LolPlugin.getInstance().getLogger().warning("Impossible de créer map.yml.");
+                }
+            } catch (Exception e) {
+                LolPlugin.getInstance().getLogger().warning("Échec de création de map.yml : " + e.getMessage());
+            }
         }
         this.config = YamlConfiguration.loadConfiguration(mapFile);
         load();
@@ -60,7 +66,13 @@ public class MapManager {
         // Utiliser la même map.yml que le template
         this.mapFile = new File(LolPlugin.getInstance().getDataFolder(), "map.yml");
         if (!mapFile.exists()) {
-            try { mapFile.createNewFile(); } catch (Exception ignored) {}
+            try {
+                if (!mapFile.createNewFile()) {
+                    LolPlugin.getInstance().getLogger().warning("Impossible de créer map.yml.");
+                }
+            } catch (Exception e) {
+                LolPlugin.getInstance().getLogger().warning("Échec de création de map.yml : " + e.getMessage());
+            }
         }
         this.config = YamlConfiguration.loadConfiguration(mapFile);
         load();
@@ -141,6 +153,7 @@ public class MapManager {
         for (String key : section.getKeys(false)) {
             String path = "structures." + key + ".";
             String worldName = config.getString(path + "world");
+            if (worldName == null) continue;
             var world = LolPlugin.getInstance().getServer().getWorld(worldName);
             if (world == null) continue;
 
@@ -268,7 +281,9 @@ public class MapManager {
         if (section != null) {
             for (String key : section.getKeys(false)) {
                 String path = "spawns." + key + ".";
-                var world = LolPlugin.getInstance().getServer().getWorld(config.getString(path + "world"));
+                String worldName = config.getString(path + "world");
+                if (worldName == null) continue;
+                var world = LolPlugin.getInstance().getServer().getWorld(worldName);
                 if (world == null) continue;
                 Location loc = new Location(world,
                         config.getDouble(path + "x"),

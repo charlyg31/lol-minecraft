@@ -300,7 +300,7 @@ public class LolItem {
 
     /** Définit la recette : les IDs des composants qui construisent cet item. */
     public LolItem recipe(String... componentIds) {
-        for (String c : componentIds) buildsFrom.add(c);
+        java.util.Collections.addAll(buildsFrom, componentIds);
         return this;
     }
     public java.util.List<String> getBuildsFrom() { return buildsFrom; }

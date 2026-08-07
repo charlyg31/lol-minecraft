@@ -30,8 +30,8 @@ public class SchematicManager {
         this.plugin = plugin;
         this.gson = new GsonBuilder().setPrettyPrinting().create();
         this.schematicsFolder = new File(plugin.getDataFolder(), "schematics");
-        if (!schematicsFolder.exists()) {
-            schematicsFolder.mkdirs();
+        if (!schematicsFolder.exists() && !schematicsFolder.mkdirs()) {
+            plugin.getLogger().warning("Impossible de créer le dossier schematics/.");
         }
     }
 

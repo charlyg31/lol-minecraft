@@ -59,14 +59,15 @@ public class SkinManager {
         if (!f.exists()) createDefaultFile(f);
 
         FileConfiguration cfg = YamlConfiguration.loadConfiguration(f);
-        if (!cfg.isConfigurationSection("skins")) {
-            LolPlugin.getInstance().getLogger().warning("skins.yml : section \'skins\' manquante.");
+        var skinsSection = cfg.getConfigurationSection("skins");
+        if (skinsSection == null) {
+            LolPlugin.getInstance().getLogger().warning("skins.yml : section 'skins' manquante.");
             return;
         }
-        for (String key : cfg.getConfigurationSection("skins").getKeys(false)) {
+        for (String key : skinsSection.getKeys(false)) {
             String value = cfg.getString("skins." + key + ".value", "");
             String sig   = cfg.getString("skins." + key + ".signature", "");
-            if (value != null && !value.isEmpty() && sig != null && !sig.isEmpty()) {
+            if (!value.isEmpty() && !sig.isEmpty()) {
                 skins.put(key.toLowerCase(), new Skin(value, sig));
             }
         }
@@ -152,7 +153,10 @@ public class SkinManager {
     }
 
     private void createDefaultFile(File f) {
-        LolPlugin.getInstance().getDataFolder().mkdirs();
+        if (!LolPlugin.getInstance().getDataFolder().mkdirs()
+                && !LolPlugin.getInstance().getDataFolder().exists()) {
+            LolPlugin.getInstance().getLogger().warning("Impossible de créer le dossier de données du plugin.");
+        }
         try {
             YamlConfiguration def = new YamlConfiguration();
             def.set("# Générer les skins sur https://mineskin.org", null);

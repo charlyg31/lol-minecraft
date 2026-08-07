@@ -26,12 +26,11 @@ public class ForfeitManager {
     private static final double VOTE_RATIO   = 3.0 / 5.0;       // 3/5
 
     private final Map<Team, Set<UUID>>   votes      = new EnumMap<>(Team.class);
-    private final Map<Team, Long>        voteStart  = new EnumMap<>(Team.class);
     private final Map<Team, org.bukkit.scheduler.BukkitTask> timers = new EnumMap<>(Team.class);
 
     public void reset() {
         timers.values().forEach(t -> { if (t != null) t.cancel(); });
-        votes.clear(); voteStart.clear(); timers.clear();
+        votes.clear(); timers.clear();
     }
 
     /**
@@ -62,7 +61,6 @@ public class ForfeitManager {
         // Démarrer un nouveau vote si aucun en cours
         if (!votes.containsKey(team)) {
             votes.put(team, new HashSet<>());
-            voteStart.put(team, System.currentTimeMillis());
             broadcastTeam(team, Component.text(
                 "🏳 Vote d'abandon lancé par " + player.getName() + " ! /l ff pour voter (60s)",
                 NamedTextColor.YELLOW));
@@ -70,7 +68,7 @@ public class ForfeitManager {
             var task = new BukkitRunnable() {
                 @Override public void run() {
                     if (votes.containsKey(team)) {
-                        votes.remove(team); voteStart.remove(team); timers.remove(team);
+                        votes.remove(team); timers.remove(team);
                         broadcastTeam(team, Component.text(
                             "🏳 Vote d'abandon expiré.", NamedTextColor.GRAY));
                     }
@@ -89,7 +87,10 @@ public class ForfeitManager {
 
         // Compter les membres de l'équipe en ligne
         int total = tm.getTeamMembers(team).stream()
-            .mapToInt(id -> Bukkit.getPlayer(id) != null && Bukkit.getPlayer(id).isOnline() ? 1 : 0)
+            .mapToInt(id -> {
+                var p = Bukkit.getPlayer(id);
+                return (p != null && p.isOnline()) ? 1 : 0;
+            })
             .sum();
         int needed = (int) Math.ceil(total * VOTE_RATIO);
 
@@ -100,7 +101,7 @@ public class ForfeitManager {
         if (teamVotes.size() >= needed) {
             // Abandon !
             timers.get(team).cancel();
-            votes.remove(team); voteStart.remove(team); timers.remove(team);
+            votes.remove(team); timers.remove(team);
             Bukkit.broadcast(Component.text(
                 "🏳 L'équipe " + (team == Team.BLUE ? "Bleue" : "Rouge") + " abandonne !",
                 NamedTextColor.RED));

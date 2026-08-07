@@ -105,12 +105,16 @@ public class InstanceManager {
 
                 // 4. Enregistrer les joueurs
                 for (UUID uid : blue) {
+                    var p = Bukkit.getPlayer(uid);
+                    if (p == null) continue; // déconnecté entre l'inscription et le lancement
                     playerMap.put(uid, instance);
-                    instance.addPlayer(Bukkit.getPlayer(uid), TeamManager.Team.BLUE);
+                    instance.addPlayer(p, TeamManager.Team.BLUE);
                 }
                 for (UUID uid : red) {
+                    var p = Bukkit.getPlayer(uid);
+                    if (p == null) continue;
                     playerMap.put(uid, instance);
-                    instance.addPlayer(Bukkit.getPlayer(uid), TeamManager.Team.RED);
+                    instance.addPlayer(p, TeamManager.Team.RED);
                 }
 
                 instance.setState(GameInstance.State.READY);
