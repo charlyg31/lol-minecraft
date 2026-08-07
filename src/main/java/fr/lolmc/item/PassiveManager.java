@@ -37,6 +37,8 @@ public class PassiveManager {
 
     // État par joueur
     private final Map<UUID, ItemState> states = new HashMap<>();
+    /** Abyssal Mask : porteur -> (ennemi affecté -> montant de MR retiré), pour un retrait exact. */
+    private final Map<UUID, java.util.Map<UUID, Double>> abyssalAffected = new HashMap<>();
 
     // Tâches BukkitTask stockées pour annulation propre
     private final java.util.List<org.bukkit.scheduler.BukkitTask> tasks = new java.util.ArrayList<>();
@@ -286,11 +288,11 @@ public class PassiveManager {
             else if (hasAnyItem(attacker,"lich_bane"))
                 spellbladeDmg = as.calcMagicalDamage(1.5 * as.getBaseAD() + 0.4 * as.getFinalAP(), vs);
             else if (hasAnyItem(attacker,"sheen"))
-                spellbladeDmg = as.calcPhysicalDamage(1.0 * as.getBaseAD(), vs);
+                spellbladeDmg = as.calcPhysicalDamage(as.getBaseAD(), vs);
             else if (hasAnyItem(attacker,"divine_sunderer"))
                 spellbladeDmg = as.calcPhysicalDamage(1.25 * as.getBaseAD() + 0.06 * vhp.getMaxHP(), vs);
             else if (hasAnyItem(attacker,"essence_reaver"))
-                spellbladeDmg = as.calcPhysicalDamage(as.getBaseAD() * 1.0, vs);
+                spellbladeDmg = as.calcPhysicalDamage(as.getBaseAD(), vs);
             if (spellbladeDmg > 0) {
                 vhp.takeDamage(spellbladeDmg);
                 fr.lolmc.util.VisualEffectUtil.impact(attacker.getWorld(),
@@ -395,10 +397,7 @@ public class PassiveManager {
                 BaseChampion champ = championManager.getChampion(attacker);
                 for (int i = 1; i <= 4; i++) {
                     var ability = champ.getAbility(i);
-                    if (ability != null) {
-                        // Simuler -1s de CD en avançant le timestamp
-                        // Géré via triggerCooldown avec offset
-                    }
+                    if (ability != null) ability.reduceCooldown(attacker, 1.0);
                 }
             }
         }
@@ -414,8 +413,17 @@ public class PassiveManager {
 
         // ── Navori Quickblades: si crit → -15% CD sorts ──
         if (hasAnyItem(attacker,"navori_quickblades") && isCrit) {
-            // Réduire les CD actifs de 15%
-            // Implémenté comme bonus CD reducé dans getCurrentCooldown()
+            var navoriCm = LolPlugin.getInstance().getChampionManager();
+            if (navoriCm.hasChampion(attacker)) {
+                var navoriChamp = navoriCm.getChampion(attacker);
+                for (int i = 1; i <= 4; i++) {
+                    var navoriAbil = navoriChamp.getAbility(i);
+                    if (navoriAbil != null) {
+                        double remaining = navoriAbil.getRemainingCooldown(attacker);
+                        if (remaining > 0) navoriAbil.reduceCooldown(attacker, remaining * 0.15);
+                    }
+                }
+            }
         }
 
         // ── Leona Lumière du Soleil : allié frappe cible marquée ──
@@ -507,7 +515,7 @@ public class PassiveManager {
             long now=System.currentTimeMillis(); ItemState stsr=getState(attacker);
             if (now-stsr.lastStormrazor > 18000) {
                 stsr.lastStormrazor = now;
-                if (victim instanceof Player vp) vp.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,10,5,false,false));
+                victim.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,10,5,false,false));
             }
         }
         // ── Phage : +15 MS 2s ──
@@ -619,11 +627,7 @@ public class PassiveManager {
         // ── Morgana Siphon de l'Âme : soin sur sorts (20% dégâts) ──
         { var __cm = LolPlugin.getInstance().getChampionManager();
             if (__cm.hasChampion(caster) && "morgana".equals(__cm.getChampion(caster).getId())) {
-                boolean isChampOrMonster = (victim instanceof Player)
-                        || fr.lolmc.game.JungleManager.isJungleMonster(victim);
-                if (isChampOrMonster) {
-                    __cm.getChampion(caster).getHPSystem().heal(rawDamage * 0.20);
-                }
+                __cm.getChampion(caster).getHPSystem().heal(rawDamage * 0.20);
             }}
 
         // ── Taste of Blood : soin sur dégâts à champion (CD 20s) ──
@@ -1021,10 +1025,11 @@ public class PassiveManager {
         state.lastGaleforce = System.currentTimeMillis();
         ChampionStats stats = champ.getStats();
         double projDmg = stats.calcPhysicalDamage(200 + stats.getFinalAD() * 0.60, null);
-        // Animation dash : traînée de particules
+        // Animation dash : traînée de BlockDisplay
         Location dashStart = player.getLocation().clone();
-        Location dashDest = player.getTargetBlockExact(10) != null
-                ? player.getTargetBlockExact(10).getLocation()
+        var dashTargetBlock = player.getTargetBlockExact(10);
+        Location dashDest = dashTargetBlock != null
+                ? dashTargetBlock.getLocation()
                 : player.getLocation().add(player.getLocation().getDirection().multiply(10));
         Location dashSafe = safeLocation(dashStart, dashDest);
         // Traînée avant téléportation
@@ -1086,8 +1091,10 @@ public class PassiveManager {
             sendCDMessage(player, "Redemption", state.lastRedemption, 120000L); return;
         }
         state.lastRedemption = System.currentTimeMillis();
-        Location target = (player.getTargetBlockExact(30) != null ? player.getTargetBlockExact(30).getLocation() : player.getLocation().add(player.getLocation().getDirection().multiply(30)));
-        if (target == null) target = player.getLocation();
+        var redemptionTargetBlock = player.getTargetBlockExact(30);
+        Location target = redemptionTargetBlock != null
+                ? redemptionTargetBlock.getLocation()
+                : player.getLocation().add(player.getLocation().getDirection().multiply(30));
         final Location healLoc = target;
         player.sendActionBar(Component.text("💫 Redemption lancé! (2.5s)", NamedTextColor.WHITE));
         new BukkitRunnable() {
@@ -1150,8 +1157,11 @@ public class PassiveManager {
             sendCDMessage(player, "Rocketbelt", state.lastHextechRocket, 90000L); return;
         }
         state.lastHextechRocket = System.currentTimeMillis();
-        Location dst = (player.getTargetBlockExact(5) != null ? player.getTargetBlockExact(5).getLocation() : player.getLocation().add(player.getLocation().getDirection().multiply(5)));
-        if (dst != null) player.teleport(safeLocation(player.getLocation(), dst));
+        var rocketTargetBlock = player.getTargetBlockExact(5);
+        Location dst = rocketTargetBlock != null
+                ? rocketTargetBlock.getLocation()
+                : player.getLocation().add(player.getLocation().getDirection().multiply(5));
+        player.teleport(safeLocation(player.getLocation(), dst));
         double missileDmg = champ.getStats().calcMagicalDamage(75 + champ.getStats().getFinalAP() * 0.15, null);
         player.getWorld().getNearbyEntities(player.getLocation(), 6, 2, 6).stream()
                 .filter(e -> e instanceof Player && !e.equals(player))
@@ -1268,16 +1278,44 @@ public class PassiveManager {
             @Override public void run() {
                 for (Player p : WorldContext.getGamePlayers()) {
                     if (!championManager.hasChampion(p)) continue;
-                    if (!hasAnyItem(p,"abyssal_mask")) continue;
-                    p.getWorld().getNearbyEntities(p.getLocation(), 5, 2, 5).stream()
-                            .filter(e -> e instanceof Player && !e.equals(p))
-                            .forEach(e -> {
-                                Player enemy = (Player) e;
-                                if (championManager.hasChampion(enemy)) {
-                                    // Appliquer -15% MR temporairement (reset chaque tick)
-                                    // Implémenté via un debuff dans ChampionStats
-                                }
-                            });
+                    var currentlyAffected = abyssalAffected.computeIfAbsent(p.getUniqueId(), _ -> new java.util.HashMap<>());
+                    if (!hasAnyItem(p,"abyssal_mask")) {
+                        // Objet retiré/vendu : lever tous les debuffs actifs de ce porteur
+                        for (var entry : currentlyAffected.entrySet()) {
+                            var enemy = org.bukkit.Bukkit.getPlayer(entry.getKey());
+                            if (enemy != null && championManager.hasChampion(enemy)) {
+                                championManager.getChampion(enemy).getStats().addBonusMR(entry.getValue());
+                            }
+                        }
+                        currentlyAffected.clear();
+                        continue;
+                    }
+                    var nowNearbyIds = p.getWorld().getNearbyEntities(p.getLocation(), 5, 2, 5).stream()
+                            .filter(e -> e instanceof Player enemyP && !e.equals(p) && championManager.hasChampion(enemyP))
+                            .map(e -> e.getUniqueId())
+                            .collect(java.util.stream.Collectors.toSet());
+                    // Ennemis sortis de l'aura : retirer exactement le montant appliqué
+                    var it = currentlyAffected.entrySet().iterator();
+                    while (it.hasNext()) {
+                        var entry = it.next();
+                        if (nowNearbyIds.contains(entry.getKey())) continue;
+                        var enemy = org.bukkit.Bukkit.getPlayer(entry.getKey());
+                        if (enemy != null && championManager.hasChampion(enemy)) {
+                            championManager.getChampion(enemy).getStats().addBonusMR(entry.getValue());
+                        }
+                        it.remove();
+                    }
+                    // Nouveaux ennemis entrés dans l'aura : appliquer le debuff, stocker le montant exact
+                    for (UUID enemyId : nowNearbyIds) {
+                        if (currentlyAffected.containsKey(enemyId)) continue;
+                        var enemy = org.bukkit.Bukkit.getPlayer(enemyId);
+                        if (enemy != null && championManager.hasChampion(enemy)) {
+                            var enemyStats = championManager.getChampion(enemy).getStats();
+                            double debuff = enemyStats.getFinalMR() * 0.15;
+                            enemyStats.addBonusMR(-debuff);
+                            currentlyAffected.put(enemyId, debuff); // à réappliquer exactement au retrait
+                        }
+                    }
                 }
             }
         }.runTaskTimer(LolPlugin.getInstance(), 0L, 10L));
@@ -1435,10 +1473,12 @@ public class PassiveManager {
     /** Nettoie l'état d'un joueur (déconnexion / fin de partie). */
     public void cleanup(java.util.UUID uuid) {
         states.remove(uuid);
+        abyssalAffected.remove(uuid);
     }
 
     /** Nettoie tous les états (fin de partie / onDisable). */
     public void cleanupAll() {
         states.clear();
+        abyssalAffected.clear();
     }
 }

@@ -80,7 +80,8 @@ public class PreGameGUI implements Listener {
                             selected ? "Clique pour retirer" : "Clique pour ajouter", NamedTextColor.GRAY)
                     .decoration(TextDecoration.ITALIC, false)));
             if (selected) {
-                meta.addEnchant(fr.lolmc.util.Compat.glowEnchant(), 1, true);
+                var glow = fr.lolmc.util.Compat.glowEnchant();
+                if (glow != null) meta.addEnchant(glow, 1, true);
                 meta.addItemFlags(org.bukkit.inventory.ItemFlag.HIDE_ENCHANTS);
             }
             item.setItemMeta(meta);

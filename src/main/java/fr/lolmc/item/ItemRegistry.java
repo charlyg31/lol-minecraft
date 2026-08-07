@@ -419,6 +419,8 @@ public class ItemRegistry {
     }
 
     private static void reg(LolItem item) { ITEMS.put(item.getId(), item); }
+    /** Force le chargement de cette classe (déclenche le bloc static d'enregistrement des objets). */
+    public static void ensureLoaded() { /* no-op : l'appel suffit à déclencher le bloc static */ }
     public static LolItem get(String id)  { return ITEMS.get(id); }
     public static Collection<LolItem> all()             { return ITEMS.values(); }
     public static Map<String, LolItem> getAll()         { return ITEMS; }

@@ -39,7 +39,6 @@ public class ConsumableManager {
     // Charges fiole rechargeable
     private final Map<UUID, Integer> refillableCharges = new HashMap<>();
     // Wards placées par joueur
-    private final Map<UUID, Integer> wardCharges = new HashMap<>();
     // Élixir actif
     private final Map<UUID, String> activeElixir = new HashMap<>();
     private final Map<UUID, Long> elixirExpire = new HashMap<>();
@@ -227,10 +226,10 @@ public class ConsumableManager {
 
     /** Place une ward visible (bloc de lumière temporaire) */
     public boolean placeWard(Player player, boolean visible) {
-        Location target = (player.getTargetBlockExact(20) != null
-                ? player.getTargetBlockExact(20).getLocation()
-                : player.getLocation().add(player.getLocation().getDirection().multiply(20)));
-        if (target == null) target = player.getLocation();
+        var targetBlock = player.getTargetBlockExact(20);
+        Location target = targetBlock != null
+                ? targetBlock.getLocation()
+                : player.getLocation().add(player.getLocation().getDirection().multiply(20));
 
         // Pose sur la surface (au-dessus du sol visé) sans détruire de bloc.
         final Location wardLoc = surfaceLocation(target);
@@ -270,10 +269,10 @@ public class ConsumableManager {
 
     /** Control Ward: révèle et détruit les wards ennemies proches */
     public void placeControlWard(Player player) {
-        Location target = (player.getTargetBlockExact(15) != null
-                ? player.getTargetBlockExact(15).getLocation()
-                : player.getLocation().add(player.getLocation().getDirection().multiply(15)));
-        if (target == null) target = player.getLocation();
+        var targetBlock = player.getTargetBlockExact(15);
+        Location target = targetBlock != null
+                ? targetBlock.getLocation()
+                : player.getLocation().add(player.getLocation().getDirection().multiply(15));
 
         final Location wardLoc = surfaceLocation(target);
 
@@ -331,7 +330,7 @@ public class ConsumableManager {
             stand.setCustomNameVisible(nameVisible);
             stand.customName(Component.text(name, NamedTextColor.AQUA));
             var eq = stand.getEquipment();
-            if (eq != null) eq.setHelmet(new ItemStack(headMat));
+            eq.setHelmet(new ItemStack(headMat));
             stand.getScoreboardTags().add("lol_ward");
         });
         return as.getUniqueId();
@@ -425,7 +424,6 @@ public class ConsumableManager {
 
     // Getters
     public int getRefillableCharges(Player p) { return refillableCharges.getOrDefault(p.getUniqueId(), 0); }
-    public int getWardCharges(Player p) { return wardCharges.getOrDefault(p.getUniqueId(), 0); }
     public String getActiveElixir(Player p) { return activeElixir.get(p.getUniqueId()); }
 
     /** Récupère les blocs dans un rayon (getNearbyBlocks n'existe pas en Paper). */

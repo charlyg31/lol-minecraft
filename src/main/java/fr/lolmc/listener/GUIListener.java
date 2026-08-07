@@ -101,7 +101,7 @@ public class GUIListener implements Listener {
         if (event.getSlot() == 5 || event.getRawSlot() == 5) {
             // Vérifier que c'est bien notre tête LoL
             ItemStack current = player.getInventory().getHelmet();
-            if (current != null && isChampionHead(current)) {
+            if (isChampionHead(current)) {
                 event.setCancelled(true);
                 player.sendActionBar(Component.text(
                     "⚠ Tu ne peux pas retirer le casque de champion!",
@@ -112,7 +112,7 @@ public class GUIListener implements Listener {
         // Empêcher aussi le shift-click sur le casque depuis l'inventaire
         if (event.isShiftClick()) {
             ItemStack clicked = event.getCurrentItem();
-            if (clicked != null && isChampionHead(clicked)) {
+            if (isChampionHead(clicked)) {
                 event.setCancelled(true);
             }
         }

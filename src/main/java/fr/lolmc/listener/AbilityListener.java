@@ -125,7 +125,7 @@ public class AbilityListener implements Listener {
 
             if (secs > 0) {
                 // Quantité = secondes restantes (chiffre rouge visible sur l'item)
-                item.setAmount(Math.max(1, Math.min(64, secs)));
+                item.setAmount(Math.clamp(secs, 1, 64));
                 var meta = item.getItemMeta();
                 if (meta != null) {
                     meta.displayName(net.kyori.adventure.text.Component.text(
@@ -225,13 +225,10 @@ public class AbilityListener implements Listener {
         // ── Contrôle de Tibbers (Annie) : clic gauche avec le R en main = envoyer Tibbers ──
         var tibbersEnt = fr.lolmc.champion.impl.mid.Annie.getActiveTibbers(caster);
         if (tibbersEnt instanceof org.bukkit.entity.PolarBear tib
-                && "ability".equals(t)
                 && "r_annie".equals(HotbarManager.getId(held))) {
             fr.lolmc.champion.impl.mid.Annie.onTibbersControl(caster, tib);
             return;
         }
-
-        if (!"ability".equals(t)) return;
 
         onLeftClickCast(caster, slot, held, null);
     }
@@ -459,11 +456,12 @@ public class AbilityListener implements Listener {
             boolean canUp = champ.getLevelSystem().canLevelUp(slot);
             var meta = item.getItemMeta();
             if (meta == null) continue;
+            var glow = Compat.glowEnchant();
             if (canUp) {
-                meta.addEnchant(Compat.glowEnchant(), 1, true);
+                if (glow != null) meta.addEnchant(glow, 1, true);
                 meta.addItemFlags(org.bukkit.inventory.ItemFlag.HIDE_ENCHANTS);
             } else {
-                meta.removeEnchant(Compat.glowEnchant());
+                if (glow != null) meta.removeEnchant(glow);
             }
             item.setItemMeta(meta);
         }
@@ -623,7 +621,7 @@ public class AbilityListener implements Listener {
         if (slot == 0) {
             var aam2 = LolPlugin.getInstance().getAutoAttackManager();
             aam2.tryAutoAttack(caster, target);
-            if (target != null) aam2.toggleLock(caster, target);
+            aam2.toggleLock(caster, target);
         } else if (slot >= 1 && slot <= 4) {
             // Le débounce est déjà appliqué en amont (onArmSwing / onLeftClick)
             manager.getChampion(caster).tryUseAbility(caster, slot, target);

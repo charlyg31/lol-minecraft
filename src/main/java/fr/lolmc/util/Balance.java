@@ -54,7 +54,7 @@ public final class Balance {
     /** Tableau de cooldown par rang d'un sort, ou null si non défini (→ valeur du code). */
     public static double[] cd(String abilityId) {
         List<Double> l = cfg().getDoubleList(abilityId + ".cooldown");
-        return (l == null || l.isEmpty()) ? null : toArray(l);
+        return l.isEmpty() ? null : toArray(l);
     }
 
     /** Coût en ressource d'un sort, ou la valeur par défaut du code si non défini. */
@@ -66,7 +66,7 @@ public final class Balance {
     /** Tableau de dégâts de base d'un sort, ou le défaut du code si non défini. */
     public static double[] base(String abilityId, double[] def) {
         List<Double> l = cfg().getDoubleList(abilityId + ".base");
-        return (l == null || l.isEmpty()) ? def : toArray(l);
+        return l.isEmpty() ? def : toArray(l);
     }
 
     /** Ratio nommé d'un sort (ad, ap, hp...), ou le défaut du code si non défini. */

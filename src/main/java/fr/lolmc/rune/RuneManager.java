@@ -41,7 +41,14 @@ public class RuneManager {
     public RuneManager() {
         this.runeFile = new java.io.File(LolPlugin.getInstance().getDataFolder(), "runes.yml");
         if (!runeFile.exists()) {
-            try { runeFile.createNewFile(); } catch (Exception ignored) {}
+            try {
+                if (!runeFile.createNewFile()) {
+                    LolPlugin.getInstance().getLogger().warning(
+                        "Impossible de créer runes.yml (fichier existait déjà entre le check et la création ?)");
+                }
+            } catch (Exception e) {
+                LolPlugin.getInstance().getLogger().warning("Échec de création de runes.yml : " + e.getMessage());
+            }
         }
         this.runeConfig = org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(runeFile);
         loadAllPages();
@@ -571,8 +578,13 @@ public class RuneManager {
         String minorsStr = data.getOrDefault("minors", "");
         if (!minorsStr.isEmpty()) {
             String[] parts = minorsStr.split(",");
-            for (int i = 0; i < Math.min(parts.length, 6); i++) {
-//                 if (i < page.minors.length) page.minors[i] = parts[i].trim();
+            page.primaryRunes.clear();
+            page.secondaryRunes.clear();
+            for (int i = 0; i < Math.min(parts.length, 5); i++) {
+                String rune = parts[i].trim();
+                if (rune.isEmpty()) continue;
+                if (i < 3) page.primaryRunes.add(rune);
+                else page.secondaryRunes.add(rune);
             }
         }
         playerPages.put(player.getUniqueId(), page);

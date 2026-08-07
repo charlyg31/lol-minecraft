@@ -232,10 +232,9 @@ public final class TargetingUtil {
             // Sbire ou monstre : dégât direct (pas de système de résistance LoL)
             double newHealth = Math.max(0, target.getHealth() - amount);
             target.setHealth(newHealth);
-            HealthBar.update(target, newHealth,
-                target.getAttribute(Compat.maxHealth()) != null
-                    ? target.getAttribute(Compat.maxHealth()).getValue()
-                    : target.getMaxHealth());
+            var maxHpAttr = target.getAttribute(Compat.maxHealth());
+            double maxHp = maxHpAttr != null ? maxHpAttr.getValue() : target.getMaxHealth();
+            HealthBar.update(target, newHealth, maxHp);
             fr.lolmc.util.VisualEffectUtil.impact(target.getWorld(),
                     target.getLocation().add(0, 1, 0), Material.WHITE_STAINED_GLASS, 0.28f, 4L);
         }

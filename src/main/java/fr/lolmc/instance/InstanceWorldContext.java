@@ -61,6 +61,6 @@ public final class InstanceWorldContext {
         String template = LolPlugin.getInstance().getConfig()
             .getString("world.template", "lolmc_template");
         World w = player.getWorld();
-        return w != null && w.getName().equals(template);
+        return w.getName().equals(template);
     }
 }

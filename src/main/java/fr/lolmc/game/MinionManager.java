@@ -174,23 +174,23 @@ public class MinionManager {
             z.setTarget(null);
             double baseHp = (type == MinionType.CASTER) ? CASTER_HP : MINION_HP;
             double safeHp = Math.min(baseHp, 1024.0);
-            z.getAttribute(Compat.maxHealth()).setBaseValue(safeHp);
+            var maxHpAttr = z.getAttribute(Compat.maxHealth());
+            if (maxHpAttr != null) maxHpAttr.setBaseValue(safeHp);
             z.setHealth(safeHp);
-            z.getAttribute(Compat.movementSpeed()).setBaseValue(MINION_SPEED);
+            var msAttr = z.getAttribute(Compat.movementSpeed());
+            if (msAttr != null) msAttr.setBaseValue(MINION_SPEED);
             // Tag PDC
             z.getPersistentDataContainer().set(KEY_MINION, PersistentDataType.BYTE, (byte) 1);
             z.getPersistentDataContainer().set(KEY_TEAM, PersistentDataType.STRING, team.name());
             z.getPersistentDataContainer().set(KEY_LANE, PersistentDataType.STRING, lane);
             // Supprimer l'équipement vanilla (armes, armures)
             var eq = z.getEquipment();
-            if (eq != null) {
-                eq.setItemInMainHand(null);
-                eq.setItemInOffHand(null);
-                eq.setHelmet(null);
-                eq.setChestplate(null);
-                eq.setLeggings(null);
-                eq.setBoots(null);
-            }
+            eq.setItemInMainHand(null);
+            eq.setItemInOffHand(null);
+            eq.setHelmet(null);
+            eq.setChestplate(null);
+            eq.setLeggings(null);
+            eq.setBoots(null);
         });
         applyMinionModel(minion, type, team, type == MinionType.CASTER ? 0.7f : (type == MinionType.CANNON ? 1.0f : 0.8f));
         // Barre de vie APRÈS makeInvisible (forcer visible=true car Paper cache le name sur les entités invisibles)
@@ -229,9 +229,11 @@ public class MinionManager {
             h.setShouldBurnInDay(false);
             h.setCustomNameVisible(true);
             double superHp = Math.min(MINION_HP * 3, 1000.0); // cap Paper 26.1.2 = 1024
-            h.getAttribute(Compat.maxHealth()).setBaseValue(superHp);
+            var maxHpAttr = h.getAttribute(Compat.maxHealth());
+            if (maxHpAttr != null) maxHpAttr.setBaseValue(superHp);
             h.setHealth(superHp);
-            h.getAttribute(Compat.movementSpeed()).setBaseValue(MINION_SPEED);
+            var msAttr = h.getAttribute(Compat.movementSpeed());
+            if (msAttr != null) msAttr.setBaseValue(MINION_SPEED);
             h.getPersistentDataContainer().set(KEY_MINION, PersistentDataType.BYTE, (byte) 1);
             h.getPersistentDataContainer().set(KEY_TEAM, PersistentDataType.STRING, team.name());
             h.getPersistentDataContainer().set(KEY_LANE, PersistentDataType.STRING, lane);

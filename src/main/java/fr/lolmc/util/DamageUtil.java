@@ -59,8 +59,9 @@ public class DamageUtil {
     }
 
     public static void damage(Player attacker, Player victim, double rawAmount, boolean isAbility, Type type) {
+        if (victim == null) return; // garde : victim ne devrait jamais être null, mais évite un NPE en cascade
         // Aggro sbires + tour : mécanique de laning LoL
-        if (attacker != null && victim != null) {
+        if (attacker != null) {
             var aggro = fr.lolmc.LolPlugin.getInstance().getAggroManager();
             if (aggro != null) aggro.onChampionAttack(attacker, victim);
             // Interrompre la canalisation de TP de la victime
@@ -175,7 +176,7 @@ public class DamageUtil {
         }
 
         // 7. Vérifier la mort
-        if (vc.getHPSystem().isDead()) {
+        if (vc.getHPSystem().isDead() && hud != null) {
             hud.triggerDeath(victim, attacker);
         }
     }
@@ -185,15 +186,6 @@ public class DamageUtil {
     /** Dégâts déjà calculés, type physique par défaut (compat ancienne signature). */
     public static void damage(Player attacker, Player victim, double amount, boolean isAbility) {
         damage(attacker, victim, amount, isAbility, Type.PHYSICAL);
-    }
-
-    /** Dégât de sort (physique par défaut — les sorts magiques utilisent abilityDamageMagic). */
-    public static void abilityDamage(Player attacker, Player victim, double amount) {
-        damage(attacker, victim, amount, true, Type.PHYSICAL);
-    }
-
-    public static void abilityDamageMagic(Player attacker, Player victim, double amount) {
-        damage(attacker, victim, amount, true, Type.MAGICAL);
     }
 
     public static void trueDamage(Player attacker, Player victim, double amount) {

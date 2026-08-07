@@ -92,7 +92,7 @@ public class MatchmakingManager {
         }
         if (toRemove != null) {
             queue.remove(toRemove);
-            inQueue.removeAll(toRemove);
+            inQueue.removeAll(new HashSet<>(toRemove));
             for (UUID id : toRemove) {
                 Player p = Bukkit.getPlayer(id);
                 if (p != null) p.sendMessage(Component.text("Recherche annulée.", NamedTextColor.GRAY));
@@ -128,7 +128,7 @@ public class MatchmakingManager {
         used.addAll(result.blueGroups);
         used.addAll(result.redGroups);
         queue.removeAll(used);
-        for (List<UUID> g : used) inQueue.removeAll(g);
+        for (List<UUID> g : used) inQueue.removeAll(new HashSet<>(g));
 
         // Aplatir en listes de joueurs
         List<UUID> blue = new ArrayList<>();
@@ -166,9 +166,8 @@ public class MatchmakingManager {
             // Groupes restants après avoir retiré l'équipe bleue
             Set<Integer> usedBlue = new HashSet<>(blueIdx);
             List<List<UUID>> remaining = new ArrayList<>();
-            List<Integer> remapIndex = new ArrayList<>();
             for (int i = 0; i < groups.size(); i++) {
-                if (!usedBlue.contains(i)) { remaining.add(groups.get(i)); remapIndex.add(i); }
+                if (!usedBlue.contains(i)) remaining.add(groups.get(i));
             }
             // Chercher une équipe rouge = 5 dans le reste
             List<List<Integer>> redCombos = subsetsSummingTo(remaining, PLAYERS_PER_TEAM);

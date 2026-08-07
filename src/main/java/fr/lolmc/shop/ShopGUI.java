@@ -157,7 +157,8 @@ public class ShopGUI {
     private ItemStack decorateBrowse(ItemStack stack, LolItem item) {
         ItemMeta m = stack.getItemMeta();
         if (m == null) return stack;
-        List<Component> lore = m.lore() != null ? new ArrayList<>(m.lore()) : new ArrayList<>();
+        var existingLore = m.lore();
+        List<Component> lore = existingLore != null ? new ArrayList<>(existingLore) : new ArrayList<>();
         lore.add(Component.empty());
         if (!item.getBuildsFrom().isEmpty())
             lore.add(Component.text("🧬 " + item.getBuildsFrom().size() + " composants",
@@ -220,7 +221,8 @@ public class ShopGUI {
             ItemStack stack = it.buildItemStack();
             ItemMeta m = stack.getItemMeta();
             if (m != null) {
-                List<Component> lore = m.lore() != null ? new ArrayList<>(m.lore()) : new ArrayList<>();
+                var existingLore = m.lore();
+                List<Component> lore = existingLore != null ? new ArrayList<>(existingLore) : new ArrayList<>();
                 lore.add(Component.empty());
                 lore.add(Component.text("▶ Clic : voir cet item", NamedTextColor.YELLOW)
                     .decoration(TextDecoration.ITALIC, false));
@@ -283,7 +285,6 @@ public class ShopGUI {
     public boolean isDetailView(Player player) {
         if (!detailItem.containsKey(player.getUniqueId())) return false;
         var view = player.getOpenInventory();
-        if (view == null) return false;
         String title = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
             .plainText().serialize(view.title());
         return title.startsWith(DETAIL_PREFIX);

@@ -49,8 +49,8 @@ public class MinimapManager implements Listener {
 
     private static final long PING_DURATION_MS = 5000L;
 
-    private int centerX = 0, centerZ = 0;
-    private MapView.Scale scale = MapView.Scale.FARTHEST;
+    private int centerX, centerZ;
+    private MapView.Scale scale;
 
     private MapView sharedView = null;
 
@@ -67,7 +67,9 @@ public class MinimapManager implements Listener {
         centerZ = cfg.getInt("minimap.center-z", 0);
         try {
             scale = MapView.Scale.valueOf(cfg.getString("minimap.scale", "FARTHEST"));
-        } catch (IllegalArgumentException ignored) { scale = MapView.Scale.FARTHEST; }
+        } catch (IllegalArgumentException ignored) {
+            scale = MapView.Scale.FARTHEST;
+        }
     }
 
     // ──────────────────────────────────────────────────────────────
@@ -97,7 +99,7 @@ public class MinimapManager implements Listener {
     /** Donne la minimap dans la main secondaire du joueur. */
     public void giveMinimap(Player player) {
         World world = player.getWorld();
-        if (sharedView == null || !sharedView.getWorld().equals(world)) {
+        if (sharedView == null || !world.equals(sharedView.getWorld())) {
             sharedView = Bukkit.createMap(world);
             sharedView.setScale(scale);
             sharedView.setCenterX(centerX);
@@ -120,7 +122,7 @@ public class MinimapManager implements Listener {
     /** Retire la minimap de la main secondaire si présente. */
     public void removeMinimap(Player player) {
         ItemStack off = player.getInventory().getItemInOffHand();
-        if (off != null && off.getType() == Material.FILLED_MAP) {
+        if (off.getType() == Material.FILLED_MAP) {
             player.getInventory().setItemInOffHand(null);
         }
     }

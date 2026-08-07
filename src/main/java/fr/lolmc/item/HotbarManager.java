@@ -286,7 +286,8 @@ public class HotbarManager {
         ItemMeta meta = stack.getItemMeta();
         if (meta != null) {
             // Ajouter un indicateur "ACTIF — clic droit"
-            List<Component> lore = meta.lore() != null ? new ArrayList<>(meta.lore()) : new ArrayList<>();
+            var existingLore = meta.lore();
+            List<Component> lore = existingLore != null ? new ArrayList<>(existingLore) : new ArrayList<>();
             lore.add(Component.text("➤ ACTIF — clic droit", NamedTextColor.GOLD)
                     .decoration(TextDecoration.ITALIC, false));
             meta.lore(lore);

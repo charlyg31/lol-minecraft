@@ -35,7 +35,13 @@ public class PlayerPreferences {
     public PlayerPreferences() {
         this.file = new File(LolPlugin.getInstance().getDataFolder(), "preferences.yml");
         if (!file.exists()) {
-            try { file.createNewFile(); } catch (Exception ignored) {}
+            try {
+                if (!file.createNewFile()) {
+                    LolPlugin.getInstance().getLogger().warning("Impossible de créer preferences.yml.");
+                }
+            } catch (Exception e) {
+                LolPlugin.getInstance().getLogger().warning("Échec de création de preferences.yml : " + e.getMessage());
+            }
         }
         this.config = YamlConfiguration.loadConfiguration(file);
         load();
