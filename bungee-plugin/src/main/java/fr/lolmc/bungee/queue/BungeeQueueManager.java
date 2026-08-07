@@ -153,8 +153,9 @@ public class BungeeQueueManager {
             if (solo == null) continue;
 
             List<String> roles = roleManager.getRoles(uid);
-            boolean wantsRole = roles.contains(missingRole)
-                || roles.containsAll(List.of("TOP","JUNGLE","MID","ADC","SUPPORT"));
+            Set<String> rolesSet = new java.util.HashSet<>(roles);
+            boolean wantsRole = rolesSet.contains(missingRole)
+                || rolesSet.containsAll(List.of("TOP","JUNGLE","MID","ADC","SUPPORT"));
 
             if (wantsRole) {
                 // Cherche déjà ce rôle → ajout direct sans proposition

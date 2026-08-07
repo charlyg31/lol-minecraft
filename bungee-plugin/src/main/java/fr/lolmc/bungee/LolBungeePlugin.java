@@ -37,7 +37,9 @@ public class LolBungeePlugin extends Plugin {
     @Override
     public void onEnable() {
         instance = this;
-        getDataFolder().mkdirs();
+        if (!getDataFolder().mkdirs() && !getDataFolder().exists()) {
+            getLogger().warning("Impossible de créer le dossier de données du plugin.");
+        }
         loadConfig();
 
         // Init managers
@@ -74,8 +76,8 @@ public class LolBungeePlugin extends Plugin {
             try (java.io.InputStream in = getResourceAsStream("config.yml")) {
                 if (in != null) {
                     java.nio.file.Files.copy(in, configFile.toPath());
-                } else {
-                    configFile.createNewFile();
+                } else if (!configFile.createNewFile()) {
+                    getLogger().warning("Impossible de créer config.yml.");
                 }
             } catch (java.io.IOException e) {
                 getLogger().warning("Erreur création config.yml: " + e.getMessage());

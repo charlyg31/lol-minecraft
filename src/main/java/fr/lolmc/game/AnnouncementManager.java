@@ -46,7 +46,7 @@ public class AnnouncementManager {
     /**
      * Annonce un kill de champion.
      */
-    public void announceKill(Player killer, Player victim) {
+    public void announceKill(Player killer) {
         long now = System.currentTimeMillis();
 
         // ── Premier Sang ──
@@ -59,11 +59,11 @@ public class AnnouncementManager {
         // ── Killing Spree (serie sans mourir) ──
         int spree = spreeStreak.merge(killer.getUniqueId(), 1, Integer::sum);
         String spreeMsg = switch (spree) {
-            case 3  -> "\u2694 KILLING SPREE!";
-            case 4  -> "\u2694\u2694 RAMPAGE!";
-            case 5  -> "\u2694\u2694\u2694 UNSTOPPABLE!";
-            case 6  -> "\u2694\u2694\u2694\u2694 DOMINATING!";
-            case 7  -> "\u2694\u2694\u2694\u2694\u2694 GODLIKE!";
+            case 3  -> "⚔ KILLING SPREE!";
+            case 4  -> "⚔⚔ RAMPAGE!";
+            case 5  -> "⚔⚔⚔ UNSTOPPABLE!";
+            case 6  -> "⚔⚔⚔⚔ DOMINATING!";
+            case 7  -> "⚔⚔⚔⚔⚔ GODLIKE!";
             default -> spree >= 8 ? "\uD83D\uDC51 LEGENDARY! (" + spree + " kills)" : null;
         };
         if (spreeMsg != null) {
