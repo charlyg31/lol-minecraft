@@ -1311,7 +1311,7 @@ public class PassiveManager {
                         var enemy = org.bukkit.Bukkit.getPlayer(enemyId);
                         if (enemy != null && championManager.hasChampion(enemy)) {
                             var enemyStats = championManager.getChampion(enemy).getStats();
-                            double debuff = enemyStats.getFinalMR() * 0.15;
+                            double debuff = enemyStats.getFinalMagicResist() * 0.15;
                             enemyStats.addBonusMR(-debuff);
                             currentlyAffected.put(enemyId, debuff); // à réappliquer exactement au retrait
                         }
