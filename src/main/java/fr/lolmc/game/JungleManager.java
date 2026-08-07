@@ -291,7 +291,7 @@ public class JungleManager {
         // Spawn de tous les mobs du groupe (groupCount)
         for (int i = 0; i < type.groupCount; i++) {
             // Décaler légèrement les mobs du groupe autour du centre
-            double angle = 2 * Math.PI * i / Math.max(1, type.groupCount);
+            double angle = 2 * Math.PI * i / type.groupCount;
             double radius = type.groupCount > 1 ? 1.5 : 0;
             Location spawnLoc = loc.clone().add(Math.cos(angle) * radius, 0, Math.sin(angle) * radius);
 
