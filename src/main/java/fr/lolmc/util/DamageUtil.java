@@ -79,6 +79,23 @@ public class DamageUtil {
         ChampionStats as = (attacker != null && cm.hasChampion(attacker))
                 ? cm.getChampion(attacker).getStats() : null;
 
+        if (isAbility && attacker != null) {
+            if (vs.consumeEonShield()) {
+                victim.sendActionBar(net.kyori.adventure.text.Component.text(
+                    "Annul - sort bloque!", net.kyori.adventure.text.format.NamedTextColor.AQUA));
+                attacker.sendActionBar(net.kyori.adventure.text.Component.text(
+                    "Sort bloque par un bouclier!", net.kyori.adventure.text.format.NamedTextColor.GRAY));
+                return;
+            }
+            if (vs.consumeBansheeShield()) {
+                victim.sendActionBar(net.kyori.adventure.text.Component.text(
+                    "Bouclier de Banshee - sort bloque!", net.kyori.adventure.text.format.NamedTextColor.AQUA));
+                attacker.sendActionBar(net.kyori.adventure.text.Component.text(
+                    "Sort bloque par un bouclier!", net.kyori.adventure.text.format.NamedTextColor.GRAY));
+                return;
+            }
+        }
+
         // 1. Résistance (armure/MR avec pénétration de l'attaquant)
         double afterResist;
         if (type == Type.TRUE || as == null) {

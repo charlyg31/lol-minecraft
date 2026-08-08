@@ -36,6 +36,8 @@ public class ChampionStats {
     // ── Grievous Wounds (antiheal) ──
     private double grievousWoundsReduction = 0; // 0.0 = normal, 0.40 = GW40, 0.60 = GW60
     private long grievousWoundsExpire = 0;       // timestamp d'expiration
+    private double serpentVenomReduction = 0;
+    private long serpentVenomExpire = 0;
 
     // ── Bonus objets ──
     private double bonusMaxHP, bonusAttackDamage, bonusAbilityPower;
@@ -211,7 +213,10 @@ public class ChampionStats {
     // BOUCLIERS (vrai système, se consument)
     // ══════════════════════════════════════════════
 
-    public void addShield(double amount)       { shieldAmount += amount; }
+    public void addShield(double amount)       {
+        if (hasSerpentVenom()) amount *= (1 - serpentVenomReduction);
+        shieldAmount += amount;
+    }
     public void addMagicShield(double amount)   { magicShieldAmount += amount; }
     public double getShield()                   { return shieldAmount + magicShieldAmount; }
 
@@ -235,6 +240,10 @@ public class ChampionStats {
     }
 
     public void clearShields() { shieldAmount = 0; magicShieldAmount = 0; }
+
+    public void reduceShield(double percent) {
+        shieldAmount = Math.max(0, shieldAmount * (1 - percent));
+    }
 
     // ══════════════════════════════════════════════
     // AJOUT BONUS (objets)
@@ -320,5 +329,37 @@ public class ChampionStats {
 
     public boolean hasGrievousWounds() {
         return grievousWoundsExpire > 0 && System.currentTimeMillis() <= grievousWoundsExpire;
+    }
+
+    public void applySerpentVenom(double percent, long durationMs) {
+        if (percent > serpentVenomReduction) serpentVenomReduction = percent;
+        long expire = System.currentTimeMillis() + durationMs;
+        if (expire > serpentVenomExpire) serpentVenomExpire = expire;
+    }
+
+    public boolean hasSerpentVenom() {
+        if (serpentVenomExpire > 0 && System.currentTimeMillis() > serpentVenomExpire) {
+            serpentVenomReduction = 0; serpentVenomExpire = 0;
+        }
+        return serpentVenomExpire > 0 && System.currentTimeMillis() <= serpentVenomExpire;
+    }
+
+    private boolean eonShieldReady = false;
+    private boolean bansheeShieldReady = false;
+
+    public void setEonShieldReady(boolean ready)     { eonShieldReady = ready; }
+    public boolean isEonShieldReady()                { return eonShieldReady; }
+    public boolean consumeEonShield() {
+        if (!eonShieldReady) return false;
+        eonShieldReady = false;
+        return true;
+    }
+
+    public void setBansheeShieldReady(boolean ready) { bansheeShieldReady = ready; }
+    public boolean isBansheeShieldReady()            { return bansheeShieldReady; }
+    public boolean consumeBansheeShield() {
+        if (!bansheeShieldReady) return false;
+        bansheeShieldReady = false;
+        return true;
     }
 }
