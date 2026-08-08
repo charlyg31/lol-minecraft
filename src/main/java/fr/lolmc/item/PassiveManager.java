@@ -308,6 +308,13 @@ public class PassiveManager {
             ahp.heal(botrkDmg * 0.10);
         }
 
+        if (hasAnyItem(attacker,"serpents_fang")) {
+            var serpentAAType = fr.lolmc.game.AutoAttackManager.getAAType(ac);
+            double serpentPercent = serpentAAType == fr.lolmc.game.AutoAttackManager.AAType.MELEE ? 0.50 : 0.35;
+            vs.reduceShield(serpentPercent);
+            vs.applySerpentVenom(serpentPercent, 3000L);
+        }
+
         // ── Kraken Slayer: 3ème AA = +150 vrais dégâts ──
         if (hasAnyItem(attacker,"kraken_slayer","kraken_slayer2")) {
             state.krakenStacks++;
@@ -621,7 +628,10 @@ public class PassiveManager {
 
         // ── Serpent's Fang: réduit boucliers ennemis ──
         if (!isMagical && hasAnyItem(caster,"serpents_fang")) {
-            // Les boucliers ne sont pas implémentés comme HP séparés → skip
+            var serpentAAType = fr.lolmc.game.AutoAttackManager.getAAType(ac);
+            double serpentPercent = serpentAAType == fr.lolmc.game.AutoAttackManager.AAType.MELEE ? 0.50 : 0.35;
+            vc.getStats().reduceShield(serpentPercent);
+            vc.getStats().applySerpentVenom(serpentPercent, 3000L);
         }
 
         // ── Morgana Siphon de l'Âme : soin sur sorts (20% dégâts) ──
@@ -1333,6 +1343,19 @@ public class PassiveManager {
 
         // ── Spirit Visage: marquer le joueur comme ayant +30% soins ──
         state.hasSpiritVisage = hasAnyItem(p,"spirit_visage");
+
+        if (hp.msSinceLastDamage() >= 40000L) {
+            if (hasAnyItem(p,"edge_of_night") && !stats.isEonShieldReady()) {
+                stats.setEonShieldReady(true);
+                p.sendActionBar(Component.text("Annul pret!", NamedTextColor.AQUA));
+            }
+            if (hasAnyItem(p,"banshees_veil") && !stats.isBansheeShieldReady()) {
+                stats.setBansheeShieldReady(true);
+                p.sendActionBar(Component.text("Bouclier de Banshee pret!", NamedTextColor.AQUA));
+            }
+        }
+        if (!hasAnyItem(p,"edge_of_night") && stats.isEonShieldReady()) stats.setEonShieldReady(false);
+        if (!hasAnyItem(p,"banshees_veil") && stats.isBansheeShieldReady()) stats.setBansheeShieldReady(false);
 
         // ── Jak'Sho: reset stacks hors combat ──
         if (!hp.isInCombat()) {

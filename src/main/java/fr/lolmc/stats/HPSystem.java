@@ -72,6 +72,10 @@ public class HPSystem {
         return (System.currentTimeMillis() - lastDamageTime) < COMBAT_COOLDOWN_MS;
     }
 
+    public long msSinceLastDamage() {
+        return lastDamageTime == 0 ? Long.MAX_VALUE : System.currentTimeMillis() - lastDamageTime;
+    }
+
     // ── Mapping Minecraft ─────────────────────────────────────────
 
     /**
