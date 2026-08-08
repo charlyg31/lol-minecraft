@@ -22,16 +22,16 @@ import org.bukkit.event.player.PlayerInteractEvent;
 import java.util.*;
 
 /**
- * Commande admin /lol pour configurer la carte.
+ * Commande admin /lola pour configurer la carte.
  *
- *   /lol set turret <top|mid|bot|base> <index>  → puis clic sur la case centrale
- *   /lol set nexus <top|mid|bot> <index>         → puis clic
- *   /lol set basenexus                           → puis clic (nexus principal)
- *   /lol position <blue|red> <1-5>               → puis clic au sol (spawn)
- *   /lol lane <top|mid|bot>                       → clics successifs = waypoints, /lol lane done
- *   /lol schem <pos1|pos2|save>                  → définition et sauvegarde de schématique d'ancre
- *   /lol start                                    → lance la partie (reset structures)
- *   /lol stop                                     → arrête la partie
+ *   /lola set turret <top|mid|bot|base> <index>  → puis clic sur la case centrale
+ *   /lola set nexus <top|mid|bot> <index>         → puis clic
+ *   /lola set basenexus                           → puis clic (nexus principal)
+ *   /lola position <blue|red> <1-5>               → puis clic au sol (spawn)
+ *   /lola lane <top|mid|bot>                       → clics successifs = waypoints, /lola lane done
+ *   /lola schem <pos1|pos2|save>                  → définition et sauvegarde de schématique d'ancre
+ *   /lola start                                    → lance la partie (reset structures)
+ *   /lola stop                                     → arrête la partie
  */
 public class LolCommand implements CommandExecutor, TabCompleter, Listener {
 
@@ -59,7 +59,7 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
     public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args) {
         if (!(sender instanceof Player player)) { sender.sendMessage("§cJoueur uniquement."); return true; }
 
-        // /lol → commandes joueur (uniquement ce qui n'est pas géré par BungeeCord)
+        // /lola → commandes joueur (uniquement ce qui n'est pas géré par BungeeCord)
         if (cmd.getName().equalsIgnoreCase("l")) {
             String sub = args.length > 0 ? args[0].toLowerCase() : "help";
             boolean inGame = LolPlugin.getInstance().getGameManager().isGameRunning()
@@ -99,11 +99,11 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
                     }
                 }
                 default -> {
-                    player.sendMessage(Component.text("§6=== Commandes /lol ===", NamedTextColor.GOLD));
-                    player.sendMessage(Component.text("§e/lol runes §7— Configurer ses runes"));
-                    player.sendMessage(Component.text("§e/lol ping <danger|omw|miss|assist|enemy> §7— Ping équipe"));
-                    player.sendMessage(Component.text("§e/lol ff §7— Vote d'abandon"));
-                    player.sendMessage(Component.text("§e/lol stats §7— Statistiques de la partie"));
+                    player.sendMessage(Component.text("§6=== Commandes /l ===", NamedTextColor.GOLD));
+                    player.sendMessage(Component.text("§e/l runes §7— Configurer ses runes"));
+                    player.sendMessage(Component.text("§e/l ping <danger|omw|miss|assist|enemy> §7— Ping équipe"));
+                    player.sendMessage(Component.text("§e/l ff §7— Vote d'abandon"));
+                    player.sendMessage(Component.text("§e/l stats §7— Statistiques de la partie"));
                     player.sendMessage(Component.text("§7File d'attente, groupes et rôles : §e/lol <top|mid|adc|jungle|support|all>", NamedTextColor.GRAY));
                 }
             }
@@ -213,11 +213,11 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
         return true;
     }
 
-    // ── /lol schem ────────────────────────────────────────────────
+    // ── /lola schem ────────────────────────────────────────────────
 
     private void handleSchem(Player player, String[] args) {
         if (args.length < 2) {
-            player.sendMessage("§cUsage: /lol schem <pos1|pos2|save> ...");
+            player.sendMessage("§cUsage: /lola schem <pos1|pos2|save> ...");
             return;
         }
 
@@ -242,7 +242,7 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
 
         if (subCommand.equals("save")) {
             if (args.length < 3) {
-                player.sendMessage("§cUsage: /lol schem save <nom_de_la_schematic>");
+                player.sendMessage("§cUsage: /lola schem save <nom_de_la_schematic>");
                 return;
             }
 
@@ -267,17 +267,17 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
             return;
         }
 
-        player.sendMessage("§cAction inconnue. Utilise /lol schem <pos1|pos2|save>");
+        player.sendMessage("§cAction inconnue. Utilise /lola schem <pos1|pos2|save>");
     }
 
-    // ── /lol set ──────────────────────────────────────────────────
+    // ── /lola set ──────────────────────────────────────────────────
 
     private void handleSet(Player player, String[] args) {
-        if (args.length < 2) { player.sendMessage("§cUsage: /lol set <turret|nexus|basenexus> ..."); return; }
+        if (args.length < 2) { player.sendMessage("§cUsage: /lola set <turret|nexus|basenexus> ..."); return; }
         String what = args[1].toLowerCase();
 
         if (what.equals("basenexus")) {
-            if (args.length < 3) { player.sendMessage("§cUsage: /lol set basenexus <blue|red>"); return; }
+            if (args.length < 3) { player.sendMessage("§cUsage: /lola set basenexus <blue|red>"); return; }
             Team team = parseTeam(args[2]);
             if (team == null) { player.sendMessage("§cÉquipe: blue ou red"); return; }
             pending.put(player.getUniqueId(), new PendingSetup("structure", Type.NEXUS_BASE, team, "base", 1, 0));
@@ -287,7 +287,7 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
         }
 
         if (args.length < 5) {
-            player.sendMessage("§cUsage: /lol set " + what + " <blue|red> <top|mid|bot|base> <index>");
+            player.sendMessage("§cUsage: /lola set " + what + " <blue|red> <top|mid|bot|base> <index>");
             return;
         }
         Type type = switch (what) {
@@ -318,10 +318,10 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
                 type.name().toLowerCase(), team.name(), lane, index), NamedTextColor.AQUA));
     }
 
-    // ── /lol position ─────────────────────────────────────────────
+    // ── /lola position ─────────────────────────────────────────────
 
     private void handlePosition(Player player, String[] args) {
-        if (args.length < 3) { player.sendMessage("§cUsage: /lol position <blue|red> <1-5>"); return; }
+        if (args.length < 3) { player.sendMessage("§cUsage: /lola position <blue|red> <1-5>"); return; }
         Team team = parseTeam(args[1]);
         if (team == null) { player.sendMessage("§cÉquipe: blue ou red"); return; }
         int pos;
@@ -334,10 +334,10 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
                 "👉 Clique au sol pour définir le spawn %s #%d.", team.name(), pos), NamedTextColor.AQUA));
     }
 
-    // ── /lol lane ─────────────────────────────────────────────────
+    // ── /lola lane ─────────────────────────────────────────────────
 
     private void handleLane(Player player, String[] args) {
-        if (args.length < 2) { player.sendMessage("§cUsage: /lol lane <top|mid|bot> | /lol lane done"); return; }
+        if (args.length < 2) { player.sendMessage("§cUsage: /lola lane <top|mid|bot> | /lola lane done"); return; }
         if (args[1].equalsIgnoreCase("done")) {
             List<Location> wps = laneSetup.remove(player.getUniqueId());
             String lane = laneSetupName.remove(player.getUniqueId());
@@ -355,10 +355,10 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
         laneSetupName.put(player.getUniqueId(), lane);
         player.sendMessage(Component.text(String.format(
                 "👉 Clique successivement sur le chemin de la lane %s (du spawn BLEU vers ROUGE). "
-                        + "Tape /lol lane done pour finir.", lane), NamedTextColor.AQUA));
+                        + "Tape /lola lane done pour finir.", lane), NamedTextColor.AQUA));
     }
 
-    // ── /lol debug ────────────────────────────────────────────────
+    // ── /lola debug ────────────────────────────────────────────────
 
     private void handleDebug(Player player, String[] args) {
         var plugin = LolPlugin.getInstance();
@@ -389,7 +389,7 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
                     return;
                 }
                 default -> {
-                    player.sendMessage(Component.text("Usage: /lol debug [on|off|clear|state] — sans argument: rapport d'état du joueur", NamedTextColor.GRAY));
+                    player.sendMessage(Component.text("Usage: /lola debug [on|off|clear|state] — sans argument: rapport d'état du joueur", NamedTextColor.GRAY));
                     return;
                 }
             }
@@ -440,7 +440,7 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
         player.sendMessage(Component.text("═══════════════════", NamedTextColor.YELLOW));
     }
 
-    // ── /lol solo ─────────────────────────────────────────────────
+    // ── /lola solo ─────────────────────────────────────────────────
 
     private void handleSolo(Player player, String[] args) {
         String champId = args.length >= 2 ? args[1].toLowerCase() : "garen";
@@ -470,7 +470,7 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
     }
 
     private void handleGive(Player player, String[] args) {
-        if (args.length < 2) { player.sendMessage("§cUsage: /lol give <champion>"); return; }
+        if (args.length < 2) { player.sendMessage("§cUsage: /lola give <champion>"); return; }
         String champId = args[1].toLowerCase();
         LolPlugin.getInstance().getChampionManager().assignChampion(player, champId);
         LolPlugin.getInstance().getRuneManager().applyRuneStats(player);
@@ -478,7 +478,7 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
     }
 
     private void handleLevel(Player player, String[] args) {
-        if (args.length < 2) { player.sendMessage("§cUsage: /lol level <1-18>"); return; }
+        if (args.length < 2) { player.sendMessage("§cUsage: /lola level <1-18>"); return; }
         var cm = LolPlugin.getInstance().getChampionManager();
         if (!cm.hasChampion(player)) { player.sendMessage("§cTu n'as pas de champion."); return; }
         int lvl;
@@ -494,7 +494,7 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
     }
 
     private void handleGold(Player player, String[] args) {
-        if (args.length < 2) { player.sendMessage("§cUsage: /lol gold <montant>"); return; }
+        if (args.length < 2) { player.sendMessage("§cUsage: /lola gold <montant>"); return; }
         int amount;
         try { amount = Integer.parseInt(args[1]); }
         catch (NumberFormatException e) { player.sendMessage("§cMontant invalide."); return; }
@@ -503,7 +503,7 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
     }
 
     private void handleTeamCmd(Player player, String[] args) {
-        if (args.length < 2) { player.sendMessage("§cUsage: /lol team <blue/red>"); return; }
+        if (args.length < 2) { player.sendMessage("§cUsage: /lola team <blue/red>"); return; }
         var team = parseTeam(args[1]);
         if (team == null) { player.sendMessage("§cÉquipe: blue ou red"); return; }
         LolPlugin.getInstance().getTeamManager().setTeam(player, team);
@@ -523,7 +523,7 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
     }
 
     private void handleShopNpc(Player player, String[] args) {
-        if (args.length < 2) { player.sendMessage("§cUsage: /lol shopnpc <blue|red>"); return; }
+        if (args.length < 2) { player.sendMessage("§cUsage: /lola shopnpc <blue|red>"); return; }
         Team team = parseTeam(args[1]);
         if (team == null) { player.sendMessage("§cÉquipe: blue ou red"); return; }
         LolPlugin.getInstance().getShopNpcManager().spawnShopNpc(player.getLocation(), team);
@@ -531,7 +531,7 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
     }
 
     private void handleMode(Player player, String[] args) {
-        if (args.length < 2) { player.sendMessage("§cUsage: /lol mode <ranked|normal>"); return; }
+        if (args.length < 2) { player.sendMessage("§cUsage: /lola mode <ranked|normal>"); return; }
         boolean ranked = args[1].equalsIgnoreCase("ranked") || args[1].equalsIgnoreCase("classe");
         LolPlugin.getInstance().getMatchScoreboard().startMatch(ranked);
         player.sendMessage(Component.text("✔ Mode de partie : " + (ranked ? "CLASSÉ" : "AMICAL"), NamedTextColor.GREEN));
@@ -539,7 +539,7 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
 
     private void handleJungle(Player player, String[] args) {
         if (args.length < 2) {
-            player.sendMessage("§cUsage: /lol jungle <type> [blue|red]");
+            player.sendMessage("§cUsage: /lola jungle <type> [blue|red]");
             return;
         }
         fr.lolmc.game.JungleManager.MonsterType type;
@@ -554,7 +554,7 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
         Team team = null;
         if (!isEpic) {
             if (args.length < 3) {
-                player.sendMessage("§cCe camp nécessite une équipe: /lol jungle " + args[1] + " <blue|red>");
+                player.sendMessage("§cCe camp nécessite une équipe: /lola jungle " + args[1] + " <blue|red>");
                 return;
             }
             team = parseTeam(args[2]);
@@ -578,7 +578,7 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
         }
 
         if (args.length < 3) {
-            player.sendMessage("§cUsage: /lol road <top|mid|bot> <blue|red> | /lol road end");
+            player.sendMessage("§cUsage: /lola road <top|mid|bot> <blue|red> | /lola road end");
             return;
         }
         String lane = args[1].toLowerCase();
@@ -596,7 +596,7 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
             tool.setItemMeta(meta);
         }
         player.getInventory().addItem(tool);
-        player.sendMessage(Component.text(String.format("🖌 Trace la route de la lane %s. Clique les blocs, puis /lol road end.", lane), NamedTextColor.AQUA));
+        player.sendMessage(Component.text(String.format("🖌 Trace la route de la lane %s. Clique les blocs, puis /lola road end.", lane), NamedTextColor.AQUA));
     }
 
     // ── Événement de Clic ─────────────────────────────────────────
@@ -688,13 +688,13 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
 
     private void sendHelp(Player p) {
         p.sendMessage(Component.text("═══ Configuration LoL ═══", NamedTextColor.GOLD));
-        p.sendMessage(Component.text("/lol set turret <blue|red> <top|mid|bot|base> <index>", NamedTextColor.AQUA));
-        p.sendMessage(Component.text("/lol set nexus <blue|red> <top|mid|bot> <index>", NamedTextColor.AQUA));
-        p.sendMessage(Component.text("/lol set basenexus <blue|red>", NamedTextColor.AQUA));
-        p.sendMessage(Component.text("/lol position <blue|red> <1-5>", NamedTextColor.AQUA));
-        p.sendMessage(Component.text("/lol lane <top|mid|bot> ... /lol lane done", NamedTextColor.AQUA));
-        p.sendMessage(Component.text("/lol schem <pos1|pos2|save>", NamedTextColor.YELLOW)); // AJOUT : Aide textuelle
-        p.sendMessage(Component.text("/lol start | /lol stop", NamedTextColor.AQUA));
+        p.sendMessage(Component.text("/lola set turret <blue|red> <top|mid|bot|base> <index>", NamedTextColor.AQUA));
+        p.sendMessage(Component.text("/lola set nexus <blue|red> <top|mid|bot> <index>", NamedTextColor.AQUA));
+        p.sendMessage(Component.text("/lola set basenexus <blue|red>", NamedTextColor.AQUA));
+        p.sendMessage(Component.text("/lola position <blue|red> <1-5>", NamedTextColor.AQUA));
+        p.sendMessage(Component.text("/lola lane <top|mid|bot> ... /lola lane done", NamedTextColor.AQUA));
+        p.sendMessage(Component.text("/lola schem <pos1|pos2|save>", NamedTextColor.YELLOW)); // AJOUT : Aide textuelle
+        p.sendMessage(Component.text("/lola start | /lola stop", NamedTextColor.AQUA));
     }
 
     @Override
@@ -724,12 +724,12 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
     // COMMANDES ADMIN AVANCÉES
     // ══════════════════════════════════════════════════════════════
 
-    // ── /lol spawn <type> [équipe] ─────────────────────────────────────
+    // ── /lola spawn <type> [équipe] ─────────────────────────────────────
     // Types: minion_melee, minion_caster, minion_cannon, minion_super,
     //        dragon, baron, herald, wolf, blue, red, gromp, raptor, krug
     private void handleSpawn(Player player, String[] args) {
         if (args.length < 2) {
-            player.sendMessage(Component.text("§c/lol spawn <entité> [team:blue|red]", NamedTextColor.RED));
+            player.sendMessage(Component.text("§c/lola spawn <entité> [team:blue|red]", NamedTextColor.RED));
             player.sendMessage(Component.text("§7Entités: minion_melee minion_caster minion_cannon minion_super", NamedTextColor.GRAY));
             player.sendMessage(Component.text("§7         dragon baron herald wolf blue red gromp raptor krug", NamedTextColor.GRAY));
             return;
@@ -760,12 +760,12 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
         }
     }
 
-    // ── /lol buff <type> [joueur] ─────────────────────────────────────
+    // ── /lola buff <type> [joueur] ─────────────────────────────────────
     // Buffs: red, blue, baron, dragon_infernal, dragon_ocean, dragon_mountain,
     //        dragon_cloud, dragon_chemtech, dragon_elder, dragon_soul
     private void handleBuff(Player player, String[] args) {
         if (args.length < 2) {
-            player.sendMessage(Component.text("§c/lol buff <type> [joueur]", NamedTextColor.RED));
+            player.sendMessage(Component.text("§c/lola buff <type> [joueur]", NamedTextColor.RED));
             player.sendMessage(Component.text("§7Types: red blue baron dragon_infernal dragon_ocean dragon_mountain dragon_cloud dragon_chemtech dragon_elder dragon_soul", NamedTextColor.GRAY));
             return;
         }
@@ -782,7 +782,7 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
         if (!target.equals(player)) target.sendMessage(Component.text("✔ Buff '" + buffType + "' reçu de " + player.getName(), NamedTextColor.GOLD));
     }
 
-    // ── /lol resetcd [joueur] ─────────────────────────────────────────────
+    // ── /lola resetcd [joueur] ─────────────────────────────────────────────
     // Remet tous les cooldowns de sorts à 0 pour le joueur
     private void handleResetCd(Player player, String[] args) {
         Player target = player;
@@ -811,9 +811,9 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
         if (!target.equals(player)) target.sendMessage(Component.text("✔ Tes cooldowns ont été réinitialisés par " + player.getName(), NamedTextColor.GOLD));
     }
 
-    // ── /lol hp <montant|full> [joueur] ───────────────────────────────────
+    // ── /lola hp <montant|full> [joueur] ───────────────────────────────────
     private void handleHp(Player player, String[] args) {
-        if (args.length < 2) { player.sendMessage(Component.text("§c/lol hp <montant|full> [joueur]", NamedTextColor.RED)); return; }
+        if (args.length < 2) { player.sendMessage(Component.text("§c/lola hp <montant|full> [joueur]", NamedTextColor.RED)); return; }
         Player target = player;
         if (args.length >= 3) {
             target = org.bukkit.Bukkit.getPlayerExact(args[2]);
@@ -836,33 +836,43 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
         }
     }
 
-    // ── /lol wave ────────────────────────────────────────────────────────
+    // ── /lola wave ────────────────────────────────────────────────────────
     // Force le spawn immédiat d'une vague de sbires
     private void handleWave(Player player) {
         LolPlugin.getInstance().getMinionManager().forceWave();
         player.sendMessage(Component.text("✔ Vague forcée!", NamedTextColor.GREEN));
     }
 
-    // ── /lol help ────────────────────────────────────────────────────────
+    // ── /lola help ────────────────────────────────────────────────────────
     private void handleAdminHelp(Player player) {
-        player.sendMessage(Component.text("═══ /lol — Commandes admin ═══", NamedTextColor.GOLD));
+        player.sendMessage(Component.text("═══ /lola — Commandes admin ═══", NamedTextColor.GOLD));
         String[][] cmds = {
-            {"/lol solo [champion]",        "Mode test solo (niveau 18, 20k or)"},
-            {"/lol give <champion>",         "Assigner un champion"},
-            {"/lol level <1-18>",            "Changer de niveau"},
-            {"/lol gold <montant>",          "Ajouter de l'or"},
-            {"/lol hp <montant|full> [j]",   "Modifier les HP"},
-            {"/lol resetcd [joueur]",        "Reset tous les cooldowns"},
-            {"/lol buff <type> [joueur]",    "Appliquer un buff"},
-            {"/lol spawn <entité> [team]",   "Spawner une entité"},
-            {"/lol wave",                    "Forcer une vague de sbires"},
-            {"/lol ff",                      "Vote de surrender"},
-            {"/lol start",                   "Lancer la partie"},
-            {"/lol stop",                    "Arrêter la partie"},
-            {"/lol testgame",                "Lancer une partie test"},
-            {"/lol debug on|off",            "Activer/désactiver le debug"},
-            {"/lol reload",                  "Recharger champions.yml"},
-            {"/lol permcheck",                "Vérifier les permissions de skin vs plugin.yml"},
+            {"/lola solo [champion]",        "Mode test solo (niveau 18, 20k or)"},
+            {"/lola give <champion>",         "Assigner un champion"},
+            {"/lola level <1-18>",            "Changer de niveau"},
+            {"/lola gold <montant>",          "Ajouter de l'or"},
+            {"/lola hp <montant|full> [j]",   "Modifier les HP"},
+            {"/lola resetcd [joueur]",        "Reset tous les cooldowns"},
+            {"/lola buff <type> [joueur]",    "Appliquer un buff"},
+            {"/lola spawn <entité> [team]",   "Spawner une entité"},
+            {"/lola wave",                    "Forcer une vague de sbires"},
+            {"/lola start",                   "Lancer la partie"},
+            {"/lola stop",                    "Arrêter la partie"},
+            {"/lola testgame",                "Lancer une partie test"},
+            {"/lola debug on|off",            "Activer/désactiver le debug"},
+            {"/lola reload",                  "Recharger champions.yml"},
+            {"/lola set <turret|nexus|basenexus> ...", "Placer une structure"},
+            {"/lola position <blue|red> <1-5>", "Définir un point de spawn"},
+            {"/lola center",                  "Définir le centre de la minimap ici"},
+            {"/lola lane <top|mid|bot> | done", "Tracer une lane"},
+            {"/lola schem <pos1|pos2|save> ...", "Gérer une schématique"},
+            {"/lola road <top|mid|bot|end> ...", "Tracer une route"},
+            {"/lola jungle <type> [blue|red]", "Spawner un monstre de jungle"},
+            {"/lola shopnpc <blue|red>",      "Créer un PNJ boutique ici"},
+            {"/lola mode <ranked|normal>",    "Définir le mode de partie"},
+            {"/lola team <blue|red>",         "Se placer dans une équipe"},
+            {"/lola select",                  "Lancer la sélection de champion pour tous"},
+            {"/lola permcheck",                "Vérifier les permissions de skin vs plugin.yml"},
         };
         for (String[] cmd : cmds) {
             player.sendMessage(Component.text("§e" + cmd[0] + " §7— " + cmd[1]));
