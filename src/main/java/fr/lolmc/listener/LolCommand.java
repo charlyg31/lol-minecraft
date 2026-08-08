@@ -1,9 +1,9 @@
 package fr.lolmc.listener;
 
 import fr.lolmc.LolPlugin;
+import org.jetbrains.annotations.NotNull;
 import fr.lolmc.game.GameStructure.Type;
 import fr.lolmc.game.MapManager;
-import java.util.Arrays;
 import fr.lolmc.team.TeamManager.Team;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -23,7 +23,6 @@ import java.util.*;
 
 /**
  * Commande admin /lola pour configurer la carte.
- *
  *   /lola set turret <top|mid|bot|base> <index>  → puis clic sur la case centrale
  *   /lola set nexus <top|mid|bot> <index>         → puis clic
  *   /lola set basenexus                           → puis clic (nexus principal)
@@ -56,7 +55,7 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
     }
 
     @Override
-    public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args) {
+    public boolean onCommand(@NotNull CommandSender sender, @NotNull Command cmd, @NotNull String label, @NotNull String[] args) {
         if (!(sender instanceof Player player)) { sender.sendMessage("§cJoueur uniquement."); return true; }
 
         // /lola → commandes joueur (uniquement ce qui n'est pas géré par BungeeCord)
@@ -224,50 +223,45 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
         String subCommand = args[1].toLowerCase();
         UUID uuid = player.getUniqueId();
 
-        if (subCommand.equals("pos1")) {
-            Location loc = player.getLocation().getBlock().getLocation();
-            Location[] sel = schematicSelections.computeIfAbsent(uuid, _ -> new Location[2]);
-            sel[0] = loc;
-            player.sendMessage(Component.text("✔ Position 1 définie à tes pieds : " + loc.getBlockX() + ", " + loc.getBlockY() + ", " + loc.getBlockZ(), NamedTextColor.GREEN));
-            return;
-        }
-
-        if (subCommand.equals("pos2")) {
-            Location loc = player.getLocation().getBlock().getLocation();
-            Location[] sel = schematicSelections.computeIfAbsent(uuid, _ -> new Location[2]);
-            sel[1] = loc;
-            player.sendMessage(Component.text("✔ Position 2 définie à tes pieds : " + loc.getBlockX() + ", " + loc.getBlockY() + ", " + loc.getBlockZ(), NamedTextColor.GREEN));
-            return;
-        }
-
-        if (subCommand.equals("save")) {
-            if (args.length < 3) {
-                player.sendMessage("§cUsage: /lola schem save <nom_de_la_schematic>");
-                return;
+        switch (subCommand) {
+            case "pos1" -> {
+                Location loc = player.getLocation().getBlock().getLocation();
+                Location[] sel = schematicSelections.computeIfAbsent(uuid, _ -> new Location[2]);
+                sel[0] = loc;
+                player.sendMessage(Component.text("✔ Position 1 définie à tes pieds : " + loc.getBlockX() + ", " + loc.getBlockY() + ", " + loc.getBlockZ(), NamedTextColor.GREEN));
             }
-
-            Location[] sel = schematicSelections.get(uuid);
-            if (sel == null || sel[0] == null || sel[1] == null) {
-                player.sendMessage(Component.text("❌ Erreur : Tu dois d'abord définir pos1 et pos2 !", NamedTextColor.RED));
-                return;
+            case "pos2" -> {
+                Location loc = player.getLocation().getBlock().getLocation();
+                Location[] sel = schematicSelections.computeIfAbsent(uuid, _ -> new Location[2]);
+                sel[1] = loc;
+                player.sendMessage(Component.text("✔ Position 2 définie à tes pieds : " + loc.getBlockX() + ", " + loc.getBlockY() + ", " + loc.getBlockZ(), NamedTextColor.GREEN));
             }
+            case "save" -> {
+                if (args.length < 3) {
+                    player.sendMessage("§cUsage: /lola schem save <nom_de_la_schematic>");
+                    return;
+                }
 
-            if (!sel[0].getWorld().equals(sel[1].getWorld())) {
-                player.sendMessage(Component.text("❌ Erreur : Les deux coins doivent être dans le même monde !", NamedTextColor.RED));
-                return;
+                Location[] sel = schematicSelections.get(uuid);
+                if (sel == null || sel[0] == null || sel[1] == null) {
+                    player.sendMessage(Component.text("❌ Erreur : Tu dois d'abord définir pos1 et pos2 !", NamedTextColor.RED));
+                    return;
+                }
+
+                if (!sel[0].getWorld().equals(sel[1].getWorld())) {
+                    player.sendMessage(Component.text("❌ Erreur : Les deux coins doivent être dans le même monde !", NamedTextColor.RED));
+                    return;
+                }
+
+                String name = args[2];
+                player.sendMessage(Component.text("⏳ Analyse de la zone et recherche du FOUR d'ancrage pour '" + name + "'...", NamedTextColor.YELLOW));
+
+                mapManager.getSchematics().saveSchematicWithAnchor(name, sel[0], sel[1]);
+
+                player.sendMessage(Component.text("✔ Sauvegarde de la schématique exécutée !", NamedTextColor.GREEN));
             }
-
-            String name = args[2];
-            player.sendMessage(Component.text("⏳ Analyse de la zone et recherche du FOUR d'ancrage pour '" + name + "'...", NamedTextColor.YELLOW));
-
-            // Appel direct à ton gestionnaire de schématiques
-            mapManager.getSchematics().saveSchematicWithAnchor(name, sel[0], sel[1]);
-
-            player.sendMessage(Component.text("✔ Sauvegarde de la schématique exécutée !", NamedTextColor.GREEN));
-            return;
+            default -> player.sendMessage("§cAction inconnue. Utilise /lola schem <pos1|pos2|save>");
         }
-
-        player.sendMessage("§cAction inconnue. Utilise /lola schem <pos1|pos2|save>");
     }
 
     // ── /lola set ──────────────────────────────────────────────────
@@ -484,7 +478,7 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
         int lvl;
         try { lvl = Integer.parseInt(args[1]); }
         catch (NumberFormatException e) { player.sendMessage("§cNiveau invalide."); return; }
-        lvl = Math.max(1, Math.min(18, lvl));
+        lvl = Math.clamp(lvl, 1, 18);
         var champ = cm.getChampion(player);
         champ.getLevelSystem().setLevel(lvl);
         champ.getLevelSystem().maxOutAbilities();
@@ -631,39 +625,44 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
 
         Location clicked = e.getClickedBlock().getLocation();
 
-        if (setup.kind().equals("structure")) {
-            int angle = 0;
-            String facingMsg = "orientation par défaut (Sud)";
-            var bd = e.getClickedBlock().getBlockData();
-            if (bd instanceof org.bukkit.block.data.Directional dir) {
-                angle = switch (dir.getFacing()) {
-                    case SOUTH -> 0;
-                    case WEST  -> 90;
-                    case NORTH -> 180;
-                    case EAST  -> 270;
-                    default    -> 0;
-                };
-                facingMsg = "orientée vers " + dir.getFacing() + " (" + angle + "°)";
-                e.getClickedBlock().setType(org.bukkit.Material.AIR);
+        switch (setup.kind()) {
+            case "structure" -> {
+                int angle = 0;
+                String facingMsg = "orientation par défaut (Sud)";
+                var bd = e.getClickedBlock().getBlockData();
+                if (bd instanceof org.bukkit.block.data.Directional dir) {
+                    angle = switch (dir.getFacing()) {
+                        case SOUTH -> 0;
+                        case WEST  -> 90;
+                        case NORTH -> 180;
+                        case EAST  -> 270;
+                        default    -> 0;
+                    };
+                    facingMsg = "orientée vers " + dir.getFacing() + " (" + angle + "°)";
+                    e.getClickedBlock().setType(org.bukkit.Material.AIR);
+                }
+                mapManager.setStructure(setup.type(), setup.team(), setup.lane(), setup.index(), clicked, angle);
+                var tier = pendingTier.remove(player.getUniqueId());
+                if (tier != null) {
+                    mapManager.setStructureTier(setup.type(), setup.team(), setup.lane(), setup.index(), tier);
+                }
+                player.sendMessage(Component.text("   ↳ " + facingMsg, NamedTextColor.GRAY));
+                showMarker(clicked.clone().add(0, 1, 0), setup.team());
+                player.sendMessage(Component.text(String.format("✔ %s %s %s #%d placé.", setup.type().name().toLowerCase(), setup.team().name(), setup.lane(), setup.index()), NamedTextColor.GREEN));
             }
-            mapManager.setStructure(setup.type(), setup.team(), setup.lane(), setup.index(), clicked, angle);
-            var tier = pendingTier.remove(player.getUniqueId());
-            if (tier != null) {
-                mapManager.setStructureTier(setup.type(), setup.team(), setup.lane(), setup.index(), tier);
+            case "jungle" -> {
+                var type = fr.lolmc.game.JungleManager.MonsterType.valueOf(setup.lane());
+                LolPlugin.getInstance().getJungleManager().setCamp(type, setup.team(), clicked.clone().add(0.5, 1, 0.5));
+                player.sendMessage(Component.text(String.format("✔ %s placé.", type.displayName), NamedTextColor.GREEN));
             }
-            player.sendMessage(Component.text("   ↳ " + facingMsg, NamedTextColor.GRAY));
-            showMarker(clicked.clone().add(0, 1, 0), setup.team());
-            player.sendMessage(Component.text(String.format("✔ %s %s %s #%d placé.", setup.type().name().toLowerCase(), setup.team().name(), setup.lane(), setup.index()), NamedTextColor.GREEN));
-        } else if (setup.kind().equals("jungle")) {
-            var type = fr.lolmc.game.JungleManager.MonsterType.valueOf(setup.lane());
-            LolPlugin.getInstance().getJungleManager().setCamp(type, setup.team(), clicked.clone().add(0.5, 1, 0.5));
-            player.sendMessage(Component.text(String.format("✔ %s placé.", type.displayName), NamedTextColor.GREEN));
-        } else if (setup.kind().equals("spawn")) {
-            Location spawnLoc = clicked.clone().add(0.5, 1, 0.5);
-            spawnLoc.setYaw(player.getLocation().getYaw());
-            spawnLoc.setPitch(0);
-            mapManager.setSpawn(setup.team(), setup.position(), spawnLoc);
-            player.sendMessage(Component.text(String.format("✔ Spawn %s #%d défini.", setup.team().name(), setup.position()), NamedTextColor.GREEN));
+            case "spawn" -> {
+                Location spawnLoc = clicked.clone().add(0.5, 1, 0.5);
+                spawnLoc.setYaw(player.getLocation().getYaw());
+                spawnLoc.setPitch(0);
+                mapManager.setSpawn(setup.team(), setup.position(), spawnLoc);
+                player.sendMessage(Component.text(String.format("✔ Spawn %s #%d défini.", setup.team().name(), setup.position()), NamedTextColor.GREEN));
+            }
+            default -> { }
         }
 
         pending.remove(player.getUniqueId());
@@ -698,7 +697,7 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
     }
 
     @Override
-    public List<String> onTabComplete(CommandSender sender, Command cmd, String alias, String[] args) {
+    public List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command cmd, @NotNull String alias, @NotNull String[] args) {
         if (args.length == 1) return List.of("set", "position", "lane", "schem", "road", "jungle", "shopnpc", "mode", "select", "solo", "give", "level", "gold", "team", "testgame", "debug", "reload", "start", "stop", "center"); // MODIFICATION : Injecté "schem"
         if (args.length == 2) {
             return switch (args[0].toLowerCase()) {
@@ -713,7 +712,6 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
             };
         }
         if (args.length == 3 && args[0].equalsIgnoreCase("set")) {
-            if (args[1].equalsIgnoreCase("basenexus")) return List.of("blue", "red");
             return List.of("blue", "red");
         }
         if (args.length == 4 && args[0].equalsIgnoreCase("set")) return List.of("top", "mid", "bot", "base");
