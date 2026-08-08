@@ -205,9 +205,9 @@ public class MinionManager {
             // HP du cannon plus élevé
             if (type == MinionType.CANNON) {
                 var hpAttr = minion.getAttribute(fr.lolmc.util.Compat.maxHealth());
-                double safeCannonHp = Math.min(CANNON_HP, 1024.0);
+                double safeCannonHp = 1024.0; // CANNON_HP (1257) depasse le plafond Paper 26.1.2, plafonne directement
                 if (hpAttr != null) { hpAttr.setBaseValue(safeCannonHp); minion.setHealth(safeCannonHp); }
-                if (CANNON_HP > 1024.0) fr.lolmc.util.VirtualHP.init(minion, CANNON_HP);
+                fr.lolmc.util.VirtualHP.init(minion, CANNON_HP);
             }
     }
 
@@ -228,7 +228,7 @@ public class MinionManager {
             h.setAdult(); // SÉCURITÉ : On s'assure également qu'il s'agit d'un adulte via l'API moderne
             h.setShouldBurnInDay(false);
             h.setCustomNameVisible(true);
-            double superHp = Math.min(MINION_HP * 3, 1000.0); // cap Paper 26.1.2 = 1024
+            double superHp = 1000.0; // cap Paper 26.1.2 = 1024 ; MINION_HP*3 (1431) le depasserait donc plafonne directement
             var maxHpAttr = h.getAttribute(Compat.maxHealth());
             if (maxHpAttr != null) maxHpAttr.setBaseValue(superHp);
             h.setHealth(superHp);
@@ -243,8 +243,8 @@ public class MinionManager {
                             : net.kyori.adventure.text.format.NamedTextColor.RED));
         });
         applyMinionModel(superMinion, MinionType.SUPER, team, 1.0f);
-        fr.lolmc.util.HealthBar.apply(superMinion, Math.min(MINION_HP * 3, 1000.0),
-            Math.min(MINION_HP * 3, 1000.0), team == Team.BLUE ? "🔵 Super-Sbire" : "🔴 Super-Sbire");
+        fr.lolmc.util.HealthBar.apply(superMinion, 1000.0,
+            1000.0, team == Team.BLUE ? "🔵 Super-Sbire" : "🔴 Super-Sbire");
         superMinion.setCustomNameVisible(true);
     }
 
