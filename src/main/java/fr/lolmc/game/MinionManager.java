@@ -9,8 +9,6 @@ import fr.lolmc.LolPlugin;
 import fr.lolmc.util.WorldContext;
 
 import fr.lolmc.team.TeamManager.Team;
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Location;
 import org.bukkit.NamespacedKey;
 import org.bukkit.entity.*;
@@ -33,7 +31,6 @@ public class MinionManager {
     public static NamespacedKey KEY_TEAM;
     public static NamespacedKey KEY_LANE;
 
-    private final MapManager mapManager;
     // Waypoints par lane : "top" → liste de points que les sbires suivent
     private final Map<String, List<Location>> blueLaneWaypoints = new HashMap<>();
     private final Map<String, List<Location>> redLaneWaypoints = new HashMap<>();
@@ -66,7 +63,6 @@ public class MinionManager {
     private enum MinionType { MELEE, CASTER, CANNON, SUPER }
 
     public MinionManager(MapManager mapManager) {
-        this.mapManager = mapManager;
         KEY_MINION = new NamespacedKey(LolPlugin.getInstance(), "minion");
         KEY_TEAM = new NamespacedKey(LolPlugin.getInstance(), "minion_team");
         KEY_LANE = new NamespacedKey(LolPlugin.getInstance(), "minion_lane");
@@ -173,7 +169,7 @@ public class MinionManager {
             // Empêcher le zombie de cibler les joueurs tout seul (IA vanilla)
             z.setTarget(null);
             double baseHp = (type == MinionType.CASTER) ? CASTER_HP : MINION_HP;
-            double safeHp = Math.min(baseHp, 1024.0);
+            double safeHp = baseHp; // toujours < 1024 (plafond Paper 26.1.2), Math.min etait superflu
             var maxHpAttr = z.getAttribute(Compat.maxHealth());
             if (maxHpAttr != null) maxHpAttr.setBaseValue(safeHp);
             z.setHealth(safeHp);
@@ -427,7 +423,7 @@ public class MinionManager {
                 return wp;
             }
         }
-        return waypoints.get(waypoints.size() - 1); // dernier point = base ennemie
+        return waypoints.getLast(); // dernier point = base ennemie
     }
 
     private Location getMinionSpawn(Team team, String lane) {
@@ -435,8 +431,8 @@ public class MinionManager {
         if (road == null || road.isEmpty()) return null;
         // Bleu spawn au début de la route, rouge à la fin
         return team == Team.BLUE
-                ? road.get(0).clone()
-                : road.get(road.size() - 1).clone();
+                ? road.getFirst().clone()
+                : road.getLast().clone();
     }
 
     // ── Helpers PDC ───────────────────────────────────────────────
@@ -532,6 +528,15 @@ public class MinionManager {
     /** Désactive les super-sbires sur une lane (inhibiteur repoussé). */
     public void onInhibitorRespawned(String key) {
         // key format: "BLUE_top" ou "RED_mid"
+        String[] parts = key.split("_", 2);
+        if (parts.length == 2) {
+            try {
+                disableSuperMinions(Team.valueOf(parts[0]), parts[1]);
+                return;
+            } catch (IllegalArgumentException ignored) {
+                // format inattendu, fallback ci-dessous
+            }
+        }
         superMinionLanes.remove(key);
     }
 
