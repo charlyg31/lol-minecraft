@@ -70,14 +70,7 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
                 case "ping" -> {
                     if (!inGame) { player.sendMessage(Component.text("❌ Disponible uniquement en partie.", NamedTextColor.RED)); break; }
                     String ptype = args.length > 1 ? args[1].toLowerCase() : "danger";
-                    var type = switch (ptype) {
-                        case "danger", "warn"          -> fr.lolmc.game.AnnouncementManager.PingType.DANGER;
-                        case "omw", "onmyway"          -> fr.lolmc.game.AnnouncementManager.PingType.ON_MY_WAY;
-                        case "miss", "missing", "mia"  -> fr.lolmc.game.AnnouncementManager.PingType.MISSING;
-                        case "assist"                  -> fr.lolmc.game.AnnouncementManager.PingType.ASSIST;
-                        case "enemy", "here"           -> fr.lolmc.game.AnnouncementManager.PingType.ENEMY;
-                        default                        -> fr.lolmc.game.AnnouncementManager.PingType.DANGER;
-                    };
+                    var type = parsePingType(ptype);
                     LolPlugin.getInstance().getAnnouncementManager().sendPing(player, type);
                 }
                 case "ff", "forfait" -> {
@@ -287,8 +280,13 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
         Type type = switch (what) {
             case "turret" -> Type.TURRET;
             case "inhibitor" -> Type.INHIBITOR;
-            default -> Type.NEXUS;
+            case "nexus" -> Type.NEXUS;
+            default -> null;
         };
+        if (type == null) {
+            player.sendMessage("§cType inconnu : " + what + " (attendu: turret, inhibitor ou nexus)");
+            return;
+        }
         Team team = parseTeam(args[2]);
         if (team == null) { player.sendMessage("§cÉquipe: blue ou red"); return; }
         String lane = args[3].toLowerCase();
@@ -631,6 +629,10 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
                 String facingMsg = "orientation par défaut (Sud)";
                 var bd = e.getClickedBlock().getBlockData();
                 if (bd instanceof org.bukkit.block.data.Directional dir) {
+                    // SOUTH est le default technique (Java exige un default sur un switch
+                    // expression avec une enum aussi large que BlockFace). SOUTH est aussi
+                    // l orientation par defaut documentee du batiment, d ou la duplication.
+                    //noinspection DuplicateBranchesInSwitch
                     angle = switch (dir.getFacing()) {
                         case SOUTH -> 0;
                         case WEST  -> 90;
@@ -675,6 +677,21 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
         new org.bukkit.scheduler.BukkitRunnable() {
             @Override public void run() { if (loc.getBlock().getType() == mat) loc.getBlock().setType(original); }
         }.runTaskLater(LolPlugin.getInstance(), 200L);
+    }
+
+    private fr.lolmc.game.AnnouncementManager.PingType parsePingType(String ptype) {
+        // DANGER est le default technique (Java exige un default sur un switch expression
+        // sur String). DANGER est aussi le comportement de secours voulu pour toute entree
+        // invalide, d ou la duplication avec danger/warn.
+        //noinspection DuplicateBranchesInSwitch
+        return switch (ptype) {
+            case "danger", "warn"          -> fr.lolmc.game.AnnouncementManager.PingType.DANGER;
+            case "omw", "onmyway"          -> fr.lolmc.game.AnnouncementManager.PingType.ON_MY_WAY;
+            case "miss", "missing", "mia"  -> fr.lolmc.game.AnnouncementManager.PingType.MISSING;
+            case "assist"                  -> fr.lolmc.game.AnnouncementManager.PingType.ASSIST;
+            case "enemy", "here"           -> fr.lolmc.game.AnnouncementManager.PingType.ENEMY;
+            default                        -> fr.lolmc.game.AnnouncementManager.PingType.DANGER;
+        };
     }
 
     private Team parseTeam(String s) {
