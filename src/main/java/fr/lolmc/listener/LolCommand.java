@@ -55,7 +55,7 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
     }
 
     @Override
-    public boolean onCommand(@NotNull CommandSender sender, @NotNull Command cmd, @NotNull String label, @NotNull String[] args) {
+    public boolean onCommand(@NotNull CommandSender sender, @NotNull Command cmd, @NotNull String label, @NotNull String @NotNull [] args) {
         if (!(sender instanceof Player player)) { sender.sendMessage("§cJoueur uniquement."); return true; }
 
         // /lola → commandes joueur (uniquement ce qui n'est pas géré par BungeeCord)
@@ -697,7 +697,7 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
     }
 
     @Override
-    public List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command cmd, @NotNull String alias, @NotNull String[] args) {
+    public List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command cmd, @NotNull String alias, @NotNull String @NotNull [] args) {
         if (args.length == 1) return List.of("set", "position", "lane", "schem", "road", "jungle", "shopnpc", "mode", "select", "solo", "give", "level", "gold", "team", "testgame", "debug", "reload", "start", "stop", "center"); // MODIFICATION : Injecté "schem"
         if (args.length == 2) {
             return switch (args[0].toLowerCase()) {
