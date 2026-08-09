@@ -9,7 +9,6 @@ import fr.lolmc.team.TeamManager;
 import fr.lolmc.ward.WardManager;
 import fr.lolmc.matchmaking.PartyManager;
 import fr.lolmc.matchmaking.MatchmakingManager;
-import fr.lolmc.listener.PartyCommand;
 import fr.lolmc.listener.LolCommand;
 import fr.lolmc.manager.SchematicManager;
 import fr.lolmc.game.MapManager;
@@ -44,12 +43,10 @@ import fr.lolmc.stats.persistence.RankedManager;
 import fr.lolmc.stats.persistence.ApiServer;
 import fr.lolmc.listener.EntityDeathListener;
 import fr.lolmc.item.consumable.ConsumableManager;
-import fr.lolmc.listener.ShopCommand;
 import fr.lolmc.listener.ShopListener;
 import fr.lolmc.shop.GoldManager;
 import fr.lolmc.shop.ShopGUI;
 import fr.lolmc.listener.HealthListener;
-import fr.lolmc.listener.ChampionCommand;
 import fr.lolmc.listener.GUIListener;
 import fr.lolmc.manager.ChampionGUI;
 import fr.lolmc.manager.HUDManager;
@@ -280,9 +277,6 @@ public class LolPlugin extends JavaPlugin {
 
     public static LolPlugin getInstance() { return instance; }
     public ChampionManager getChampionManager() { return championManager; }
-    public HeadManager getHeadManager()         { return headManager; }
-    public ChampionGUI getChampionGUI()         { return championGUI; }
-    public GUIListener getGUIListener()         { return guiListener; }
     public HUDManager getHUDManager()           { return hudManager; }
     public ShopGUI getShopGUI()                 { return shopGUI; }
     public GoldManager getGoldManager()         { return goldManager; }
@@ -296,7 +290,6 @@ public class LolPlugin extends JavaPlugin {
     public WardManager getWardManager()         { return wardManager; }
     public PartyManager getPartyManager()       { return partyManager; }
     public MatchmakingManager getMatchmakingManager() { return matchmakingManager; }
-    public SchematicManager getSchematicManager() { return schematicManager; }
     public MapManager getMapManager()           { return mapManager; }
     public TurretManager getTurretManager()     { return turretManager; }
     public MinionManager getMinionManager()     { return minionManager; }
@@ -309,7 +302,6 @@ public class LolPlugin extends JavaPlugin {
     public RewardManager getRewardManager()     { return rewardManager; }
     public JungleManager getJungleManager()     { return jungleManager; }
     public BushManager getBushManager()         { return bushManager; }
-    public MonsterAbilities getMonsterAbilities() { return monsterAbilities; }
     public GameManager getGameManager()         { return gameManager; }
     public BaseManager getBaseManager()         { return baseManager; }
     public FogOfWarManager getFogOfWarManager() { return fogOfWarManager; }
@@ -357,7 +349,6 @@ public class LolPlugin extends JavaPlugin {
     public fr.lolmc.listener.StructureDamageListener getStructureDamageListener() { return structureDamageListener; }
     public AnnouncementManager getAnnouncementManager() { return announcementManager; }
     public SummonerSpellManager getSummonerSpellManager() { return summonerSpellManager; }
-    public ChunkLoaderManager getChunkLoaderManager() { return chunkLoaderManager; } // AJOUT : Getter associé
     public RuneManager getRuneManager()         { return runeManager; }
     public ChampSelectManager getChampSelectManager() { return champSelectManager; }
     public ChampSelectGUI getChampSelectGUI()   { return champSelectGUI; }
@@ -374,7 +365,6 @@ public class LolPlugin extends JavaPlugin {
 
     public fr.lolmc.ability.AbilityPreview getAbilityPreview() { return abilityPreview; }
     public fr.lolmc.instance.InstanceManager getInstanceManager() { return instanceManager; }
-    public fr.lolmc.game.PlantManager getPlantManager()           { return plantManager; }
     public fr.lolmc.game.MinimapManager getMinimapManager()       { return minimapManager; }
     public fr.lolmc.manager.SkinManager getSkinManager()          { return skinManager; }
 }
