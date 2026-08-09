@@ -189,6 +189,7 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
                 mapManager.resetAllStructures();
                 LolPlugin.getInstance().getMinionManager().startWaves();
                 LolPlugin.getInstance().getJungleManager().startJungle();
+                LolPlugin.getInstance().getPlantManager().spawnAll();
                 LolPlugin.getInstance().getGameManager().startGame();
                 LolPlugin.getInstance().getMatchScoreboard().startMatch(
                         LolPlugin.getInstance().getMatchScoreboard().isRanked());
@@ -197,6 +198,7 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
             case "stop" -> {
                 LolPlugin.getInstance().getMinionManager().stopWaves();
                 LolPlugin.getInstance().getJungleManager().stopJungle();
+                LolPlugin.getInstance().getPlantManager().clearAll();
                 LolPlugin.getInstance().getGameManager().stopGame();
                 player.sendMessage(Component.text("⏹ Partie arrêtée.", NamedTextColor.YELLOW));
             }
@@ -452,6 +454,7 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
         mapManager.resetAllStructures();
         plugin.getMinionManager().startWaves();
         plugin.getJungleManager().startJungle();
+        plugin.getPlantManager().spawnAll();
         plugin.getGameManager().startGame();
         plugin.getMatchScoreboard().startMatch(false);
         var spawn = plugin.getMapManager().getSpawn(fr.lolmc.team.TeamManager.Team.BLUE, 1);
@@ -509,6 +512,7 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
         mapManager.resetAllStructures();
         plugin.getMinionManager().startWaves();
         plugin.getJungleManager().startJungle();
+        plugin.getPlantManager().spawnAll();
         plugin.getGameManager().startGame();
         plugin.getMatchScoreboard().startMatch(false);
         player.sendMessage(Component.text("🧪 Map lancée (structures, sbires, jungle, timer).", NamedTextColor.GREEN));

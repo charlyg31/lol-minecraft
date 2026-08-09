@@ -59,9 +59,6 @@ public class LolPlugin extends JavaPlugin {
     private static LolPlugin instance;
     private fr.lolmc.game.AutoAttackManager autoAttackManager;
     private ChampionManager championManager;
-    private HeadManager headManager;
-    private ChampionGUI championGUI;
-    private GUIListener guiListener;
     private HUDManager hudManager;
     private ShopGUI shopGUI;
     private GoldManager goldManager;
@@ -75,7 +72,6 @@ public class LolPlugin extends JavaPlugin {
     private WardManager wardManager;
     private PartyManager partyManager;
     private MatchmakingManager matchmakingManager;
-    private SchematicManager schematicManager;
     private MapManager mapManager;
     private TurretManager turretManager;
     private MinionManager minionManager;
@@ -88,7 +84,6 @@ public class LolPlugin extends JavaPlugin {
     private RewardManager rewardManager;
     private JungleManager jungleManager;
     private BushManager bushManager;
-    private MonsterAbilities monsterAbilities;
     private GameManager gameManager;
     private BaseManager baseManager;
     private FogOfWarManager fogOfWarManager;
@@ -129,6 +124,7 @@ public class LolPlugin extends JavaPlugin {
         this.abilityPreview   = new fr.lolmc.ability.AbilityPreview();
         this.instanceManager  = new fr.lolmc.instance.InstanceManager(this);
         this.plantManager     = new fr.lolmc.game.PlantManager();
+        getServer().getPluginManager().registerEvents(this.plantManager, this);
         this.minimapManager   = new fr.lolmc.game.MinimapManager();
         this.skinManager      = new fr.lolmc.manager.SkinManager();
         // Bridge cross-serveur (BungeeCord)
@@ -144,10 +140,6 @@ public class LolPlugin extends JavaPlugin {
      */
     private void initManagersAndListeners() {
         initCoreManagers();
-//         initGameManagers();
-//         initShopManagers();
-//         initQueueManagers();
-//         registerListenersInternal();
     }
 
     private void initCoreManagers() {
@@ -168,7 +160,7 @@ public class LolPlugin extends JavaPlugin {
         chunkLoaderManager = new ChunkLoaderManager();
         chunkLoaderManager.runTaskTimer(this, 0L, 20L);
         // ── Map/Game (dépend de goldManager) ──────────────────────────
-        schematicManager = new SchematicManager(this);
+        SchematicManager schematicManager = new SchematicManager(this);
         mapManager = new MapManager(schematicManager);
         minionManager = new MinionManager();
         turretManager = new TurretManager(mapManager, championManager, teamManager);
@@ -182,7 +174,7 @@ public class LolPlugin extends JavaPlugin {
         rewardManager = new RewardManager(championManager, goldManager);
         jungleManager = new JungleManager();
         bushManager = new BushManager(teamManager);
-        monsterAbilities = new MonsterAbilities();
+        new MonsterAbilities();
         databaseManager = new DatabaseManager();
         databaseManager.init();
         rankedManager = new RankedManager(databaseManager);
@@ -217,9 +209,9 @@ public class LolPlugin extends JavaPlugin {
         consumableManager = new ConsumableManager(championManager, hudManager);
 
         ItemRegistry.ensureLoaded();
-        headManager     = new HeadManager(this);
-        championGUI     = new ChampionGUI(championManager, headManager);
-        guiListener     = new GUIListener(championGUI, championManager, headManager, hudManager);
+        HeadManager headManager = new HeadManager(this);
+        ChampionGUI championGUI = new ChampionGUI(championManager, headManager);
+        GUIListener guiListener = new GUIListener(championGUI, championManager, headManager, hudManager);
 
         // ── Listeners (dépend de tout) ─────────────────────────────────
         abilityListener = new AbilityListener(championManager);
@@ -244,8 +236,8 @@ public class LolPlugin extends JavaPlugin {
             cmdLola.setTabCompleter(lolCmd);
         }
         getServer().getPluginManager().registerEvents(lolCmd, this);
-                structureDamageListener = new fr.lolmc.listener.StructureDamageListener(mapManager, championManager, teamManager);
-                getServer().getPluginManager().registerEvents(structureDamageListener, this);
+        structureDamageListener = new fr.lolmc.listener.StructureDamageListener(mapManager, championManager, teamManager);
+        getServer().getPluginManager().registerEvents(structureDamageListener, this);
         getServer().getPluginManager().registerEvents(new fr.lolmc.listener.ChatListener(), this);
         getServer().getPluginManager().registerEvents(
                 new EntityDeathListener(championManager, rewardManager), this);
@@ -311,26 +303,26 @@ public class LolPlugin extends JavaPlugin {
      * Converties en blocs avec le ratio scale.lol-units-per-block de config.yml.
      */
     private static final java.util.Map<String, Double> LOL_AA_RANGES = java.util.Map.ofEntries(
-        java.util.Map.entry("garen",       175.0),
-        java.util.Map.entry("darius",      175.0),
-        java.util.Map.entry("malphite",    150.0),
-        java.util.Map.entry("nasus",       175.0),
-        java.util.Map.entry("warwick",     175.0),
-        java.util.Map.entry("amumu",       150.0),
-        java.util.Map.entry("masteryi",    175.0),
-        java.util.Map.entry("leesin",      175.0),
-        java.util.Map.entry("annie",       625.0),
-        java.util.Map.entry("veigar",      700.0),
-        java.util.Map.entry("zed",         175.0),
-        java.util.Map.entry("yasuo",       175.0),
-        java.util.Map.entry("morgana",     900.0),
-        java.util.Map.entry("leona",       175.0),
-        java.util.Map.entry("blitzcrank",  175.0),
-        java.util.Map.entry("janna",       550.0),
-        java.util.Map.entry("ashe",        600.0),
-        java.util.Map.entry("sivir",       500.0),
-        java.util.Map.entry("jinx",        525.0),
-        java.util.Map.entry("missfortune", 650.0)
+            java.util.Map.entry("garen",       175.0),
+            java.util.Map.entry("darius",      175.0),
+            java.util.Map.entry("malphite",    150.0),
+            java.util.Map.entry("nasus",       175.0),
+            java.util.Map.entry("warwick",     175.0),
+            java.util.Map.entry("amumu",       150.0),
+            java.util.Map.entry("masteryi",    175.0),
+            java.util.Map.entry("leesin",      175.0),
+            java.util.Map.entry("annie",       625.0),
+            java.util.Map.entry("veigar",      700.0),
+            java.util.Map.entry("zed",         175.0),
+            java.util.Map.entry("yasuo",       175.0),
+            java.util.Map.entry("morgana",     900.0),
+            java.util.Map.entry("leona",       175.0),
+            java.util.Map.entry("blitzcrank",  175.0),
+            java.util.Map.entry("janna",       550.0),
+            java.util.Map.entry("ashe",        600.0),
+            java.util.Map.entry("sivir",       500.0),
+            java.util.Map.entry("jinx",        525.0),
+            java.util.Map.entry("missfortune", 650.0)
     );
 
     public void applyAAScaleFromConfig() {
@@ -365,6 +357,7 @@ public class LolPlugin extends JavaPlugin {
 
     public fr.lolmc.ability.AbilityPreview getAbilityPreview() { return abilityPreview; }
     public fr.lolmc.instance.InstanceManager getInstanceManager() { return instanceManager; }
+    public fr.lolmc.game.PlantManager getPlantManager()           { return plantManager; }
     public fr.lolmc.game.MinimapManager getMinimapManager()       { return minimapManager; }
     public fr.lolmc.manager.SkinManager getSkinManager()          { return skinManager; }
 }
