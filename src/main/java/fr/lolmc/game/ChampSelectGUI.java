@@ -40,7 +40,7 @@ public class ChampSelectGUI implements Listener {
 
     // Bans actifs (empêchés d'être sélectionnés)
     private static final java.util.Set<String> bannedChampions
-        = java.util.Collections.synchronizedSet(new java.util.HashSet<>());
+            = java.util.Collections.synchronizedSet(new java.util.HashSet<>());
     private static int banRound = 0; // 0 = pas en ban, 1-10 = tour de ban
 
     // Les 20 champions disponibles (id → matériau d'icône)
@@ -127,7 +127,7 @@ public class ChampSelectGUI implements Listener {
         // Construire l'inventaire
         int rows = Math.max(2, (int) Math.ceil(all.size() / 9.0) + 1);
         Inventory inv = Bukkit.createInventory(null, rows * 9,
-            Component.text(SKIN_TITLE + " — " + capitalize(champId), NamedTextColor.GOLD));
+                Component.text(SKIN_TITLE + " — " + capitalize(champId), NamedTextColor.GOLD));
 
         // Filler gris
         ItemStack filler = fillerItem();
@@ -143,12 +143,12 @@ public class ChampSelectGUI implements Listener {
         // Bouton retour (avant-dernier slot) + lock (dernier)
         int last = inv.getSize() - 1;
         inv.setItem(last - 1, button(Material.ARROW,
-            Component.text("◀ Retour aux champions", NamedTextColor.YELLOW), ""));
+                Component.text("◀ Retour aux champions", NamedTextColor.YELLOW), ""));
         var baseSkin = SkinRegistry.getBase(champId);
         String baseLabel = baseSkin != null ? baseSkin.displayName() : "Skin de base";
         inv.setItem(last, button(Material.LIME_DYE,
-            Component.text("✔ " + baseLabel, NamedTextColor.GREEN),
-            "Utiliser le skin de base"));
+                Component.text("✔ " + baseLabel, NamedTextColor.GREEN),
+                "Utiliser le skin de base"));
 
         player.openInventory(inv);
     }
@@ -160,21 +160,21 @@ public class ChampSelectGUI implements Listener {
 
         if (hasAccess) {
             meta.displayName(Component.text("🎨 " + skin.displayName(), NamedTextColor.GOLD)
-                .decoration(TextDecoration.ITALIC, false));
+                    .decoration(TextDecoration.ITALIC, false));
             meta.lore(List.of(
-                Component.text("Skin n°" + skin.skinNumber(), NamedTextColor.GRAY)
-                    .decoration(TextDecoration.ITALIC, false),
-                Component.text("▶ Clic pour choisir", NamedTextColor.YELLOW)
-                    .decoration(TextDecoration.ITALIC, false)
+                    Component.text("Skin n°" + skin.skinNumber(), NamedTextColor.GRAY)
+                            .decoration(TextDecoration.ITALIC, false),
+                    Component.text("▶ Clic pour choisir", NamedTextColor.YELLOW)
+                            .decoration(TextDecoration.ITALIC, false)
             ));
         } else {
             meta.displayName(Component.text("🔒 " + skin.displayName(), NamedTextColor.DARK_GRAY)
-                .decoration(TextDecoration.ITALIC, false));
+                    .decoration(TextDecoration.ITALIC, false));
             meta.lore(List.of(
-                Component.text("Permission requise:", NamedTextColor.GRAY)
-                    .decoration(TextDecoration.ITALIC, false),
-                Component.text(skin.getPermission(), NamedTextColor.RED)
-                    .decoration(TextDecoration.ITALIC, false)
+                    Component.text("Permission requise:", NamedTextColor.GRAY)
+                            .decoration(TextDecoration.ITALIC, false),
+                    Component.text(skin.getPermission(), NamedTextColor.RED)
+                            .decoration(TextDecoration.ITALIC, false)
             ));
         }
         item.setItemMeta(meta);
@@ -243,7 +243,7 @@ public class ChampSelectGUI implements Listener {
     public void onClick(InventoryClickEvent e) {
         Component title = e.getView().title();
         String titleStr = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
-            .plainText().serialize(title);
+                .plainText().serialize(title);
         if (!title.equals(CHAMP_TITLE) && !title.equals(RUNE_TITLE)
                 && !titleStr.startsWith("🎨 Choisir un skin")) return;
         e.setCancelled(true);
@@ -269,7 +269,7 @@ public class ChampSelectGUI implements Listener {
         } else if (titleStr.startsWith("🎨 Choisir un skin")) {
             // Extraire le champId du titre "🎨 Choisir un skin — garen"
             String champId = titleStr.contains(" — ")
-                ? titleStr.substring(titleStr.indexOf(" — ") + 3).toLowerCase() : "garen";
+                    ? titleStr.substring(titleStr.indexOf(" — ") + 3).toLowerCase() : "garen";
             int slot = e.getSlot();
             int invSize = e.getView().getTopInventory().getSize();
 
@@ -293,8 +293,8 @@ public class ChampSelectGUI implements Listener {
                     csm.onSkinChosen(player, champId, skin.id());
                 } else {
                     player.sendActionBar(Component.text(
-                        "🔒 Permission requise : " + skin.getPermission(),
-                        NamedTextColor.RED));
+                            "🔒 Permission requise : " + skin.getPermission(),
+                            NamedTextColor.RED));
                 }
             }
         } else if (title.equals(RUNE_TITLE)) {
@@ -328,7 +328,7 @@ public class ChampSelectGUI implements Listener {
     /** Ouvre le menu de ban pour un joueur. */
     public void openBanMenu(Player player) {
         Inventory inv = Bukkit.createInventory(null, 27, BAN_TITLE);
-        for (int i = 0; i < CHAMPIONS.length && i < 27; i++) {
+        for (int i = 0; i < CHAMPIONS.length; i++) {
             if (!bannedChampions.contains(CHAMPIONS[i]))
                 inv.setItem(i, buildChampionIcon(CHAMPIONS[i]));
         }
@@ -340,8 +340,8 @@ public class ChampSelectGUI implements Listener {
         bannedChampions.add(championId);
         banRound++;
         Bukkit.broadcast(Component.text(
-            "🚫 " + championId + " est banni! (ban " + banRound + "/10)",
-            NamedTextColor.RED));
+                "🚫 " + championId + " est banni! (ban " + banRound + "/10)",
+                NamedTextColor.RED));
     }
 
     public static boolean isBanned(String championId) { return bannedChampions.contains(championId); }
@@ -356,11 +356,11 @@ public class ChampSelectGUI implements Listener {
         if (meta != null) {
             boolean banned = isBanned(championId);
             meta.displayName(net.kyori.adventure.text.Component.text(
-                (banned ? "§c✗ " : "§f") + championId,
-                net.kyori.adventure.text.format.NamedTextColor.WHITE)
-                .decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
+                            (banned ? "§c✗ " : "§f") + championId,
+                            net.kyori.adventure.text.format.NamedTextColor.WHITE)
+                    .decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
             if (banned) meta.addEnchant(
-                org.bukkit.enchantments.Enchantment.UNBREAKING, 1, true);
+                    org.bukkit.enchantments.Enchantment.UNBREAKING, 1, true);
             is.setItemMeta(meta);
         }
         return is;
