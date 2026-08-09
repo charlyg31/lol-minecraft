@@ -66,7 +66,7 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
 
             switch (sub) {
                 case "runes" ->
-                    LolPlugin.getInstance().getRuneGUI().open(player);
+                        LolPlugin.getInstance().getRuneGUI().open(player);
                 case "ping" -> {
                     if (!inGame) { player.sendMessage(Component.text("❌ Disponible uniquement en partie.", NamedTextColor.RED)); break; }
                     String ptype = args.length > 1 ? args[1].toLowerCase() : "danger";
@@ -85,24 +85,26 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
                         player.sendMessage(Component.text("Aucune stat disponible.", NamedTextColor.GRAY));
                     } else {
                         player.sendMessage(Component.text(String.format(
-                            "§eStats: %d/%d/%d | CS %d | Or %d | DMG %,d",
-                            st.kills, st.deaths, st.assists, st.cs, st.gold, st.damageDealt),
-                            NamedTextColor.GOLD));
+                                        "§eStats: %d/%d/%d | CS %d | Or %d | DMG %,d",
+                                        st.kills, st.deaths, st.assists, st.cs, st.gold, st.damageDealt),
+                                NamedTextColor.GOLD));
                     }
                 }
+                case "shop" -> LolPlugin.getInstance().getShopListener().openShop(player);
                 default -> {
                     player.sendMessage(Component.text("§6=== Commandes /l ===", NamedTextColor.GOLD));
                     player.sendMessage(Component.text("§e/l runes §7— Configurer ses runes"));
                     player.sendMessage(Component.text("§e/l ping <danger|omw|miss|assist|enemy> §7— Ping équipe"));
                     player.sendMessage(Component.text("§e/l ff §7— Vote d'abandon"));
                     player.sendMessage(Component.text("§e/l stats §7— Statistiques de la partie"));
+                    player.sendMessage(Component.text("§e/l shop §7— Ouvrir la boutique"));
                     player.sendMessage(Component.text("§7File d'attente, groupes et rôles : §e/lol <top|mid|adc|jungle|support|all>", NamedTextColor.GRAY));
                 }
             }
             return true;
         }
 
-                // /lola → commandes admin uniquement
+        // /lola → commandes admin uniquement
         if (!player.hasPermission("lolmc.admin") && !player.isOp()) {
             player.sendMessage(Component.text("❌ Permission requise.", NamedTextColor.RED));
             return true;
@@ -122,9 +124,9 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
                 // Réinitialiser la vue partagée pour forcer un re-rendu
                 LolPlugin.getInstance().getMinimapManager().resetView();
                 player.sendMessage(net.kyori.adventure.text.Component.text(
-                    String.format("✔ Centre de la minimap défini à X=%d Z=%d (reçu les changements)",
-                        loc.getBlockX(), loc.getBlockZ()),
-                    net.kyori.adventure.text.format.NamedTextColor.GREEN));
+                        String.format("✔ Centre de la minimap défini à X=%d Z=%d (reçu les changements)",
+                                loc.getBlockX(), loc.getBlockZ()),
+                        net.kyori.adventure.text.format.NamedTextColor.GREEN));
             }
             case "lane" -> handleLane(player, args);
             case "schem" -> handleSchem(player, args);
@@ -151,7 +153,7 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
                 // Recharger la portée du fog of war
                 var fog = LolPlugin.getInstance().getFogOfWarManager();
                 if (fog != null) fog.setVisionRange(
-                    LolPlugin.getInstance().getConfig().getDouble("fog.vision-range", 30.0));
+                        LolPlugin.getInstance().getConfig().getDouble("fog.vision-range", 30.0));
                 // Recharger les skins
                 LolPlugin.getInstance().getSkinManager().reload();
                 // Recharger l'échelle des portées AA
@@ -167,14 +169,14 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
                 for (String perm : declared) {
                     if (pm.getPermission(perm) == null) {
                         player.sendMessage(Component.text("⚠ Permission absente de plugin.yml : " + perm,
-                            NamedTextColor.RED));
+                                NamedTextColor.RED));
                         missing++;
                     }
                 }
                 player.sendMessage(Component.text(
-                    "✔ Vérification terminée : " + declared.size() + " permission(s) de skin dans le code, "
-                        + missing + " manquante(s) dans plugin.yml.",
-                    missing == 0 ? NamedTextColor.GREEN : NamedTextColor.YELLOW));
+                        "✔ Vérification terminée : " + declared.size() + " permission(s) de skin dans le code, "
+                                + missing + " manquante(s) dans plugin.yml.",
+                        missing == 0 ? NamedTextColor.GREEN : NamedTextColor.YELLOW));
             }
             case "select" -> {
                 var ids = new java.util.ArrayList<java.util.UUID>();
@@ -434,35 +436,34 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
         player.sendMessage(Component.text("═══════════════════", NamedTextColor.YELLOW));
     }
 
-    // ── /lola solo ─────────────────────────────────────────────────
+// ── /lola solo ─────────────────────────────────────────────────
+private void handleSolo(Player player, String[] args) {
+    String champId = args.length >= 2 ? args[1].toLowerCase() : "garen";
+    var plugin = LolPlugin.getInstance();
 
-    private void handleSolo(Player player, String[] args) {
-        String champId = args.length >= 2 ? args[1].toLowerCase() : "garen";
-        var plugin = LolPlugin.getInstance();
-
-        plugin.getTeamManager().setTeam(player, fr.lolmc.team.TeamManager.Team.BLUE);
-        plugin.getChampionManager().assignChampion(player, champId);
-        var soloChamp = plugin.getChampionManager().getChampion(player);
-        if (soloChamp != null) {
-            soloChamp.getLevelSystem().setLevel(18);
-            soloChamp.getStats().setChampionLevel(18);
-            soloChamp.getLevelSystem().maxOutAbilities();
-            plugin.getHotbarManager().renderPage(player, soloChamp);
-        }
-        plugin.getRuneManager().applyRuneStats(player);
-        plugin.getGoldManager().addGold(player.getUniqueId(), 20000);
-        mapManager.resetAllStructures();
-        plugin.getMinionManager().startWaves();
-        plugin.getJungleManager().startJungle();
-        plugin.getPlantManager().spawnAll();
-        plugin.getGameManager().startGame();
-        plugin.getMatchScoreboard().startMatch(false);
-        var spawn = plugin.getMapManager().getSpawn(fr.lolmc.team.TeamManager.Team.BLUE, 1);
-        if (spawn != null) player.teleport(spawn);
-
-        player.sendMessage(Component.text("🧪 MODE SOLO lancé!", NamedTextColor.GREEN));
-        player.sendMessage(Component.text("Équipe BLEUE • Champion: " + champId, NamedTextColor.AQUA));
+    plugin.getTeamManager().setTeam(player, fr.lolmc.team.TeamManager.Team.BLUE);
+    plugin.getChampionManager().assignChampion(player, champId);
+    var soloChamp = plugin.getChampionManager().getChampion(player);
+    if (soloChamp != null) {
+        soloChamp.getLevelSystem().setLevel(18);
+        soloChamp.getStats().setChampionLevel(18);
+        soloChamp.getLevelSystem().maxOutAbilities();
+        plugin.getHotbarManager().renderPage(player, soloChamp);
     }
+    plugin.getRuneManager().applyRuneStats(player);
+    plugin.getGoldManager().addGold(player.getUniqueId(), 20000);
+    mapManager.resetAllStructures();
+    plugin.getMinionManager().startWaves();
+    plugin.getJungleManager().startJungle();
+    plugin.getPlantManager().spawnAll();
+    plugin.getGameManager().startGame();
+    plugin.getMatchScoreboard().startMatch(false);
+    var spawn = plugin.getMapManager().getSpawn(fr.lolmc.team.TeamManager.Team.BLUE, 1);
+    if (spawn != null) player.teleport(spawn);
+
+    player.sendMessage(Component.text("🧪 MODE SOLO lancé!", NamedTextColor.GREEN));
+    player.sendMessage(Component.text("Équipe BLEUE • Champion: " + champId, NamedTextColor.AQUA));
+}
 
     private void handleGive(Player player, String[] args) {
         if (args.length < 2) { player.sendMessage("§cUsage: /lola give <champion>"); return; }
@@ -859,36 +860,34 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
     private void handleAdminHelp(Player player) {
         player.sendMessage(Component.text("═══ /lola — Commandes admin ═══", NamedTextColor.GOLD));
         String[][] cmds = {
-            {"/lola solo [champion]",        "Mode test solo (niveau 18, 20k or)"},
-            {"/lola give <champion>",         "Assigner un champion"},
-            {"/lola level <1-18>",            "Changer de niveau"},
-            {"/lola gold <montant>",          "Ajouter de l'or"},
-            {"/lola hp <montant|full> [j]",   "Modifier les HP"},
-            {"/lola resetcd [joueur]",        "Reset tous les cooldowns"},
-            {"/lola buff <type> [joueur]",    "Appliquer un buff"},
-            {"/lola spawn <entité> [team]",   "Spawner une entité"},
-            {"/lola wave",                    "Forcer une vague de sbires"},
-            {"/lola start",                   "Lancer la partie"},
-            {"/lola stop",                    "Arrêter la partie"},
-            {"/lola testgame",                "Lancer une partie test"},
-            {"/lola debug on|off",            "Activer/désactiver le debug"},
-            {"/lola reload",                  "Recharger champions.yml"},
-            {"/lola set <turret|nexus|basenexus> ...", "Placer une structure"},
-            {"/lola position <blue|red> <1-5>", "Définir un point de spawn"},
-            {"/lola center",                  "Définir le centre de la minimap ici"},
-            {"/lola lane <top|mid|bot> | done", "Tracer une lane"},
-            {"/lola schem <pos1|pos2|save> ...", "Gérer une schématique"},
-            {"/lola road <top|mid|bot|end> ...", "Tracer une route"},
-            {"/lola jungle <type> [blue|red]", "Spawner un monstre de jungle"},
-            {"/lola shopnpc <blue|red>",      "Créer un PNJ boutique ici"},
-            {"/lola mode <ranked|normal>",    "Définir le mode de partie"},
-            {"/lola team <blue|red>",         "Se placer dans une équipe"},
-            {"/lola select",                  "Lancer la sélection de champion pour tous"},
-            {"/lola permcheck",                "Vérifier les permissions de skin vs plugin.yml"},
+                {"/lola solo [champion]",        "Mode test solo (niveau 18, 20k or)"},
+                {"/lola give <champion>",         "Assigner un champion"},
+                {"/lola level <1-18>",            "Changer de niveau"},
+                {"/lola gold <montant>",          "Ajouter de l'or"},
+                {"/lola hp <montant|full> [j]",   "Modifier les HP"},
+                {"/lola resetcd [joueur]",        "Reset tous les cooldowns"},
+                {"/lola buff <type> [joueur]",    "Appliquer un buff"},
+                {"/lola spawn <entité> [team]",   "Spawner une entité"},
+                {"/lola wave",                    "Forcer une vague de sbires"},
+                {"/lola start",                   "Lancer la partie"},
+                {"/lola stop",                    "Arrêter la partie"},
+                {"/lola testgame",                "Lancer une partie test"},
+                {"/lola debug on|off",            "Activer/désactiver le debug"},
+                {"/lola reload",                  "Recharger champions.yml"},
+                {"/lola set <turret|nexus|basenexus> ...", "Placer une structure"},
+                {"/lola position <blue|red> <1-5>", "Définir un point de spawn"},
+                {"/lola center",                  "Définir le centre de la minimap ici"},
+                {"/lola lane <top|mid|bot> | done", "Tracer une lane"},
+                {"/lola schem <pos1|pos2|save> ...", "Gérer une schématique"},
+                {"/lola road <top|mid|bot|end> ...", "Tracer une route"},
+                {"/lola jungle <type> [blue|red]", "Spawner un monstre de jungle"},
+                {"/lola shopnpc <blue|red>",      "Créer un PNJ boutique ici"},
+                {"/lola mode <ranked|normal>",    "Définir le mode de partie"},
+                {"/lola team <blue|red>",         "Se placer dans une équipe"},
+                {"/lola select",                  "Lancer la sélection de champion pour tous"},
+                {"/lola permcheck",                "Vérifier les permissions de skin vs plugin.yml"},
         };
         for (String[] cmd : cmds) {
             player.sendMessage(Component.text("§e" + cmd[0] + " §7— " + cmd[1]));
         }
     }
-
-}

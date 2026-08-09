@@ -71,10 +71,11 @@ public class ShopListener implements Listener {
     public void awaitSearchInput(Player p) { awaitingSearch.add(p.getUniqueId()); }
 
     @org.bukkit.event.EventHandler
-    public void onChatSearch(org.bukkit.event.player.AsyncPlayerChatEvent e) {
+    public void onChatSearch(io.papermc.paper.event.player.AsyncChatEvent e) {
         if (!awaitingSearch.remove(e.getPlayer().getUniqueId())) return;
         e.setCancelled(true);
-        String msg = e.getMessage().trim();
+        String msg = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
+                .plainText().serialize(e.message()).trim();
         Player p = e.getPlayer();
         org.bukkit.Bukkit.getScheduler().runTask(LolPlugin.getInstance(), () -> {
             if (msg.equalsIgnoreCase("annuler")) shopGUI.open(p);
@@ -85,7 +86,7 @@ public class ShopListener implements Listener {
     // ── Initialiser l'inventaire d'un joueur ──────────────────────
     public PlayerInventoryManager getOrCreate(Player player) {
         return inventoryManagers.computeIfAbsent(
-                player.getUniqueId(), k -> new PlayerInventoryManager());
+                player.getUniqueId(), _ -> new PlayerInventoryManager());
     }
 
     public void initPlayer(Player player) {
@@ -376,15 +377,15 @@ public class ShopListener implements Listener {
             case "refillable_potion", "refillable_potion2"  -> cm.useRefillablePotion(player);
             case "biscuit", "biscuit_will"                  -> cm.useBiscuit(player);
             case "elixir_wrath", "elixir_wrath2" -> {
-                if (!checkElixirLevel(player)) break;
+                if (isElixirLevelTooLow(player)) break;
                 cm.useElixirWrath(player);
             }
             case "elixir_iron", "elixir_iron2" -> {
-                if (!checkElixirLevel(player)) break;
+                if (isElixirLevelTooLow(player)) break;
                 cm.useElixirIron(player);
             }
             case "elixir_sorcery", "elixir_sorcery2" -> {
-                if (!checkElixirLevel(player)) break;
+                if (isElixirLevelTooLow(player)) break;
                 cm.useElixirSorcery(player);
             }
             case "stealth_ward", "stealth_ward2"            -> cm.placeWard(player, false);
@@ -407,19 +408,18 @@ public class ShopListener implements Listener {
     }
 
     public GoldManager getGoldManager() { return goldManager; }
-    public Map<UUID, PlayerInventoryManager> getInventoryManagers() { return inventoryManagers; }
 
-    /** Les Élixirs nécessitent le niveau 9 (comme en LoL). */
-    private boolean checkElixirLevel(org.bukkit.entity.Player player) {
+    /** Vrai si le niveau du joueur est insuffisant pour les Élixirs (niveau 9 requis, comme en LoL). */
+    private boolean isElixirLevelTooLow(org.bukkit.entity.Player player) {
         var cm = LolPlugin.getInstance().getChampionManager();
-        if (!cm.hasChampion(player)) return false;
+        if (!cm.hasChampion(player)) return true;
         int lvl = cm.getChampion(player).getLevelSystem().getLevel();
         if (lvl < 9) {
             player.sendMessage(net.kyori.adventure.text.Component.text(
                     "❌ Les Élixirs nécessitent le niveau 9 (tu es niveau " + lvl + ").",
                     net.kyori.adventure.text.format.NamedTextColor.RED));
-            return false;
+            return true;
         }
-        return true;
+        return false;
     }
 }

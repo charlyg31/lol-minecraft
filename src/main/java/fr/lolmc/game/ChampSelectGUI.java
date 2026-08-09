@@ -4,12 +4,9 @@ import fr.lolmc.champion.skin.ChampionSkin;
 import fr.lolmc.champion.skin.SkinRegistry;
 
 import fr.lolmc.LolPlugin;
-import fr.lolmc.rune.RuneRegistry;
-import fr.lolmc.rune.RuneRegistry.Path;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
-import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer; // AJOUT : Import pour convertir l'ancien format coloré
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -26,7 +23,7 @@ import java.util.List;
  *  - Menu de choix du champion (grille des 20 champions)
  *  - Menu de choix des runes (voies + keystones)
  *
- * Les clics sont interceptés et routés vers le ChampSelectManager.
+ * <p>Les clics sont interceptés et routés vers le ChampSelectManager.
  */
 public class ChampSelectGUI implements Listener {
 
@@ -121,6 +118,7 @@ public class ChampSelectGUI implements Listener {
         if (accessible.size() <= 1 && !SkinRegistry.hasSkins(champId)) {
             // Informer ChampSelectManager que le skin de base est choisi
             LolPlugin.getInstance().getChampSelectManager().onSkinChosen(player, champId, "base");
+            player.closeInventory();
             return;
         }
 
@@ -192,51 +190,6 @@ public class ChampSelectGUI implements Listener {
         return false;
     }
 
-    // ── Menu Runes ────────────────────────────────────────────────
-
-    public void openRuneMenu(Player player) {
-        Inventory inv = Bukkit.createInventory(null, 54, RUNE_TITLE);
-        int row = 0;
-        for (Path path : Path.values()) {
-            List<RuneRegistry.Rune> keystones = RuneRegistry.getKeystones(path);
-            int col = 0;
-            inv.setItem(row * 9, pathIcon(path));
-            for (var ks : keystones) {
-                inv.setItem(row * 9 + 1 + col, runeIcon(ks.name(), ks.description()));
-                col++;
-            }
-            row++;
-        }
-        player.openInventory(inv);
-    }
-
-    private ItemStack pathIcon(Path path) {
-        Material mat = switch (path) {
-            case PRECISION -> Material.GOLD_INGOT;
-            case DOMINATION -> Material.REDSTONE;
-            case SORCERY -> Material.LAPIS_LAZULI;
-            case RESOLVE -> Material.EMERALD;
-            case INSPIRATION -> Material.PRISMARINE_CRYSTALS;
-        };
-
-        // CORRECTION : On reprend path.color d'origine et on le convertit proprement en Component moderne
-        Component display = LegacyComponentSerializer.legacySection().deserialize(path.color + path.displayName);
-        return button(mat, display, "Voie de runes");
-    }
-
-    private ItemStack runeIcon(String name, String desc) {
-        ItemStack item = new ItemStack(Material.ENCHANTED_BOOK);
-        var meta = item.getItemMeta();
-        if (meta != null) {
-            meta.displayName(Component.text(name, NamedTextColor.LIGHT_PURPLE)
-                    .decoration(TextDecoration.ITALIC, false));
-            meta.lore(List.of(Component.text(desc, NamedTextColor.GRAY)
-                    .decoration(TextDecoration.ITALIC, false)));
-            item.setItemMeta(meta);
-        }
-        return item;
-    }
-
     // ── Gestion des clics ─────────────────────────────────────────
 
     @EventHandler
@@ -258,7 +211,7 @@ public class ChampSelectGUI implements Listener {
             int slot = e.getSlot();
             if (slot < CHAMPIONS.length) {
                 csm.chooseChampion(player, CHAMPIONS[slot]);
-                player.closeInventory();
+                openSkinMenu(player, CHAMPIONS[slot]);
             } else if (slot == 25) {
                 player.closeInventory();
                 LolPlugin.getInstance().getRuneGUI().open(player);

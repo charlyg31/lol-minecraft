@@ -64,6 +64,7 @@ public class ChampSelectManager {
     public void startSelection(Collection<UUID> players, boolean ranked) {
         this.ranked = ranked;
         this.bannedChampions.clear();
+        ChampSelectGUI.resetBans();
         if (ranked) {
             startBanPhaseInternal(players);
         } else {
@@ -85,8 +86,8 @@ public class ChampSelectManager {
         banTimeLeft = BAN_DURATION;
 
         selectBar = BossBar.bossBar(
-            Component.text("⛔ Phase de BAN — " + BAN_DURATION + "s", NamedTextColor.RED),
-            1.0f, BossBar.Color.RED, BossBar.Overlay.PROGRESS);
+                Component.text("⛔ Phase de BAN — " + BAN_DURATION + "s", NamedTextColor.RED),
+                1.0f, BossBar.Color.RED, BossBar.Overlay.PROGRESS);
 
         for (UUID id : participants) {
             Player p = Bukkit.getPlayer(id);
@@ -130,7 +131,7 @@ public class ChampSelectManager {
         for (UUID id : participants) {
             Player p = Bukkit.getPlayer(id);
             if (p != null) p.sendMessage(Component.text(
-                "⛔ " + player.getName() + " a banni " + championId + "!", NamedTextColor.RED));
+                    "⛔ " + player.getName() + " a banni " + championId + "!", NamedTextColor.RED));
         }
         // 6 bans total (3 par équipe) → passer au pick
         if (bannedChampions.size() >= 6) {
@@ -184,7 +185,7 @@ public class ChampSelectManager {
                 timeLeft--;
                 if (selectBar != null) {
                     selectBar.name(Component.text("⏱ Sélection — " + timeLeft + "s ("
-                            + locked.size() + "/" + participants.size() + " prêts)",
+                                    + locked.size() + "/" + participants.size() + " prêts)",
                             NamedTextColor.LIGHT_PURPLE));
                     selectBar.progress(Math.max(0f, (float) timeLeft / SELECT_DURATION));
                 }
@@ -279,7 +280,7 @@ public class ChampSelectManager {
             LolPlugin.getInstance().getSkinManager().applySkin(p, champ, skinId);
 
             p.sendMessage(Component.text("⚔ Partie lancée avec " + champ
-                + " | Skin: " + skinId + " | Sorts: " + spells[0] + " + " + spells[1] + "!", NamedTextColor.GOLD));
+                    + " | Skin: " + skinId + " | Sorts: " + spells[0] + " + " + spells[1] + "!", NamedTextColor.GOLD));
         }
 
         // Lancer la partie physique
