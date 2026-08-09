@@ -58,8 +58,8 @@ public class ShopListener implements Listener {
             if (base == null || !base.getWorld().equals(player.getWorld())
                     || base.distanceSquared(player.getLocation()) > radius * radius) {
                 player.sendMessage(net.kyori.adventure.text.Component.text(
-                    "🏪 La boutique n'est accessible qu'a la base !",
-                    net.kyori.adventure.text.format.NamedTextColor.RED));
+                        "🏪 La boutique n'est accessible qu'a la base !",
+                        net.kyori.adventure.text.format.NamedTextColor.RED));
                 return;
             }
         }
@@ -67,7 +67,7 @@ public class ShopListener implements Listener {
     }
 
     private final java.util.Set<java.util.UUID> awaitingSearch =
-        java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
+            java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
     public void awaitSearchInput(Player p) { awaitingSearch.add(p.getUniqueId()); }
 
     @org.bukkit.event.EventHandler
@@ -167,7 +167,8 @@ public class ShopListener implements Listener {
             if (shopGUI.isBuySlot(slot)) {
                 String id = shopGUI.getDetailItemId(player);
                 LolItem it = (id != null) ? ItemRegistry.get(id) : null;
-                if (it != null && purchase(player, it)) {
+                // purchase() gère déjà item == null en première ligne (retourne false)
+                if (purchase(player, it)) {
                     shopGUI.openDetail(player, it.getId()); // rafraîchir (or / dispo)
                 }
                 return;

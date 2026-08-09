@@ -712,10 +712,10 @@ public class PassiveManager {
                     String.format("⚔ Maw Lifeline! +%.0f bouclier magique", shield), NamedTextColor.RED));
         }
 
-        // ── Edge of Night: bouclier sorts (1 fois) ──
-        if (hasAnyItem(victim,"edge_of_night") && !state.spellbladePrimed) {
-            // Simuler bouclier absorbant 1 dégât de sort (skip sort = annuler 1 dégât)
-        }
+        // Note : le blocage effectif du bouclier Edge of Night/Banshee (consommation de
+        // isEonShieldReady/isBansheeShieldReady) est géré en amont dans DamageUtil.damage(),
+        // avant même le calcul des dégâts — c'est le bon endroit puisque onDamageTaken ne
+        // s'exécute qu'après application des dégâts aux HP.
 
         // ── Atakhan Vorace : résurrection unique (avant GA) ──
         if (state.atakhanRevive && hp.isDead() && !state.gaActive) {
