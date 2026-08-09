@@ -173,7 +173,7 @@ public class LolPlugin extends JavaPlugin {
         // ── Map/Game (dépend de goldManager) ──────────────────────────
         schematicManager = new SchematicManager(this);
         mapManager = new MapManager(schematicManager);
-        minionManager = new MinionManager(mapManager);
+        minionManager = new MinionManager();
         turretManager = new TurretManager(mapManager, championManager, teamManager);
         roadManager = new RoadManager();
         roadManager.applyToMinionManager();

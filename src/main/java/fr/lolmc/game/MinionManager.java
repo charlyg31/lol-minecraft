@@ -23,7 +23,7 @@ import java.util.*;
  *  - Avancent le long de leur lane vers la base ennemie
  *  - Combattent les sbires/champions/tourelles ennemis
  *
- * Les sbires sont des Zombies/Husks taggés via PDC.
+ * <p>Les sbires sont des Zombies/Husks taggés via PDC.
  */
 public class MinionManager {
 
@@ -62,7 +62,7 @@ public class MinionManager {
     /** Types de sbires (apparence façon LoL). */
     private enum MinionType { MELEE, CASTER, CANNON, SUPER }
 
-    public MinionManager(MapManager mapManager) {
+    public MinionManager() {
         KEY_MINION = new NamespacedKey(LolPlugin.getInstance(), "minion");
         KEY_TEAM = new NamespacedKey(LolPlugin.getInstance(), "minion_team");
         KEY_LANE = new NamespacedKey(LolPlugin.getInstance(), "minion_lane");
@@ -133,17 +133,7 @@ public class MinionManager {
                 final int delay = i * 8; // décaler chaque sbire de 0.4s
                 // LoL : 3 sbires de mêlée puis 3 sbires à distance (mages)
                 // 3e vague = un sbire canon à la place du 1er caster
-                    final MinionType type;
-                    // Cadence canon LoL : toutes les 3 vagues avant 15min,
-                    // toutes les 2 entre 15 et 25min, chaque vague après 25min
-                    long elapsedS = LolPlugin.getInstance().getGameManager() != null
-                        ? LolPlugin.getInstance().getGameManager().getElapsedSeconds() : 0;
-                    int cannonEvery = elapsedS >= 25 * 60 ? 1 : (elapsedS >= 15 * 60 ? 2 : 3);
-                    if (wave % cannonEvery == 0 && i == MINIONS_PER_WAVE / 2) {
-                        type = MinionType.CANNON;
-                    } else {
-                        type = (i < MINIONS_PER_WAVE / 2) ? MinionType.MELEE : MinionType.CASTER;
-                    }
+                final MinionType type = determineMinionType(wave, i);
                 new BukkitRunnable() {
                     @Override public void run() {
                         if (spawning) spawnMinion(team, lane, spawnPoint, type);
@@ -162,17 +152,29 @@ public class MinionManager {
         }
     }
 
+    // Cadence canon LoL : toutes les 3 vagues avant 15min,
+    // toutes les 2 entre 15 et 25min, chaque vague après 25min
+    private MinionType determineMinionType(int wave, int i) {
+        long elapsedS = LolPlugin.getInstance().getGameManager() != null
+            ? LolPlugin.getInstance().getGameManager().getElapsedSeconds() : 0;
+        int cannonEvery = elapsedS >= 25 * 60 ? 1 : (elapsedS >= 15 * 60 ? 2 : 3);
+        if (wave % cannonEvery == 0 && i == MINIONS_PER_WAVE / 2) {
+            return MinionType.CANNON;
+        }
+        return (i < MINIONS_PER_WAVE / 2) ? MinionType.MELEE : MinionType.CASTER;
+    }
+
     private void spawnMinion(Team team, String lane, Location loc, MinionType type) {
         Zombie minion = loc.getWorld().spawn(loc, Husk.class, z -> {
             z.setAdult(); // CORRECTION : Remplace le setBaby(false) déprécié
             z.setShouldBurnInDay(false);
             // Empêcher le zombie de cibler les joueurs tout seul (IA vanilla)
             z.setTarget(null);
+            // toujours < 1024 (plafond Paper 26.1.2), pas besoin de clamp
             double baseHp = (type == MinionType.CASTER) ? CASTER_HP : MINION_HP;
-            double safeHp = baseHp; // toujours < 1024 (plafond Paper 26.1.2), Math.min etait superflu
             var maxHpAttr = z.getAttribute(Compat.maxHealth());
-            if (maxHpAttr != null) maxHpAttr.setBaseValue(safeHp);
-            z.setHealth(safeHp);
+            if (maxHpAttr != null) maxHpAttr.setBaseValue(baseHp);
+            z.setHealth(baseHp);
             var msAttr = z.getAttribute(Compat.movementSpeed());
             if (msAttr != null) msAttr.setBaseValue(MINION_SPEED);
             // Tag PDC
