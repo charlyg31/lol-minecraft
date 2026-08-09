@@ -629,12 +629,9 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
                 String facingMsg = "orientation par défaut (Sud)";
                 var bd = e.getClickedBlock().getBlockData();
                 if (bd instanceof org.bukkit.block.data.Directional dir) {
-                    // SOUTH est le default technique (Java exige un default sur un switch
-                    // expression avec une enum aussi large que BlockFace). SOUTH est aussi
-                    // l orientation par defaut documentee du batiment, d ou la duplication.
-                    //noinspection DuplicateBranchesInSwitch
+                    // SOUTH est l orientation par defaut documentee du batiment ; elle
+                    // retombe naturellement sur le default technique du switch (0°).
                     angle = switch (dir.getFacing()) {
-                        case SOUTH -> 0;
                         case WEST  -> 90;
                         case NORTH -> 180;
                         case EAST  -> 270;
@@ -680,12 +677,9 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
     }
 
     private fr.lolmc.game.AnnouncementManager.PingType parsePingType(String ptype) {
-        // DANGER est le default technique (Java exige un default sur un switch expression
-        // sur String). DANGER est aussi le comportement de secours voulu pour toute entree
-        // invalide, d ou la duplication avec danger/warn.
-        //noinspection DuplicateBranchesInSwitch
+        // "danger"/"warn" retombent sur DANGER, qui est aussi le comportement de secours
+        // pour toute entree invalide (default) : pas besoin de les lister explicitement.
         return switch (ptype) {
-            case "danger", "warn"          -> fr.lolmc.game.AnnouncementManager.PingType.DANGER;
             case "omw", "onmyway"          -> fr.lolmc.game.AnnouncementManager.PingType.ON_MY_WAY;
             case "miss", "missing", "mia"  -> fr.lolmc.game.AnnouncementManager.PingType.MISSING;
             case "assist"                  -> fr.lolmc.game.AnnouncementManager.PingType.ASSIST;
@@ -720,9 +714,8 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
             return switch (args[0].toLowerCase()) {
                 case "set" -> List.of("turret", "inhibitor", "nexus", "basenexus");
                 case "schem" -> List.of("pos1", "pos2", "save"); // AJOUT : Auto-complétion de l'action de schématique
-                case "shopnpc" -> List.of("blue", "red");
+                case "shopnpc", "position", "lane" -> List.of("blue", "red");
                 case "mode" -> List.of("ranked", "normal");
-                case "position", "lane" -> List.of("blue", "red");
                 case "road" -> List.of("top", "mid", "bot", "end");
                 case "jungle" -> List.of("gromp", "murkwolf", "raptor", "krug", "red_buff", "blue_buff", "scuttle_crab", "dragon_infernal", "dragon_ocean", "dragon_mountain", "dragon_cloud", "dragon_chemtech", "dragon_elder", "herald", "baron");
                 default -> List.of();
