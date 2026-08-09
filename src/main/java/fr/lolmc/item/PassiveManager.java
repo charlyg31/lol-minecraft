@@ -21,7 +21,6 @@ import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
-import org.bukkit.util.Vector;
 
 import java.util.*;
 
@@ -38,10 +37,10 @@ public class PassiveManager {
     // État par joueur
     private final Map<UUID, ItemState> states = new HashMap<>();
     /** Abyssal Mask : porteur -> (ennemi affecté -> montant de MR retiré), pour un retrait exact. */
-    private final Map<UUID, java.util.Map<UUID, Double>> abyssalAffected = new HashMap<>();
+    private final Map<UUID, Map<UUID, Double>> abyssalAffected = new HashMap<>();
 
     // Tâches BukkitTask stockées pour annulation propre
-    private final java.util.List<org.bukkit.scheduler.BukkitTask> tasks = new java.util.ArrayList<>();
+    private final List<org.bukkit.scheduler.BukkitTask> tasks = new ArrayList<>();
 
     public PassiveManager(ChampionManager cm, HUDManager hud, ShopListener sl) {
         this.championManager = cm;
@@ -148,16 +147,16 @@ public class PassiveManager {
         // ── Sudden Impact : +12 létalité/+9 pén. magique pendant 5s (une seule instance active) ──
         var runePageSI = LolPlugin.getInstance().getRuneManager();
         long __siExpire = getState(caster).antihealTargets.getOrDefault(
-                new java.util.UUID(0L, caster.getUniqueId().getLeastSignificantBits()), 0L);
+                new UUID(0L, caster.getUniqueId().getLeastSignificantBits()), 0L);
         boolean __siActive = System.currentTimeMillis() < __siExpire;
         if (!__siActive && runePageSI != null && runePageSI.getPage(caster.getUniqueId()).has("sudden_impact")) {
             // Marquer actif (5s) via une clé dédiée dans antihealTargets
             getState(caster).antihealTargets.put(
-                    new java.util.UUID(0L, caster.getUniqueId().getLeastSignificantBits()),
+                    new UUID(0L, caster.getUniqueId().getLeastSignificantBits()),
                     System.currentTimeMillis() + 5000L);
             champ.getStats().addBonusLethality(12);
             champ.getStats().addBonusFlatMagicPen(9);
-            new org.bukkit.scheduler.BukkitRunnable() { @Override public void run() {
+            new BukkitRunnable() { @Override public void run() {
                 if (championManager.hasChampion(caster)) {
                     championManager.getChampion(caster).getStats().addBonusLethality(-12);
                     championManager.getChampion(caster).getStats().addBonusFlatMagicPen(-9);
@@ -388,8 +387,8 @@ public class PassiveManager {
             int stacks = Math.min(6, state.blackCleaverStacks.getOrDefault(vid, 0) + 1);
             state.blackCleaverStacks.put(vid, stacks);
             // Décrémenter 1 stack après 6s
-            final java.util.UUID fvid = vid;
-            new org.bukkit.scheduler.BukkitRunnable() {
+            final UUID fvid = vid;
+            new BukkitRunnable() {
                 @Override public void run() {
                     state.blackCleaverStacks.merge(fvid, -1, (a, b) -> Math.max(0, a + b));
                 }
@@ -414,8 +413,8 @@ public class PassiveManager {
             vs.applyGrievousWounds(0.40, 3000L);
             state.antihealTargets.put(vid, System.currentTimeMillis() + 3000L);
             if (victim.isOnline())
-                victim.sendActionBar(net.kyori.adventure.text.Component.text(
-                        "🩹 Blessures Graves! (-40% soins)", net.kyori.adventure.text.format.NamedTextColor.DARK_RED));
+                victim.sendActionBar(Component.text(
+                        "🩹 Blessures Graves! (-40% soins)", NamedTextColor.DARK_RED));
         }
 
         // ── Navori Quickblades: si crit → -15% CD sorts ──
@@ -438,9 +437,9 @@ public class PassiveManager {
             var cm2 = LolPlugin.getInstance().getChampionManager();
             int lvl2 = cm2.hasChampion(attacker) ? cm2.getChampion(attacker).getLevelSystem().getLevel() : 1;
             double sunDmg = 35 + lvl2 * 2.6; // 35-80 selon le niveau
-            fr.lolmc.util.TargetingUtil.dealDamage(attacker, victim, sunDmg, fr.lolmc.util.TargetingUtil.DmgType.MAGICAL);
-            attacker.sendActionBar(net.kyori.adventure.text.Component.text(
-                    "☀ Lumière du Soleil! +" + (int)sunDmg, net.kyori.adventure.text.format.NamedTextColor.YELLOW));
+            TargetingUtil.dealDamage(attacker, victim, sunDmg, TargetingUtil.DmgType.MAGICAL);
+            attacker.sendActionBar(Component.text(
+                    "☀ Lumière du Soleil! +" + (int)sunDmg, NamedTextColor.YELLOW));
         }
 
         // ── Frostfire Gauntlet: zone de glace ralentissante sur AA ──
@@ -459,9 +458,7 @@ public class PassiveManager {
                             && !pe.equals(victim) && !pe.equals(attacker)
                             && championManager.hasChampion(pe)
                             && __tmTH.areEnemies(attacker, pe))
-                    .forEach(e -> {
-                        championManager.getChampion((Player)e).getHPSystem().takeDamage(titanicDmg);
-                    });
+                    .forEach(e -> championManager.getChampion((Player)e).getHPSystem().takeDamage(titanicDmg));
         }
 
         // ── Rapidfire Cannon: prochaine AA bonus si hors portée normale ──
@@ -489,9 +486,9 @@ public class PassiveManager {
 
         // ── Tiamat / Ravenous Hydra / Profane Hydra / Ironspike Whip : AoE AA ──
         if (hasAnyItem(attacker,"tiamat","ravenous_hydra","profane_hydra","ironspike_whip")) {
-            for (var t : fr.lolmc.util.TargetingUtil.enemiesAround(attacker, 3.0)) {
+            for (var t : TargetingUtil.enemiesAround(attacker, 3.0)) {
                 if (t.equals(victim)) continue;
-                fr.lolmc.util.TargetingUtil.dealDamage(attacker, t, aaDmg*0.40, fr.lolmc.util.TargetingUtil.DmgType.PHYSICAL);
+                TargetingUtil.dealDamage(attacker, t, aaDmg*0.40, TargetingUtil.DmgType.PHYSICAL);
             }
         }
         // ── Umbral Glaive : détecte/détruit wards ──
@@ -534,7 +531,7 @@ public class PassiveManager {
         if (hasAnyItem(attacker,"rageknife")) {
             int rk = (getState(attacker).rageknifeCount+1) % 2;
             getState(attacker).rageknifeCount = rk;
-            if (rk == 0) fr.lolmc.util.TargetingUtil.dealDamage(attacker, victim, aaDmg*0.20, fr.lolmc.util.TargetingUtil.DmgType.MAGICAL);
+            if (rk == 0) TargetingUtil.dealDamage(attacker, victim, aaDmg*0.20, TargetingUtil.DmgType.MAGICAL);
         }
         // ── Phantom Dancer : +7% MS ──
         if (hasAnyItem(attacker,"phantom_dancer","phantom_dancer2")) {
@@ -549,25 +546,25 @@ public class PassiveManager {
         // ── Dusk and Dawn : après sort, prochain AA double on-hit ──
         if (getState(attacker).duskDawnReady) {
             getState(attacker).duskDawnReady = false;
-            fr.lolmc.util.TargetingUtil.dealDamage(attacker, victim, aaDmg*0.50, fr.lolmc.util.TargetingUtil.DmgType.PHYSICAL);
+            TargetingUtil.dealDamage(attacker, victim, aaDmg*0.50, TargetingUtil.DmgType.PHYSICAL);
         }
         // ── Emblem All-In / Fiendhunter : prochain AA crit garanti ──
         if (getState(attacker).nextAACrit) {
             getState(attacker).nextAACrit = false;
-            fr.lolmc.util.TargetingUtil.dealDamage(attacker, victim, aaDmg*0.75, fr.lolmc.util.TargetingUtil.DmgType.PHYSICAL);
+            TargetingUtil.dealDamage(attacker, victim, aaDmg*0.75, TargetingUtil.DmgType.PHYSICAL);
         }
         // ── Protoplasm Harness : 6 stacks → AoE ──
         if (hasAnyItem(attacker,"protoplasm_harness")) {
             int ph = (getState(attacker).protoStacks+1) % 6;
             getState(attacker).protoStacks = ph;
-            if (ph == 0) fr.lolmc.util.TargetingUtil.dealDamageAll(attacker, fr.lolmc.util.TargetingUtil.enemiesAround(attacker,3.5), aaDmg*0.30, fr.lolmc.util.TargetingUtil.DmgType.PHYSICAL);
+            if (ph == 0) TargetingUtil.dealDamageAll(attacker, TargetingUtil.enemiesAround(attacker,3.5), aaDmg*0.30, TargetingUtil.DmgType.PHYSICAL);
         }
         // ── Yun Tal Wildarrows : crits → DoT 60%AD physique 3s ──
         if (hasAnyItem(attacker,"yun_tal_wildarrows") && getState(attacker).lastHitCrit)
             applyDoT(attacker, victim, as.getFinalAD()*0.20, 3, "yuntal");
         // ── Noonquiver : tir bonus 50 dégâts physiques ──
         if (hasAnyItem(attacker,"noonquiver"))
-            fr.lolmc.util.TargetingUtil.dealDamage(attacker, victim, 50, fr.lolmc.util.TargetingUtil.DmgType.PHYSICAL);
+            TargetingUtil.dealDamage(attacker, victim, 50, TargetingUtil.DmgType.PHYSICAL);
 
         // ── Lifesteal (tous items) ──
         double lifesteal = as.getFinalLifeSteal();
@@ -592,8 +589,8 @@ public class PassiveManager {
         if (!championManager.hasChampion(attacker)) return;
         // ── Scorchclaw Smite : AA ralentissent les monstres de jungle ──
         if (hasAnyItem(attacker, "blue_smite")) {
-            victim.addPotionEffect(new org.bukkit.potion.PotionEffect(
-                org.bukkit.potion.PotionEffectType.SLOWNESS, 40, 1, false, false));
+            victim.addPotionEffect(new PotionEffect(
+                PotionEffectType.SLOWNESS, 40, 1, false, false));
         }
         // ── Gustwalker Smite : bonus vitesse après tuer un monstre (géré dans onJungleKill) ──
     }
@@ -608,7 +605,6 @@ public class PassiveManager {
         ChampionStats as = ac.getStats();
         HPSystem vhp = vc.getHPSystem();
         HPSystem ahp = ac.getHPSystem();
-        UUID vid = victim.getUniqueId();
 
         // ── Liandry's Anguish: brûlure 1% HP max/s pendant 4s ──
         if (isMagical && hasAnyItem(caster,"liandry_anguish")) {
@@ -679,7 +675,7 @@ public class PassiveManager {
     // ════════════════════════════════════════════════════════
     // ÉVÉNEMENT: DÉGÂTS REÇUS
     // ════════════════════════════════════════════════════════
-    public void onDamageTaken(Player victim, double damageAmount) {
+    public void onDamageTaken(Player victim) {
         if (!championManager.hasChampion(victim)) return;
         BaseChampion champ = championManager.getChampion(victim);
         HPSystem hp = champ.getHPSystem();
@@ -723,8 +719,8 @@ public class PassiveManager {
             state.gaActive = true;
             hp.setCurrentHP(1);
             victim.showTitle(net.kyori.adventure.title.Title.title(
-                    net.kyori.adventure.text.Component.text("🌺"),
-                    net.kyori.adventure.text.Component.text("Pétales Sanglants — Résurrection 4s..."),
+                    Component.text("🌺"),
+                    Component.text("Pétales Sanglants — Résurrection 4s..."),
                     net.kyori.adventure.title.Title.Times.times(
                             java.time.Duration.ofMillis(250),
                             java.time.Duration.ofMillis(3000),
@@ -750,8 +746,8 @@ public class PassiveManager {
             state.gaCooldown = System.currentTimeMillis();
             hp.setCurrentHP(1);
             victim.showTitle(net.kyori.adventure.title.Title.title(
-                    net.kyori.adventure.text.Component.text("☠"),
-                    net.kyori.adventure.text.Component.text("Guardian Angel — Résurrection 4s..."),
+                    Component.text("☠"),
+                    Component.text("Guardian Angel — Résurrection 4s..."),
                     net.kyori.adventure.title.Title.Times.times(
                             java.time.Duration.ofMillis(250),
                             java.time.Duration.ofMillis(3000),
@@ -762,8 +758,8 @@ public class PassiveManager {
                     hp.setCurrentHP(hp.getMaxHP() * 0.50);
                     state.gaActive = false;
                     victim.showTitle(net.kyori.adventure.title.Title.title(
-                            net.kyori.adventure.text.Component.empty(),
-                            net.kyori.adventure.text.Component.text("✅ Ressuscité!"),
+                            Component.empty(),
+                            Component.text("✅ Ressuscité!"),
                             net.kyori.adventure.title.Title.Times.times(
                                     java.time.Duration.ofMillis(250),
                                     java.time.Duration.ofMillis(1500),
@@ -779,7 +775,7 @@ public class PassiveManager {
     // ════════════════════════════════════════════════════════
     // ÉVÉNEMENT: KILL / ASSIST
     // ════════════════════════════════════════════════════════
-    public void onKill(Player killer, Player victim) {
+    public void onKill(Player killer) {
         // ── Ravenous Hunter : omnivamp croissant par takedown ──
         if (LolPlugin.getInstance().getRuneManager() != null) {
             var page = LolPlugin.getInstance().getRuneManager().getPage(killer.getUniqueId());
@@ -833,8 +829,7 @@ public class PassiveManager {
         }
         // ── Mejai's Soulstealer : +5 AP par kill (max 25 stacks) ──
         if (hasAnyItem(killer,"mejais_soulstealer")) {
-            int stk = Math.min(25, getState(killer).mejaisStacks+1);
-            getState(killer).mejaisStacks = stk;
+            getState(killer).mejaisStacks = Math.min(25, getState(killer).mejaisStacks+1);
             stats.addBonusAP(5);
         }
         // ── Stormsurge / Stormsurge NH : kill → foudre sur voisins ──
@@ -912,9 +907,9 @@ public class PassiveManager {
         ItemState state = getState(player);
 
         switch (itemId) {
-            case "zhonyas_hourglass" -> activateZhonyasHourglass(player, champ, state);
+            case "zhonyas_hourglass" -> activateZhonyasHourglass(player, state);
             case "galeforce" -> activateGaleforce(player, champ, state);
-            case "shurelyas" -> activateShurelyas(player, champ, state);
+            case "shurelyas" -> activateShurelyas(player, state);
             case "redemption" -> activateRedemption(player, champ, state);
             case "locket" -> activateLocket(player, champ, state);
             case "mikaels" -> activateMikaels(player, champ, state);
@@ -1009,7 +1004,7 @@ public class PassiveManager {
     // ════════════════════════════════════════════════════════
     // TÂCHES RÉPÉTÉES (auras, DoT, stacks passifs)
     // ════════════════════════════════════════════════════════
-    private void activateZhonyasHourglass(Player player, BaseChampion champ, ItemState state) {
+    private void activateZhonyasHourglass(Player player, ItemState state) {
         if (state.isOnCooldown(state.lastZhonyas, 120000L)) {
             sendCDMessage(player, "Zhonya's", state.lastZhonyas, 120000L); return;
         }
@@ -1047,7 +1042,7 @@ public class PassiveManager {
         int dashSteps = Math.max(3, (int)(dashDist / 0.4));
         org.bukkit.util.Vector dashStep = dashSafe.toVector()
                 .subtract(dashStart.toVector()).normalize().multiply(dashDist / dashSteps);
-        org.bukkit.Location cur = dashStart.clone();
+        Location cur = dashStart.clone();
         for (int si = 0; si < dashSteps; si++) {
             cur.add(dashStep);
             fr.lolmc.util.VisualEffectUtil.impact(player.getWorld(), cur.clone(), Material.WHITE_STAINED_GLASS, 0.18f, 3L);
@@ -1057,8 +1052,8 @@ public class PassiveManager {
         // 3 projectiles animés vers les 3 ennemis les plus proches
         final var enemies = player.getWorld().getNearbyEntities(player.getLocation(), 8, 2, 8).stream()
                 .filter(e -> e instanceof Player ep && !ep.equals(player)
-                        && championManager.hasChampion((Player)e)
-                        && LolPlugin.getInstance().getTeamManager().areEnemies(player, (Player)e))
+                        && championManager.hasChampion(ep)
+                        && LolPlugin.getInstance().getTeamManager().areEnemies(player, ep))
                 .limit(3).toList();
         for (var enemy : enemies) {
             final var fe = enemy;
@@ -1067,8 +1062,8 @@ public class PassiveManager {
             double pd = projStart.distance(projEnd);
             int ps = Math.max(3,(int)(pd/0.5));
             org.bukkit.util.Vector pv = projEnd.toVector().subtract(projStart.toVector()).normalize().multiply(pd/ps);
-            new org.bukkit.scheduler.BukkitRunnable(){
-                int pi=0; Location pc = projStart.clone();
+            new BukkitRunnable(){
+                int pi=0; final Location pc = projStart.clone();
                 @Override public void run(){
                     if(pi>=ps){cancel();
                         if(championManager.hasChampion((Player)fe))
@@ -1085,7 +1080,7 @@ public class PassiveManager {
         }
         player.sendActionBar(Component.text("⚡ Galeforce! " + enemies.size() + " projectiles", NamedTextColor.YELLOW));
     }
-    private void activateShurelyas(Player player, BaseChampion champ, ItemState state) {
+    private void activateShurelyas(Player player, ItemState state) {
         if (state.isOnCooldown(state.lastShurelyas, 120000L)) {
             sendCDMessage(player, "Shurelya's", state.lastShurelyas, 120000L); return;
         }
@@ -1102,10 +1097,9 @@ public class PassiveManager {
         }
         state.lastRedemption = System.currentTimeMillis();
         var redemptionTargetBlock = player.getTargetBlockExact(30);
-        Location target = redemptionTargetBlock != null
+        final Location healLoc = redemptionTargetBlock != null
                 ? redemptionTargetBlock.getLocation()
                 : player.getLocation().add(player.getLocation().getDirection().multiply(30));
-        final Location healLoc = target;
         player.sendActionBar(Component.text("💫 Redemption lancé! (2.5s)", NamedTextColor.WHITE));
         new BukkitRunnable() {
             @Override public void run() {
@@ -1251,9 +1245,9 @@ public class PassiveManager {
                     ItemState state = getState(p);
                     BaseChampion champ = championManager.getChampion(p);
                     if (!champ.getHPSystem().isInCombat()) {
+                        // TODO : la vitesse bonus (deadManStacks * 0.3, max +30 MS) n'est
+                        // actuellement appliquée nulle part (HUDManager ne lit pas ce champ).
                         state.deadManStacks = Math.min(100, state.deadManStacks + 5);
-                        double bonus = state.deadManStacks * 0.3; // max +30 MS
-                        // Appliqué via walkSpeed dans HUDManager
                     }
                 }
             }
@@ -1288,7 +1282,7 @@ public class PassiveManager {
             @Override public void run() {
                 for (Player p : WorldContext.getGamePlayers()) {
                     if (!championManager.hasChampion(p)) continue;
-                    var currentlyAffected = abyssalAffected.computeIfAbsent(p.getUniqueId(), _ -> new java.util.HashMap<>());
+                    var currentlyAffected = abyssalAffected.computeIfAbsent(p.getUniqueId(), _ -> new HashMap<>());
                     if (!hasAnyItem(p,"abyssal_mask")) {
                         // Objet retiré/vendu : lever tous les debuffs actifs de ce porteur
                         for (var entry : currentlyAffected.entrySet()) {
@@ -1377,11 +1371,8 @@ public class PassiveManager {
                     });
         }
 
-        // ── Force of Nature: stacks MR → appliquer ──
-        if (hasAnyItem(p,"force_of_nature")) {
-            int fnStacks = state.forceOfNatureStacks.values().stream().mapToInt(Integer::intValue).sum();
-            // +6 MR par stack, déjà appliqué en temps réel
-        }
+        // TODO : Force of Nature (+6 MR/stack) n'est pas implémenté — forceOfNatureStacks
+        // n'est jamais rempli nulle part dans le code, cette map reste toujours vide.
     }
 
     // ════════════════════════════════════════════════════════
@@ -1452,10 +1443,6 @@ public class PassiveManager {
         getState(player).atakhanRevive = true;
     }
 
-    public boolean isReviving(java.util.UUID uuid) {
-        return states.containsKey(uuid) && states.get(uuid).gaActive;
-    }
-
 
     /**
      * Appelé quand un joueur tue un monstre de jungle.
@@ -1467,11 +1454,11 @@ public class PassiveManager {
         // ── Gustwalker Smite : +20% vitesse de déplacement pendant 2s après un kill ──
         if (hasAnyItem(killer, "smite_stalker")) {
             champ.getStats().addBonusMoveSpeed(20);
-            new org.bukkit.scheduler.BukkitRunnable() {
+            new BukkitRunnable() {
                 @Override public void run() { champ.getStats().addBonusMoveSpeed(-20); }
             }.runTaskLater(LolPlugin.getInstance(), 40L);
-            killer.sendActionBar(net.kyori.adventure.text.Component.text(
-                "🌿 Gustwalker: +20 MS!", net.kyori.adventure.text.format.NamedTextColor.GREEN));
+            killer.sendActionBar(Component.text(
+                "🌿 Gustwalker: +20 MS!", NamedTextColor.GREEN));
         }
         // ── Mosstomper Smite : bouclier 65-170 après un kill de jungle (CD 12s) ──
         if (hasAnyItem(killer, "pickaxe_jungle")) {
@@ -1483,18 +1470,18 @@ public class PassiveManager {
                 double shield = 65 + lvl * 7.0; // ~65-170 selon niveau
                 champ.getStats().addShield(shield);
                 final double fsh = shield;
-                new org.bukkit.scheduler.BukkitRunnable() {
+                new BukkitRunnable() {
                     @Override public void run() { champ.getStats().addShield(-fsh); }
                 }.runTaskLater(LolPlugin.getInstance(), 60L); // 3s
-                killer.sendActionBar(net.kyori.adventure.text.Component.text(
+                killer.sendActionBar(Component.text(
                     String.format("🌿 Mosstomper: Bouclier %.0f!", shield),
-                    net.kyori.adventure.text.format.NamedTextColor.GREEN));
+                    NamedTextColor.GREEN));
             }
         }
     }
 
     /** Nettoie l'état d'un joueur (déconnexion / fin de partie). */
-    public void cleanup(java.util.UUID uuid) {
+    public void cleanup(UUID uuid) {
         states.remove(uuid);
         abyssalAffected.remove(uuid);
     }
