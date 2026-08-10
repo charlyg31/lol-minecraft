@@ -145,7 +145,7 @@ public class RewardManager {
 
         // Déclencher les passifs on-kill (Hubris, Axiom Arc...)
         var pm = LolPlugin.getInstance().getPassiveManager();
-        if (pm != null) pm.onKill(killer, victim);
+        if (pm != null) pm.onKill(killer);
     }
 
     // ── Monstre de jungle ─────────────────────────────────────────
