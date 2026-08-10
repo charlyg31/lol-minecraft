@@ -21,10 +21,6 @@ public class DamageUtil {
 
     public enum Type { PHYSICAL, MAGICAL, TRUE }
 
-    /**
-     * Inflige des dégâts déjà réduits par l'armure/MR.
-     * @param amount dégâts post-résistance
-     */
     // ══════════════════════════════════════════════════════════════
     // SURCHARGES UNIVERSELLES (acceptent sbires, monstres, joueurs)
     // ══════════════════════════════════════════════════════════════
@@ -140,7 +136,6 @@ public class DamageUtil {
         // dans Amumu.java — plus de renvoi de dégâts ici.
         // Dragon Elder : exécution si la cible tombe sous 20% HP
         if (attacker != null) {
-            var ac = LolPlugin.getInstance().getChampionManager().getChampion(attacker);
             // Vérifier si l'attaquant a le buff dragon_elder
             if (attacker.hasPotionEffect(org.bukkit.potion.PotionEffectType.STRENGTH)
                     && vc.getHPSystem().getHPRatio() < 0.20) {

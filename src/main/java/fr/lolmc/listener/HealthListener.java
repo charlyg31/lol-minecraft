@@ -143,7 +143,7 @@ public class HealthListener implements Listener {
                 } else {
                     if (cm.hasChampion(p)) cm.removeChampion(p);
                     tm.removePlayer(id);
-                    var world = plugin.getServer().getWorlds().get(0);
+                    var world = plugin.getServer().getWorlds().getFirst();
                     p.teleport(world.getSpawnLocation());
                     if (gm.isRunning()) {
                         p.sendMessage(net.kyori.adventure.text.Component.text(

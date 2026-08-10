@@ -13,14 +13,11 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Une instance de partie complètement isolée.
- *
  * Chaque GameInstance possède ses propres managers (GameManager, MinionManager,
  * JungleManager, etc.) et opère sur son propre monde Minecraft dédié.
- *
  * Convention de nommage des mondes :
  *   Template  : lolmc_template   (configuré une fois, jamais utilisé en jeu)
  *   Instance  : lolmc_game_1, lolmc_game_2, lolmc_game_3…
- *
  * Isolation garantie :
  *   - Chaque instance a son propre World → WorldContext filtre par monde
  *   - Les managers à état (stacks, timers, entités) sont instanciés séparément
