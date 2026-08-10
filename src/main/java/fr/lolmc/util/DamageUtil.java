@@ -9,7 +9,6 @@ import org.bukkit.entity.Player;
 
 /**
  * Routeur central de dégâts — chaîne complète LoL.
- *
  * Ordre d'application (après que le sort a déjà calculé la réduction armure/MR) :
  *   1. Réductions défensives de la cible (plate + %, AA si auto-attaque)
  *   2. Absorption par les boucliers (anti-magie en priorité si dégât magique)
