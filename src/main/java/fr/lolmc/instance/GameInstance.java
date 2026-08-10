@@ -63,7 +63,7 @@ public class GameInstance {
         this.gameManager         = new GameManager();
         this.gameManager.setGameInstance(this); // lier à cette instance
         this.rewardManager       = new RewardManager(lp.getChampionManager(), lp.getGoldManager());
-        this.minionManager       = new MinionManager(mapManager);
+        this.minionManager       = new MinionManager();
         this.turretManager       = new TurretManager(mapManager, lp.getChampionManager(), lp.getTeamManager());
         this.jungleManager       = new JungleManager(world);
         this.baseManager         = new BaseManager(world);

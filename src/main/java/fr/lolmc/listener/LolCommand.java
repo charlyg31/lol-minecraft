@@ -890,4 +890,4 @@ private void handleSolo(Player player, String[] args) {
         for (String[] cmd : cmds) {
             player.sendMessage(Component.text("§e" + cmd[0] + " §7— " + cmd[1]));
         }
-    }
+    }}

@@ -84,7 +84,7 @@ public class HealthListener implements Listener {
             PassiveManager pm = LolPlugin.getInstance().getPassiveManager();
             var bushMgr = LolPlugin.getInstance().getBushManager();
             if (bushMgr != null) bushMgr.revealOnDamage(p);
-            if (pm != null) pm.onDamageTaken(p, finalDmg);
+            if (pm != null) pm.onDamageTaken(p);
             hud.updateHUD(p, champ);
         }
     }

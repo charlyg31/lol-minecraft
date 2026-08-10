@@ -178,7 +178,7 @@ public class DamageUtil {
         // 5. Passifs défensifs + DoT
         var pm = LolPlugin.getInstance().getPassiveManager();
         if (pm != null) {
-            pm.onDamageTaken(victim, afterShield);
+            pm.onDamageTaken(victim);
             if (isAbility && attacker != null && cm.hasChampion(attacker)) {
                 pm.onAbilityDamage(attacker, victim, afterShield, type == Type.MAGICAL);
             }
