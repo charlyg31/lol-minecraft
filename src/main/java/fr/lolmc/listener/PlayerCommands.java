@@ -1,6 +1,7 @@
 package fr.lolmc.listener;
 
 import fr.lolmc.LolPlugin;
+import org.jetbrains.annotations.NotNull;
 import fr.lolmc.game.AnnouncementManager.PingType;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -19,7 +20,7 @@ import java.util.List;
 public class PlayerCommands implements CommandExecutor, TabCompleter {
 
     @Override
-    public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args) {
+    public boolean onCommand(@NotNull CommandSender sender, @NotNull Command cmd, @NotNull String label, @NotNull String @NotNull [] args) {
         if (!(sender instanceof Player player)) { sender.sendMessage("§cJoueur uniquement."); return true; }
 
         switch (cmd.getName().toLowerCase()) {
@@ -30,26 +31,18 @@ public class PlayerCommands implements CommandExecutor, TabCompleter {
                 }
                 LolPlugin.getInstance().getBaseManager().startRecall(player);
             }
-            case "roles", "lobby", "play" -> {
-                LolPlugin.getInstance().getPreGameGUI().open(player);
-            }
-            case "queue" -> {
-                LolPlugin.getInstance().getRoleQueueManager().joinQueue(player);
-            }
+            case "roles", "lobby", "play" -> LolPlugin.getInstance().getPreGameGUI().open(player);
+            case "queue" -> LolPlugin.getInstance().getRoleQueueManager().joinQueue(player);
             case "pick" -> {
                 if (args.length < 1) { player.sendMessage("§cUsage: /pick <champion>"); return true; }
                 LolPlugin.getInstance().getChampSelectManager().chooseChampion(player, args[0].toLowerCase());
             }
-            case "runes" -> {
-                LolPlugin.getInstance().getRuneGUI().open(player);
-            }
+            case "runes" -> LolPlugin.getInstance().getRuneGUI().open(player);
             case "spell" -> {
                 if (args.length < 2) { player.sendMessage("§cUsage: /spell <sort1> <sort2>"); return true; }
                 LolPlugin.getInstance().getChampSelectManager().chooseSpells(player, args[0], args[1]);
             }
-            case "lock" -> {
-                LolPlugin.getInstance().getChampSelectManager().lock(player);
-            }
+            case "lock" -> LolPlugin.getInstance().getChampSelectManager().lock(player);
             case "ping" -> {
                 // /ping seul = ping générique d'alerte
                 if (args.length < 1) {
@@ -75,7 +68,7 @@ public class PlayerCommands implements CommandExecutor, TabCompleter {
     }
 
     @Override
-    public List<String> onTabComplete(CommandSender sender, Command cmd, String alias, String[] args) {
+    public List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command cmd, @NotNull String alias, @NotNull String @NotNull [] args) {
         if (cmd.getName().equalsIgnoreCase("ping") && args.length == 1) {
             return Arrays.asList("danger", "omw", "miss", "missing", "assist", "help", "enemy");
         }
