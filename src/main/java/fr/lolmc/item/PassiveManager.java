@@ -464,7 +464,7 @@ public class PassiveManager {
         // ── Rapidfire Cannon: prochaine AA bonus si hors portée normale ──
         if (hasAnyItem(attacker,"rapidfire_cannon")) {
             state.voltaicStacks = Math.min(100, state.voltaicStacks + 5);
-            if (state.voltaicStacks >= 100) {
+            if (state.voltaicStacks == 100) {
                 state.voltaicStacks = 0;
                 // Bonus dégâts électriques sur la prochaine AA
                 DamageUtil.damage(attacker, victim,

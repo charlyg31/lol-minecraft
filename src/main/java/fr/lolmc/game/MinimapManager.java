@@ -2,6 +2,7 @@ package fr.lolmc.game;
 
 import fr.lolmc.LolPlugin;
 import fr.lolmc.team.TeamManager;
+import org.jetbrains.annotations.NotNull;
 import fr.lolmc.util.WorldContext;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -91,8 +92,8 @@ public class MinimapManager implements Listener {
         centerX = cfg.getInt("minimap.center-x", 0);
         centerZ = cfg.getInt("minimap.center-z", 0);
         sharedView = null;
-        for (Player p : org.bukkit.Bukkit.getOnlinePlayers()) {
-            if (fr.lolmc.util.WorldContext.isInGameWorld(p)) giveMinimap(p);
+        for (Player p : Bukkit.getOnlinePlayers()) {
+            if (WorldContext.isInGameWorld(p)) giveMinimap(p);
         }
     }
 
@@ -144,7 +145,7 @@ public class MinimapManager implements Listener {
         TerrainRenderer() { super(false); } // non contextuel = rendu une fois pour tous
 
         @Override
-        public void render(MapView map, MapCanvas canvas, Player viewer) {
+        public void render(@NotNull MapView map, @NotNull MapCanvas canvas, @NotNull Player viewer) {
             if (rendered) return;
             rendered = true;
 
@@ -210,7 +211,7 @@ public class MinimapManager implements Listener {
         CursorRenderer() { super(true); } // contextual = rendu par joueur
 
         @Override
-        public void render(MapView map, MapCanvas canvas, Player viewer) {
+        public void render(@NotNull MapView map, @NotNull MapCanvas canvas, @NotNull Player viewer) {
             MapCursorCollection cursors = canvas.getCursors();
             while (cursors.size() > 0) cursors.removeCursor(cursors.getCursor(0));
 

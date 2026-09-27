@@ -10,12 +10,8 @@ import fr.lolmc.stats.ResourceSystem;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
-import org.bukkit.attribute.Attribute;
-import org.bukkit.attribute.Attribute;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
-
-import fr.lolmc.champion.impl.mid.Yasuo;
 
 public class HUDManager {
 
@@ -152,7 +148,7 @@ public class HUDManager {
         int hpMax = (int) hp.getMaxHP();
 
         // Construire une mini barre de vie (20 segments)
-        int filled = (int) Math.round(hp.getHPRatio() * 20);
+        int filled = Math.round(hp.getHPRatio() * 20);
         StringBuilder bar = new StringBuilder();
         for (int i = 0; i < 20; i++) bar.append(i < filled ? "❤" : "♡");
 
@@ -170,7 +166,7 @@ public class HUDManager {
             int resMax = (int) res.getMax();
             String symbol = res.getSymbol();
             // Mini barre de ressource (10 segments)
-            int resFilled = (int) Math.round(res.getRatio() * 10);
+            int resFilled = Math.round(res.getRatio() * 10);
             String resBar = "█".repeat(resFilled) + "░".repeat(10 - resFilled);
             resourceComp = Component.text(
                 String.format("  %s [%s] %d/%d", symbol, resBar, resCur, resMax),
@@ -251,13 +247,13 @@ public class HUDManager {
         // Passer en mode spectateur
         player.setGameMode(org.bukkit.GameMode.SPECTATOR);
         player.showTitle(net.kyori.adventure.title.Title.title(
-            net.kyori.adventure.text.Component.text("☠ Tu es mort", net.kyori.adventure.text.format.NamedTextColor.DARK_RED),
-            net.kyori.adventure.text.Component.text("Respawn dans " + respawnSeconds + "s", net.kyori.adventure.text.format.NamedTextColor.GRAY),
+            Component.text("☠ Tu es mort", NamedTextColor.DARK_RED),
+            Component.text("Respawn dans " + respawnSeconds + "s", NamedTextColor.GRAY),
             net.kyori.adventure.title.Title.Times.times(
                 java.time.Duration.ofMillis(500), java.time.Duration.ofSeconds(3), java.time.Duration.ofSeconds(1))));
 
         // Countdown visible
-        new org.bukkit.scheduler.BukkitRunnable() {
+        new BukkitRunnable() {
             int remaining = respawnSeconds;
             @Override public void run() {
                 if (!player.isOnline()) { cancel(); return; }
@@ -266,9 +262,9 @@ public class HUDManager {
                     cancel();
                     return;
                 }
-                player.sendActionBar(net.kyori.adventure.text.Component.text(
+                player.sendActionBar(Component.text(
                     "☠ Respawn dans " + remaining + "s",
-                    net.kyori.adventure.text.format.NamedTextColor.RED));
+                    NamedTextColor.RED));
                 remaining--;
             }
         }.runTaskTimer(plugin, 0L, 20L);
@@ -299,8 +295,8 @@ public class HUDManager {
         }
 
         player.showTitle(net.kyori.adventure.title.Title.title(
-            net.kyori.adventure.text.Component.text("✔ Respawn", net.kyori.adventure.text.format.NamedTextColor.GREEN),
-            net.kyori.adventure.text.Component.empty(),
+            Component.text("✔ Respawn", NamedTextColor.GREEN),
+            Component.empty(),
             net.kyori.adventure.title.Title.Times.times(
                 java.time.Duration.ofMillis(250), java.time.Duration.ofSeconds(1), java.time.Duration.ofMillis(500))));
     }
@@ -332,7 +328,7 @@ public class HUDManager {
 
 
     private void updatePlayerHealthBar(Player player,
-            fr.lolmc.champion.base.BaseChampion champ) {
+            BaseChampion champ) {
         double cur = champ.getHPSystem().getCurrentHP();
         double max = champ.getHPSystem().getMaxHP();
         String label = champ.getId().substring(0,1).toUpperCase()
