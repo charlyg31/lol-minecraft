@@ -10,8 +10,6 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Location;
 import org.bukkit.Material;
-import org.bukkit.Particle;
-import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -240,7 +238,7 @@ public class ConsumableManager {
 
         // Entité invisible représentant la ward (ArmorStand marqueur + tête de torche).
         Material headMat = visible ? Material.TORCH : Material.SOUL_TORCH;
-        final java.util.UUID wardEntityId = spawnWardEntity(wardLoc, headMat,
+        final UUID wardEntityId = spawnWardEntity(wardLoc, headMat,
                 visible ? "🔵 Totem de vision" : "👁 Ward furtive", visible);
 
         new BukkitRunnable() {
@@ -282,7 +280,7 @@ public class ConsumableManager {
         LolPlugin.getInstance().getWardManager().revealEnemyWards(player, wardLoc, 6.0, 10_000L);
 
         // Entité invisible (control ward = chandelle rose)
-        final java.util.UUID wardEntityId = spawnWardEntity(wardLoc, Material.PINK_CANDLE,
+        final UUID wardEntityId = spawnWardEntity(wardLoc, Material.PINK_CANDLE,
                 "🔮 Control Ward", true);
 
         // Enregistrer la control ward elle-même (équipe du poseur)
@@ -318,7 +316,7 @@ public class ConsumableManager {
     }
 
     /** Spawn un ArmorStand invisible marqueur portant une tête (torche/chandelle) comme ward. */
-    private java.util.UUID spawnWardEntity(Location loc, Material headMat, String name, boolean nameVisible) {
+    private UUID spawnWardEntity(Location loc, Material headMat, String name, boolean nameVisible) {
         org.bukkit.entity.ArmorStand as = loc.getWorld().spawn(loc, org.bukkit.entity.ArmorStand.class, stand -> {
             stand.setMarker(true);          // pas de hitbox, n'interfère pas avec les clics
             stand.setVisible(false);        // corps invisible
@@ -389,7 +387,7 @@ public class ConsumableManager {
                 long now = System.currentTimeMillis();
                 new ArrayList<>(elixirExpire.keySet()).forEach(uuid -> {
                     if (now > elixirExpire.getOrDefault(uuid, 0L)) {
-                        org.bukkit.entity.Player p = LolPlugin.getInstance()
+                        Player p = LolPlugin.getInstance()
                             .getServer().getPlayer(uuid);
                         if (p != null) {
                             removeElixirEffects(p);
@@ -427,8 +425,8 @@ public class ConsumableManager {
     public String getActiveElixir(Player p) { return activeElixir.get(p.getUniqueId()); }
 
     /** Récupère les blocs dans un rayon (getNearbyBlocks n'existe pas en Paper). */
-    private static java.util.List<org.bukkit.block.Block> nearbyBlocks(Location center, int radius) {
-        java.util.List<org.bukkit.block.Block> blocks = new java.util.ArrayList<>();
+    private static List<org.bukkit.block.Block> nearbyBlocks(Location center, int radius) {
+        List<org.bukkit.block.Block> blocks = new ArrayList<>();
         for (int x = -radius; x <= radius; x++)
             for (int y = -radius; y <= radius; y++)
                 for (int z = -radius; z <= radius; z++)

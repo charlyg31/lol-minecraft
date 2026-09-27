@@ -125,7 +125,7 @@ public final class VisualEffectUtil {
 
         new BukkitRunnable() {
             int step_ = 0;
-            Location current = start.clone();
+            final Location current = start.clone();
             @Override public void run() {
                 if (step_ >= totalSteps) {
                     proj.remove();
@@ -210,17 +210,7 @@ public final class VisualEffectUtil {
                                                                    Material block, int segments, float size) {
         var list = new java.util.ArrayList<BlockDisplay>(segments);
         for (int i = 0; i < segments; i++) {
-            var d = loc.getWorld().spawn(loc, BlockDisplay.class, disp -> {
-                disp.setBlock(block.createBlockData());
-                disp.setBrightness(new Display.Brightness(15, 15));
-                disp.setPersistent(false);
-                disp.setInterpolationDuration(2);
-                disp.setInterpolationDelay(0);
-                disp.setTransformation(centeredCube(size));
-                disp.setVisibleByDefault(false);
-            });
-            viewer.showEntity(LolPlugin.getInstance(), d);
-            list.add(d);
+            list.add(privateMarker(viewer, loc, block, size));
         }
         return list;
     }
