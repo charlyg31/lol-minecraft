@@ -15,9 +15,9 @@ package fr.lolmc.stats;
 public class ChampionStats {
 
     // ── Stats de base (niveau 1) ──
-    private double baseMaxHP, baseAttackDamage, baseAbilityPower;
-    private double baseArmor, baseMagicResist, baseAttackSpeed;
-    private double baseCritChance, baseCritDamage, baseMovementSpeed, baseRange, baseHPRegen;
+    private final double baseMaxHP, baseAttackDamage, baseAbilityPower;
+    private final double baseArmor, baseMagicResist, baseAttackSpeed;
+    private final double baseCritChance, baseCritDamage, baseMovementSpeed, baseRange, baseHPRegen;
 
     // ── Pénétration ──
     private double baseLethality;        // pénétration armure plate
