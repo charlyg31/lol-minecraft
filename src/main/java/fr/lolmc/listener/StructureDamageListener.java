@@ -41,7 +41,6 @@ public class StructureDamageListener implements Listener {
         this.teamManager = teamManager;
     }
 
-    @EventHandler
     /**
      * Applique les dégâts d'une auto-attaque sur une structure.
      * Appelé depuis AbilityListener quand un joueur attaque depuis sa portée AA LoL.
@@ -70,7 +69,7 @@ public class StructureDamageListener implements Listener {
 
         // Fortification LoL : les tours externes (T1) prennent -50% de
         // degats pendant les 5 premieres minutes
-        if (structure.getType() == fr.lolmc.game.GameStructure.Type.TURRET
+        if (structure.getType() == Type.TURRET
                 && structure.getIndex() == 1
                 && LolPlugin.getInstance().getGameManager().getElapsedSeconds() < 300) {
             damage *= 0.5;
@@ -153,7 +152,7 @@ public class StructureDamageListener implements Listener {
         // Turret Plating : -40% degats si plaques actives + or de plaque au frappeur
         var tm = LolPlugin.getInstance().getTurretManager();
         String structKey = structure.getType().name() + "_" + structure.getTeam() + "_" + structure.getLane();
-        if (structure.getType() == fr.lolmc.game.GameStructure.Type.TURRET && tm.hasPlating(structKey)) {
+        if (structure.getType() == Type.TURRET && tm.hasPlating(structKey)) {
             damage *= 0.60;
             tm.tickPlating(structKey, player);
             // Or de plaque (avant 14min, max 5 par tour)
@@ -180,15 +179,14 @@ public class StructureDamageListener implements Listener {
     private void onStructureDestroyed(GameStructure structure, Player destroyer) {
         String name = structureName(structure);
         Team enemyTeam = structure.getTeam();
-        Player player = destroyer;
         Team playerTeam = LolPlugin.getInstance().getTeamManager().getTeam(destroyer);
 
         // Inhibiteur détruit → super-sbires sur cette lane pour l'équipe adverse
         if (structure.getType() == Type.TURRET) {
             int turretIndex = structure.getIndex(); // 1=T1, 2=T2, 3=T3
-            LolPlugin.getInstance().getRewardManager().onTurretDestroyed(player, playerTeam, turretIndex);
+            LolPlugin.getInstance().getRewardManager().onTurretDestroyed(destroyer, playerTeam, turretIndex);
             LolPlugin.getInstance().getFeatManager().claim(
-                fr.lolmc.game.FeatManager.Feat.FIRST_TOWER, playerTeam, player);
+                fr.lolmc.game.FeatManager.Feat.FIRST_TOWER, playerTeam, destroyer);
         } else if (structure.getType() == Type.INHIBITOR) {
             LolPlugin.getInstance().getMinionManager()
                     .enableSuperMinions(enemyTeam, structure.getLane());
@@ -196,7 +194,7 @@ public class StructureDamageListener implements Listener {
             LolPlugin.getInstance().getGameManager().onInhibitorDestroyed(inhKey);
             LolPlugin.getInstance().getAnnouncementManager().announceInhibitorDestroyed(
                     structure.getLane(), enemyTeam.name());
-            LolPlugin.getInstance().getRewardManager().onInhibitorDestroyed(player, playerTeam);
+            LolPlugin.getInstance().getRewardManager().onInhibitorDestroyed(destroyer, playerTeam);
         }
 
         // Annonce
@@ -246,8 +244,7 @@ public class StructureDamageListener implements Listener {
         var mm  = LolPlugin.getInstance().getMatchmakingManager();
         var im  = LolPlugin.getInstance().getInstanceManager();
         // Trouver l'instance du joueur qui a détruit le Nexus
-        final Player nexusDestroyer = destroyer;
-        var winnerInstance = (nexusDestroyer != null) ? im.getInstanceOf(nexusDestroyer) : null;
+        var winnerInstance = (destroyer != null) ? im.getInstanceOf(destroyer) : null;
         new org.bukkit.scheduler.BukkitRunnable() {
             int countdown = 30;
             @Override public void run() {
@@ -274,9 +271,9 @@ public class StructureDamageListener implements Listener {
                 }
                 if (countdown <= 10 || countdown % 10 == 0) {
                     for (Player p : fr.lolmc.util.WorldContext.getGamePlayers()) {
-                        p.sendActionBar(net.kyori.adventure.text.Component.text(
+                        p.sendActionBar(Component.text(
                             "🏠 Retour dans " + countdown + "s",
-                            net.kyori.adventure.text.format.NamedTextColor.YELLOW));
+                            NamedTextColor.YELLOW));
                     }
                 }
                 countdown--;

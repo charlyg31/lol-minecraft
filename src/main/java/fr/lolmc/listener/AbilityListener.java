@@ -1,7 +1,6 @@
 package fr.lolmc.listener;
 import fr.lolmc.util.Compat;
 import org.bukkit.Location;
-import org.bukkit.Material;
 import fr.lolmc.game.AutoAttackManager;
 import fr.lolmc.game.GameStructure;
 
@@ -18,7 +17,6 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.ProjectileLaunchEvent;
-import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.player.*;
@@ -198,18 +196,18 @@ public class AbilityListener implements Listener {
     // LEFT_CLICK_AIR n'est pas toujours envoyé par le client ; l'animation
     // de balancement du bras (arm swing) l'est à chaque clic gauche.
     @EventHandler
-    public void onArmSwing(org.bukkit.event.player.PlayerAnimationEvent e) {
+    public void onArmSwing(PlayerAnimationEvent e) {
         Player caster = e.getPlayer();
         // Log AVANT le filtre hasChampion : confirme que l'event se déclenche
         fr.lolmc.util.DebugLogger.log("ArmSwing-RAW", caster.getName()
             + " a déclenché PlayerAnimationEvent (hasChampion="
             + manager.hasChampion(caster) + ")");
         if (!manager.hasChampion(caster)) return;
-        if (!fr.lolmc.util.WorldContext.isInGameWorld(caster)) return;
+        if (!WorldContext.isInGameWorld(caster)) return;
 
         // Ignorer l'animation de la main secondaire (Paper envoie ARM_SWING
         // ET OFF_ARM_SWING pour un seul clic → double déclenchement des sorts)
-        if (e.getAnimationType() != org.bukkit.event.player.PlayerAnimationType.ARM_SWING) return;
+        if (e.getAnimationType() != PlayerAnimationType.ARM_SWING) return;
 
         fr.lolmc.util.DebugLogger.log("ArmSwing", caster.getName()
             + " animation=" + e.getAnimationType());
@@ -241,8 +239,8 @@ public class AbilityListener implements Listener {
                 .getPersistentDataContainer().has(
                     new org.bukkit.NamespacedKey(LolPlugin.getInstance(), "herald_eye"),
                     org.bukkit.persistence.PersistentDataType.BYTE)
-                && (e.getAction() == org.bukkit.event.block.Action.RIGHT_CLICK_AIR
-                 || e.getAction() == org.bukkit.event.block.Action.RIGHT_CLICK_BLOCK)) {
+                && (e.getAction() == Action.RIGHT_CLICK_AIR
+                 || e.getAction() == Action.RIGHT_CLICK_BLOCK)) {
             e.setCancelled(true);
             var jm2 = LolPlugin.getInstance().getJungleManager();
             if (jm2 != null && jm2.summonHerald(e.getPlayer())) {
@@ -253,7 +251,7 @@ public class AbilityListener implements Listener {
 
         Player caster = e.getPlayer();
         if (!manager.hasChampion(caster)) return;
-        if (!fr.lolmc.util.WorldContext.isInGameWorld(caster)) return;
+        if (!WorldContext.isInGameWorld(caster)) return;
 
         Action a = e.getAction();
         int slot = caster.getInventory().getHeldItemSlot();
@@ -507,9 +505,9 @@ public class AbilityListener implements Listener {
         if (!fr.lolmc.game.MinionManager.isMinion(damagerLe)) return;
         e.setCancelled(true);
         var tm = LolPlugin.getInstance().getTeamManager();
-        fr.lolmc.team.TeamManager.Team minionTeam =
+        Team minionTeam =
             fr.lolmc.game.MinionManager.getMinionTeam(damagerLe);
-        fr.lolmc.team.TeamManager.Team victimTeam = tm.getTeam(victim);
+        Team victimTeam = tm.getTeam(victim);
         if (minionTeam == null || minionTeam == victimTeam) return;
         // Dégâts du sbire selon son type
         String typeTag = fr.lolmc.game.MinionManager.getMinionTypeTag(damagerLe);
@@ -553,8 +551,7 @@ public class AbilityListener implements Listener {
                  DRAGON_CLOUD, DRAGON_CHEMTECH -> 150.0;
             case HERALD         -> 200.0;
             case ATAKHAN        -> 300.0;
-            case RED_BUFF       -> 80.0;
-            case BLUE_BUFF      -> 80.0;
+            case RED_BUFF, BLUE_BUFF -> 80.0;
             case GROMP          -> 60.0;
             case MURKWOLF       -> 40.0;  // gros loup
             case RAPTOR         -> 30.0;  // gros raptor
@@ -663,13 +660,13 @@ public class AbilityListener implements Listener {
                 && e.getSlot() == 40) {
             offhandSlot = true;
         }
-        if (offhandSlot && fr.lolmc.util.WorldContext.isInGameWorld(p)) {
+        if (offhandSlot && WorldContext.isInGameWorld(p)) {
             e.setCancelled(true);
         }
         // Toute action d'échange offhand (touche F / clic offhand) est bloquée en jeu,
         // qu'un item LoL soit impliqué ou non : c'est ce qui cassait l'agencement.
         if (e.getClick() == org.bukkit.event.inventory.ClickType.SWAP_OFFHAND
-                && fr.lolmc.util.WorldContext.isInGameWorld(p)) {
+                && WorldContext.isInGameWorld(p)) {
             e.setCancelled(true);
         }
         // Shift-clic : déplace un item vers un autre inventaire/slot → casse la barre si LoL
@@ -702,14 +699,14 @@ public class AbilityListener implements Listener {
         if (HotbarManager.isLolItem(e.getOldCursor())) { e.setCancelled(true); return; }
         for (int raw : e.getRawSlots()) {
             if (raw == 40 || raw == 45 || (raw >= 0 && raw <= 8)) {
-                if (fr.lolmc.util.WorldContext.isInGameWorld(p)) { e.setCancelled(true); return; }
+                if (WorldContext.isInGameWorld(p)) { e.setCancelled(true); return; }
             }
         }
     }
 
     // ── Empêcher l'échange main principale ↔ main secondaire (touche F) ──
     @EventHandler
-    public void onSwapHands(org.bukkit.event.player.PlayerSwapHandItemsEvent e) {
+    public void onSwapHands(PlayerSwapHandItemsEvent e) {
         Player p = e.getPlayer();
         if (!manager.hasChampion(p)) return;
         // Tout item LoL (ou n'importe quel item de la hotbar gérée) ne doit jamais
@@ -720,7 +717,7 @@ public class AbilityListener implements Listener {
             return;
         }
         // Par sécurité en partie : bloquer tout swap offhand dans le monde de jeu.
-        if (fr.lolmc.util.WorldContext.isInGameWorld(p)) {
+        if (WorldContext.isInGameWorld(p)) {
             e.setCancelled(true);
         }
     }
@@ -735,7 +732,7 @@ public class AbilityListener implements Listener {
 
     // ── Nettoyage mémoire à la déconnexion ──
     @EventHandler
-    public void onJoinBridge(org.bukkit.event.player.PlayerJoinEvent e) {
+    public void onJoinBridge(PlayerJoinEvent e) {
         var bridge = LolPlugin.getInstance().getBridgeManager();
         if (bridge != null && bridge.isEnabled()) bridge.onPlayerJoin(e.getPlayer());
         // Restaurer l'état si reconnexion en pleine partie
@@ -753,7 +750,7 @@ public class AbilityListener implements Listener {
     public void onItemHeld(PlayerItemHeldEvent e) {
         Player player = e.getPlayer();
         if (!manager.hasChampion(player)) return;
-        if (!fr.lolmc.util.WorldContext.isInGameWorld(player)) return;
+        if (!WorldContext.isInGameWorld(player)) return;
         var preview = LolPlugin.getInstance().getAbilityPreview();
         if (preview == null) return;
         int newSlot = e.getNewSlot();
