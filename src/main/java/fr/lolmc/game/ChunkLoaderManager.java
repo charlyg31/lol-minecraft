@@ -1,6 +1,5 @@
 package fr.lolmc.game;
 
-import fr.lolmc.LolPlugin;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 import org.bukkit.World;
@@ -68,20 +67,8 @@ public class ChunkLoaderManager extends BukkitRunnable {
     private boolean isMinionOrMonster(Entity entity) {
         if (!(entity instanceof LivingEntity)) return false;
 
-        // Exemple 1 : Si tu utilises les Scoreboard Tags lors du spawn de tes sbires
-        if (entity.getScoreboardTags().contains("lol_minion") || entity.getScoreboardTags().contains("lol_monster")) {
-            return true;
-        }
-
-        // Exemple 2 : Si tes sbires ont un nom spécifique (ex: "Sbire de mêlée")
-        /*
-        String name = entity.getCustomName();
-        if (name != null && (name.contains("Sbire") || name.contains("Baron"))) {
-            return true;
-        }
-        */
-
-        return false;
+        // Détection via Scoreboard Tags posés au spawn des sbires/monstres
+        return entity.getScoreboardTags().contains("lol_minion") || entity.getScoreboardTags().contains("lol_monster");
     }
 
     /**

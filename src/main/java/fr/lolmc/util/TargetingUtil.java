@@ -52,9 +52,7 @@ public final class TargetingUtil {
             return minionTeam == null || minionTeam != myTeam;
         }
         // Monstre de jungle = toujours attaquable
-        if (JungleManager.isJungleMonster(entity)) return true;
-
-        return false;
+        return JungleManager.isJungleMonster(entity);
     }
 
     // ══════════════════════════════════════════════════════════════
@@ -146,7 +144,7 @@ public final class TargetingUtil {
         // Un seul BlockDisplay fin et étiré sur toute la trajectoire effective
         // (remplace l'ancienne trainée de 15-20 particules/entités par tir).
         if (stopDist > 0.1) {
-            fr.lolmc.util.VisualEffectUtil.skillshotLine(start, dir, stopDist,
+            VisualEffectUtil.skillshotLine(start, dir, stopDist,
                     Material.WHITE_STAINED_GLASS, (float) Math.min(width, 1.0), 4L);
         }
         return hit;
@@ -226,7 +224,7 @@ public final class TargetingUtil {
         } else if (VirtualHP.has(target)) {
             // Entité à HP virtuels (Baron, Elder, canon...) : dégâts virtuels
             VirtualHP.damage(target, amount, caster);
-            fr.lolmc.util.VisualEffectUtil.impact(target.getWorld(),
+            VisualEffectUtil.impact(target.getWorld(),
                     target.getLocation().add(0, 1, 0), Material.WHITE_STAINED_GLASS, 0.28f, 4L);
         } else {
             // Sbire ou monstre : dégât direct (pas de système de résistance LoL)
@@ -235,7 +233,7 @@ public final class TargetingUtil {
             var maxHpAttr = target.getAttribute(Compat.maxHealth());
             double maxHp = maxHpAttr != null ? maxHpAttr.getValue() : target.getMaxHealth();
             HealthBar.update(target, newHealth, maxHp);
-            fr.lolmc.util.VisualEffectUtil.impact(target.getWorld(),
+            VisualEffectUtil.impact(target.getWorld(),
                     target.getLocation().add(0, 1, 0), Material.WHITE_STAINED_GLASS, 0.28f, 4L);
         }
     }
@@ -248,7 +246,7 @@ public final class TargetingUtil {
      */
     public static double getRealHealth(LivingEntity target) {
         if (target instanceof Player p) {
-            var cm = fr.lolmc.LolPlugin.getInstance().getChampionManager();
+            var cm = LolPlugin.getInstance().getChampionManager();
             if (cm != null && cm.hasChampion(p))
                 return cm.getChampion(p).getHPSystem().getCurrentHP();
             return p.getHealth();
@@ -259,7 +257,7 @@ public final class TargetingUtil {
     /** HP max réels à l'échelle LoL (pendant de getRealHealth). */
     public static double getRealMaxHealth(LivingEntity target) {
         if (target instanceof Player p) {
-            var cm = fr.lolmc.LolPlugin.getInstance().getChampionManager();
+            var cm = LolPlugin.getInstance().getChampionManager();
             if (cm != null && cm.hasChampion(p))
                 return cm.getChampion(p).getHPSystem().getMaxHP();
             var attr = p.getAttribute(Compat.maxHealth());
