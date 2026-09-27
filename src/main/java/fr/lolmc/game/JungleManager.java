@@ -14,9 +14,7 @@ import fr.lolmc.team.TeamManager.Team;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Location;
-import org.bukkit.Particle;
 import org.bukkit.NamespacedKey;
-import org.bukkit.attribute.Attribute;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.*;
@@ -38,11 +36,11 @@ import java.util.*;
  * et des récompenses (or + XP). Positions configurées par commande et par équipe.
  */
 public class JungleManager {
-    private static final java.util.Map<Object, String> dragonSoulType = new java.util.HashMap<>();
+    private static final Map<Object, String> dragonSoulType = new HashMap<>();
 
     // ── Rotation des dragons (LoL) : 3 premiers élémentaires DIFFÉRENTS,
     //    le 3e fige l'élément de la Faille ; après une âme → Elder ──
-    private final java.util.List<MonsterType> spawnedDragonElements = new java.util.ArrayList<>();
+    private final List<MonsterType> spawnedDragonElements = new ArrayList<>();
     private MonsterType lockedDragonElement = null;
 
     private static final MonsterType[] DRAGON_POOL = {
@@ -59,16 +57,16 @@ public class JungleManager {
         }
         if (lockedDragonElement != null) return lockedDragonElement;
         // Tirer un élément pas encore apparu
-        java.util.List<MonsterType> pool = new java.util.ArrayList<>();
+        List<MonsterType> pool = new ArrayList<>();
         for (MonsterType t : DRAGON_POOL)
             if (!spawnedDragonElements.contains(t)) pool.add(t);
-        MonsterType pick = pool.get(new java.util.Random().nextInt(pool.size()));
+        MonsterType pick = pool.get(new Random().nextInt(pool.size()));
         spawnedDragonElements.add(pick);
         if (spawnedDragonElements.size() == 3) {
             lockedDragonElement = pick;
-            org.bukkit.Bukkit.broadcast(net.kyori.adventure.text.Component.text(
+            Bukkit.broadcast(Component.text(
                 "🐉 La Faille se transforme : élément " + pick.displayName + " !",
-                net.kyori.adventure.text.format.NamedTextColor.LIGHT_PURPLE));
+                NamedTextColor.LIGHT_PURPLE));
         }
         return pick;
     }
@@ -85,14 +83,14 @@ public class JungleManager {
     // Monstres vivants : entityUUID → MonsterType
     private final Map<UUID, MonsterType> liveMonsters = new HashMap<>();
     // Voidgrubs tués par équipe → bonus dégâts aux structures
-    private final java.util.Map<fr.lolmc.team.TeamManager.Team, Integer> voidgrubKills
-        = new java.util.EnumMap<>(fr.lolmc.team.TeamManager.Team.class);
+    private final Map<Team, Integer> voidgrubKills
+        = new EnumMap<>(Team.class);
     // Chrono de respawn des épiques : type → timestamp de respawn
-    private final java.util.Map<String, Long> epicRespawnAt = new java.util.concurrent.ConcurrentHashMap<>();
+    private final Map<String, Long> epicRespawnAt = new java.util.concurrent.ConcurrentHashMap<>();
     // Décorations : monstreUUID → liste des UUID des parties du modèle (nettoyage)
     private final Map<UUID, List<UUID>> monsterDeco = new HashMap<>();
     // Dragons tués par équipe (pour l'âme du Dragon au 4e)
-    private final Map<fr.lolmc.team.TeamManager.Team, Integer> dragonsKilled = new HashMap<>();
+    private final Map<Team, Integer> dragonsKilled = new HashMap<>();
     private boolean active = false;
 
     // ══════════════════════════════════════════════════════════════
@@ -229,8 +227,8 @@ public class JungleManager {
 
     /** Lance la jungle : fait apparaître tous les camps. */
     // Tâches de premier spawn programmé (annulées au stop)
-    private final java.util.List<org.bukkit.scheduler.BukkitTask> initialSpawnTasks
-        = new java.util.ArrayList<>();
+    private final List<org.bukkit.scheduler.BukkitTask> initialSpawnTasks
+        = new ArrayList<>();
 
     /** Délai de PREMIER spawn en secondes, fidèle LoL S15. */
     private static int initialSpawnDelay(MonsterType type) {
@@ -311,11 +309,11 @@ public class JungleManager {
             String name = type.groupCount > 1
                     ? type.displayName + (isLarge ? " (Grand)" : " (Petit)")
                     : type.displayName;
-            mob.customName(net.kyori.adventure.text.Component.text(name));
+            mob.customName(Component.text(name));
             mob.setCustomNameVisible(true);
             if (type == MonsterType.KRUG && isLarge)
                 mob.getPersistentDataContainer().set(
-                    new org.bukkit.NamespacedKey(LolPlugin.getInstance(), "krug_large"),
+                    new NamespacedKey(LolPlugin.getInstance(), "krug_large"),
                     PersistentDataType.BYTE, (byte) 1);
             mob.setRemoveWhenFarAway(false);
             // Monstre passif : ne poursuit pas, reste à son camp (réveillé quand attaqué)
@@ -325,11 +323,11 @@ public class JungleManager {
             }
             // Mémoriser la position du camp pour le reset
             mob.getPersistentDataContainer().set(
-                new org.bukkit.NamespacedKey(LolPlugin.getInstance(), "camp_x"),
-                org.bukkit.persistence.PersistentDataType.DOUBLE, mob.getLocation().getX());
+                new NamespacedKey(LolPlugin.getInstance(), "camp_x"),
+                PersistentDataType.DOUBLE, mob.getLocation().getX());
             mob.getPersistentDataContainer().set(
-                new org.bukkit.NamespacedKey(LolPlugin.getInstance(), "camp_z"),
-                org.bukkit.persistence.PersistentDataType.DOUBLE, mob.getLocation().getZ());
+                new NamespacedKey(LolPlugin.getInstance(), "camp_z"),
+                PersistentDataType.DOUBLE, mob.getLocation().getZ());
 
             // Les épiques mobiles (dragons/baron) peuvent bouger, le reste est statique
             var speedAttr = mob.getAttribute(Compat.movementSpeed());
@@ -362,7 +360,6 @@ public class JungleManager {
         }
     }
 
-    /** Appelé quand un monstre meurt (depuis le listener). */
     /** Petit Krug issu de la division du grand (35% HP, or/4). */
     private void spawnKrugMini(CampSpawn camp, Location loc) {
         MonsterType type = MonsterType.KRUG;
@@ -371,7 +368,7 @@ public class JungleManager {
         double hp = type.maxHP * 0.35;
         var hpAttr = mob.getAttribute(Compat.maxHealth());
         if (hpAttr != null) { hpAttr.setBaseValue(hp); mob.setHealth(hp); }
-        mob.customName(net.kyori.adventure.text.Component.text(type.displayName + " (Petit)"));
+        mob.customName(Component.text(type.displayName + " (Petit)"));
         mob.setCustomNameVisible(true);
         mob.setRemoveWhenFarAway(false);
         if (mob instanceof Mob mo) { mo.setAware(false); mo.setTarget(null); }
@@ -398,11 +395,11 @@ public class JungleManager {
         var wm = LolPlugin.getInstance().getWardManager();
         if (wm != null) wm.placeWard(killer, loc.clone().add(0, 0.5, 0), 60);
         var team = LolPlugin.getInstance().getTeamManager().getTeam(killer);
-        var shrineDisplays = new java.util.ArrayList<org.bukkit.entity.BlockDisplay>(3);
+        var shrineDisplays = new ArrayList<BlockDisplay>(3);
         for (int i = 0; i < 3; i++) {
-            shrineDisplays.add(loc.getWorld().spawn(loc, org.bukkit.entity.BlockDisplay.class, disp -> {
+            shrineDisplays.add(loc.getWorld().spawn(loc, BlockDisplay.class, disp -> {
                 disp.setBlock(Material.LIGHT_BLUE_STAINED_GLASS.createBlockData());
-                disp.setBrightness(new org.bukkit.entity.Display.Brightness(15, 15));
+                disp.setBrightness(new Display.Brightness(15, 15));
                 disp.setPersistent(false);
                 disp.setInterpolationDuration(3);
                 disp.setInterpolationDelay(0);
@@ -433,8 +430,8 @@ public class JungleManager {
                     for (Player p : loc.getWorld().getPlayers()) {
                         if (LolPlugin.getInstance().getTeamManager().getTeam(p) != team) continue;
                         if (p.getLocation().distanceSquared(loc) <= 2.5 * 2.5)
-                            p.addPotionEffect(new org.bukkit.potion.PotionEffect(
-                                org.bukkit.potion.PotionEffectType.SPEED, 40, 0, false, false));
+                            p.addPotionEffect(new PotionEffect(
+                                PotionEffectType.SPEED, 40, 0, false, false));
                     }
                 }
                 ticks += 4;
@@ -442,6 +439,7 @@ public class JungleManager {
         }.runTaskTimer(LolPlugin.getInstance(), 0L, 4L);
     }
 
+    /** Appelé quand un monstre meurt (depuis le listener). */
     public void onMonsterDeath(UUID entityId, Player killer) {
         MonsterType type = liveMonsters.remove(entityId);
         if (type == null) return;
@@ -469,7 +467,7 @@ public class JungleManager {
         // ── Krugs : le grand se divise en 2 petits (LoL) ──
         if (type == MonsterType.KRUG && camp != null && deathLoc != null
                 && deadEnt != null && deadEnt.getPersistentDataContainer().has(
-                    new org.bukkit.NamespacedKey(LolPlugin.getInstance(), "krug_large"),
+                    new NamespacedKey(LolPlugin.getInstance(), "krug_large"),
                     PersistentDataType.BYTE)) {
             for (int i = 0; i < 2; i++)
                 spawnKrugMini(camp, deathLoc.clone().add(i == 0 ? 0.8 : -0.8, 0, 0.4));
@@ -523,9 +521,9 @@ public class JungleManager {
                             if (objBounty > 0) {
                                 LolPlugin.getInstance().getGoldManager()
                                     .addGold(killer.getUniqueId(), objBounty);
-                                killer.sendActionBar(net.kyori.adventure.text.Component.text(
+                                killer.sendActionBar(Component.text(
                                     "💰 Bounty d'objectif +" + objBounty + " or (comeback)!",
-                                    net.kyori.adventure.text.format.NamedTextColor.GOLD));
+                                    NamedTextColor.GOLD));
                             }
                         }
                     }
@@ -560,10 +558,10 @@ public class JungleManager {
                     int grubs = voidgrubKills.merge(kteam, 1, Integer::sum);
                     if (grubs == 3 || grubs == 6) {
                         for (UUID mid : LolPlugin.getInstance().getTeamManager().getTeamMembers(kteam)) {
-                            Player mp = org.bukkit.Bukkit.getPlayer(mid);
-                            if (mp != null) mp.sendMessage(net.kyori.adventure.text.Component.text(
+                            Player mp = Bukkit.getPlayer(mid);
+                            if (mp != null) mp.sendMessage(Component.text(
                                 "🐛 " + grubs + " Nuées du Néant — +" + (grubs == 3 ? "6" : "14")
-                                + "% dégâts aux structures!", net.kyori.adventure.text.format.NamedTextColor.DARK_PURPLE));
+                                + "% dégâts aux structures!", NamedTextColor.DARK_PURPLE));
                         }
                     }
                 }
@@ -578,7 +576,7 @@ public class JungleManager {
                     var kt = LolPlugin.getInstance().getTeamManager().getTeam(killer);
                     if (kt != null)
                         LolPlugin.getInstance().getFeatManager().claim(
-                            fr.lolmc.game.FeatManager.Feat.FIRST_EPIC, kt, killer);
+                            FeatManager.Feat.FIRST_EPIC, kt, killer);
                 }
             }
         }
@@ -689,9 +687,9 @@ public class JungleManager {
                         "🪱 Buff du Baron! +24 AD +40 AP (3min)", NamedTextColor.LIGHT_PURPLE));
                 // Marqueur violet autour du joueur pendant 180s (visible par tous, comme en LoL)
                 var baronDisplay = player.getWorld().spawn(player.getLocation().add(0,1,0),
-                        org.bukkit.entity.BlockDisplay.class, disp -> {
+                        BlockDisplay.class, disp -> {
                     disp.setBlock(Material.PURPLE_STAINED_GLASS.createBlockData());
-                    disp.setBrightness(new org.bukkit.entity.Display.Brightness(15, 15));
+                    disp.setBrightness(new Display.Brightness(15, 15));
                     disp.setPersistent(false);
                     disp.setInterpolationDuration(3);
                     disp.setInterpolationDelay(0);
@@ -799,21 +797,21 @@ public class JungleManager {
 
     /** Donne l'Œil du Héraut : clic droit → invoque un Héraut qui charge la tour. */
     private void giveHeraldEye(Player killer) {
-        var eye = new org.bukkit.inventory.ItemStack(org.bukkit.Material.ENDER_EYE);
+        var eye = new org.bukkit.inventory.ItemStack(Material.ENDER_EYE);
         var meta = eye.getItemMeta();
-        meta.displayName(net.kyori.adventure.text.Component.text(
-            "👁 Œil du Héraut", net.kyori.adventure.text.format.NamedTextColor.LIGHT_PURPLE));
-        meta.lore(java.util.List.of(net.kyori.adventure.text.Component.text(
+        meta.displayName(Component.text(
+            "👁 Œil du Héraut", NamedTextColor.LIGHT_PURPLE));
+        meta.lore(List.of(Component.text(
             "Clic droit près d'une tour ennemie pour invoquer le Héraut",
-            net.kyori.adventure.text.format.NamedTextColor.GRAY)));
+            NamedTextColor.GRAY)));
         meta.getPersistentDataContainer().set(
-            new org.bukkit.NamespacedKey(LolPlugin.getInstance(), "herald_eye"),
-            org.bukkit.persistence.PersistentDataType.BYTE, (byte) 1);
+            new NamespacedKey(LolPlugin.getInstance(), "herald_eye"),
+            PersistentDataType.BYTE, (byte) 1);
         eye.setItemMeta(meta);
         killer.getInventory().addItem(eye);
-        killer.sendMessage(net.kyori.adventure.text.Component.text(
+        killer.sendMessage(Component.text(
             "👁 Tu as reçu l'Œil du Héraut! Clic droit près d'une tour ennemie.",
-            net.kyori.adventure.text.format.NamedTextColor.LIGHT_PURPLE));
+            NamedTextColor.LIGHT_PURPLE));
     }
 
     /**
@@ -828,35 +826,35 @@ public class JungleManager {
         if (mm == null) return false;
 
         // Tour ennemie la plus proche (max 30 blocs)
-        fr.lolmc.game.GameStructure target = null;
+        GameStructure target = null;
         double best = 30 * 30;
         for (var s : mm.getStructures()) {
             if (s.isDestroyed() || s.getTeam() == team) continue;
-            if (s.getType() != fr.lolmc.game.GameStructure.Type.TURRET) continue;
+            if (s.getType() != GameStructure.Type.TURRET) continue;
             double d = s.getCenter().distanceSquared(summoner.getLocation());
             if (d < best) { best = d; target = s; }
         }
         if (target == null) {
-            summoner.sendActionBar(net.kyori.adventure.text.Component.text(
+            summoner.sendActionBar(Component.text(
                 "❌ Aucune tour ennemie à proximité (30 blocs)",
-                net.kyori.adventure.text.format.NamedTextColor.RED));
+                NamedTextColor.RED));
             return false;
         }
 
         // Spawn du Héraut allié
         var spawn = summoner.getLocation().clone().add(1, 0, 1);
-        var herald = (org.bukkit.entity.Ravager) spawn.getWorld()
-            .spawnEntity(spawn, org.bukkit.entity.EntityType.RAVAGER);
-        herald.customName(net.kyori.adventure.text.Component.text(
-            "👁 Héraut de la Faille", net.kyori.adventure.text.format.NamedTextColor.LIGHT_PURPLE));
+        var herald = (Ravager) spawn.getWorld()
+            .spawnEntity(spawn, EntityType.RAVAGER);
+        herald.customName(Component.text(
+            "👁 Héraut de la Faille", NamedTextColor.LIGHT_PURPLE));
         herald.setCustomNameVisible(true);
-        var maxHpAttr = herald.getAttribute(fr.lolmc.util.Compat.maxHealth());
+        var maxHpAttr = herald.getAttribute(Compat.maxHealth());
         if (maxHpAttr != null) { maxHpAttr.setBaseValue(1024); herald.setHealth(1024); }
         fr.lolmc.util.VirtualHP.init(herald, 2000); // HP LoL du Heraut invoque
 
         final var ft = target;
         // Le Héraut charge : avance vers la tour, puis frappe pour 1500
-        new org.bukkit.scheduler.BukkitRunnable() {
+        new BukkitRunnable() {
             int ticks = 0;
             @Override public void run() {
                 if (!herald.isValid() || ft.isDestroyed()) { 
@@ -880,9 +878,9 @@ public class JungleManager {
                         var sdl = LolPlugin.getInstance().getStructureDamageListener();
                         // Détruire proprement via le flux normal
                         LolPlugin.getInstance().getServer().broadcast(
-                            net.kyori.adventure.text.Component.text(
+                            Component.text(
                                 "👁 Le Héraut a détruit une tourelle!",
-                                net.kyori.adventure.text.format.NamedTextColor.LIGHT_PURPLE));
+                                NamedTextColor.LIGHT_PURPLE));
                     }
                     herald.setHealth(0.01);
                     herald.damage(1000); // mort du Héraut après la charge
@@ -891,20 +889,20 @@ public class JungleManager {
             }
         }.runTaskTimer(LolPlugin.getInstance(), 0L, 5L);
 
-        summoner.sendActionBar(net.kyori.adventure.text.Component.text(
+        summoner.sendActionBar(Component.text(
             "👁 Héraut invoqué — il charge la tour!",
-            net.kyori.adventure.text.format.NamedTextColor.LIGHT_PURPLE));
+            NamedTextColor.LIGHT_PURPLE));
         return true;
     }
 
-    public int getVoidgrubKills(fr.lolmc.team.TeamManager.Team team) {
+    public int getVoidgrubKills(Team team) {
         return voidgrubKills.getOrDefault(team, 0);
     }
-    public double getVoidgrubDamageBonus(fr.lolmc.team.TeamManager.Team team) {
+    public double getVoidgrubDamageBonus(Team team) {
         int g = getVoidgrubKills(team);
         if (g >= 6) return 1.14; if (g >= 3) return 1.06; return 1.0;
     }
-    public java.util.Map<String, Long> getEpicRespawnAt() { return epicRespawnAt; }
+    public Map<String, Long> getEpicRespawnAt() { return epicRespawnAt; }
 
     public static boolean isJungleMonster(Entity e) {
         if (!(e instanceof LivingEntity)) return false;
@@ -1046,25 +1044,22 @@ public class JungleManager {
     private float hitboxScaleFor(MonsterType type) {
         return switch (type) {
             case GROMP        -> 2.0f;   // slime petit -> grossir
-            case MURKWOLF     -> 1.0f;
-            case RAPTOR       -> 1.0f;
+            case MURKWOLF, RAPTOR, SCUTTLE_CRAB, ATAKHAN -> 1.0f;
             case KRUG         -> 2.5f;   // silverfish minuscule -> grossir
             case RED_BUFF     -> 2.0f;   // magma cube petit
             case BLUE_BUFF    -> 0.8f;   // iron golem deja grand -> reduire un peu
-            case SCUTTLE_CRAB -> 1.0f;
             case DRAGON_INFERNAL, DRAGON_OCEAN, DRAGON_MOUNTAIN,
                  DRAGON_CLOUD, DRAGON_CHEMTECH, DRAGON_ELDER -> 0.85f; // ravager -> modele plus fin
             case HERALD       -> 0.85f;
             case BARON        -> 0.9f;
             case VOIDGRUB     -> 0.8f;
-            case ATAKHAN      -> 1.0f;
         };
     }
 
     public void clearAllMonsters() {
-        java.util.List<org.bukkit.World> __worlds = WorldContext.getGameWorld() != null
-                ? java.util.List.of(WorldContext.getGameWorld())
-                : java.util.List.of();
+        List<org.bukkit.World> __worlds = WorldContext.getGameWorld() != null
+                ? List.of(WorldContext.getGameWorld())
+                : List.of();
             for (var world : __worlds) {
             for (Entity e : world.getEntities()) {
                 if (isJungleMonster(e) || MobAppearance.isDecoration(e)) e.remove();
@@ -1106,13 +1101,13 @@ public class JungleManager {
 
 
     /** Spawn un monstre de jungle de test à la position donnée. */
-    public void spawnTestMonster(org.bukkit.Location loc, String monsterTypeName) {
+    public void spawnTestMonster(Location loc, String monsterTypeName) {
         try {
             MonsterType type = MonsterType.valueOf(monsterTypeName.toUpperCase());
-            var entity = loc.getWorld().spawn(loc, org.bukkit.entity.Zombie.class);
+            var entity = loc.getWorld().spawn(loc, Zombie.class);
             var pdc = entity.getPersistentDataContainer();
-            pdc.set(KEY_MONSTER, org.bukkit.persistence.PersistentDataType.STRING, type.name());
-            var hpAttr = entity.getAttribute(fr.lolmc.util.Compat.maxHealth());
+            pdc.set(KEY_MONSTER, PersistentDataType.STRING, type.name());
+            var hpAttr = entity.getAttribute(Compat.maxHealth());
             if (hpAttr != null) { hpAttr.setBaseValue(Math.min(type.maxHP, 1024.0)); entity.setHealth(Math.min(type.maxHP, 1024.0)); }
             if (type.maxHP > 1024.0) fr.lolmc.util.VirtualHP.init(entity, type.maxHP);
             liveMonsters.put(entity.getUniqueId(), type);
@@ -1123,7 +1118,7 @@ public class JungleManager {
     }
 
     /** Expose applyBuff() en public pour les commandes admin. */
-    public void applyBuffPublic(org.bukkit.entity.Player player, String buff) {
+    public void applyBuffPublic(Player player, String buff) {
         applyBuff(player, buff);
     }
 
@@ -1135,27 +1130,27 @@ public class JungleManager {
         String txt = "§e⏱ " + camp.type.displayName + "\n§7Réapparition : §f"
                 + (secondsLeft / 60) + ":" + String.format("%02d", secondsLeft % 60);
 
-        org.bukkit.entity.TextDisplay td = null;
+        TextDisplay td = null;
         if (camp.respawnHologramId != null) {
-            org.bukkit.entity.Entity e = w.getEntity(camp.respawnHologramId);
-            if (e instanceof org.bukkit.entity.TextDisplay t) td = t;
+            Entity e = w.getEntity(camp.respawnHologramId);
+            if (e instanceof TextDisplay t) td = t;
         }
         if (td == null) {
-            td = w.spawn(camp.location.clone().add(0, 1.6, 0), org.bukkit.entity.TextDisplay.class, t -> {
-                t.setBillboard(org.bukkit.entity.Display.Billboard.CENTER);
+            td = w.spawn(camp.location.clone().add(0, 1.6, 0), TextDisplay.class, t -> {
+                t.setBillboard(Display.Billboard.CENTER);
                 t.setSeeThrough(true);
                 t.getScoreboardTags().add("lol_respawn_holo");
             });
             camp.respawnHologramId = td.getUniqueId();
         }
-        td.text(net.kyori.adventure.text.Component.text(txt));
+        td.text(Component.text(txt));
     }
 
     private void removeRespawnHologram(CampSpawn camp) {
         if (camp.respawnHologramId == null) return;
         org.bukkit.World w = camp.location.getWorld();
         if (w != null) {
-            org.bukkit.entity.Entity e = w.getEntity(camp.respawnHologramId);
+            Entity e = w.getEntity(camp.respawnHologramId);
             if (e != null) e.remove();
         }
         camp.respawnHologramId = null;
