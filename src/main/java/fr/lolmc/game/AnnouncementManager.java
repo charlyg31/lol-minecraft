@@ -25,7 +25,7 @@ public class AnnouncementManager {
 
     public AnnouncementManager() {}
     // Killing spree par joueur (Doublé/Triplé/Quadra/Penta meurtre)
-    private final java.util.Map<java.util.UUID, Integer> spreeStreak = new java.util.HashMap<>();
+    private final Map<UUID, Integer> spreeStreak = new HashMap<>();
 
     private boolean firstBloodDone = false;
     public boolean isFirstBloodDone() { return firstBloodDone; }
@@ -53,7 +53,7 @@ public class AnnouncementManager {
         if (!firstBloodDone) {
             firstBloodDone = true;
             broadcastTitle("§4PREMIER SANG", "§7" + killer.getName() + " a frappé en premier!",
-                    net.kyori.adventure.sound.Sound.sound(net.kyori.adventure.key.Key.key("entity.wither.spawn"), net.kyori.adventure.sound.Sound.Source.MASTER, 1f, 1f));
+                    Sound.sound(net.kyori.adventure.key.Key.key("entity.wither.spawn"), Sound.Source.MASTER, 1f, 1f));
         }
 
         // ── Killing Spree (serie sans mourir) ──
@@ -67,9 +67,9 @@ public class AnnouncementManager {
             default -> spree >= 8 ? "\uD83D\uDC51 LEGENDARY! (" + spree + " kills)" : null;
         };
         if (spreeMsg != null) {
-            broadcastTitle("\u00A74\u00A7l" + spreeMsg, "\u00A77" + killer.getName(),
-                net.kyori.adventure.sound.Sound.sound(net.kyori.adventure.key.Key.key("entity.player.levelup"),
-                    net.kyori.adventure.sound.Sound.Source.MASTER, 1f, 1.2f));
+            broadcastTitle("§4§l" + spreeMsg, "§7" + killer.getName(),
+                Sound.sound(net.kyori.adventure.key.Key.key("entity.player.levelup"),
+                    Sound.Source.MASTER, 1f, 1.2f));
         }
         // ── Kills multiples ──
         Long last = lastKillTime.get(killer.getUniqueId());
@@ -89,7 +89,7 @@ public class AnnouncementManager {
 
         if (multiKill != null) {
             broadcastTitle(multiKill, "§7" + killer.getName(),
-                    net.kyori.adventure.sound.Sound.sound(net.kyori.adventure.key.Key.key("entity.ender_dragon.growl"), net.kyori.adventure.sound.Sound.Source.MASTER, 1f, 1f));
+                    Sound.sound(net.kyori.adventure.key.Key.key("entity.ender_dragon.growl"), Sound.Source.MASTER, 1f, 1f));
         }
     }
 
@@ -180,12 +180,11 @@ public class AnnouncementManager {
      * visible 3 secondes. Couleur selon le type de ping.
      */
     private void spawnPingMarker(Location loc, PingType type, fr.lolmc.team.TeamManager.Team team) {
-        org.bukkit.Material block = switch (type) {
-            case DANGER     -> Material.RED_STAINED_GLASS;
+        Material block = switch (type) {
+            case DANGER, ENEMY -> Material.RED_STAINED_GLASS;
             case ON_MY_WAY  -> Material.LIME_STAINED_GLASS;
             case MISSING    -> Material.YELLOW_STAINED_GLASS;
             case ASSIST     -> Material.ORANGE_STAINED_GLASS;
-            case ENEMY      -> Material.RED_STAINED_GLASS;
         };
         var world = loc.getWorld();
         if (world == null) return;
@@ -259,12 +258,12 @@ public class AnnouncementManager {
 
 
     /** Annonce la prise d'un objectif epique avec titre a tout le serveur. */
-    public void announceObjective(String displayName, String killerName, net.kyori.adventure.text.format.NamedTextColor color) {
-        broadcastTitle(displayName, "Par " + killerName, net.kyori.adventure.sound.Sound.sound(net.kyori.adventure.key.Key.key("entity.ender_dragon.growl"), net.kyori.adventure.sound.Sound.Source.MASTER, 1f, 0.8f));
+    public void announceObjective(String displayName, String killerName, NamedTextColor color) {
+        broadcastTitle(displayName, "Par " + killerName, Sound.sound(net.kyori.adventure.key.Key.key("entity.ender_dragon.growl"), Sound.Source.MASTER, 1f, 0.8f));
     }
 
     public void announceInhibitorDestroyed(String lane, String team) {
         broadcastTitle("\uD83C\uDFDB Inhibiteur detruit!", lane + " (" + team + ") — respawn 5min",
-            net.kyori.adventure.sound.Sound.sound(net.kyori.adventure.key.Key.key("entity.wither.spawn"), net.kyori.adventure.sound.Sound.Source.MASTER, 1f, 1f));
+            Sound.sound(net.kyori.adventure.key.Key.key("entity.wither.spawn"), Sound.Source.MASTER, 1f, 1f));
     }
 }
