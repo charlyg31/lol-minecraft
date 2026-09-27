@@ -153,7 +153,7 @@ public class BungeeQueueManager {
             if (solo == null) continue;
 
             List<String> roles = roleManager.getRoles(uid);
-            Set<String> rolesSet = new java.util.HashSet<>(roles);
+            Set<String> rolesSet = new HashSet<>(roles);
             boolean wantsRole = rolesSet.contains(missingRole)
                 || rolesSet.containsAll(List.of("TOP","JUNGLE","MID","ADC","SUPPORT"));
 
@@ -186,15 +186,13 @@ public class BungeeQueueManager {
             FillProposal proposal = new FillProposal(gamePlayers, missingRole, newExcluded);
             pendingProposals.put(uid, proposal);
 
-            var task = ProxyServer.getInstance().getScheduler().schedule(plugin, () -> {
+            proposal.timeoutTask = ProxyServer.getInstance().getScheduler().schedule(plugin, () -> {
                 FillProposal p = pendingProposals.remove(uid);
                 if (p != null) {
                     solo.sendMessage(new TextComponent("§7Proposition expirée — tu restes en file."));
                     tryProposeFill(gamePlayers, missingRole, newExcluded);
                 }
             }, 20, TimeUnit.SECONDS);
-
-            proposal.timeoutTask = task;
             return;
         }
     }
@@ -246,14 +244,14 @@ public class BungeeQueueManager {
 
         // GAME_READY après 6s (2s connect + 4s chargement)
         ProxyServer.getInstance().getScheduler().schedule(plugin, () -> {
-            StringBuilder sb = new StringBuilder("{");
-            sb.append("\"type\":\"GAME_READY\",");
-            sb.append("\"ranked\":").append(isRanked).append(",");
-            sb.append("\"count\":").append(allPlayers.size()).append(",");
-            sb.append("\"players\":\"");
-            sb.append(String.join(",", allPlayers.stream().map(UUID::toString).toList()));
-            sb.append("\"}");
-            sendPluginMessage(carrier, gameServer, sb.toString());
+            String json = "{"
+                    + "\"type\":\"GAME_READY\","
+                    + "\"ranked\":" + isRanked + ","
+                    + "\"count\":" + allPlayers.size() + ","
+                    + "\"players\":\""
+                    + String.join(",", allPlayers.stream().map(UUID::toString).toList())
+                    + "\"}";
+            sendPluginMessage(carrier, gameServer, json);
             plugin.getLogger().info("[Queue] GAME_READY envoyé pour " + allPlayers.size() + " joueurs (ranked=" + isRanked + ")");
             // Remettre ranked-mode à false après usage (par défaut non-ranked)
             if (isRanked) plugin.setRankedMode(false);

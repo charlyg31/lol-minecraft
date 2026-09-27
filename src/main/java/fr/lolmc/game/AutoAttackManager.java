@@ -472,7 +472,7 @@ public class AutoAttackManager {
 
         new BukkitRunnable() {
             int step_ = 0;
-            Location current = start.clone();
+            final Location current = start.clone();
             @Override public void run() {
                 if (step_ >= totalSteps) {
                     orb.remove();
@@ -531,7 +531,7 @@ public class AutoAttackManager {
 
         new BukkitRunnable() {
             int step_ = 0;
-            Location current = start.clone();
+            final Location current = start.clone();
             @Override public void run() {
                 if (step_ >= totalSteps) {
                     head.remove();

@@ -7,7 +7,6 @@ import net.md_5.bungee.api.connection.ProxiedPlayer;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
 
 /**
  * Gestion des groupes cross-serveur depuis le proxy.
@@ -263,7 +262,7 @@ public class BungeePartyManager {
                 for (UUID mu : members) {
                     if (!Boolean.TRUE.equals(ready.get(mu))) {
                         ProxiedPlayer mp = ProxyServer.getInstance().getPlayer(mu);
-                        if (waiting.length() > 0) waiting.append(", ");
+                        if (!waiting.isEmpty()) waiting.append(", ");
                         waiting.append(mp != null ? mp.getName() : "?");
                     }
                 }
