@@ -91,7 +91,7 @@ public class SchematicManager {
                 gson.toJson(blocks, writer);
                 plugin.getLogger().info("Schématique '" + name + "' sauvegardée avec l'ancre Four !");
             } catch (IOException e) {
-                e.printStackTrace();
+                plugin.getLogger().log(java.util.logging.Level.SEVERE, "Échec de sauvegarde de la schématique '" + name + "'", e);
             }
         });
     }
@@ -186,7 +186,7 @@ public class SchematicManager {
                 });
 
             } catch (IOException e) {
-                e.printStackTrace();
+                plugin.getLogger().log(java.util.logging.Level.SEVERE, "Échec de chargement de la schématique", e);
             }
         });
     }

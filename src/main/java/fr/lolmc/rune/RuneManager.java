@@ -28,7 +28,7 @@ public class RuneManager {
     private final Map<UUID, RunePage> playerPages = new HashMap<>();
     // Fichier de sauvegarde des pages
     private final java.io.File runeFile;
-    private org.bukkit.configuration.file.FileConfiguration runeConfig;
+    private final org.bukkit.configuration.file.FileConfiguration runeConfig;
 
     // Stacks de keystones par joueur (Conqueror, Electrocute, etc.)
     private final Map<UUID, Integer> keystoneStacks = new HashMap<>();
@@ -200,7 +200,6 @@ public class RuneManager {
             case "font_life" -> { /* soin alliés déclenché dans CCManager.stun/root */ }
             // ── INSPIRATION ──
             case "cosmic_insight" -> s.addBonusAbilityHaste(18); // +hâte invocateur/objets (approx)
-            case "absolute_focus_alt" -> {}
             default -> {}
         }
     }
@@ -396,7 +395,7 @@ public class RuneManager {
                 // 100 énergie accumulée par AA/mouvement → AA bonus soin + vitesse
                 int stacks = Math.min(100, keystoneStacks.getOrDefault(attacker.getUniqueId(), 0) + 20);
                 keystoneStacks.put(attacker.getUniqueId(), stacks);
-                if (stacks >= 100) {
+                if (stacks == 100) {
                     keystoneStacks.put(attacker.getUniqueId(), 0);
                     var cm = LolPlugin.getInstance().getChampionManager();
                     if (cm.hasChampion(attacker)) {
@@ -570,9 +569,9 @@ public class RuneManager {
      * Applique les données de rune reçues depuis le lobby via BridgeManager.
      * @param data Map contenant "keystone", "minors", "spell1", "spell2"
      */
-    public void applyKeystoneFromBridge(org.bukkit.entity.Player player,
-                                         String keystone,
-                                         java.util.Map<String, String> data) {
+    public void applyKeystoneFromBridge(Player player,
+                                        String keystone,
+                                        Map<String, String> data) {
         RunePage page = getPage(player.getUniqueId());
         page.keystone = keystone;
         String minorsStr = data.getOrDefault("minors", "");
@@ -589,8 +588,8 @@ public class RuneManager {
         }
         playerPages.put(player.getUniqueId(), page);
         applyRuneStats(player);
-        player.sendMessage(net.kyori.adventure.text.Component.text(
-            "✔ Runes appliquées depuis le lobby!", net.kyori.adventure.text.format.NamedTextColor.GREEN));
+        player.sendMessage(Component.text(
+            "✔ Runes appliquées depuis le lobby!", NamedTextColor.GREEN));
     }
 
 
