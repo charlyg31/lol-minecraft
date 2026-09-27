@@ -21,7 +21,7 @@ public class MapManager {
 
     private final SchematicManager schematics;
     private final File mapFile;
-    private FileConfiguration config;
+    private final FileConfiguration config;
 
     // Structures actives en jeu (rechargées au reset)
     private final List<GameStructure> structures = new ArrayList<>();
@@ -36,9 +36,6 @@ public class MapManager {
     private static final double INHIBITOR_HP = 4000;
     private static final double NEXUS_HP = 5000;
     private static final double NEXUS_BASE_HP = 5500;
-
-    // World cible (null = utilise le monde de chaque Location stockée)
-    private org.bukkit.World targetWorld = null;
 
     public MapManager(SchematicManager schematics) {
         this.schematics = schematics;
@@ -62,7 +59,6 @@ public class MapManager {
      */
     public MapManager(SchematicManager schematics, org.bukkit.World instanceWorld) {
         this.schematics  = schematics;
-        this.targetWorld = instanceWorld;
         // Utiliser la même map.yml que le template
         this.mapFile = new File(LolPlugin.getInstance().getDataFolder(), "map.yml");
         if (!mapFile.exists()) {
@@ -83,12 +79,12 @@ public class MapManager {
     /** Remplace le World de toutes les Locations par instanceWorld. */
     private void remapToWorld(org.bukkit.World w) {
         spawns.replaceAll((k, loc) -> loc == null ? null
-            : new org.bukkit.Location(w, loc.getX(), loc.getY(), loc.getZ(),
+            : new Location(w, loc.getX(), loc.getY(), loc.getZ(),
                 loc.getYaw(), loc.getPitch()));
         for (GameStructure s : structures) {
             if (s.getCenter() != null) {
-                org.bukkit.Location c = s.getCenter();
-                s.setCenter(new org.bukkit.Location(w, c.getX(), c.getY(), c.getZ()));
+                Location c = s.getCenter();
+                s.setCenter(new Location(w, c.getX(), c.getY(), c.getZ()));
             }
         }
     }
@@ -376,8 +372,8 @@ public class MapManager {
 
 
     /** Retourne toutes les structures d'une équipe (pour le TP). */
-    public java.util.List<GameStructure> getStructuresForTeam(fr.lolmc.team.TeamManager.Team team) {
-        var result = new java.util.ArrayList<GameStructure>();
+    public List<GameStructure> getStructuresForTeam(Team team) {
+        var result = new ArrayList<GameStructure>();
         for (var s : structures) { if (s.getTeam() == team) result.add(s); }
         return result;
     }
@@ -387,7 +383,7 @@ public class MapManager {
     public void respawnInhibitor(String key) {
         for (var s : structures) {
             String sKey = s.getType().name() + "_" + s.getTeam() + "_" + s.getLane();
-            if (sKey.equals(key) && s.getType() == GameStructure.Type.INHIBITOR) {
+            if (sKey.equals(key) && s.getType() == Type.INHIBITOR) {
                 s.respawn();
                 return;
             }
