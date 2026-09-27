@@ -2,6 +2,7 @@ package fr.lolmc.listener;
 
 import fr.lolmc.manager.ChampionManager;
 import fr.lolmc.shop.GoldManager;
+import org.jetbrains.annotations.NotNull;
 import fr.lolmc.shop.ShopGUI;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -26,7 +27,7 @@ public class ShopCommand implements CommandExecutor, TabCompleter {
     }
 
     @Override
-    public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args) {
+    public boolean onCommand(@NotNull CommandSender sender, @NotNull Command cmd, @NotNull String label, @NotNull String @NotNull [] args) {
         if (!(sender instanceof Player player)) {
             sender.sendMessage("§cCommande joueur uniquement.");
             return true;
@@ -64,7 +65,7 @@ public class ShopCommand implements CommandExecutor, TabCompleter {
     }
 
     @Override
-    public List<String> onTabComplete(CommandSender sender, Command cmd, String alias, String[] args) {
+    public List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command cmd, @NotNull String alias, @NotNull String @NotNull [] args) {
         if (args.length == 1) return List.of("gold", "addgold");
         return List.of();
     }

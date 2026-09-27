@@ -1,5 +1,6 @@
 package fr.lolmc.listener;
 import fr.lolmc.LolPlugin;
+import org.jetbrains.annotations.NotNull;
 
 import fr.lolmc.team.TeamManager;
 import fr.lolmc.team.TeamManager.Team;
@@ -22,7 +23,7 @@ public class TeamCommand implements CommandExecutor, TabCompleter {
     }
 
     @Override
-    public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args) {
+    public boolean onCommand(@NotNull CommandSender sender, @NotNull Command cmd, @NotNull String label, @NotNull String @NotNull [] args) {
         if (!(sender instanceof Player player)) {
             sender.sendMessage("§cCommande joueur uniquement.");
             return true;
@@ -66,7 +67,7 @@ public class TeamCommand implements CommandExecutor, TabCompleter {
     }
 
     @Override
-    public List<String> onTabComplete(CommandSender sender, Command cmd, String alias, String[] args) {
+    public List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command cmd, @NotNull String alias, @NotNull String @NotNull [] args) {
         if (args.length == 1) return List.of("bleu", "rouge", "auto");
         return List.of();
     }
@@ -74,14 +75,14 @@ public class TeamCommand implements CommandExecutor, TabCompleter {
 
     /** Sous-commande: /team chat <message> — envoie un message à l'équipe. */
     // Note: aussi accessible via /t (alias)
-    public void sendTeamChat(org.bukkit.entity.Player sender, String message) {
+    public void sendTeamChat(Player sender, String message) {
         var tm = LolPlugin.getInstance().getTeamManager();
         var team = tm.getTeam(sender);
         if (team == null) {
-            sender.sendMessage(net.kyori.adventure.text.Component.text("Tu n'as pas d'équipe.", net.kyori.adventure.text.format.NamedTextColor.RED));
+            sender.sendMessage(Component.text("Tu n'as pas d'équipe.", NamedTextColor.RED));
             return;
         }
-        net.kyori.adventure.text.Component msg = net.kyori.adventure.text.Component.text(
+        Component msg = Component.text(
             "[" + team.name() + "] " + sender.getName() + ": " + message,
             team.chatColor);
         for (java.util.UUID id : tm.getTeamMembers(team)) {

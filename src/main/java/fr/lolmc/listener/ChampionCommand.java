@@ -2,6 +2,7 @@ package fr.lolmc.listener;
 
 import fr.lolmc.champion.base.BaseChampion;
 import fr.lolmc.manager.ChampionGUI;
+import org.jetbrains.annotations.NotNull;
 import fr.lolmc.manager.ChampionManager;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -26,7 +27,7 @@ public class ChampionCommand implements CommandExecutor, TabCompleter {
     }
 
     @Override
-    public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args) {
+    public boolean onCommand(@NotNull CommandSender sender, @NotNull Command cmd, @NotNull String label, @NotNull String @NotNull [] args) {
         if (!(sender instanceof Player player)) {
             sender.sendMessage("§cCommande joueur uniquement.");
             return true;
@@ -133,7 +134,7 @@ public class ChampionCommand implements CommandExecutor, TabCompleter {
     }
 
     @Override
-    public List<String> onTabComplete(CommandSender sender, Command cmd, String alias, String[] args) {
+    public List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command cmd, @NotNull String alias, @NotNull String @NotNull [] args) {
         List<String> completions = new ArrayList<>();
         if (args.length == 1) {
             completions.addAll(List.of("gui", "pick", "list", "info"));
