@@ -146,8 +146,7 @@ public class GameStructure {
             String label = switch (type) {
                 case TURRET     -> "🗼";
                 case INHIBITOR  -> "💎";
-                case NEXUS      -> "🏰";
-                case NEXUS_BASE -> "🏰";
+                case NEXUS, NEXUS_BASE -> "🏰";
             } + " " + (team == Team.BLUE ? "§9" : "§c");
             fr.lolmc.util.HealthBar.apply(as, currentHP, maxHP, label);
 

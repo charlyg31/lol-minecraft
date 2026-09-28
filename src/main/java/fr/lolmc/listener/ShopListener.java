@@ -373,7 +373,7 @@ public class ShopListener implements Listener {
         ConsumableManager cm = LolPlugin.getInstance().getConsumableManager();
         if (cm == null) return;
         switch (id) {
-            case "health_potion", "health_potion2"         -> cm.useHealthPotion(player);
+            case "health_potion", "health_potion2", "cappa_juice", "cappa_juice2" -> cm.useHealthPotion(player);
             case "refillable_potion", "refillable_potion2"  -> cm.useRefillablePotion(player);
             case "biscuit", "biscuit_will"                  -> cm.useBiscuit(player);
             case "elixir_wrath", "elixir_wrath2" -> {
@@ -392,7 +392,6 @@ public class ShopListener implements Listener {
             case "control_ward", "control_ward2"            -> cm.placeControlWard(player);
             case "farsight", "farsight2"                    -> cm.placeWard(player, true);
             case "oracle_lens", "oracle_lens2"              -> LolPlugin.getInstance().getAbilityListener().revealNearbyWards(player);
-            case "cappa_juice", "cappa_juice2"              -> cm.useHealthPotion(player);
             default -> player.sendActionBar(net.kyori.adventure.text.Component.text(
                     "Consommable: " + id, net.kyori.adventure.text.format.NamedTextColor.GRAY));
         }
