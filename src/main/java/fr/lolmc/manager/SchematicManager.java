@@ -206,11 +206,10 @@ public class SchematicManager {
 
     private int getFaceIndex(BlockFace face) {
         switch (face) {
-            case NORTH: return 0;
             case EAST: return 1;
             case SOUTH: return 2;
             case WEST: return 3;
-            default: return 0;
+            default: return 0; // NORTH, et repli pour toute autre face
         }
     }
 }

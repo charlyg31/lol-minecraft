@@ -37,16 +37,30 @@ public class BaseManager {
     private static final double FOUNTAIN_DAMAGE_PER_SEC = 10000.0;
     private static final double HEAL_RING_RADIUS = 8.0;
 
-    private org.bukkit.World scopedWorld = null;
+    private final org.bukkit.World scopedWorld; // null = mode global
+    private final MapManager scopedMap;         // null = MapManager global
 
     public BaseManager() {
+        this.scopedWorld = null;
+        this.scopedMap = null;
         startHealRingTask();
     }
 
-    /** Constructeur pour les instances : scoped à un World, tâche non démarrée. */
-    public BaseManager(org.bukkit.World world) {
+    /** Constructeur pour les instances : scoped à un World et à SA carte, tâche non démarrée. */
+    public BaseManager(org.bukkit.World world, MapManager map) {
         this.scopedWorld = world;
+        this.scopedMap = map;
         // Démarrage via startHealRingTask() appelé par GameInstance.start()
+    }
+
+    /** Carte à utiliser : celle de l'instance, sinon la carte globale. */
+    private MapManager map() {
+        return scopedMap != null ? scopedMap : LolPlugin.getInstance().getMapManager();
+    }
+
+    /** Joueurs concernés : ceux du monde de l'instance, sinon ceux du monde de jeu global. */
+    private java.util.Collection<Player> gamePlayers() {
+        return scopedWorld != null ? scopedWorld.getPlayers() : WorldContext.getGamePlayers();
     }
 
     // ══════════════════════════════════════════════════════════════
@@ -140,7 +154,7 @@ public class BaseManager {
             player.sendActionBar(Component.text("❌ Recall: aucune équipe", NamedTextColor.RED));
             return;
         }
-        Location spawn = LolPlugin.getInstance().getMapManager().getSpawn(team, 1);
+        Location spawn = map().getSpawn(team, 1);
         fr.lolmc.util.DebugLogger.log("Recall", "completeRecall: spawn=" + spawn);
         if (spawn == null) {
             player.sendActionBar(Component.text(
@@ -232,9 +246,9 @@ public class BaseManager {
             @Override public void run() {
                 var cm = LolPlugin.getInstance().getChampionManager();
                 var tm = LolPlugin.getInstance().getTeamManager();
-                var mm = LolPlugin.getInstance().getMapManager();
+                var mm = map();
 
-                for (Player p : WorldContext.getGamePlayers()) {
+                for (Player p : gamePlayers()) {
                     if (!cm.hasChampion(p)) continue;
                     Team team = tm.getTeam(p);
                     if (team == null) continue;

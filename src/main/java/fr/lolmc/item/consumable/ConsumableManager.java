@@ -68,7 +68,15 @@ public class ConsumableManager {
         player.sendActionBar(Component.text("🧪 Potion de vie (150 HP sur 15s)", NamedTextColor.RED));
         double healPerTick = 150.0 / 15.0; // 10 HP/s
 
-        BukkitRunnable task = new BukkitRunnable() {
+        BukkitRunnable task = createHealthPotionTask(player, champ, hp, healPerTick);
+        task.runTaskTimer(LolPlugin.getInstance(), 0L, 20L);
+        setActivePotion(player, task);
+        return true;
+    }
+
+    /** Tâche de soin progressif de la potion de vie : healPerTick PV par seconde pendant 15 s. */
+    private BukkitRunnable createHealthPotionTask(Player player, BaseChampion champ, HPSystem hp, double healPerTick) {
+        return new BukkitRunnable() {
             int ticks = 0;
             @Override public void run() {
                 if (ticks >= 15 || !player.isOnline()) { cancel(); cleanPotion(player); return; }
@@ -79,9 +87,6 @@ public class ConsumableManager {
                 ticks++;
             }
         };
-        task.runTaskTimer(LolPlugin.getInstance(), 0L, 20L);
-        setActivePotion(player, task);
-        return true;
     }
 
     // ════════════════════════════════════════════════════════

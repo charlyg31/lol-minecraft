@@ -4,6 +4,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.NamespacedKey;
 import org.bukkit.Registry;
 import org.bukkit.attribute.Attribute;
+import org.bukkit.entity.LivingEntity;
 import org.bukkit.enchantments.Enchantment;
 
 /**
@@ -23,6 +24,18 @@ public final class Compat {
     /** Attribut "max health" (anciennement GENERIC_MAX_HEALTH). */
     public static Attribute maxHealth() {
         return attribute("max_health", "generic.max_health");
+    }
+
+    /** Vie max vanilla par défaut d'un LivingEntity, si l'attribut est introuvable. */
+    private static final double DEFAULT_MAX_HEALTH = 20.0;
+
+    /**
+     * Vie max vanilla d'une entité, lue via l'attribut (getMaxHealth() est déprécié
+     * depuis 1.11). Retourne 20 (valeur vanilla) si l'attribut est introuvable.
+     */
+    public static double maxHealthOf(LivingEntity entity) {
+        var attr = entity.getAttribute(maxHealth());
+        return attr != null ? attr.getValue() : DEFAULT_MAX_HEALTH;
     }
 
     /** Attribut "movement speed" (anciennement GENERIC_MOVEMENT_SPEED). */

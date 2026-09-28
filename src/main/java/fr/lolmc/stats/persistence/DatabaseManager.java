@@ -161,28 +161,7 @@ public class DatabaseManager {
     public void saveStats(PlayerStats s) {
         cache.put(s.uuid, s);
         if (!available || connection == null) return;
-        String sql = """
-            INSERT INTO player_stats (uuid, name, elo, ranked_games, ranked_wins, ranked_kills,
-                ranked_deaths, ranked_assists, normal_games, normal_wins, normal_kills,
-                normal_deaths, normal_assists)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
-            ON DUPLICATE KEY UPDATE name=VALUES(name), elo=VALUES(elo),
-                ranked_games=VALUES(ranked_games), ranked_wins=VALUES(ranked_wins),
-                ranked_kills=VALUES(ranked_kills), ranked_deaths=VALUES(ranked_deaths),
-                ranked_assists=VALUES(ranked_assists), normal_games=VALUES(normal_games),
-                normal_wins=VALUES(normal_wins), normal_kills=VALUES(normal_kills),
-                normal_deaths=VALUES(normal_deaths), normal_assists=VALUES(normal_assists)
-            """;
-        // SQLite ne supporte pas ON DUPLICATE KEY → utiliser INSERT OR REPLACE
-        if (dbType.equals("sqlite")) {
-            sql = """
-                INSERT OR REPLACE INTO player_stats (uuid, name, elo, ranked_games, ranked_wins,
-                    ranked_kills, ranked_deaths, ranked_assists, normal_games, normal_wins,
-                    normal_kills, normal_deaths, normal_assists)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
-                """;
-        }
-        try (PreparedStatement ps = connection.prepareStatement(sql)) {
+        try (PreparedStatement ps = connection.prepareStatement(upsertPlayerStatsSql())) {
             ps.setString(1, s.uuid.toString());
             ps.setString(2, s.name);
             ps.setInt(3, s.elo);
@@ -200,6 +179,30 @@ public class DatabaseManager {
         } catch (SQLException e) {
             LolPlugin.getInstance().getLogger().warning("Erreur sauvegarde stats: " + e.getMessage());
         }
+    }
+
+    /** Requête d'upsert des stats joueur : SQLite n'a pas ON DUPLICATE KEY, on y utilise INSERT OR REPLACE. */
+    private String upsertPlayerStatsSql() {
+        if (dbType.equals("sqlite")) {
+            return """
+                INSERT OR REPLACE INTO player_stats (uuid, name, elo, ranked_games, ranked_wins,
+                    ranked_kills, ranked_deaths, ranked_assists, normal_games, normal_wins,
+                    normal_kills, normal_deaths, normal_assists)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+                """;
+        }
+        return """
+            INSERT INTO player_stats (uuid, name, elo, ranked_games, ranked_wins, ranked_kills,
+                ranked_deaths, ranked_assists, normal_games, normal_wins, normal_kills,
+                normal_deaths, normal_assists)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+            ON DUPLICATE KEY UPDATE name=VALUES(name), elo=VALUES(elo),
+                ranked_games=VALUES(ranked_games), ranked_wins=VALUES(ranked_wins),
+                ranked_kills=VALUES(ranked_kills), ranked_deaths=VALUES(ranked_deaths),
+                ranked_assists=VALUES(ranked_assists), normal_games=VALUES(normal_games),
+                normal_wins=VALUES(normal_wins), normal_kills=VALUES(normal_kills),
+                normal_deaths=VALUES(normal_deaths), normal_assists=VALUES(normal_assists)
+            """;
     }
 
     public PlayerStats getCached(UUID uuid) {

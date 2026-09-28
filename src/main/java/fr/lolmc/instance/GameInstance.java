@@ -63,7 +63,7 @@ public class GameInstance {
         this.minionManager       = new MinionManager();
         this.turretManager       = new TurretManager(mapManager, lp.getChampionManager(), lp.getTeamManager());
         this.jungleManager       = new JungleManager(world);
-        this.baseManager         = new BaseManager(world);
+        this.baseManager         = new BaseManager(world, mapManager);
         this.fogManager          = new FogOfWarManager(lp.getTeamManager(), world);
         this.passiveManager      = new PassiveManager(lp.getChampionManager(), lp.getHUDManager(), lp.getShopListener());
         this.announcementManager = new AnnouncementManager();
