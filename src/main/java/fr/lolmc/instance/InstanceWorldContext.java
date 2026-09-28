@@ -5,7 +5,6 @@ import org.bukkit.World;
 import org.bukkit.entity.Player;
 
 import java.util.Collection;
-import java.util.List;
 
 /**
  * Version instance-aware de WorldContext.

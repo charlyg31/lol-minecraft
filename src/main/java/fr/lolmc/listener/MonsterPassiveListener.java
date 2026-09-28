@@ -1,6 +1,5 @@
 package fr.lolmc.listener;
 
-import fr.lolmc.LolPlugin;
 import fr.lolmc.game.JungleManager;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
@@ -34,16 +33,8 @@ public class MonsterPassiveListener implements Listener {
         fr.lolmc.util.VirtualHP.damage(le, e.getDamage(), src);
     }
 
-    @EventHandler
-    public void onMonsterHit(EntityDamageByEntityEvent e) {
-        if (!(e.getEntity() instanceof LivingEntity mob)) return;
-        if (!JungleManager.isJungleMonster(mob)) return;
-        if (!(e.getDamager() instanceof Player attacker)) return;
-        if (!LolPlugin.getInstance().getChampionManager().hasChampion(attacker)) return;
-
-        // (LoL : les buffs ne punissent pas d'être frappés — la brûlure du
-        //  Rouge vient de sa capacité redSmash, pas d'une riposte passive)
-    }
+    // Pas de riposte passive quand on frappe un monstre : en LoL les buffs ne punissent
+    // pas d'être frappés (la brûlure du Rouge vient de sa capacité redSmash).
 
     /** Quand un monstre de jungle ou un sbire FRAPPE : déclenche son animation d'attaque. */
     @EventHandler
