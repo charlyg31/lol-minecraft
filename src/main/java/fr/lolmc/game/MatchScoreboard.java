@@ -65,10 +65,7 @@ public class MatchScoreboard {
     // AFFICHAGE DE FIN DE PARTIE
     // ══════════════════════════════════════════════════════════════
 
-    /**
-     * Affiche le tableau de score à tous les joueurs et persiste en base.
-     * @param winner équipe gagnante
-     */
+    /** Ajoute à {@code lines} l'entête et les statistiques de chaque joueur d'une équipe. */
     private void appendTeamScores(List<Component> lines, Team team, fr.lolmc.team.TeamManager tm) {
         // Entête équipe
         String teamName = team == Team.BLUE ? "§9═══ Équipe Bleue ═══" : "§c═══ Équipe Rouge ═══";

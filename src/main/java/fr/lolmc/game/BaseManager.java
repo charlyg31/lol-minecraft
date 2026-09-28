@@ -38,7 +38,6 @@ public class BaseManager {
     private static final double HEAL_RING_RADIUS = 8.0;
 
     private org.bukkit.World scopedWorld = null;
-    private org.bukkit.scheduler.BukkitTask healTask = null;
 
     public BaseManager() {
         startHealRingTask();

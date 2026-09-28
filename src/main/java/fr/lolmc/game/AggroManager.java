@@ -1,7 +1,6 @@
 package fr.lolmc.game;
 
 import fr.lolmc.LolPlugin;
-import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 
 import java.util.Map;

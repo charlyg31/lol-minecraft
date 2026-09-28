@@ -31,12 +31,12 @@ import java.util.UUID;
  *       value: "..."
  *       signature: "..."
  *
- * Les couples value/signature se génèrent sur https://mineskin.org
+ * Les couples value/signature se génèrent sur <a href="https://mineskin.org">mineskin.org</a>
  * à partir d'un PNG 64×64 de skin Minecraft du champion.
  *
  * Ajout d'un skin :
  *   1. Prendre une capture du skin LoL en PNG 64×64 format Steve
- *   2. Uploader sur https://mineskin.org/generate
+ *   2. Uploader sur <a href="https://mineskin.org/generate">mineskin.org/generate</a>
  *   3. Copier value et signature dans skins.yml
  *   4. /lola reload pour recharger sans redémarrer
  */

@@ -10,7 +10,6 @@ import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.scoreboard.*;
 
-import java.util.UUID;
 
 /**
  * Scoreboard Tab (touche Tab) façon LoL.

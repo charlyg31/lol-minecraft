@@ -14,11 +14,9 @@ import net.md_5.bungee.event.EventHandler;
  */
 public class ServerSwitchListener implements Listener {
 
-    private final LolBungeePlugin plugin;
     private final OriginTracker   tracker;
 
     public ServerSwitchListener(LolBungeePlugin plugin, OriginTracker tracker) {
-        this.plugin  = plugin;
         this.tracker = tracker;
     }
 

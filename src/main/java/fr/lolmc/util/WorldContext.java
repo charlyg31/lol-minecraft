@@ -7,7 +7,6 @@ import org.bukkit.entity.Player;
 
 import java.util.Collection;
 import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * Filtre centralisé par monde.
@@ -82,12 +81,6 @@ public final class WorldContext {
         // Vérifier si dans une instance
         return fr.lolmc.instance.InstanceWorldContext.isInAnyInstance(player);
     }
-
-    /**
-     * Vrai si le joueur est dans le monde de jeu.
-     * Utilisé pour décider d'activer les mécaniques LoL sur lui.
-     */
-
 
     /**
      * Vrai si le joueur est dans le monde lobby.

@@ -41,7 +41,6 @@ public class ChampSelectManager {
     private static final int SELECT_DURATION = 60; // 60s de sélection
     private static final int BAN_DURATION    = 30; // 30s de ban (classé)
 
-    private boolean ranked = false;
     private final java.util.Set<String> bannedChampions = new java.util.LinkedHashSet<>();
     private int banTimeLeft = 0;
     private BukkitRunnable banTask;
@@ -50,9 +49,6 @@ public class ChampSelectManager {
     // DÉMARRAGE DE LA SÉLECTION
     // ══════════════════════════════════════════════════════════════
 
-    /**
-     * Lance la phase de sélection avec les joueurs donnés (ex: les 10 de la file).
-     */
     /** Alias utilisé par MatchmakingManager et PreGameGUI — lance la sélection. */
     public void startBanPhase() {
         var gm = LolPlugin.getInstance().getGameManager();
@@ -62,7 +58,6 @@ public class ChampSelectManager {
 
     /** Surcharge avec mode ranked (pick+ban) ou normal (pick seul). */
     public void startSelection(Collection<UUID> players, boolean ranked) {
-        this.ranked = ranked;
         this.bannedChampions.clear();
         ChampSelectGUI.resetBans();
         if (ranked) {

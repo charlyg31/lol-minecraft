@@ -203,7 +203,6 @@ public class RuneGUI implements Listener {
         // Bouton valider
         if (slot == 53) {
             validateAndSave(player, page);
-            return;
         }
     }
 

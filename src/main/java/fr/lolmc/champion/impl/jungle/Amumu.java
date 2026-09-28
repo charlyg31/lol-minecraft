@@ -13,7 +13,6 @@ import org.bukkit.*;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.Vector;
-import java.util.*;
 
 public class Amumu extends BaseChampion implements fr.lolmc.champion.base.StatefulChampion {
     public Amumu() {

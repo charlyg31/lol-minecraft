@@ -278,8 +278,7 @@ public class ShopGUI {
         if (slot == NAV_FIRST && page > 0)               { open(player, cat, 0);         return true; }
         if (slot == NAV_LAST  && page < totalPages - 1)  { open(player, cat, totalPages - 1); return true; }
         if (slot == CLOSE_SLOT) { player.closeInventory(); return true; }
-        if (slot == NAV_INFO)   return true; // bouton info, rien à faire
-        return false;
+        return slot == NAV_INFO; // bouton info : rien à faire, mais clic consommé
     }
 
     public boolean isDetailView(Player player) {

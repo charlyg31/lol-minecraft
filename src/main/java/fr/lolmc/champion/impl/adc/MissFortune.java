@@ -14,7 +14,6 @@ import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
-import java.util.*;
 
 public class MissFortune extends BaseChampion implements fr.lolmc.champion.base.StatefulChampion {
     public MissFortune() {

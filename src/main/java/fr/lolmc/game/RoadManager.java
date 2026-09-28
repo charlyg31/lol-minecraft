@@ -25,7 +25,7 @@ import java.util.*;
 public class RoadManager {
 
     private final File roadFile;
-    private FileConfiguration config;
+    private final FileConfiguration config;
 
     // Routes finalisées : lane → liste de waypoints (centres des segments)
     private final Map<String, List<Location>> roads = new HashMap<>();
