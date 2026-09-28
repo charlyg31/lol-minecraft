@@ -325,16 +325,7 @@ public class MapManager {
         };
 
         String root = typeName + "_" + teamName;
-        String laneCap = (lane == null || lane.isEmpty()) ? "" :
-            lane.substring(0, 1).toUpperCase() + lane.substring(1).toLowerCase();
-
-        // Candidats du plus spécifique au plus générique (sans seuil)
-        List<String> candidates = new ArrayList<>();
-        if (!laneCap.isEmpty()) {
-            candidates.add(root + "_" + laneCap + "_" + index); // Turret_Blue_Top_1
-            candidates.add(root + "_" + laneCap);                // Turret_Blue_Top
-        }
-        candidates.add(root);                                    // Turret_Blue
+        List<String> candidates = schematicCandidates(root, lane, index);
 
         if (folder.exists() && folder.isDirectory()) {
             for (String candidate : candidates) {
@@ -355,6 +346,20 @@ public class MapManager {
             }
         }
         return root;
+    }
+
+    /** Noms candidats du plus spécifique au plus générique (sans seuil de HP). */
+    private List<String> schematicCandidates(String root, String lane, int index) {
+        String laneCap = (lane == null || lane.isEmpty()) ? "" :
+            lane.substring(0, 1).toUpperCase() + lane.substring(1).toLowerCase();
+
+        List<String> candidates = new ArrayList<>();
+        if (!laneCap.isEmpty()) {
+            candidates.add(root + "_" + laneCap + "_" + index); // Turret_Blue_Top_1
+            candidates.add(root + "_" + laneCap);                // Turret_Blue_Top
+        }
+        candidates.add(root);                                    // Turret_Blue
+        return candidates;
     }
 
     private String schematicBaseName(Type type, Team team) {

@@ -230,8 +230,7 @@ public final class TargetingUtil {
             // Sbire ou monstre : dégât direct (pas de système de résistance LoL)
             double newHealth = Math.max(0, target.getHealth() - amount);
             target.setHealth(newHealth);
-            var maxHpAttr = target.getAttribute(Compat.maxHealth());
-            double maxHp = maxHpAttr != null ? maxHpAttr.getValue() : target.getMaxHealth();
+            double maxHp = Compat.maxHealthOf(target);
             HealthBar.update(target, newHealth, maxHp);
             VisualEffectUtil.impact(target.getWorld(),
                     target.getLocation().add(0, 1, 0), Material.WHITE_STAINED_GLASS, 0.28f, 4L);
@@ -264,8 +263,7 @@ public final class TargetingUtil {
             return attr != null ? attr.getValue() : 20.0;
         }
         if (VirtualHP.has(target)) return VirtualHP.getMax(target);
-        var attr = target.getAttribute(Compat.maxHealth());
-        return attr != null ? attr.getValue() : target.getMaxHealth();
+        return Compat.maxHealthOf(target);
     }
 
     /** Applique des dégâts à toute une liste d'entités. */

@@ -76,7 +76,7 @@ public class JungleManager {
     public static NamespacedKey KEY_GOLD;    // or individuel du mob
 
     private final File jungleFile;
-    private FileConfiguration config;
+    private final FileConfiguration config;
 
     // Camps configurés : id unique → CampSpawn
     private final Map<String, CampSpawn> camps = new HashMap<>();
@@ -219,6 +219,13 @@ public class JungleManager {
     public JungleManager(org.bukkit.World world) {
         this();
         this.scopedWorld = world;
+        if (world != null) remapCampsToWorld(world);
+    }
+
+    /** Instance : les camps de jungle.yml sont ceux du monde template, on les replace dans le monde de l'instance. */
+    private void remapCampsToWorld(org.bukkit.World w) {
+        camps.replaceAll((id, c) -> new CampSpawn(id, c.type,
+                new Location(w, c.location.getX(), c.location.getY(), c.location.getZ())));
     }
 
     // ══════════════════════════════════════════════════════════════
@@ -439,6 +446,19 @@ public class JungleManager {
         }.runTaskTimer(LolPlugin.getInstance(), 0L, 4L);
     }
 
+    /** Id du buff d'équipe d'un épique. Atakhan change de forme selon l'agressivité de la partie (kills totaux). */
+    private String epicBuffId(MonsterType type) {
+        String buffId = type.buff;
+        if (type == MonsterType.ATAKHAN) {
+            int totalKills = 0;
+            var msb2 = LolPlugin.getInstance().getMatchScoreboard();
+            if (msb2 != null)
+                for (var st : msb2.getStats().values()) totalKills += st.kills;
+            buffId = totalKills >= 15 ? "atakhan_voracious" : "atakhan";
+        }
+        return buffId;
+    }
+
     /** Appelé quand un monstre meurt (depuis le listener). */
     public void onMonsterDeath(UUID entityId, Player killer) {
         MonsterType type = liveMonsters.remove(entityId);
@@ -502,16 +522,7 @@ public class JungleManager {
                     if (type == MonsterType.HERALD) {
                         giveHeraldEye(killer);
                     }
-                    String buffId = type.buff;
-                    // Atakhan : forme selon l'agressivité de la partie (kills totaux)
-                    if (type == MonsterType.ATAKHAN) {
-                        int totalKills = 0;
-                        var msb2 = LolPlugin.getInstance().getMatchScoreboard();
-                        if (msb2 != null)
-                            for (var st : msb2.getStats().values()) totalKills += st.kills;
-                        buffId = totalKills >= 15 ? "atakhan_voracious" : "atakhan";
-                    }
-                    applyTeamBuff(killer, buffId);
+                    applyTeamBuff(killer, epicBuffId(type));
                     // Bounty d'objectif (comeback) sur les épiques
                     if (type.isEpic()) {
                         var ktm = LolPlugin.getInstance().getTeamManager().getTeam(killer);
@@ -1057,9 +1068,9 @@ public class JungleManager {
     }
 
     public void clearAllMonsters() {
-        List<org.bukkit.World> __worlds = WorldContext.getGameWorld() != null
-                ? List.of(WorldContext.getGameWorld())
-                : List.of();
+        // Instance : on nettoie SON monde, jamais le monde de jeu principal.
+        org.bukkit.World target = scopedWorld != null ? scopedWorld : WorldContext.getGameWorld();
+        List<org.bukkit.World> __worlds = target != null ? List.of(target) : List.of();
             for (var world : __worlds) {
             for (Entity e : world.getEntities()) {
                 if (isJungleMonster(e) || MobAppearance.isDecoration(e)) e.remove();

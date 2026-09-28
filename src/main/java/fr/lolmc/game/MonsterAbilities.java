@@ -296,13 +296,12 @@ public class MonsterAbilities {
 
     private Material dragonBlockColor(MonsterType type) {
         return switch (type) {
-            case DRAGON_INFERNAL -> Material.ORANGE_STAINED_GLASS;
             case DRAGON_OCEAN -> Material.LIGHT_BLUE_STAINED_GLASS;
             case DRAGON_MOUNTAIN -> Material.BROWN_STAINED_GLASS;
             case DRAGON_CLOUD -> Material.WHITE_STAINED_GLASS;
             case DRAGON_CHEMTECH -> Material.LIME_STAINED_GLASS;
             case DRAGON_ELDER -> Material.PURPLE_STAINED_GLASS;
-            default -> Material.ORANGE_STAINED_GLASS;
+            default -> Material.ORANGE_STAINED_GLASS; // DRAGON_INFERNAL, et repli pour tout autre monstre
         };
     }
 

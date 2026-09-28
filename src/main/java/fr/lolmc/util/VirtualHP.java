@@ -54,7 +54,7 @@ public final class VirtualHP {
 
     public static double getMax(LivingEntity entity) {
         Double v = entity.getPersistentDataContainer().get(keyMax(), PersistentDataType.DOUBLE);
-        return v != null ? v : entity.getMaxHealth();
+        return v != null ? v : Compat.maxHealthOf(entity);
     }
 
     public static double getCurrent(LivingEntity entity) {
@@ -89,8 +89,7 @@ public final class VirtualHP {
         }
 
         // Vie vanilla proportionnelle (min 1 pour ne pas tuer par accident)
-        var attr = entity.getAttribute(Compat.maxHealth());
-        double vanillaMax = attr != null ? attr.getValue() : entity.getMaxHealth();
+        double vanillaMax = Compat.maxHealthOf(entity);
         entity.setHealth(Math.max(1.0, cur / max * vanillaMax));
 
         HealthBar.update(entity, cur, max);
