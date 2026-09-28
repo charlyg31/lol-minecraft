@@ -24,7 +24,7 @@ public class ShopNpcManager implements Listener {
 
     public static NamespacedKey KEY_SHOP_NPC;
     private final File npcFile;
-    private org.bukkit.configuration.file.FileConfiguration config;
+    private final org.bukkit.configuration.file.FileConfiguration config;
 
     public ShopNpcManager() {
         KEY_SHOP_NPC = new NamespacedKey(LolPlugin.getInstance(), "shop_npc");

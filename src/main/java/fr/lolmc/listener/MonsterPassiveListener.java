@@ -2,8 +2,6 @@ package fr.lolmc.listener;
 
 import fr.lolmc.LolPlugin;
 import fr.lolmc.game.JungleManager;
-import fr.lolmc.game.JungleManager.MonsterType;
-import fr.lolmc.game.MonsterAbilities;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -42,9 +40,6 @@ public class MonsterPassiveListener implements Listener {
         if (!JungleManager.isJungleMonster(mob)) return;
         if (!(e.getDamager() instanceof Player attacker)) return;
         if (!LolPlugin.getInstance().getChampionManager().hasChampion(attacker)) return;
-
-        MonsterType type = JungleManager.getMonsterType(mob);
-        if (type == null) return;
 
         // (LoL : les buffs ne punissent pas d'être frappés — la brûlure du
         //  Rouge vient de sa capacité redSmash, pas d'une riposte passive)

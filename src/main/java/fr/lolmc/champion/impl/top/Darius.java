@@ -15,7 +15,6 @@ import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.Vector;
-import java.util.*;
 
 public class Darius extends BaseChampion implements fr.lolmc.champion.base.StatefulChampion {
     public Darius() {

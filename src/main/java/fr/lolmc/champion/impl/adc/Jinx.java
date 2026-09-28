@@ -13,7 +13,6 @@ import org.bukkit.*;
 import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
-import java.util.*;
 
 public class Jinx extends BaseChampion implements fr.lolmc.champion.base.StatefulChampion {
     public Jinx() {

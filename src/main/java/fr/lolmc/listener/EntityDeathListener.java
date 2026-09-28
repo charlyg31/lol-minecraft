@@ -100,7 +100,6 @@ public class EntityDeathListener implements Listener {
                 };
                 rewardManager.onMinionKill(killer, gold, xp);
             }
-            return;
         }
     }
 

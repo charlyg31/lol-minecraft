@@ -55,13 +55,12 @@ public class ChatListener implements Listener {
         var tm = LolPlugin.getInstance().getTeamManager();
         if (tm != null && tm.hasTeam(p) && fr.lolmc.util.WorldContext.isInGameWorld(p)) {
             e.setCancelled(true);
-            String text2 = msg;
             org.bukkit.Bukkit.getScheduler().runTask(LolPlugin.getInstance(), () -> {
                 var teamCmd = LolPlugin.getInstance().getCommand("team");
                 if (teamCmd != null) {
                     var exec = teamCmd.getExecutor();
                     if (exec instanceof fr.lolmc.listener.TeamCommand tc)
-                        tc.sendTeamChat(p, text2);
+                        tc.sendTeamChat(p, msg);
                 }
             });
         }

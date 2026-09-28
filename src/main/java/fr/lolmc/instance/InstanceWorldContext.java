@@ -27,9 +27,7 @@ public final class InstanceWorldContext {
 
     /** Joueurs en ligne dans le monde d'une instance donnée. */
     public static Collection<Player> getPlayersIn(GameInstance instance) {
-        if (instance == null || instance.getWorld() == null)
-            return List.of();
-        return instance.getWorld().getPlayers();
+        return fr.lolmc.util.WorldContext.getInstancePlayers(instance);
     }
 
     /** Vrai si le joueur est dans le monde de cette instance. */

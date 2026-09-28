@@ -1,6 +1,5 @@
 package fr.lolmc.stats.persistence;
 
-import fr.lolmc.LolPlugin;
 
 import java.util.List;
 import java.util.UUID;

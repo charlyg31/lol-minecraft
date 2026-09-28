@@ -20,7 +20,7 @@ public class FogOfWarManager {
 
     private final TeamManager teamManager;
     private double visionRange;
-    private boolean enabled;
+    private final boolean enabled;
 
     // World filtré (null = tous les mondes, mode legacy)
     private org.bukkit.World scopedWorld = null;
@@ -232,10 +232,9 @@ public class FogOfWarManager {
      * (un allié du viewer, y compris lui-même, est à portée de vision)
      */
     private boolean hasVisionOf(Player viewer, Player target, java.util.List<Player> players) {
-        var tm = teamManager;
         for (Player ally : players) {
             // Allié du viewer (ou lui-même)
-            if (!ally.equals(viewer) && !tm.areAllies(viewer, ally)) continue;
+            if (!ally.equals(viewer) && !teamManager.areAllies(viewer, ally)) continue;
             if (!ally.getWorld().equals(target.getWorld())) continue;
             if (ally.getLocation().distanceSquared(target.getLocation()) <= visionRange * visionRange) {
                 return true;

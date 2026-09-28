@@ -30,7 +30,7 @@ public class PlayerPreferences {
 
     private final Map<UUID, Prefs> prefs = new HashMap<>();
     private final File file;
-    private FileConfiguration config;
+    private final FileConfiguration config;
 
     public PlayerPreferences() {
         this.file = new File(LolPlugin.getInstance().getDataFolder(), "preferences.yml");

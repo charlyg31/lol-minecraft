@@ -58,7 +58,9 @@ public final class MobAppearance {
 
     /**
      * Crée un player head avec une texture base64 (le JSON encodé
-     * {"textures":{"SKIN":{"url":"http://textures.minecraft.net/texture/..."}}}).
+     * {@code {"textures":{"SKIN":{"url":"http://textures.minecraft.net/texture/..."}}}}).
+     * Les URLs de textures sont hébergées sur
+     * <a href="http://textures.minecraft.net/texture/">textures.minecraft.net</a>.
      * Les valeurs base64 se récupèrent sur minecraft-heads.com ou dans un datapack existant.
      */
     @SuppressWarnings("deprecation")

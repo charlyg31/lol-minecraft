@@ -122,7 +122,6 @@ public class PreGameGUI implements Listener {
         if (slot == 15) {
             player.closeInventory();
             rqm.joinQueue(player);
-            return;
         }
     }
 

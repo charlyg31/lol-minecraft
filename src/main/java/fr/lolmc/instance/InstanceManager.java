@@ -51,7 +51,7 @@ public class InstanceManager {
     // UUID joueur → GameInstance
     private final Map<UUID, GameInstance>   playerMap = new ConcurrentHashMap<>();
 
-    private String templateWorldName;
+    private final String templateWorldName;
 
     public InstanceManager(LolPlugin plugin) {
         this.plugin            = plugin;
