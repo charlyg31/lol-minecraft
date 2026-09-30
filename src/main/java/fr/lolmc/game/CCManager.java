@@ -49,6 +49,80 @@ public class CCManager {
 
     // ── Application ──
 
+    /**
+     * Imperial Mandate : si l'attaquant porte l'objet, marque la cible (marque expirant après 4s).
+     * À appeler en plus de stun/root/slow quand ces derniers immobilisent ou ralentissent un ennemi.
+     */
+    public void markCoordinatedFire(Player attacker, LivingEntity target) {
+        var pm = LolPlugin.getInstance().getPassiveManager();
+        if (pm == null || !pm.hasAnyItem(attacker, "imperial_mandate")) return;
+        if (!(target instanceof Player)) return; // ne marque que les champions
+        pm.getState((Player) target).coordinatedFireMarkExpire = System.currentTimeMillis() + 4000L;
+        fr.lolmc.util.VisualEffectUtil.impact(target.getWorld(), target.getLocation().add(0, 2.3, 0),
+                Material.PURPLE_STAINED_GLASS, 0.2f, 8L);
+    }
+
+    /**
+     * Zeke's Convergence : si le porteur immobilise/ralentit un ennemi, l'allié champion le plus
+     * proche du porteur (hors lui-même) reçoit +30% dégâts pendant 6s.
+     */
+    public void applyZekeConduit(Player caster, LivingEntity ccTarget) {
+        var pm = LolPlugin.getInstance().getPassiveManager();
+        if (pm == null || !pm.hasAnyItem(caster, "zekess_convergence")) return;
+        var cm = LolPlugin.getInstance().getChampionManager();
+        var tm = LolPlugin.getInstance().getTeamManager();
+        if (cm == null || tm == null) return;
+        Player nearestAlly = null;
+        double nearestDist = Double.MAX_VALUE;
+        for (Player p : fr.lolmc.util.WorldContext.getGamePlayers()) {
+            if (p.equals(caster) || !cm.hasChampion(p) || !tm.areAllies(caster, p)) continue;
+            if (!p.getWorld().equals(caster.getWorld())) continue;
+            double d = p.getLocation().distanceSquared(caster.getLocation());
+            if (d < nearestDist) { nearestDist = d; nearestAlly = p; }
+        }
+        if (nearestAlly != null && nearestDist <= 10.0*10.0) { // portée de proximité, cohérente avec les autres auras du projet
+            cm.getChampion(nearestAlly).getStats().applyZekeBuff(6000L);
+            nearestAlly.sendActionBar(Component.text("⚡ Conduit ! +30% dégâts (6s)", NamedTextColor.AQUA));
+        }
+    }
+
+    /**
+     * Rune Aftershock : après avoir immobilisé/ralenti un ennemi, le porteur gagne des
+     * résistances temporaires (2.5s) puis explose en dégâts magiques sur les ennemis proches.
+     */
+    public void applyAftershock(Player caster, LivingEntity ccTarget) {
+        var rm = LolPlugin.getInstance().getRuneManager();
+        var cm = LolPlugin.getInstance().getChampionManager();
+        if (rm == null || cm == null || !cm.hasChampion(caster)) return;
+        var page = rm.getPage(caster.getUniqueId());
+        if (page == null || !"aftershock".equals(page.keystone)) return;
+        var state = LolPlugin.getInstance().getPassiveManager().getState(caster);
+        if (state.isOnCooldown(state.aftershockLastUse, 20000L)) return;
+        state.aftershockLastUse = System.currentTimeMillis();
+
+        var stats = cm.getChampion(caster).getStats();
+        double bonusRes = Math.min(35 + stats.getBonusArmor() * 0.80, 150);
+        stats.addBonusArmor(bonusRes);
+        stats.addBonusMR(bonusRes);
+        caster.sendActionBar(Component.text("🛡 Réplique ! +" + (int) bonusRes + " résistances", NamedTextColor.GOLD));
+
+        new BukkitRunnable() {
+            @Override public void run() {
+                stats.addBonusArmor(-bonusRes);
+                stats.addBonusMR(-bonusRes);
+                double shockDmg = 25.0 + stats.getBonusHP() * 0.08;
+                for (var e : caster.getWorld().getNearbyEntities(caster.getLocation(), 6, 3, 6)) {
+                    if (e instanceof Player enemyP && !enemyP.equals(caster) && cm.hasChampion(enemyP)
+                            && LolPlugin.getInstance().getTeamManager().areEnemies(caster, enemyP)) {
+                        cm.getChampion(enemyP).getHPSystem().takeDamage(shockDmg);
+                    }
+                }
+                fr.lolmc.util.VisualEffectUtil.impactBurst(caster.getWorld(), caster.getLocation().add(0,1,0),
+                        Material.STONE, 0.3f, 1.0, 8, 6L);
+            }
+        }.runTaskLater(LolPlugin.getInstance(), 50L);
+    }
+
     public void stun(LivingEntity target, int ticks) {
         ticks = withTenacity(target, ticks);
         long until = now() + ticks * 50L;
@@ -78,7 +152,14 @@ public class CCManager {
 
     public void slow(LivingEntity target, int ticks, int amplifier) {
         ticks = withTenacity(target, ticks);
-        target.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, ticks, amplifier, false, true));
+        if (target instanceof Player p) {
+            var cm = LolPlugin.getInstance().getChampionManager();
+            if (cm.hasChampion(p)) {
+                double sr = cm.getChampion(p).getStats().getFinalSlowResist(); // 0..0.95 (Boots of Swiftness)
+                ticks = (int) Math.round(ticks * (1.0 - sr));
+            }
+        }
+        target.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, Math.max(1, ticks), amplifier, false, true));
     }
 
     // ── Airborne (knockup) ────────────────────────────────────────────

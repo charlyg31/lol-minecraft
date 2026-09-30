@@ -67,9 +67,9 @@ public class MinimapManager implements Listener {
         centerX = cfg.getInt("minimap.center-x", 0);
         centerZ = cfg.getInt("minimap.center-z", 0);
         try {
-            scale = MapView.Scale.valueOf(cfg.getString("minimap.scale", "FARTHEST"));
+            scale = MapView.Scale.valueOf(cfg.getString("minimap.scale", "CLOSE"));
         } catch (IllegalArgumentException ignored) {
-            scale = MapView.Scale.FARTHEST;
+            scale = MapView.Scale.CLOSE;
         }
     }
 

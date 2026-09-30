@@ -68,6 +68,21 @@ public class ConsumableManager {
         player.sendActionBar(Component.text("🧪 Potion de vie (150 HP sur 15s)", NamedTextColor.RED));
         double healPerTick = 150.0 / 15.0; // 10 HP/s
 
+        // Rune Time Warp Tonic : 30% du soin total instantané + 5% vitesse pendant l'effet
+        var rmTonic = LolPlugin.getInstance().getRuneManager();
+        boolean hasTonic = rmTonic != null && rmTonic.getPage(player.getUniqueId()).has("time_warp_tonic");
+        if (hasTonic) {
+            hp.heal(150.0 * 0.30);
+            double tonicBonus = champ.getStats().getFinalMovementSpeed() * 0.05;
+            champ.getStats().addBonusMoveSpeed(tonicBonus);
+            player.sendActionBar(Component.text("⏱ Tonique Temporel !", NamedTextColor.AQUA));
+            new BukkitRunnable() {
+                @Override public void run() {
+                    if (championManager.hasChampion(player)) champ.getStats().addBonusMoveSpeed(-tonicBonus);
+                }
+            }.runTaskLater(LolPlugin.getInstance(), 300L); // 15s
+        }
+
         BukkitRunnable task = createHealthPotionTask(player, champ, hp, healPerTick);
         task.runTaskTimer(LolPlugin.getInstance(), 0L, 20L);
         setActivePotion(player, task);
@@ -423,6 +438,27 @@ public class ConsumableManager {
         List<BukkitRunnable> tasks = activePotions.remove(player.getUniqueId());
         if (tasks != null) tasks.forEach(t -> { try { t.cancel(); } catch(Exception ignored){} });
         // Les élixirs persistent après mort dans LoL → on les garde
+    }
+
+    /** Recharge la fiole rechargeable à 2 charges si le joueur en possède une (appelé quand il est à la base). */
+    public void refillAtBase(Player player) {
+        var hb = LolPlugin.getInstance().getHotbarManager();
+        if (hb == null) return;
+        var owned = hb.getConsumables(player);
+        if (!owned.contains("refillable_potion") && !owned.contains("refillable_potion2")) return;
+        if (refillableCharges.getOrDefault(player.getUniqueId(), 0) < 2) {
+            refillableCharges.put(player.getUniqueId(), 2);
+            player.sendActionBar(Component.text("🧪 Fiole rechargeable pleine (2 charges)", NamedTextColor.GREEN));
+        }
+    }
+
+    /** Fin de partie : oublie les charges et annule les potions en cours. */
+    public void reset() {
+        refillableCharges.clear();
+        for (List<BukkitRunnable> tasks : activePotions.values()) {
+            for (BukkitRunnable t : tasks) { try { t.cancel(); } catch (Exception ignored) {} }
+        }
+        activePotions.clear();
     }
 
     // Getters

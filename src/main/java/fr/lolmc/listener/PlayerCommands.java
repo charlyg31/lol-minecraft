@@ -29,7 +29,7 @@ public class PlayerCommands implements CommandExecutor, TabCompleter {
                     player.sendMessage(Component.text("❌ Tu n'as pas de champion.", NamedTextColor.RED));
                     return true;
                 }
-                LolPlugin.getInstance().getBaseManager().startRecall(player);
+                fr.lolmc.instance.InstanceHelper.baseManager(player).startRecall(player);
             }
             case "roles", "lobby", "play" -> LolPlugin.getInstance().getPreGameGUI().open(player);
             case "queue" -> LolPlugin.getInstance().getRoleQueueManager().joinQueue(player);
@@ -46,7 +46,7 @@ public class PlayerCommands implements CommandExecutor, TabCompleter {
             case "ping" -> {
                 // /ping seul = ping générique d'alerte
                 if (args.length < 1) {
-                    LolPlugin.getInstance().getAnnouncementManager().sendPing(player, PingType.DANGER);
+                    fr.lolmc.instance.InstanceHelper.announcementManager(player).sendPing(player, PingType.DANGER);
                     return true;
                 }
                 PingType type = switch (args[0].toLowerCase()) {
@@ -61,7 +61,7 @@ public class PlayerCommands implements CommandExecutor, TabCompleter {
                     player.sendMessage("§cType: danger, omw, missing, assist, enemy");
                     return true;
                 }
-                LolPlugin.getInstance().getAnnouncementManager().sendPing(player, type);
+                fr.lolmc.instance.InstanceHelper.announcementManager(player).sendPing(player, type);
             }
         }
         return true;

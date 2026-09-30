@@ -46,13 +46,13 @@ public class ShopListener implements Listener {
     /** Ouvre la boutique pour un joueur (appelable depuis /lol shop). */
     public void openShop(Player player) {
         // LoL : la boutique n'est accessible qu'a la fontaine
-        var gm = LolPlugin.getInstance().getGameManager();
+        var gm = fr.lolmc.instance.InstanceHelper.gameManager(player);
         boolean baseOnly = LolPlugin.getInstance().getConfig()
                 .getBoolean("shop.base-only", true);
         if (baseOnly && gm != null && gm.isGameRunning()
                 && fr.lolmc.util.WorldContext.isInGameWorld(player)) {
             var team = LolPlugin.getInstance().getTeamManager().getTeam(player);
-            var mm = LolPlugin.getInstance().getMapManager();
+            var mm = fr.lolmc.instance.InstanceHelper.mapManager(player);
             org.bukkit.Location base = (team != null && mm != null) ? mm.getSpawn(team, 0) : null;
             double radius = LolPlugin.getInstance().getConfig().getDouble("shop.base-radius", 15.0);
             if (base == null || !base.getWorld().equals(player.getWorld())
@@ -201,6 +201,13 @@ public class ShopListener implements Listener {
 
         // ── GESTION DES CONSOMMABLES ──
         if (item.getCategory() == ItemCategory.CONSUMABLE && cm != null) {
+            boolean refillable = item.getId().equals("refillable_potion") || item.getId().equals("refillable_potion2");
+            if (refillable && (hb.getConsumables(player).contains("refillable_potion")
+                    || hb.getConsumables(player).contains("refillable_potion2"))) {
+                player.sendActionBar(Component.text("❌ Tu possèdes déjà une fiole rechargeable (elle se recharge à la base).",
+                        NamedTextColor.RED));
+                return false;
+            }
             int gold = goldManager.getGold(player.getUniqueId());
             if (gold < item.getGoldCost()) {
                 player.sendMessage(Component.text(
@@ -211,6 +218,7 @@ public class ShopListener implements Listener {
             }
             if (!goldManager.spendGold(player.getUniqueId(), item.getGoldCost())) return false;
             hb.addConsumable(player, item.getId());
+            if (refillable) cm.giveRefillable(player); // 2 charges dès l'achat
             hb.showPage2(player, champ); // basculer sur la page utilitaire pour voir le consommable
             player.sendActionBar(Component.text("🧪 " + item.getDisplayName() + " ajouté (page 2)", NamedTextColor.GREEN));
             player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1f, 1.3f);
@@ -368,33 +376,42 @@ public class ShopListener implements Listener {
 
     // ── Consommables ───────────────────────────────────────────────
 
-    /** Appelé par AbilityListener quand un consommable est cliqué dans la hotbar. */
-    public void useConsumablePublic(Player player, String id) {
+    /**
+     * Appelé par AbilityListener quand un consommable est cliqué dans la hotbar.
+     *
+     * @return true si le consommable a été réellement utilisé et doit être retiré de la hotbar.
+     *         Un usage refusé (HP pleins, potion déjà active, niveau trop bas...) ne consomme rien,
+     *         et la fiole rechargeable reste toujours dans l'inventaire (elle se recharge à la base).
+     */
+    public boolean useConsumablePublic(Player player, String id) {
         ConsumableManager cm = LolPlugin.getInstance().getConsumableManager();
-        if (cm == null) return;
-        switch (id) {
+        if (cm == null) return false;
+        return switch (id) {
             case "health_potion", "health_potion2", "cappa_juice", "cappa_juice2" -> cm.useHealthPotion(player);
-            case "refillable_potion", "refillable_potion2"  -> cm.useRefillablePotion(player);
+            case "refillable_potion", "refillable_potion2" -> {
+                cm.useRefillablePotion(player);
+                yield false;
+            }
             case "biscuit", "biscuit_will"                  -> cm.useBiscuit(player);
-            case "elixir_wrath", "elixir_wrath2" -> {
-                if (isElixirLevelTooLow(player)) break;
-                cm.useElixirWrath(player);
-            }
-            case "elixir_iron", "elixir_iron2" -> {
-                if (isElixirLevelTooLow(player)) break;
-                cm.useElixirIron(player);
-            }
-            case "elixir_sorcery", "elixir_sorcery2" -> {
-                if (isElixirLevelTooLow(player)) break;
-                cm.useElixirSorcery(player);
-            }
+            case "elixir_wrath", "elixir_wrath2"            -> !isElixirLevelTooLow(player) && cm.useElixirWrath(player);
+            case "elixir_iron", "elixir_iron2"              -> !isElixirLevelTooLow(player) && cm.useElixirIron(player);
+            case "elixir_sorcery", "elixir_sorcery2"        -> !isElixirLevelTooLow(player) && cm.useElixirSorcery(player);
             case "stealth_ward", "stealth_ward2"            -> cm.placeWard(player, false);
-            case "control_ward", "control_ward2"            -> cm.placeControlWard(player);
+            case "control_ward", "control_ward2" -> {
+                cm.placeControlWard(player);
+                yield true;
+            }
             case "farsight", "farsight2"                    -> cm.placeWard(player, true);
-            case "oracle_lens", "oracle_lens2"              -> LolPlugin.getInstance().getAbilityListener().revealNearbyWards(player);
-            default -> player.sendActionBar(net.kyori.adventure.text.Component.text(
-                    "Consommable: " + id, net.kyori.adventure.text.format.NamedTextColor.GRAY));
-        }
+            case "oracle_lens", "oracle_lens2" -> {
+                LolPlugin.getInstance().getAbilityListener().revealNearbyWards(player);
+                yield true;
+            }
+            default -> {
+                player.sendActionBar(net.kyori.adventure.text.Component.text(
+                        "Consommable: " + id, net.kyori.adventure.text.format.NamedTextColor.GRAY));
+                yield false;
+            }
+        };
     }
 
     // ── Helpers ───────────────────────────────────────────────────

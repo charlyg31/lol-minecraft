@@ -37,6 +37,8 @@ public class RuneManager {
     private final Map<UUID, Double> gatheringStormBonus = new HashMap<>();
     // Relentless Hunter : stacks de kills uniques (un stack par champion différent tué)
     private final Map<UUID, java.util.Set<UUID>> relentlessKills = new HashMap<>();
+    // Second Wind : tâche de soin active par joueur (annulée avant chaque relance, pas de double-cumul)
+    private final Map<UUID, org.bukkit.scheduler.BukkitTask> secondWindTasks = new HashMap<>();
 
     public RuneManager() {
         this.runeFile = new java.io.File(LolPlugin.getInstance().getDataFolder(), "runes.yml");
@@ -200,6 +202,9 @@ public class RuneManager {
             case "font_life" -> { /* soin alliés déclenché dans CCManager.stun/root */ }
             // ── INSPIRATION ──
             case "cosmic_insight" -> s.addBonusAbilityHaste(18); // +hâte invocateur/objets (approx)
+            case "unflinching" -> { s.addTenacity(0.10); s.addSlowResist(0.10); }
+            case "revitalize" -> s.addRuneHealAmp(0.05);
+            case "celerity" -> { s.addBonusMoveSpeed(1); s.multiplyMS(1.07); }
             default -> {}
         }
     }
@@ -208,7 +213,7 @@ public class RuneManager {
      * Effets de runes au moment où le porteur SUBIT des dégâts.
      * (Second Souffle, Plaques Osseuses, Réplique...)
      */
-    public void onDamageTaken(Player victim, double amount) {
+    public void onDamageTaken(Player victim, double amount, boolean isMagical) {
         RunePage page = getPage(victim.getUniqueId());
         // Bone Plating : réduit les dégâts des 3 prochaines attaques ennemies de 30-60
         if (page.has("bone_plating")) {
@@ -226,45 +231,76 @@ public class RuneManager {
             }
         }
 
-        // Second Wind : soin 6 + 4% PV manquants pendant 10s après avoir pris des dégâts
-        if (page.has("second_wind")) {
-            var cm = LolPlugin.getInstance().getChampionManager();
-            if (cm.hasChampion(victim)) {
-                var hp = cm.getChampion(victim).getHPSystem();
-                double heal = 6 + (hp.getMaxHP() - hp.getCurrentHP()) * 0.04;
-                new org.bukkit.scheduler.BukkitRunnable() { int t = 0;
-                    @Override public void run() {
-                        if (t++ >= 10 || !victim.isOnline()) { cancel(); return; }
-                        if (cm.hasChampion(victim)) cm.getChampion(victim).getHPSystem().heal(heal/10.0);
-                    }
-                }.runTaskTimer(LolPlugin.getInstance(), 20L, 20L);
-            }
-        }
         var cm = LolPlugin.getInstance().getChampionManager();
         if (!cm.hasChampion(victim)) return;
         var champ = cm.getChampion(victim);
 
+        // Second Wind : soin 3 + 4% PV manquants sur 10s après avoir pris des dégâts d'un
+        // champion ennemi. Le montant est calculé une fois au déclenchement (comme le vrai
+        // jeu) ; un nouveau dégât annule la tâche en cours et relance un nouveau soin (refresh
+        // de durée) plutôt que de cumuler deux tâches de soin simultanées.
         if (page.has("second_wind")) {
-            // Soigne 6% PV manquants sur 10s après avoir subi des dégâts (simplifié: soin direct léger)
-            new org.bukkit.scheduler.BukkitRunnable() {
-                int ticks = 0;
+            var existing = secondWindTasks.remove(victim.getUniqueId());
+            if (existing != null) existing.cancel();
+            double heal = 3 + (champ.getHPSystem().getMaxHP() - champ.getHPSystem().getCurrentHP()) * 0.04;
+            var task = new org.bukkit.scheduler.BukkitRunnable() {
+                int t = 0;
                 @Override public void run() {
-                    if (ticks >= 5 || !victim.isOnline()) { cancel(); return; }
-                    double missing = champ.getHPSystem().getMaxHP() - champ.getHPSystem().getCurrentHP();
-                    champ.getHPSystem().heal(missing * 0.012);
-                    ticks++;
+                    if (t++ >= 10 || !victim.isOnline() || !cm.hasChampion(victim)) {
+                        secondWindTasks.remove(victim.getUniqueId());
+                        cancel();
+                        return;
+                    }
+                    cm.getChampion(victim).getHPSystem().heal(heal / 10.0);
                 }
             }.runTaskTimer(LolPlugin.getInstance(), 20L, 20L);
+            secondWindTasks.put(victim.getUniqueId(), task);
         }
         if (page.has("bone_plating")) {
             // Les 3 prochaines sources de dégâts sont réduites (marqueur simplifié: petit bouclier)
             champ.getStats().addFlatDamageReduction(8);
+        }
+
+        // Nullifying Orb : bouclier anti-magie sous 30% HP max (60s CD)
+        if (isMagical && page.has("nullifying_orb")) {
+            var pm2 = LolPlugin.getInstance().getPassiveManager();
+            var state = pm2 != null ? pm2.getState(victim) : null;
+            var hp2 = champ.getHPSystem();
+            if (state != null && hp2.getCurrentHP() < hp2.getMaxHP() * 0.30
+                    && !state.isOnCooldown(state.nullifyingOrbLastUse, 60000L)) {
+                state.nullifyingOrbLastUse = System.currentTimeMillis();
+                double shield = 35.0 + champ.getStats().getBonusAD() * 0.14 + champ.getStats().getFinalAP() * 0.09;
+                champ.getStats().addMagicShield(shield);
+                victim.sendActionBar(Component.text(
+                        "🔮 Orbe Annihilatrice ! +" + (int) shield + " bouclier magique", NamedTextColor.AQUA));
+            }
         }
     }
 
     /**
      * Effets on-hit additionnels (vol de vie, mana, dégâts de sort).
      */
+    /**
+     * Rune Nimbus Cloak : après un sort d'invocateur, +25% vitesse de mouvement pendant 2s.
+     * (Le vrai taux varie selon le cooldown du sort dans le jeu original ; simplifié ici
+     * à un taux médian unique.)
+     */
+    public void applyNimbusCloak(Player caster) {
+        var page = getPage(caster.getUniqueId());
+        if (!page.has("nimbus_cloak")) return;
+        var cm = LolPlugin.getInstance().getChampionManager();
+        if (!cm.hasChampion(caster)) return;
+        var stats = cm.getChampion(caster).getStats();
+        double bonusMs = stats.getFinalMovementSpeed() * 0.25;
+        stats.addBonusMoveSpeed(bonusMs);
+        caster.sendActionBar(Component.text("☁ Cape de Nimbus !", NamedTextColor.AQUA));
+        new org.bukkit.scheduler.BukkitRunnable() {
+            @Override public void run() {
+                if (cm.hasChampion(caster)) stats.addBonusMoveSpeed(-bonusMs);
+            }
+        }.runTaskLater(LolPlugin.getInstance(), 40L);
+    }
+
     public void onHitEffects(Player attacker, Player victim, double damage, boolean isAbility) {
         RunePage page = getPage(attacker.getUniqueId());
         var cm = LolPlugin.getInstance().getChampionManager();
@@ -481,6 +517,9 @@ public class RuneManager {
                 // AA ralentit 30% + crée des zones gelées
                 if (!isAbility) {
                     LolPlugin.getInstance().getCCManager().slow(victim, 30, 40);
+                    LolPlugin.getInstance().getCCManager().markCoordinatedFire(attacker, victim);
+                    LolPlugin.getInstance().getCCManager().applyZekeConduit(attacker, victim);
+                    // Aftershock ne se déclenche que sur une vraie immobilisation, pas un simple ralentissement
                     fr.lolmc.util.VisualEffectUtil.impactBurst(victim.getWorld(),
                             victim.getLocation().add(0,1,0), Material.LIGHT_BLUE_STAINED_GLASS, 0.24f, 0.5, 6, 6L);
                     attacker.sendActionBar(Component.text("❄ Augment Glacial!", NamedTextColor.AQUA));

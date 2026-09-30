@@ -61,7 +61,7 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
         // /lola → commandes joueur (uniquement ce qui n'est pas géré par BungeeCord)
         if (cmd.getName().equalsIgnoreCase("l")) {
             String sub = args.length > 0 ? args[0].toLowerCase() : "help";
-            boolean inGame = LolPlugin.getInstance().getGameManager().isGameRunning()
+            boolean inGame = fr.lolmc.instance.InstanceHelper.gameManager(player).isGameRunning()
                     && LolPlugin.getInstance().getChampionManager().hasChampion(player);
 
             switch (sub) {
@@ -71,7 +71,7 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
                     if (!inGame) { player.sendMessage(Component.text("❌ Disponible uniquement en partie.", NamedTextColor.RED)); break; }
                     String ptype = args.length > 1 ? args[1].toLowerCase() : "danger";
                     var type = parsePingType(ptype);
-                    LolPlugin.getInstance().getAnnouncementManager().sendPing(player, type);
+                    fr.lolmc.instance.InstanceHelper.announcementManager(player).sendPing(player, type);
                 }
                 case "ff", "forfait" -> {
                     if (!inGame) { player.sendMessage(Component.text("❌ Disponible uniquement en partie.", NamedTextColor.RED)); break; }
@@ -150,10 +150,17 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
             case "reload" -> {
                 LolPlugin.getInstance().reloadConfig();
                 fr.lolmc.util.Balance.load();
-                // Recharger la portée du fog of war
+                // Recharger la portée du fog of war (manager global + toutes les instances actives)
+                double visionRange = LolPlugin.getInstance().getConfig().getDouble("fog.vision-range", 30.0);
                 var fog = LolPlugin.getInstance().getFogOfWarManager();
-                if (fog != null) fog.setVisionRange(
-                        LolPlugin.getInstance().getConfig().getDouble("fog.vision-range", 30.0));
+                if (fog != null) fog.setVisionRange(visionRange);
+                var instMgr = LolPlugin.getInstance().getInstanceManager();
+                if (instMgr != null) {
+                    for (var inst : instMgr.getAllInstances()) {
+                        var instFog = inst.getFogManager();
+                        if (instFog != null) instFog.setVisionRange(visionRange);
+                    }
+                }
                 // Recharger les skins
                 LolPlugin.getInstance().getSkinManager().reload();
                 // Recharger l'échelle des portées AA
@@ -189,19 +196,19 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
             case "start" -> {
                 player.sendMessage(Component.text("⚔ Lancement de la partie...", NamedTextColor.GOLD));
                 mapManager.resetAllStructures();
-                LolPlugin.getInstance().getMinionManager().startWaves();
-                LolPlugin.getInstance().getJungleManager().startJungle();
+                fr.lolmc.instance.InstanceHelper.minionManager(player).startWaves();
+                fr.lolmc.instance.InstanceHelper.jungleManager(player).startJungle();
                 LolPlugin.getInstance().getPlantManager().spawnAll();
-                LolPlugin.getInstance().getGameManager().startGame();
+                fr.lolmc.instance.InstanceHelper.gameManager(player).startGame();
                 LolPlugin.getInstance().getMatchScoreboard().startMatch(
                         LolPlugin.getInstance().getMatchScoreboard().isRanked());
                 player.sendMessage(Component.text("✔ Partie lancée (structures, sbires, jungle, timer)!", NamedTextColor.GREEN));
             }
             case "stop" -> {
-                LolPlugin.getInstance().getMinionManager().stopWaves();
-                LolPlugin.getInstance().getJungleManager().stopJungle();
+                fr.lolmc.instance.InstanceHelper.minionManager(player).stopWaves();
+                fr.lolmc.instance.InstanceHelper.jungleManager(player).stopJungle();
                 LolPlugin.getInstance().getPlantManager().clearAll();
-                LolPlugin.getInstance().getGameManager().stopGame();
+                fr.lolmc.instance.InstanceHelper.gameManager(player).stopGame();
                 player.sendMessage(Component.text("⏹ Partie arrêtée.", NamedTextColor.YELLOW));
             }
             default -> sendHelp(player);
@@ -341,6 +348,7 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
                 player.sendMessage("§cAucune lane en cours de définition.");
                 return;
             }
+            // Configuration de la carte template (reste global, jamais une instance)
             LolPlugin.getInstance().getMinionManager().setLaneWaypoints(lane, wps);
             player.sendMessage(Component.text(String.format(
                     "✔ Lane %s enregistrée (%d points).", lane, wps.size()), NamedTextColor.GREEN));
@@ -426,11 +434,11 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
         String id = fr.lolmc.item.HotbarManager.getId(held);
         player.sendMessage(Component.text("Slot tenu: " + heldSlot + " | type=" + type + " | id=" + id, NamedTextColor.GRAY));
 
-        boolean running = plugin.getGameManager().isRunning();
+        boolean running = fr.lolmc.instance.InstanceHelper.gameManager(player).isRunning();
         player.sendMessage(Component.text("Partie active: " + running, NamedTextColor.GRAY));
 
         if (team != null) {
-            var spawn = plugin.getMapManager().getSpawn(team, 1);
+            var spawn = fr.lolmc.instance.InstanceHelper.mapManager(player).getSpawn(team, 1);
             player.sendMessage(Component.text("Spawn équipe défini: " + (spawn != null), spawn != null ? NamedTextColor.GREEN : NamedTextColor.RED));
         }
         player.sendMessage(Component.text("═══════════════════", NamedTextColor.YELLOW));
@@ -503,7 +511,7 @@ private void handleSolo(Player player, String[] args) {
         var team = parseTeam(args[1]);
         if (team == null) { player.sendMessage("§cÉquipe: blue ou red"); return; }
         LolPlugin.getInstance().getTeamManager().setTeam(player, team);
-        var spawn = LolPlugin.getInstance().getMapManager().getSpawn(team, 1);
+        var spawn = fr.lolmc.instance.InstanceHelper.mapManager(player).getSpawn(team, 1);
         if (spawn != null) player.teleport(spawn);
         player.sendMessage(Component.text("✔ Équipe: " + team.name(), NamedTextColor.GREEN));
     }
@@ -656,6 +664,7 @@ private void handleSolo(Player player, String[] args) {
             }
             case "jungle" -> {
                 var type = fr.lolmc.game.JungleManager.MonsterType.valueOf(setup.lane());
+                // Configuration de la carte template (reste global, jamais une instance)
                 LolPlugin.getInstance().getJungleManager().setCamp(type, setup.team(), clicked.clone().add(0.5, 1, 0.5));
                 player.sendMessage(Component.text(String.format("✔ %s placé.", type.displayName), NamedTextColor.GREEN));
             }
@@ -790,7 +799,7 @@ private void handleSolo(Player player, String[] args) {
         }
         var cm = LolPlugin.getInstance().getChampionManager();
         if (!cm.hasChampion(target)) { player.sendMessage(Component.text("§cLa cible n'a pas de champion", NamedTextColor.RED)); return; }
-        LolPlugin.getInstance().getJungleManager().applyBuffPublic(target, buffType);
+        fr.lolmc.instance.InstanceHelper.jungleManager(target).applyBuffPublic(target, buffType);
         player.sendMessage(Component.text("✔ Buff '" + buffType + "' appliqué à " + target.getName(), NamedTextColor.GREEN));
         if (!target.equals(player)) target.sendMessage(Component.text("✔ Buff '" + buffType + "' reçu de " + player.getName(), NamedTextColor.GOLD));
     }
@@ -852,7 +861,7 @@ private void handleSolo(Player player, String[] args) {
     // ── /lola wave ────────────────────────────────────────────────────────
     // Force le spawn immédiat d'une vague de sbires
     private void handleWave(Player player) {
-        LolPlugin.getInstance().getMinionManager().forceWave();
+        fr.lolmc.instance.InstanceHelper.minionManager(player).forceWave();
         player.sendMessage(Component.text("✔ Vague forcée!", NamedTextColor.GREEN));
     }
 

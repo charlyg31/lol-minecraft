@@ -81,10 +81,20 @@ public final class VirtualHP {
         pdc.set(keyCur(), PersistentDataType.DOUBLE, cur);
 
         if (cur <= 0) {
-            // Coup fatal vanilla pour déclencher EntityDeathEvent avec killer
+            // Coup fatal vanilla pour déclencher EntityDeathEvent avec killer.
+            // On neutralise le délai d'invincibilité Minecraft (noDamageTicks) : sinon, si ce
+            // coup arrive juste après un dégât vanilla venant d'être annulé (setCancelled), il
+            // peut être silencieusement ignoré et l'entité reste bloquée en isDying=true pour
+            // toujours (elle ignorerait alors définitivement tout dégât futur).
+            entity.setNoDamageTicks(0);
             pdc.set(keyDying(), PersistentDataType.BYTE, (byte) 1);
             if (killer != null) entity.damage(4096.0, killer);
             else entity.setHealth(0);
+            // Si l'entité est toujours vivante après le coup (invulnérable pour une autre
+            // raison, ex. plugin tiers, GameMode, etc.), ne pas rester bloqué en isDying.
+            if (!entity.isDead()) {
+                pdc.set(keyDying(), PersistentDataType.BYTE, (byte) 0);
+            }
             return 0;
         }
 

@@ -15,6 +15,57 @@ commands:
     aliases: [lolAdmin]
     permission: lolmc.admin
 
+  # ── Raccourcis joueur (mêmes fonctions que /l, plus le chat d'équipe) ──
+  team:
+    description: Choisir son équipe / chat d'équipe (/t <message>)
+    usage: /team <bleu|rouge|auto>
+    permission: lolmc.player.team
+  shop:
+    description: Ouvrir la boutique
+    usage: /shop [gold]
+    permission: lolmc.player.shop
+  champion:
+    description: Choisir ou lister les champions
+    usage: /champion <pick <nom>|list>
+    permission: lolmc.player.pick
+  party:
+    description: Gérer son groupe
+    usage: /party <invite|accept|leave|info>
+    permission: lolmc.player.party
+  queue:
+    description: Rejoindre ou quitter la file d'attente
+    usage: /queue [leave]
+    permission: lolmc.player.queue
+  recall:
+    description: Retourner à la base
+    usage: /recall
+    permission: lolmc.player.recall
+  ping:
+    description: Envoyer un ping à l'équipe
+    usage: /ping <danger|omw|missing|assist|enemy>
+    permission: lolmc.player.ping
+  pick:
+    description: Choisir son champion
+    usage: /pick <champion>
+    permission: lolmc.player.pick
+  spell:
+    description: Choisir ses sorts d'invocateur
+    usage: /spell <sort1> <sort2>
+    permission: lolmc.player.spell
+  lock:
+    description: Verrouiller sa sélection
+    usage: /lock
+    permission: lolmc.player.lock
+  runes:
+    description: Configurer ses runes
+    usage: /runes
+    permission: lolmc.player.runes
+  roles:
+    description: Ouvrir le menu de préparation (rôles, file)
+    usage: /roles
+    aliases: [lobby, play]
+    permission: lolmc.player.roles
+
 permissions:
   lolmc.admin:
     description: Accès à toutes les commandes admin

@@ -106,6 +106,7 @@ public class LolPlugin extends JavaPlugin {
     private fr.lolmc.bridge.BridgeManager bridgeManager;
     private fr.lolmc.ability.AbilityPreview abilityPreview;
     private fr.lolmc.instance.InstanceManager instanceManager;
+    private ChampionGUI championGUI;
     private fr.lolmc.game.PlantManager plantManager;
     private fr.lolmc.game.MinimapManager minimapManager;
     private fr.lolmc.manager.SkinManager skinManager;
@@ -210,7 +211,7 @@ public class LolPlugin extends JavaPlugin {
 
         ItemRegistry.ensureLoaded();
         HeadManager headManager = new HeadManager(this);
-        ChampionGUI championGUI = new ChampionGUI(championManager, headManager);
+        this.championGUI = new ChampionGUI(championManager, headManager);
         GUIListener guiListener = new GUIListener(championGUI, championManager, headManager, hudManager);
 
         // ── Listeners (dépend de tout) ─────────────────────────────────
@@ -219,6 +220,17 @@ public class LolPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new HealthListener(championManager, hudManager), this);
         getServer().getPluginManager().registerEvents(shopListener, this);
         getServer().getPluginManager().registerEvents(guiListener, this);
+    }
+
+    /** Associe une commande déclarée dans plugin.yml à son exécuteur (et à son auto-complétion). */
+    private void bindCommand(String name, org.bukkit.command.CommandExecutor executor) {
+        var command = getCommand(name);
+        if (command == null) {
+            getLogger().warning("Commande /" + name + " absente de plugin.yml : ignorée.");
+            return;
+        }
+        command.setExecutor(executor);
+        if (executor instanceof org.bukkit.command.TabCompleter completer) command.setTabCompleter(completer);
     }
 
     /** Branche les commandes (/champion, /shop, /lol, ...) et les derniers ecouteurs. */
@@ -236,6 +248,20 @@ public class LolPlugin extends JavaPlugin {
             cmdLola.setTabCompleter(lolCmd);
         }
         getServer().getPluginManager().registerEvents(lolCmd, this);
+
+        // Commandes joueur autonomes (raccourcis de /l). /team est indispensable :
+        // ChatListener s'en sert pour acheminer le chat d'équipe.
+        var playerCmds = new fr.lolmc.listener.PlayerCommands();
+        for (String name : new String[]{"recall", "roles", "pick", "spell", "lock", "ping", "runes"}) { // "lobby" et "play" sont des alias de "roles"
+            bindCommand(name, playerCmds);
+        }
+        var partyCmd = new fr.lolmc.listener.PartyCommand(partyManager, matchmakingManager);
+        bindCommand("party", partyCmd);
+        bindCommand("queue", partyCmd);
+        bindCommand("team", new fr.lolmc.listener.TeamCommand(teamManager));
+        bindCommand("shop", new fr.lolmc.listener.ShopCommand(shopGUI, championManager, goldManager));
+        bindCommand("champion", new fr.lolmc.listener.ChampionCommand(championManager, championGUI));
+
         structureDamageListener = new fr.lolmc.listener.StructureDamageListener(mapManager, championManager, teamManager);
         getServer().getPluginManager().registerEvents(structureDamageListener, this);
         getServer().getPluginManager().registerEvents(new fr.lolmc.listener.ChatListener(), this);

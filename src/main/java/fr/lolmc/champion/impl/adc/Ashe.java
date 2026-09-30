@@ -90,7 +90,7 @@ public class Ashe extends BaseChampion {
             org.bukkit.util.Vector dir = start.getDirection().normalize();
             int maxSteps = 80; // 40 blocs à 0.5 bloc/tick
             var tm = LolPlugin.getInstance().getTeamManager();
-            var fogMgr = LolPlugin.getInstance().getFogOfWarManager();
+            var fogMgr = fr.lolmc.instance.InstanceHelper.fogOfWarManager(c);
             var casterTeam = tm.getTeam(c);
             var hawkDisplay = start.getWorld().spawn(start, org.bukkit.entity.BlockDisplay.class, disp -> {
                 disp.setBlock(Material.YELLOW_STAINED_GLASS.createBlockData());
@@ -165,6 +165,9 @@ public class Ashe extends BaseChampion {
             TargetingUtil.dealDamage(c, main, dmg, TargetingUtil.DmgType.MAGICAL);
             // Vrai stun (immobilise + empêche d'agir, réduit par la ténacité)
             fr.lolmc.LolPlugin.getInstance().getCCManager().stun(main, stunTicks);
+            fr.lolmc.LolPlugin.getInstance().getCCManager().markCoordinatedFire(c, main);
+            fr.lolmc.LolPlugin.getInstance().getCCManager().applyZekeConduit(c, main);
+            fr.lolmc.LolPlugin.getInstance().getCCManager().applyAftershock(c, main);
             if(main instanceof Player __p){
                 __p.sendActionBar(Component.text("❄ ÉTOURDI par la Flèche de Cristal!",NamedTextColor.AQUA));
             }

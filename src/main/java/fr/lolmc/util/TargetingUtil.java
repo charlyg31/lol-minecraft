@@ -228,6 +228,12 @@ public final class TargetingUtil {
                     target.getLocation().add(0, 1, 0), Material.WHITE_STAINED_GLASS, 0.28f, 4L);
         } else {
             // Sbire ou monstre : dégât direct (pas de système de résistance LoL)
+            if (MinionManager.isMinion(target)) {
+                var cm2 = LolPlugin.getInstance().getChampionManager();
+                if (cm2.hasChampion(caster)) {
+                    amount *= 1.0 + cm2.getChampion(caster).getStats().getMinionDamageBonus();
+                }
+            }
             double newHealth = Math.max(0, target.getHealth() - amount);
             target.setHealth(newHealth);
             double maxHp = Compat.maxHealthOf(target);

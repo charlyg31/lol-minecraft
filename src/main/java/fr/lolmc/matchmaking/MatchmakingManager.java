@@ -28,6 +28,9 @@ public class MatchmakingManager {
     private final PartyManager partyManager;
     private final TeamManager teamManager;
 
+    /** Vrai entre la formation d'un match et le début de la sélection des champions. */
+    private volatile boolean launching = false;
+
     // File d'attente : liste de groupes (chaque groupe = liste d'UUID)
     private final List<List<UUID>> queue = new ArrayList<>();
     // Joueurs actuellement en file (pour éviter les doublons)
@@ -103,7 +106,26 @@ public class MatchmakingManager {
 
     // ── Matchmaking ───────────────────────────────────────────────
 
+    /**
+     * Vrai si un match est en cours de lancement, en sélection ou en jeu : on n'en lance pas un second
+     * dans le même monde (les joueurs restent en file, relancés à la fin du match en cours).
+     */
+    private boolean isBusy() {
+        var plugin = LolPlugin.getInstance();
+        var gm = plugin.getGameManager();
+        var csm = plugin.getChampSelectManager();
+        boolean running = gm != null && gm.isGameRunning();
+        boolean selecting = csm != null && csm.getPhase() != fr.lolmc.game.ChampSelectManager.Phase.IDLE;
+        return launching || running || selecting;
+    }
+
+    /** Appelé à la fin d'un match : relance la file pour les joueurs qui attendaient. */
+    public void retryQueue() {
+        tryStartMatch();
+    }
+
     private void tryStartMatch() {
+        if (isBusy()) return;
         if (countInQueue() < TOTAL_PLAYERS) return;
 
         // Trouver une combinaison de groupes formant 2 équipes de 5 EXACTEMENT,
@@ -210,6 +232,7 @@ public class MatchmakingManager {
         = new java.util.concurrent.ConcurrentHashMap<>();
 
     private void startMatch(List<UUID> blue, List<UUID> red) {
+        launching = true;
         announce(blue, red);
         // Notifier le bridge (lobby cross-serveur)
         var bridge = LolPlugin.getInstance().getBridgeManager();
@@ -222,10 +245,17 @@ public class MatchmakingManager {
         for (UUID id : blue) { Player p = Bukkit.getPlayer(id); if (p != null) preGameLocations.put(id, p.getLocation().clone()); }
         for (UUID id : red)  { Player p = Bukkit.getPlayer(id); if (p != null) preGameLocations.put(id, p.getLocation().clone()); }
 
+        // Mode partie unique (défaut) : on joue dans le monde configuré, sans copie de monde.
+        if (!LolPlugin.getInstance().getConfig().getBoolean("world.use-instances", false)) {
+            startMatchInGameWorld(blue, red);
+            return;
+        }
+
         // Créer une instance isolée (copie du monde template)
         final List<UUID> blueF = blue, redF = red;
         LolPlugin.getInstance().getInstanceManager().createInstance(blue, red, instance -> {
             if (instance == null) {
+                launching = false;
                 LolPlugin.getInstance().getLogger().severe("[Match] Impossible de créer l'instance!");
                 // Notifier les joueurs
                 for (UUID id : blueF) { Player p = Bukkit.getPlayer(id); if (p != null) p.sendMessage("§cErreur: impossible de créer la partie. Réessaie."); }
@@ -259,10 +289,42 @@ public class MatchmakingManager {
             // Phase de ban → pick → démarrage (3s après téléportation)
             new org.bukkit.scheduler.BukkitRunnable() {
                 @Override public void run() {
-                    LolPlugin.getInstance().getChampSelectManager().startBanPhase();
+                    beginSelection(blueF, redF);
                 }
             }.runTaskLater(LolPlugin.getInstance(), 60L);
         });
+    }
+
+    /** Mode partie unique : téléporte chaque équipe à son point de départ puis lance la sélection. */
+    private void startMatchInGameWorld(List<UUID> blue, List<UUID> red) {
+        var map = LolPlugin.getInstance().getMapManager();
+        teleportTeam(blue, map, Team.BLUE);
+        teleportTeam(red, map, Team.RED);
+        new org.bukkit.scheduler.BukkitRunnable() {
+            @Override public void run() {
+                beginSelection(blue, red);
+            }
+        }.runTaskLater(LolPlugin.getInstance(), 60L);
+    }
+
+    private void teleportTeam(List<UUID> ids, fr.lolmc.game.MapManager map, Team team) {
+        for (UUID id : ids) {
+            Player p = Bukkit.getPlayer(id);
+            if (p == null) continue;
+            org.bukkit.Location spawn = map.getSpawn(team, 0);
+            if (spawn == null) spawn = map.getSpawn(team, 1);
+            if (spawn != null) p.teleport(spawn);
+            LolPlugin.getInstance().getMinimapManager().giveMinimap(p);
+            p.sendMessage(Component.text("⚔ Partie trouvée!", NamedTextColor.GOLD));
+        }
+    }
+
+    /** Lance la sélection des champions avec les 10 joueurs du match (mode normal, sans phase de ban). */
+    private void beginSelection(List<UUID> blue, List<UUID> red) {
+        List<UUID> everyone = new ArrayList<>(blue);
+        everyone.addAll(red);
+        launching = false; // la suite est pilotée par ChampSelectManager (phase != IDLE)
+        LolPlugin.getInstance().getChampSelectManager().startSelection(everyone, false);
     }
 
     /** Renvoie un joueur à sa position d'avant la partie (appelé à la fin). */

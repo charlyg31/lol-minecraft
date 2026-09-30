@@ -17,6 +17,12 @@ import org.bukkit.scheduler.BukkitRunnable;
  * La distance de vision est réglable dans config.yml (fog.vision-range).
  */
 public class FogOfWarManager {
+    private fr.lolmc.instance.GameInstance gameInstance = null;
+    public void setGameInstance(fr.lolmc.instance.GameInstance inst) { this.gameInstance = inst; }
+    public fr.lolmc.instance.GameInstance getGameInstance() { return gameInstance; }
+    private MapManager siblingMapManager() {
+        return gameInstance != null ? gameInstance.getMapManager() : LolPlugin.getInstance().getMapManager();
+    }
 
     private final TeamManager teamManager;
     private double visionRange;
@@ -78,7 +84,7 @@ public class FogOfWarManager {
         var tm = LolPlugin.getInstance().getTeamManager();
         var team = tm.getTeam(viewer);
         if (team == null) return false;
-        var mapMgr = LolPlugin.getInstance().getMapManager();
+        var mapMgr = siblingMapManager();
         if (mapMgr == null) return false;
         for (var s : mapMgr.getStructuresForTeam(team)) {
             if (s.isDestroyed()) continue;

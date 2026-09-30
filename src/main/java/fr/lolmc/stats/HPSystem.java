@@ -35,6 +35,8 @@ public class HPSystem {
 
     // ── Dégâts & soins ───────────────────────────────────────────
 
+    private double totalHealed = 0;
+
     public void takeDamage(double amount) {
         currentHP = Math.max(0, currentHP - amount);
         lastDamageTime = System.currentTimeMillis();
@@ -42,8 +44,13 @@ public class HPSystem {
 
     public void heal(double amount) {
         double mult = (stats != null) ? stats.getHealMultiplier() : 1.0;
+        double before = currentHP;
         currentHP = Math.min(maxHP, currentHP + amount * mult);
+        totalHealed += currentHP - before; // soins réellement appliqués (hors regen naturelle)
     }
+
+    /** Total des soins réellement appliqués via heal() depuis le début de la partie (statistique "soins"). */
+    public double getTotalHealed() { return totalHealed; }
     /** Lie HPSystem aux ChampionStats pour l'antiheal. */
     public void linkStats(fr.lolmc.stats.ChampionStats s) { this.stats = s; }
 

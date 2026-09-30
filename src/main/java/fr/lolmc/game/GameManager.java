@@ -32,6 +32,22 @@ public class GameManager {
     }
     public fr.lolmc.instance.GameInstance getGameInstance() { return gameInstance; }
 
+    private AnnouncementManager siblingAnnouncementManager() {
+        return gameInstance != null ? gameInstance.getAnnouncementManager() : LolPlugin.getInstance().getAnnouncementManager();
+    }
+    private FeatManager siblingFeatManager() {
+        return gameInstance != null ? gameInstance.getFeatManager() : LolPlugin.getInstance().getFeatManager();
+    }
+    private JungleManager siblingJungleManager() {
+        return gameInstance != null ? gameInstance.getJungleManager() : LolPlugin.getInstance().getJungleManager();
+    }
+    private MapManager siblingMapManager() {
+        return gameInstance != null ? gameInstance.getMapManager() : LolPlugin.getInstance().getMapManager();
+    }
+    private MinionManager siblingMinionManager() {
+        return gameInstance != null ? gameInstance.getMinionManager() : LolPlugin.getInstance().getMinionManager();
+    }
+
     private boolean gameRunning = false;
     private final java.util.Map<java.util.UUID, fr.lolmc.game.PlayerSnapshot> snapshots
         = new java.util.concurrent.ConcurrentHashMap<>();
@@ -180,9 +196,9 @@ public class GameManager {
         // États statiques champions
         fr.lolmc.util.ChampionStateReset.resetAll();
         // Annonces (kill spree, first blood, multi-kills)
-        LolPlugin.getInstance().getAnnouncementManager().reset();
+        siblingAnnouncementManager().reset();
         // Feats of Strength
-        LolPlugin.getInstance().getFeatManager().reset();
+        siblingFeatManager().reset();
         // Tab scoreboard
         LolPlugin.getInstance().getTabScoreboard().stop();
         LolPlugin.getInstance().getAutoAttackManager().stopVisuals();
@@ -190,6 +206,12 @@ public class GameManager {
         LolPlugin.getInstance().getSkinManager().resetAll();
         // FF reset
         LolPlugin.getInstance().getForfeitManager().reset();
+        // Passifs d'objets : arrêt des tâches et remise à zéro de l'état par joueur
+        var passives = LolPlugin.getInstance().getPassiveManager();
+        if (passives != null) { passives.stopTasks(); passives.cleanupAll(); }
+        // Consommables (charges de fiole, potions en cours)
+        var consumables = LolPlugin.getInstance().getConsumableManager();
+        if (consumables != null) consumables.reset();
         // Inhibiteurs en attente de respawn
         inhibitorRespawnAt.clear();
         respawnTotalSecondsMap.clear();
@@ -210,6 +232,10 @@ public class GameManager {
             if (p.getGameMode() == org.bukkit.GameMode.SPECTATOR)
                 p.setGameMode(org.bukkit.GameMode.SURVIVAL);
         }
+
+        // Les joueurs encore en file peuvent maintenant former un nouveau match
+        var matchmaking = LolPlugin.getInstance().getMatchmakingManager();
+        if (matchmaking != null) matchmaking.retryQueue();
 
         // Renvoyer les joueurs vers le lobby (BungeeCord), si configuré
         var bridge = LolPlugin.getInstance().getBridgeManager();
@@ -257,7 +283,7 @@ public class GameManager {
                 long secs = getElapsedSeconds();
                 String time = String.format("%02d:%02d", secs / 60, secs % 60);
                 // Chrono respawn épiques dans la BossBar
-                var jm2 = LolPlugin.getInstance().getJungleManager();
+                var jm2 = siblingJungleManager();
                 StringBuilder epicTimers = new StringBuilder();
                 if (jm2 != null) {
                     long now2 = System.currentTimeMillis();
@@ -267,20 +293,11 @@ public class GameManager {
                     }
                 }
                 timerBar.name(Component.text("⏱ " + time + epicTimers, NamedTextColor.WHITE));
-                // Mettre à jour la BossBar pour chaque joueur avec son CS et or
+                // BossBar (temps + chrono épiques) pour chaque joueur ; le détail or/CS/PV/mana est
+                // affiché en continu par HUDManager sur la barre d'action, pour éviter que les deux
+                // systèmes ne se disputent le même emplacement d'affichage (clignotement).
                 for (Player p : WorldContext.getGamePlayers()) {
                     p.showBossBar(timerBar);
-                    var msb = LolPlugin.getInstance().getMatchScoreboard();
-                    if (msb != null) {
-                        var stats = msb.getStats().get(p.getUniqueId());
-                        var gm2 = LolPlugin.getInstance().getGoldManager();
-                        int gold = gm2 != null ? gm2.getGold(p.getUniqueId()) : 0;
-                        int cs = stats != null ? stats.cs : 0;
-                        // BossBar personnalisée par joueur via titre d'action bar
-                        p.sendActionBar(Component.text(
-                            String.format("⏱ %s  |  CS %d  |  💰 %d or", time, cs, gold),
-                            NamedTextColor.WHITE));
-                    }
                 }
             }
         }.runTaskTimer(LolPlugin.getInstance(), 20L, 20L);
@@ -386,7 +403,7 @@ public class GameManager {
         // Téléporter à la base de son équipe
         Team team = LolPlugin.getInstance().getTeamManager().getTeam(player);
         if (team != null) {
-            Location spawn = LolPlugin.getInstance().getMapManager().getSpawn(team, 1);
+            Location spawn = siblingMapManager().getSpawn(team, 1);
             if (spawn != null) player.teleport(spawn);
         }
     }
@@ -448,7 +465,7 @@ public class GameManager {
         // Téléporter au spawn de l'équipe
         Team team = LolPlugin.getInstance().getTeamManager().getTeam(player);
         if (team != null) {
-            Location spawn = LolPlugin.getInstance().getMapManager().getSpawn(team, 1);
+            Location spawn = siblingMapManager().getSpawn(team, 1);
             if (spawn != null) player.teleport(spawn);
         }
 
@@ -482,9 +499,9 @@ public class GameManager {
                 if (System.currentTimeMillis() >= at) {
                     inhibitorRespawnAt.remove(key);
                     // Notifier MapManager de reconstruire l'inhibiteur
-                    LolPlugin.getInstance().getMapManager().respawnInhibitor(key);
+                    siblingMapManager().respawnInhibitor(key);
                     // Arrêter les super-sbires sur cette lane
-                    LolPlugin.getInstance().getMinionManager().onInhibitorRespawned(key);
+                    siblingMinionManager().onInhibitorRespawned(key);
                     org.bukkit.Bukkit.broadcast(net.kyori.adventure.text.Component.text(
                         "🏛 Inhibiteur " + key + " a repoussé!", net.kyori.adventure.text.format.NamedTextColor.GREEN));
                     cancel();

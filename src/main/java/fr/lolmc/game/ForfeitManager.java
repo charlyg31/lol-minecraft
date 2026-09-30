@@ -38,7 +38,7 @@ public class ForfeitManager {
      * Retourne false si le vote est impossible (trop tôt, déjà voté, pas en partie).
      */
     public boolean vote(Player player) {
-        var gm = LolPlugin.getInstance().getGameManager();
+        var gm = fr.lolmc.instance.InstanceHelper.gameManager(player);
         if (!gm.isGameRunning()) {
             player.sendMessage(Component.text("❌ Aucune partie en cours.", NamedTextColor.RED));
             return false;
@@ -107,7 +107,7 @@ public class ForfeitManager {
                 NamedTextColor.RED));
             Team winner = team == Team.BLUE ? Team.RED : Team.BLUE;
             LolPlugin.getInstance().getMatchScoreboard().showEndScreen(winner);
-            LolPlugin.getInstance().getGameManager().stopGame();
+            fr.lolmc.instance.InstanceHelper.gameManager(player).stopGame();
         }
         return true;
     }

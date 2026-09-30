@@ -32,8 +32,11 @@ world:
   # Préfixe des mondes d'instance (lolmc_game_1, lolmc_game_2…)
   # NE PAS modifier après le premier démarrage.
   instance-prefix: "lolmc_game_"
-  # Nombre maximum de parties simultanées
-  max-instances: 5
+  # Mode instances (EXPERIMENTAL) : chaque match du matchmaking local joue dans une copie du monde template.
+  # false (défaut) = une seule partie à la fois dans le monde "name" ci-dessous, mode stable.
+  use-instances: false
+  # Nombre maximum de parties simultanées (mode instances)
+  max-instances: 1
   # Nom exact du monde de jeu (dossier dans le répertoire serveur)
   name: "lolmc_template"
   # Monde lobby/hub (optionnel). Si renseigné, c'est ici que
@@ -160,4 +163,10 @@ fog:
 minimap:
   center-x: 0      # centre X de ta carte LoL (bloc)
   center-z: 0      # centre Z
-  scale: FARTHEST   # CLOSEST=128b CLOSE=256 NORMAL=512 FAR=1024 FARTHEST=2048
+  # CLOSEST=128b CLOSE=256 NORMAL=512 FAR=1024 FARTHEST=2048 (rayon en blocs).
+  # Avec l'échelle par défaut (65 unités LoL/bloc), la carte de jeu fait environ
+  # 228 blocs de côté : FARTHEST (2048) l'affichait donc minuscule, au centre d'une
+  # image bien trop dézoomée. CLOSE (256) est le premier niveau qui la couvre en entier
+  # avec une marge raisonnable — ajuste vers CLOSEST si ta carte est plus petite,
+  # ou NORMAL/FAR si elle est plus grande ou si center-x/center-z ne sont pas exacts.
+  scale: CLOSE

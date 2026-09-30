@@ -61,7 +61,7 @@ public class StructureDamageListener implements Listener {
         double damage = champ.getStats().getFinalAD();
 
         // Bonus voidgrubs (3 grubs: +6%, 6 grubs: +14%)
-        var jm = LolPlugin.getInstance().getJungleManager();
+        var jm = fr.lolmc.instance.InstanceHelper.jungleManager(player);
         if (jm != null && structure.getType() == Type.TURRET) {
             damage *= jm.getVoidgrubDamageBonus(playerTeam);
         }
@@ -70,7 +70,7 @@ public class StructureDamageListener implements Listener {
         // degats pendant les 5 premieres minutes
         if (structure.getType() == Type.TURRET
                 && structure.getIndex() == 1
-                && LolPlugin.getInstance().getGameManager().getElapsedSeconds() < 300) {
+                && fr.lolmc.instance.InstanceHelper.gameManager(player).getElapsedSeconds() < 300) {
             damage *= 0.5;
         }
 
@@ -92,16 +92,38 @@ public class StructureDamageListener implements Listener {
         }
 
         // Plaques
-        var tm = LolPlugin.getInstance().getTurretManager();
+        var tm = fr.lolmc.instance.InstanceHelper.turretManager(player);
         String structKey = structure.getType().name() + "_" + structure.getTeam() + "_" + structure.getLane();
         if (structure.getType() == Type.TURRET && tm.hasPlating(structKey)) {
             damage *= 0.60;
             tm.tickPlating(structKey);
-            LolPlugin.getInstance().getRewardManager().onTurretHit(player, structure);
+            fr.lolmc.instance.InstanceHelper.rewardManager(player).onTurretHit(player, structure);
         }
 
         boolean phaseChanged = structure.takeDamage(damage);
         player.playSound(player.getLocation(), Sound.BLOCK_ANVIL_HIT, 0.5f, 1.2f);
+
+        // Rune Demolish : 3 AA sur une tourelle consomment les stacks pour un dégât bonus (45s CD)
+        if (structure.getType() == Type.TURRET && !structure.isDestroyed()) {
+            var rm = LolPlugin.getInstance().getRuneManager();
+            var pm = LolPlugin.getInstance().getPassiveManager();
+            if (rm != null && pm != null && rm.getPage(player.getUniqueId()).has("demolish")) {
+                var state = pm.getState(player);
+                String structId = structure.getId();
+                Long cd = state.demolishCooldown.get(structId);
+                if (cd == null || System.currentTimeMillis() > cd) {
+                    int stacks = state.demolishStacks.merge(structId, 1, Integer::sum);
+                    if (stacks >= 3) {
+                        state.demolishStacks.remove(structId);
+                        state.demolishCooldown.put(structId, System.currentTimeMillis() + 45000L);
+                        double demolishDmg = 100.0 + champ.getStats().getFinalMaxHP() * 0.20;
+                        structure.takeDamage(demolishDmg);
+                        player.sendActionBar(Component.text(
+                                "💥 Démolition ! +" + (int) demolishDmg + " dégâts", NamedTextColor.GOLD));
+                    }
+                }
+            }
+        }
 
         if (structure.isDestroyed()) {
             onStructureDestroyed(structure, player);
@@ -149,13 +171,13 @@ public class StructureDamageListener implements Listener {
         BaseChampion champ = championManager.getChampion(player);
         double damage = champ.getStats().getFinalAD();
         // Turret Plating : -40% degats si plaques actives + or de plaque au frappeur
-        var tm = LolPlugin.getInstance().getTurretManager();
+        var tm = fr.lolmc.instance.InstanceHelper.turretManager(player);
         String structKey = structure.getType().name() + "_" + structure.getTeam() + "_" + structure.getLane();
         if (structure.getType() == Type.TURRET && tm.hasPlating(structKey)) {
             damage *= 0.60;
             tm.tickPlating(structKey, player);
             // Or de plaque (avant 14min, max 5 par tour)
-            LolPlugin.getInstance().getRewardManager().onTurretHit(player, structure);
+            fr.lolmc.instance.InstanceHelper.rewardManager(player).onTurretHit(player, structure);
         }
 
         boolean phaseChanged = structure.takeDamage(damage);
@@ -183,17 +205,17 @@ public class StructureDamageListener implements Listener {
         // Inhibiteur détruit → super-sbires sur cette lane pour l'équipe adverse
         if (structure.getType() == Type.TURRET) {
             int turretIndex = structure.getIndex(); // 1=T1, 2=T2, 3=T3
-            LolPlugin.getInstance().getRewardManager().onTurretDestroyed(destroyer, playerTeam, turretIndex);
-            LolPlugin.getInstance().getFeatManager().claim(
+            fr.lolmc.instance.InstanceHelper.rewardManager(destroyer).onTurretDestroyed(destroyer, playerTeam, turretIndex);
+            fr.lolmc.instance.InstanceHelper.featManager(destroyer).claim(
                 fr.lolmc.game.FeatManager.Feat.FIRST_TOWER, playerTeam, destroyer);
         } else if (structure.getType() == Type.INHIBITOR) {
-            LolPlugin.getInstance().getMinionManager()
+            fr.lolmc.instance.InstanceHelper.minionManager(destroyer)
                     .enableSuperMinions(enemyTeam, structure.getLane());
             String inhKey = structure.getType().name() + "_" + enemyTeam.name() + "_" + structure.getLane();
-            LolPlugin.getInstance().getGameManager().onInhibitorDestroyed(inhKey);
-            LolPlugin.getInstance().getAnnouncementManager().announceInhibitorDestroyed(
+            fr.lolmc.instance.InstanceHelper.gameManager(destroyer).onInhibitorDestroyed(inhKey);
+            fr.lolmc.instance.InstanceHelper.announcementManager(destroyer).announceInhibitorDestroyed(
                     structure.getLane(), enemyTeam.name());
-            LolPlugin.getInstance().getRewardManager().onInhibitorDestroyed(destroyer, playerTeam);
+            fr.lolmc.instance.InstanceHelper.rewardManager(destroyer).onInhibitorDestroyed(destroyer, playerTeam);
         }
 
         // Annonce
@@ -223,7 +245,13 @@ public class StructureDamageListener implements Listener {
     private void announceVictory(Team winner, Player destroyer) {
         Component msg = Component.text("🏆 VICTOIRE DE L'ÉQUIPE " + winner.name() + " ! 🏆",
                 winner.chatColor);
-        for (Player p : LolPlugin.getInstance().getServer().getOnlinePlayers()) {
+        var inst = fr.lolmc.instance.InstanceHelper.instanceOf(destroyer);
+        // En mode instances, n'annoncer qu'aux joueurs de CETTE partie (pas tout le serveur,
+        // qui pourrait héberger d'autres parties en cours) ; sinon (mode partie unique), tout
+        // le monde partagé.
+        Iterable<Player> audience = inst != null
+                ? inst.getOnlinePlayers() : LolPlugin.getInstance().getServer().getOnlinePlayers();
+        for (Player p : audience) {
             p.showTitle(net.kyori.adventure.title.Title.title(
                     Component.text("VICTOIRE " + winner.name(), winner.chatColor),
                     Component.empty(),
@@ -236,9 +264,9 @@ public class StructureDamageListener implements Listener {
         // Afficher le tableau de score de fin de partie
         LolPlugin.getInstance().getMatchScoreboard().showEndScreen(winner);
         // Arrêter la partie
-        LolPlugin.getInstance().getMinionManager().stopWaves();
-        LolPlugin.getInstance().getJungleManager().stopJungle();
-        LolPlugin.getInstance().getGameManager().stopGame();
+        fr.lolmc.instance.InstanceHelper.minionManager(destroyer).stopWaves();
+        fr.lolmc.instance.InstanceHelper.jungleManager(destroyer).stopJungle();
+        fr.lolmc.instance.InstanceHelper.gameManager(destroyer).stopGame();
         // Retour au lobby après 30s
         var mm  = LolPlugin.getInstance().getMatchmakingManager();
         var im  = LolPlugin.getInstance().getInstanceManager();

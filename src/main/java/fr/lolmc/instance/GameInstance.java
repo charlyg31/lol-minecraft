@@ -43,6 +43,7 @@ public class GameInstance {
     private final RewardManager       rewardManager;
     private final PassiveManager      passiveManager;
     private final AnnouncementManager announcementManager;
+    private final FeatManager         featManager;
 
     // Participants + équipes propres à cette instance
     private final Set<UUID>                      participants = ConcurrentHashMap.newKeySet();
@@ -60,13 +61,18 @@ public class GameInstance {
         this.gameManager         = new GameManager();
         this.gameManager.setGameInstance(this); // lier à cette instance
         this.rewardManager       = new RewardManager(lp.getChampionManager(), lp.getGoldManager());
+        this.rewardManager.setGameInstance(this); // lier à cette instance
         this.minionManager       = new MinionManager();
+        this.minionManager.setGameInstance(this); // lier à cette instance
         this.turretManager       = new TurretManager(mapManager, lp.getChampionManager(), lp.getTeamManager());
         this.jungleManager       = new JungleManager(world);
+        this.jungleManager.setGameInstance(this); // lier à cette instance
         this.baseManager         = new BaseManager(world, mapManager);
         this.fogManager          = new FogOfWarManager(lp.getTeamManager(), world);
+        this.fogManager.setGameInstance(this); // lier à cette instance
         this.passiveManager      = new PassiveManager(lp.getChampionManager(), lp.getHUDManager(), lp.getShopListener());
         this.announcementManager = new AnnouncementManager();
+        this.featManager         = new FeatManager();
     }
 
     // ── Joueurs ───────────────────────────────────────────────────────────
@@ -135,4 +141,5 @@ public class GameInstance {
     public RewardManager       getRewardManager()        { return rewardManager; }
     public PassiveManager      getPassiveManager()       { return passiveManager; }
     public AnnouncementManager getAnnouncementManager()  { return announcementManager; }
+    public FeatManager         getFeatManager()          { return featManager; }
 }
