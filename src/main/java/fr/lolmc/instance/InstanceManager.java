@@ -184,6 +184,14 @@ public class InstanceManager {
         return playerMap.get(uuid);
     }
 
+    /** Retrouve l'instance propriétaire d'un monde donné (par nom), ou null si aucune (mode partie unique). */
+    public GameInstance getInstanceByWorldName(String worldName) {
+        for (GameInstance inst : instances.values()) {
+            if (inst.getWorldName().equals(worldName)) return inst;
+        }
+        return null;
+    }
+
     /** Retourne toutes les instances actives. */
     public Collection<GameInstance> getAllInstances() {
         return Collections.unmodifiableCollection(instances.values());

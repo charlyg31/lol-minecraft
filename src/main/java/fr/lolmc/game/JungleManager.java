@@ -36,6 +36,21 @@ import java.util.*;
  * et des récompenses (or + XP). Positions configurées par commande et par équipe.
  */
 public class JungleManager {
+    private fr.lolmc.instance.GameInstance gameInstance = null;
+    public void setGameInstance(fr.lolmc.instance.GameInstance inst) { this.gameInstance = inst; }
+    public fr.lolmc.instance.GameInstance getGameInstance() { return gameInstance; }
+
+    /** Résout un manager-frère : celui de cette instance si elle existe, sinon le global. */
+    private RewardManager siblingRewardManager() {
+        return gameInstance != null ? gameInstance.getRewardManager() : LolPlugin.getInstance().getRewardManager();
+    }
+    private MapManager siblingMapManager() {
+        return gameInstance != null ? gameInstance.getMapManager() : LolPlugin.getInstance().getMapManager();
+    }
+    private FeatManager siblingFeatManager() {
+        return gameInstance != null ? gameInstance.getFeatManager() : LolPlugin.getInstance().getFeatManager();
+    }
+
     private static final Map<Object, String> dragonSoulType = new HashMap<>();
 
     // ── Rotation des dragons (LoL) : 3 premiers élémentaires DIFFÉRENTS,
@@ -508,10 +523,10 @@ public class JungleManager {
             int gold = type.gold;
             Entity ent = LolPlugin.getInstance().getServer().getEntity(entityId);
             // (l'entité est déjà morte, on utilise l'or du type par défaut)
-            LolPlugin.getInstance().getRewardManager()
+            siblingRewardManager()
                     .onJungleMonsterKill(killer, gold, type.xp);
             // Passifs items de jungle (Gustwalker, Mosstomper, Scorchclaw)
-            var pm = LolPlugin.getInstance().getPassiveManager();
+            var pm = gameInstance != null ? gameInstance.getPassiveManager() : LolPlugin.getInstance().getPassiveManager();
             if (pm != null) pm.onJungleKill(killer);
 
             // Buffs d'objectifs : les épiques buffent TOUTE l'équipe (Dragon/Baron),
@@ -527,7 +542,7 @@ public class JungleManager {
                     if (type.isEpic()) {
                         var ktm = LolPlugin.getInstance().getTeamManager().getTeam(killer);
                         if (ktm != null) {
-                            int objBounty = LolPlugin.getInstance().getRewardManager()
+                            int objBounty = siblingRewardManager()
                                 .getObjectiveBounty(ktm);
                             if (objBounty > 0) {
                                 LolPlugin.getInstance().getGoldManager()
@@ -586,7 +601,7 @@ public class JungleManager {
                 if (type.isDragon() || type == MonsterType.HERALD) {
                     var kt = LolPlugin.getInstance().getTeamManager().getTeam(killer);
                     if (kt != null)
-                        LolPlugin.getInstance().getFeatManager().claim(
+                        siblingFeatManager().claim(
                             FeatManager.Feat.FIRST_EPIC, kt, killer);
                 }
             }
@@ -833,7 +848,7 @@ public class JungleManager {
         var tm = LolPlugin.getInstance().getTeamManager();
         var team = tm.getTeam(summoner);
         if (team == null) return false;
-        var mm = LolPlugin.getInstance().getMapManager();
+        var mm = siblingMapManager();
         if (mm == null) return false;
 
         // Tour ennemie la plus proche (max 30 blocs)

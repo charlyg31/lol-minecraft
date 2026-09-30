@@ -14,6 +14,15 @@ import org.bukkit.entity.Player;
  * Gère aussi les montées de niveau et notifie le joueur.
  */
 public class RewardManager {
+    private fr.lolmc.instance.GameInstance gameInstance = null;
+    public void setGameInstance(fr.lolmc.instance.GameInstance inst) { this.gameInstance = inst; }
+    public fr.lolmc.instance.GameInstance getGameInstance() { return gameInstance; }
+    private AnnouncementManager siblingAnnouncementManager() {
+        return gameInstance != null ? gameInstance.getAnnouncementManager() : LolPlugin.getInstance().getAnnouncementManager();
+    }
+    private GameManager siblingGameManager() {
+        return gameInstance != null ? gameInstance.getGameManager() : LolPlugin.getInstance().getGameManager();
+    }
 
     private final ChampionManager championManager;
     private final GoldManager goldManager;
@@ -127,7 +136,7 @@ public class RewardManager {
         int bounty = BOUNTY[Math.min(victimStreak, BOUNTY.length - 1)];
         int totalGold = GOLD_CHAMPION_KILL + bounty;
         // First blood : 400 or au lieu de 300 (LoL)
-        var ann = LolPlugin.getInstance().getAnnouncementManager();
+        var ann = siblingAnnouncementManager();
         if (ann != null && !ann.isFirstBloodDone()) {
             totalGold += 100; // 300 base + 100 = 400
         }
@@ -245,7 +254,8 @@ public class RewardManager {
         var gm = LolPlugin.getInstance().getGoldManager();
         if (gm == null) return 0;
         long teamGold = 0, enemyGold = 0;
-        for (var id : LolPlugin.getInstance().getGameManager().getParticipants()) {
+        var participants = gameInstance != null ? gameInstance.getParticipants() : siblingGameManager().getParticipants();
+        for (var id : participants) {
             var p = org.bukkit.Bukkit.getPlayer(id);
             if (p == null) continue;
             var t = tm.getTeam(p);
@@ -288,7 +298,8 @@ public class RewardManager {
             default -> GOLD_TURRET_T3_GLOBAL;
         };
         String teamName = attackingTeam == fr.lolmc.team.TeamManager.Team.BLUE ? "Bleue" : "Rouge";
-        for (java.util.UUID id : LolPlugin.getInstance().getGameManager().getParticipants()) {
+        var participants2 = gameInstance != null ? gameInstance.getParticipants() : siblingGameManager().getParticipants();
+        for (java.util.UUID id : participants2) {
             var p = org.bukkit.Bukkit.getPlayer(id);
             if (p == null) continue;
             if (LolPlugin.getInstance().getTeamManager().getTeam(p) == attackingTeam) {
@@ -314,7 +325,8 @@ public class RewardManager {
     /** Distribue l'or et l'XP quand un inhibiteur est détruit. */
     public void onInhibitorDestroyed(Player lastHit, fr.lolmc.team.TeamManager.Team attackingTeam) {
         String teamName = attackingTeam == fr.lolmc.team.TeamManager.Team.BLUE ? "Bleue" : "Rouge";
-        for (java.util.UUID id : LolPlugin.getInstance().getGameManager().getParticipants()) {
+        var participants2 = gameInstance != null ? gameInstance.getParticipants() : siblingGameManager().getParticipants();
+        for (java.util.UUID id : participants2) {
             var p = org.bukkit.Bukkit.getPlayer(id);
             if (p == null) continue;
             if (LolPlugin.getInstance().getTeamManager().getTeam(p) == attackingTeam) {

@@ -194,6 +194,21 @@ public class HUDManager {
         ).decoration(TextDecoration.ITALIC, false))
          .append(resourceComp);
 
+        // ── Or + CS + temps de partie, sur cette même barre (évite le clignotement d'un 2e système concurrent) ──
+        var gm = fr.lolmc.instance.InstanceHelper.gameManager(player);
+        var goldMgr = LolPlugin.getInstance().getGoldManager();
+        if (gm != null && gm.isGameRunning() && goldMgr != null) {
+            long secs = gm.getElapsedSeconds();
+            int gold = goldMgr.getGold(player.getUniqueId());
+            var msb = LolPlugin.getInstance().getMatchScoreboard();
+            var mstats = msb != null ? msb.getStats().get(player.getUniqueId()) : null;
+            int cs = mstats != null ? mstats.cs : 0;
+            actionBar = actionBar.append(Component.text(
+                String.format("  ⏱%02d:%02d  CS%d  💰%d", secs / 60, secs % 60, cs, gold),
+                NamedTextColor.GOLD
+            ).decoration(TextDecoration.ITALIC, false));
+        }
+
         player.sendActionBar(actionBar);
     }
 

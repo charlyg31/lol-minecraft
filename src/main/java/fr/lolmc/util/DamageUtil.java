@@ -74,6 +74,30 @@ public class DamageUtil {
         ChampionStats as = (attacker != null && cm.hasChampion(attacker))
                 ? cm.getChampion(attacker).getStats() : null;
 
+        // ── Anathema's Chains: le premier ennemi qui frappe le porteur devient son Némésis (-20% de ses dégâts) ──
+        var pmAnathema = LolPlugin.getInstance().getPassiveManager();
+        if (attacker != null && pmAnathema != null && pmAnathema.hasAnyItem(victim,"anathema_chains")) {
+            var vState = pmAnathema.getState(victim);
+            if (vState.anathemaNemesis == null) vState.anathemaNemesis = attacker.getUniqueId();
+        }
+
+        // ── Imperial Mandate: un allié (autre que le porteur) qui frappe une cible marquée détonne Coordinated Fire ──
+        if (attacker != null && pmAnathema != null) {
+            var teamMgr = LolPlugin.getInstance().getTeamManager();
+            if (teamMgr != null && !teamMgr.areAllies(attacker, victim) && !pmAnathema.hasAnyItem(attacker,"imperial_mandate")) {
+                var victimState2 = pmAnathema.getState(victim);
+                if (victimState2.coordinatedFireMarkExpire > System.currentTimeMillis()) {
+                    victimState2.coordinatedFireMarkExpire = 0; // marque consommée
+                    ChampionStats attackerStats = cm.hasChampion(attacker) ? cm.getChampion(attacker).getStats() : null;
+                    if (attackerStats != null) {
+                        double markDmg = 90.0 + attackerStats.getFinalAP() * 0.30;
+                        vc.getHPSystem().takeDamage(markDmg); // dégât brut, comme le vrai objet (pas repassé par les résistances)
+                        attacker.sendActionBar(net.kyori.adventure.text.Component.text(
+                                "⚡ Coordinated Fire !", net.kyori.adventure.text.format.NamedTextColor.GOLD));
+                    }
+                }
+            }
+        }
         if (isAbility && attacker != null) {
             if (vs.consumeEonShield()) {
                 victim.sendActionBar(net.kyori.adventure.text.Component.text(
@@ -91,6 +115,22 @@ public class DamageUtil {
             }
         }
 
+        // Zeke's Convergence : +30% dégâts si l'attaquant a le buff (allié proche qui a posé un CC)
+        if (as != null) {
+            rawAmount *= as.getZekeDamageMultiplier();
+        }
+
+        // Rune Cut Down : +8% dégâts (hors vrais dégâts) contre une cible au-dessus de 60% de son HP max
+        if (as != null && type != Type.TRUE && attacker != null) {
+            var rm = LolPlugin.getInstance().getRuneManager();
+            if (rm != null) {
+                var atkPage = rm.getPage(attacker.getUniqueId());
+                if (atkPage != null && atkPage.has("cut_down") && vc.getHPSystem().getHPRatio() > 0.60) {
+                    rawAmount *= 1.08;
+                }
+            }
+        }
+
         // 1. Résistance (armure/MR avec pénétration de l'attaquant)
         double afterResist;
         if (type == Type.TRUE || as == null) {
@@ -105,6 +145,13 @@ public class DamageUtil {
         double finalDmg = afterResist;
         if (type != Type.TRUE) {
             finalDmg = vs.applyDamageReductions(afterResist, !isAbility);
+            // Anathema's Chains : le PORTEUR (victim) prend -20% des dégâts venant de son Némésis désigné
+            if (attacker != null) {
+                var victimState = pmAnathema != null ? pmAnathema.getState(victim) : null;
+                if (victimState != null && attacker.getUniqueId().equals(victimState.anathemaNemesis)) {
+                    finalDmg *= 0.80;
+                }
+            }
         }
 
         // 2. Boucliers (les vrais dégâts passent à travers ? Non, les boucliers absorbent tout en LoL)
@@ -114,7 +161,7 @@ public class DamageUtil {
         vc.getHPSystem().takeDamage(afterShield);
         // Enregistrer la contribution pour les assists
         if (attacker != null) {
-            var rw = LolPlugin.getInstance().getRewardManager();
+            var rw = fr.lolmc.instance.InstanceHelper.rewardManager(attacker);
             if (rw != null) rw.recordDamage(attacker.getUniqueId(), victim.getUniqueId());
         }
         // Tracker dégâts infligés/subis dans le scoreboard de partie
@@ -146,10 +193,10 @@ public class DamageUtil {
         // Révéler la victime si elle est dans un bush (combat = visible)
         var bushMgr = LolPlugin.getInstance().getBushManager();
         if (bushMgr != null) bushMgr.revealOnDamage(victim);
-        var baseMgr = LolPlugin.getInstance().getBaseManager();
+        var baseMgr = fr.lolmc.instance.InstanceHelper.baseManager(victim);
         if (baseMgr != null) baseMgr.onDamage(victim);
         var runeMgr = LolPlugin.getInstance().getRuneManager();
-        if (runeMgr != null) runeMgr.onDamageTaken(victim, afterShield);
+        if (runeMgr != null) runeMgr.onDamageTaken(victim, afterShield, type == Type.MAGICAL);
         // Effets de runes (keystones) si l'attaquant est un joueur
         if (attacker != null) {
             var rm = LolPlugin.getInstance().getRuneManager();

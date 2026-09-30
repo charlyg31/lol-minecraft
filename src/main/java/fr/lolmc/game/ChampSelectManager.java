@@ -42,6 +42,7 @@ public class ChampSelectManager {
     private static final int BAN_DURATION    = 30; // 30s de ban (classé)
 
     private final java.util.Set<String> bannedChampions = new java.util.LinkedHashSet<>();
+    private final java.util.Set<UUID> hasBanned = new java.util.HashSet<>(); // 1 ban par joueur
     private int banTimeLeft = 0;
     private BukkitRunnable banTask;
 
@@ -49,7 +50,9 @@ public class ChampSelectManager {
     // DÉMARRAGE DE LA SÉLECTION
     // ══════════════════════════════════════════════════════════════
 
-    /** Alias utilisé par MatchmakingManager et PreGameGUI — lance la sélection. */
+    /** Alias utilisé par MatchmakingManager et PreGameGUI — lance la sélection.
+     *  Reste sur le GameManager global : sans joueur de référence, il n'y a pas de
+     *  moyen fiable de choisir une instance précise parmi plusieurs en cours. */
     public void startBanPhase() {
         var gm = LolPlugin.getInstance().getGameManager();
         if (gm != null) startSelection(gm.getParticipants());
@@ -59,6 +62,7 @@ public class ChampSelectManager {
     /** Surcharge avec mode ranked (pick+ban) ou normal (pick seul). */
     public void startSelection(Collection<UUID> players, boolean ranked) {
         this.bannedChampions.clear();
+        this.hasBanned.clear();
         ChampSelectGUI.resetBans();
         if (ranked) {
             startBanPhaseInternal(players);
@@ -121,6 +125,11 @@ public class ChampSelectManager {
     /** Appelé depuis ChampSelectGUI quand un joueur bannit un champion. */
     public void onBanClick(Player player, String championId) {
         if (phase != Phase.SELECTING || bannedChampions.contains(championId)) return;
+        if (!participants.contains(player.getUniqueId())) return;
+        if (!hasBanned.add(player.getUniqueId())) {
+            player.sendMessage(Component.text("❌ Tu as déjà utilisé ton ban.", NamedTextColor.RED));
+            return;
+        }
         bannedChampions.add(championId);
         ChampSelectGUI.banChampion(championId);
         for (UUID id : participants) {
@@ -278,10 +287,19 @@ public class ChampSelectManager {
                     + " | Skin: " + skinId + " | Sorts: " + spells[0] + " + " + spells[1] + "!", NamedTextColor.GOLD));
         }
 
-        // Lancer la partie physique
-        LolPlugin.getInstance().getGameManager().startGame();
-        LolPlugin.getInstance().getMinionManager().startWaves();
-        LolPlugin.getInstance().getJungleManager().startJungle();
+        // Lancer la partie physique : si les joueurs appartiennent à une GameInstance isolée
+        // (mode multi-instances), démarrer CETTE instance plutôt que les managers globaux —
+        // sinon (mode partie unique, le défaut) garder le chemin global existant.
+        var instMgr = LolPlugin.getInstance().getInstanceManager();
+        var instance = instMgr != null && !participants.isEmpty()
+                ? instMgr.getInstanceOf(participants.iterator().next()) : null;
+        if (instance != null) {
+            instance.start();
+        } else {
+            LolPlugin.getInstance().getGameManager().startGame();
+            LolPlugin.getInstance().getMinionManager().startWaves();
+            LolPlugin.getInstance().getJungleManager().startJungle();
+        }
 
         phase = Phase.IDLE;
     }

@@ -61,6 +61,8 @@ public class FlashManager {
 
         cooldowns.put(player.getUniqueId(), System.currentTimeMillis());
         player.sendActionBar(Component.text("✦ Flash!", NamedTextColor.AQUA));
+        var rm = LolPlugin.getInstance().getRuneManager();
+        if (rm != null) rm.applyNimbusCloak(player);
         return true;
     }
 

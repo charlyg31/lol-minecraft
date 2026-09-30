@@ -104,7 +104,42 @@ public class ChampionStats {
     public double getFinalAD()           { return (baseAttackDamage + growthBonus(growthAD) + bonusAttackDamage) * multAttackDamage; }
     public double getFinalAP()           { return (baseAbilityPower + bonusAbilityPower) * multAbilityPower; }
     public double getFinalArmor()        { return baseArmor + growthBonus(growthArmor) + bonusArmor; }
-    public double getFinalMagicResist()  { return baseMagicResist + growthBonus(growthMR) + bonusMagicResist; }
+    public double getFinalMagicResist()  {
+        double base = baseMagicResist + growthBonus(growthMR) + bonusMagicResist;
+        return base * (1.0 - getVileDecayReduction());
+    }
+
+    // Vile Decay (Bloodletter's Curse) : chaque stack expire indépendamment 6s après avoir été posé.
+    private final java.util.List<Long> vileDecayStackExpiries = new java.util.ArrayList<>();
+    private static final int VILE_DECAY_MAX_STACKS = 6;
+
+    /** Ajoute un stack de Vile Decay (posé par un attaquant), plafonné à 6 stacks. */
+    public void applyVileDecayStack(long durationMs) {
+        long now = System.currentTimeMillis();
+        vileDecayStackExpiries.removeIf(t -> t <= now);
+        if (vileDecayStackExpiries.size() < VILE_DECAY_MAX_STACKS) {
+            vileDecayStackExpiries.add(now + durationMs);
+        }
+    }
+
+    /** Réduction relative de MR actuellement infligée par Vile Decay (0.05 par stack, max 0.30). */
+    public double getVileDecayReduction() {
+        long now = System.currentTimeMillis();
+        vileDecayStackExpiries.removeIf(t -> t <= now);
+        return vileDecayStackExpiries.size() * 0.05;
+    }
+
+    public int getVileDecayStackCount() {
+        vileDecayStackExpiries.removeIf(t -> t <= System.currentTimeMillis());
+        return vileDecayStackExpiries.size();
+    }
+
+    // Zeke's Convergence : +30% dégâts pendant 6s quand un allié proche pose un CC.
+    private long zekeBuffExpire = 0;
+    public void applyZekeBuff(long durationMs) { zekeBuffExpire = System.currentTimeMillis() + durationMs; }
+    public boolean hasZekeBuff() { return System.currentTimeMillis() < zekeBuffExpire; }
+    public double getZekeDamageMultiplier() { return hasZekeBuff() ? 1.30 : 1.0; }
+
     private double healShieldPower = 0.0;
     public double getHealShieldPower() { return healShieldPower; }
     public void addHealShieldPower(double v) { healShieldPower = Math.max(0, healShieldPower + v); }
@@ -120,6 +155,12 @@ public class ChampionStats {
     public double getFinalOmnivamp()     { return Math.min(bonusOmnivamp, 1.0); }
     public double getFinalAbilityHaste() { return bonusAbilityHaste; }
     public double getFinalTenacity()     { return Math.min(tenacity, 0.95); }
+
+    // Réduit spécifiquement la durée des ralentissements (Boots of Swiftness), distinct
+    // de la ténacité qui réduit tous les contrôles de foule.
+    private double slowResist = 0.0;
+    public void addSlowResist(double v) { slowResist = Math.min(slowResist + v, 0.95); }
+    public double getFinalSlowResist() { return slowResist; }
 
     // Pénétration
     public double getArmorPenPercent()   { return Math.min(bonusArmorPenPercent, 1.0); }
@@ -301,14 +342,21 @@ public class ChampionStats {
         bonusArmorPenPercent=bonusFlatMagicPen=bonusMagicPenPercent=0;
         flatDamageReduction=percentDamageReduction=aaPercentReduction=tenacity=0;
         multAttackDamage=multAbilityPower=multMovementSpeed=multAttackSpeed=multMaxHP=1.0;
-        grievousWoundsReduction = 0; grievousWoundsExpire = 0;
+        grievousWoundsReduction = 0; grievousWoundsExpire = 0; healAmpBonus = 0; runeHealAmp = 0; slowResist = 0;
     }
 
     // Getters de base (affichage + passifs)
     public double getBaseAD()  { return baseAttackDamage; }
     public double getBaseAP()  { return baseAbilityPower; }
     public double getBonusHP() { return bonusMaxHP; }
+    public double getBonusArmor() { return bonusArmor; }
+    public double getBonusMagicResistValue() { return bonusMagicResist; }
     public double getBonusAD() { return bonusAttackDamage; }
+
+    // Rune Minion Dematerializer : bonus de dégâts permanent contre les sbires (0 à 0.12)
+    private double minionDamageBonus = 0.0;
+    public void setMinionDamageBonus(double v) { minionDamageBonus = v; }
+    public double getMinionDamageBonus() { return minionDamageBonus; }
     public double getBonusAP() { return bonusAbilityPower; }
 
     // ── Grievous Wounds ──────────────────────────────────────────
@@ -319,12 +367,21 @@ public class ChampionStats {
         if (expire > grievousWoundsExpire) grievousWoundsExpire = expire;
     }
 
-    /** Retourne le multiplicateur de soin effectif (1.0 = normal, 0.6 = GW40, 0.4 = GW60). */
+    // Amplification de soin/bouclier reçu (Spirit Visage +30%, Forbidden Idol +10%, etc.).
+    // Additif entre objets, comme en LoL.
+    private double healAmpBonus = 0.0;
+    public void setHealAmpBonus(double v) { healAmpBonus = v; }
+
+    // Rune Revitalize : +5% soin/bouclier, statique (contrairement à healAmpBonus, jamais recalculé).
+    private double runeHealAmp = 0.0;
+    public void addRuneHealAmp(double v) { runeHealAmp += v; }
+
+    /** Retourne le multiplicateur de soin/bouclier effectif (blessures graves ET amplification cumulées). */
     public double getHealMultiplier() {
         if (grievousWoundsExpire > 0 && System.currentTimeMillis() > grievousWoundsExpire) {
             grievousWoundsReduction = 0; grievousWoundsExpire = 0;
         }
-        return 1.0 - grievousWoundsReduction;
+        return (1.0 - grievousWoundsReduction) * (1.0 + healAmpBonus + runeHealAmp);
     }
 
     public boolean hasGrievousWounds() {

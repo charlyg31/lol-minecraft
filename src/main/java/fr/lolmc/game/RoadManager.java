@@ -120,7 +120,8 @@ public class RoadManager {
         roads.put(session.lane, waypoints);
         saveRoad(session.lane, waypoints);
 
-        // Mettre à jour le MinionManager
+        // Mettre à jour le MinionManager (reste global : configuration de la carte
+        // template, jamais appelé sur une instance de partie en cours)
         LolPlugin.getInstance().getMinionManager().setLaneWaypoints(session.lane, waypoints);
 
         return waypoints.size();
@@ -247,7 +248,8 @@ public class RoadManager {
         }
     }
 
-    /** Recharge les routes dans le MinionManager au démarrage. */
+    /** Recharge les routes dans le MinionManager au démarrage (LolPlugin.onEnable, avant
+     *  toute instance de partie : reste sur le manager global, cohérent). */
     public void applyToMinionManager() {
         for (var entry : roads.entrySet()) {
             LolPlugin.getInstance().getMinionManager().setLaneWaypoints(entry.getKey(), entry.getValue());

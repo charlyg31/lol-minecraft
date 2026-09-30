@@ -151,7 +151,13 @@ public class WardManager {
             }
             removeWardEntity(w);
             it.remove();
-            attacker.sendActionBar(Component.text("💥 Ward ennemie détruite!", NamedTextColor.GREEN));
+            // Rune Zombie Ward : la destruction crée une ward amie au même endroit
+            var rm = fr.lolmc.LolPlugin.getInstance().getRuneManager();
+            boolean zombieWard = rm != null && rm.getPage(attacker.getUniqueId()).has("zombie_ward");
+            if (zombieWard) placeWard(attacker, w.location, 90);
+            attacker.sendActionBar(Component.text(
+                    zombieWard ? "💥 Ward détruite ! 🧟 Ward Zombie posée!" : "💥 Ward ennemie détruite!",
+                    NamedTextColor.GREEN));
             attacker.getWorld().playSound(attacker.getLocation(), Sound.ENTITY_ITEM_BREAK, 1f, 1.5f);
             // Tracker dans le scoreboard
             var msb = fr.lolmc.LolPlugin.getInstance().getMatchScoreboard();

@@ -55,6 +55,10 @@ public class HealthListener implements Listener {
     public void onDamage(EntityDamageEvent e) {
         if (!(e.getEntity() instanceof Player p)) return;
         if (!manager.hasChampion(p)) return;
+        // Ne pas interférer avec le setHealth(0.0001) de triggerDeath (le joueur est déjà passé
+        // en spectateur juste avant) : sinon cet événement est annulé et la mort Minecraft
+        // n'a jamais lieu, malgré HPSystem qui le considère déjà mort.
+        if (p.getGameMode() == org.bukkit.GameMode.SPECTATOR) return;
 
         // Annuler le dégât Minecraft natif (on gère nous-mêmes)
         e.setCancelled(true);
@@ -93,7 +97,7 @@ public class HealthListener implements Listener {
     @EventHandler
     public void onQuit(org.bukkit.event.player.PlayerQuitEvent e) {
         Player p = e.getPlayer();
-        var gm = LolPlugin.getInstance().getGameManager();
+        var gm = fr.lolmc.instance.InstanceHelper.gameManager(p);
         if (gm != null && gm.isGameRunning()
                 && LolPlugin.getInstance().getChampionManager().hasChampion(p)) {
             gm.saveSnapshot(p);
@@ -171,7 +175,7 @@ public class HealthListener implements Listener {
         var team = tm.getTeam(p);
         if (team != null) {
             // Position = index du joueur dans l'équipe (simplifié: position 1-5)
-            var spawn = LolPlugin.getInstance().getMapManager().getSpawn(team, 1);
+            var spawn = fr.lolmc.instance.InstanceHelper.mapManager(p).getSpawn(team, 1);
             if (spawn != null) {
                 LolPlugin.getInstance().getServer().getScheduler().runTaskLater(
                     LolPlugin.getInstance(), () -> p.teleport(spawn), 2L);

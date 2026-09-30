@@ -264,6 +264,8 @@ public class BaseManager {
                         // Soigne 5% PV max par seconde
                         champ.getHPSystem().heal(maxHP * 0.05);
                         champ.getResourceSystem().fill(); // ressource pleine à la base
+                        var consumables = LolPlugin.getInstance().getConsumableManager();
+                        if (consumables != null) consumables.refillAtBase(p);
                         fr.lolmc.util.VisualEffectUtil.impact(p.getWorld(),
                                 p.getLocation().add(0, 1.5, 0), Material.PINK_STAINED_GLASS, 0.25f, 8L);
                         var hud = LolPlugin.getInstance().getHUDManager();

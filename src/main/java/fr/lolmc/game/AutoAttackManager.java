@@ -346,6 +346,9 @@ public class AutoAttackManager {
             // Entité à HP virtuels (Baron, Elder, canon...) : dégâts virtuels
             fr.lolmc.util.VirtualHP.damage(target, rawDamage, attacker);
         } else {
+            if (fr.lolmc.game.MinionManager.isMinion(target)) {
+                rawDamage *= 1.0 + champ.getStats().getMinionDamageBonus();
+            }
             double newHealth = Math.max(0, target.getHealth() - rawDamage);
             target.setHealth(newHealth);
             var maxHpAttr = target.getAttribute(fr.lolmc.util.Compat.maxHealth());

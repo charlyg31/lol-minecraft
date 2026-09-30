@@ -26,6 +26,16 @@ import java.util.*;
  * <p>Les sbires sont des Zombies/Husks taggés via PDC.
  */
 public class MinionManager {
+    private fr.lolmc.instance.GameInstance gameInstance = null;
+    public void setGameInstance(fr.lolmc.instance.GameInstance inst) { this.gameInstance = inst; }
+    public fr.lolmc.instance.GameInstance getGameInstance() { return gameInstance; }
+
+    private GameManager siblingGameManager() {
+        return gameInstance != null ? gameInstance.getGameManager() : LolPlugin.getInstance().getGameManager();
+    }
+    private MapManager siblingMapManager() {
+        return gameInstance != null ? gameInstance.getMapManager() : LolPlugin.getInstance().getMapManager();
+    }
 
     public static NamespacedKey KEY_MINION;
     public static NamespacedKey KEY_TEAM;
@@ -155,8 +165,8 @@ public class MinionManager {
     // Cadence canon LoL : toutes les 3 vagues avant 15min,
     // toutes les 2 entre 15 et 25min, chaque vague après 25min
     private MinionType determineMinionType(int wave, int i) {
-        long elapsedS = LolPlugin.getInstance().getGameManager() != null
-            ? LolPlugin.getInstance().getGameManager().getElapsedSeconds() : 0;
+        long elapsedS = siblingGameManager() != null
+            ? siblingGameManager().getElapsedSeconds() : 0;
         int cannonEvery = elapsedS >= 25 * 60 ? 1 : (elapsedS >= 15 * 60 ? 2 : 3);
         if (wave % cannonEvery == 0 && i == MINIONS_PER_WAVE / 2) {
             return MinionType.CANNON;
@@ -348,7 +358,7 @@ public class MinionManager {
 
     /** Cherche une structure ENNEMIE à portée d'un sbire. */
     private GameStructure findNearbyEnemyStructure(Zombie minion, Team team) {
-        var mapManager = LolPlugin.getInstance().getMapManager();
+        var mapManager = siblingMapManager();
         GameStructure s = mapManager.getStructureAt(minion.getLocation(), MINION_TURRET_RANGE);
         if (s == null) return null;
         // La structure doit appartenir à l'équipe ADVERSE
@@ -376,11 +386,11 @@ public class MinionManager {
                     target.clone().add(0.5, 1, 0.5), Material.WHITE_STAINED_GLASS, 0.26f, 3L);
             boolean phaseChanged = structure.takeDamage(MINION_DAMAGE_TO_TURRET);
             if (phaseChanged) {
-                LolPlugin.getInstance().getMapManager().updateStructurePhase(structure);
+                siblingMapManager().updateStructurePhase(structure);
             }
             // Si détruite, déclencher la logique de destruction
             if (structure.isDestroyed()) {
-                LolPlugin.getInstance().getMapManager().updateStructurePhase(structure);
+                siblingMapManager().updateStructurePhase(structure);
             }
         }
     }

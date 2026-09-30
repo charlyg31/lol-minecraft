@@ -63,6 +63,9 @@ public class Amumu extends BaseChampion implements fr.lolmc.champion.base.Statef
             TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.MAGICAL);
             onMagicHit(c, tgt, dmg);
             fr.lolmc.LolPlugin.getInstance().getCCManager().stun(tgt, 20);
+            fr.lolmc.LolPlugin.getInstance().getCCManager().markCoordinatedFire(c, tgt);
+            fr.lolmc.LolPlugin.getInstance().getCCManager().applyZekeConduit(c, tgt);
+            fr.lolmc.LolPlugin.getInstance().getCCManager().applyAftershock(c, tgt);
             if(tgt instanceof Player __p) __p.sendActionBar(Component.text("🧻 Lancer de Bandage! Stun 1s!",NamedTextColor.YELLOW));
             c.getWorld().playSound(c.getLocation(), Sound.BLOCK_WOOL_PLACE, 1f, 0.8f);
         }
@@ -137,6 +140,9 @@ public class Amumu extends BaseChampion implements fr.lolmc.champion.base.Statef
                 onMagicHit(c, __t, dmg);
                 __t.setVelocity(new Vector(0,0.4,0));
                 fr.lolmc.LolPlugin.getInstance().getCCManager().stun(__t, 30);
+                fr.lolmc.LolPlugin.getInstance().getCCManager().markCoordinatedFire(c, __t);
+                fr.lolmc.LolPlugin.getInstance().getCCManager().applyZekeConduit(c, __t);
+                fr.lolmc.LolPlugin.getInstance().getCCManager().applyAftershock(c, __t);
                 if(__t instanceof Player __p) __p.sendActionBar(Component.text("⛓ MALÉDICTION DE LA MOMIE! Stun 1.5s",NamedTextColor.DARK_PURPLE));
             }
             fr.lolmc.util.VisualEffectUtil.groundRing(c.getWorld(),

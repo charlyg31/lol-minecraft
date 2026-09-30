@@ -95,7 +95,11 @@ public class SummonerSpellManager {
             case GHOST -> castGhost(caster);
         };
 
-        if (success) triggerCooldown(caster, spell);
+        if (success) {
+            triggerCooldown(caster, spell);
+            var rm = LolPlugin.getInstance().getRuneManager();
+            if (rm != null) rm.applyNimbusCloak(caster);
+        }
         return success;
     }
 
@@ -288,7 +292,7 @@ public class SummonerSpellManager {
         var team = tm.getTeam(caster);
 
         // 1. Chercher une tourelle alliee proche du curseur (via MapManager)
-        var mapMgr = LolPlugin.getInstance().getMapManager();
+        var mapMgr = fr.lolmc.instance.InstanceHelper.mapManager(caster);
         if (mapMgr != null && team != null) {
             var structures = mapMgr.getStructuresForTeam(team);
             if (structures != null && !structures.isEmpty()) {
@@ -367,9 +371,10 @@ public class SummonerSpellManager {
         double range = LolUnits.toBlocks(500);
         // Smite upgradé : vérifier l'item jungle équipé
         var inv = LolPlugin.getInstance().getShopListener().getOrCreate(caster);
-        boolean hasMosstomper = inv.hasItem("smite_mosstomper") || inv.hasItem("mosstomper");
-        boolean hasGustwalker = inv.hasItem("smite_stalker") || inv.hasItem("gustwalker");
-        boolean hasBluesmite  = inv.hasItem("smite_blue")    || inv.hasItem("bluesmite");
+        // Ids réels du registre : Mosstomper = pickaxe_jungle, Gustwalker = smite_stalker, Scorchclaw = blue_smite
+        boolean hasMosstomper = inv.hasItem("pickaxe_jungle");
+        boolean hasGustwalker = inv.hasItem("smite_stalker");
+        boolean hasBluesmite  = inv.hasItem("blue_smite");
 
         // Châtiment rouge (Mosstomper/Bluesmite) → peut cibler les joueurs ennemis
         if ((hasMosstomper || hasBluesmite)) {

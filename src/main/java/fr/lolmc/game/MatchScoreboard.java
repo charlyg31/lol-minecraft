@@ -112,9 +112,21 @@ public class MatchScoreboard {
         }
     }
 
+    /** Recopie le total de soins de chaque champion dans les statistiques de la partie. */
+    private void syncHealingStats() {
+        var cm = LolPlugin.getInstance().getChampionManager();
+        for (var entry : stats.entrySet()) {
+            Player p = org.bukkit.Bukkit.getPlayer(entry.getKey());
+            if (p != null && cm.hasChampion(p)) {
+                entry.getValue().healingDone = (long) cm.getChampion(p).getHPSystem().getTotalHealed();
+            }
+        }
+    }
+
     /** Affiche le tableau de score à tous les joueurs et persiste en base. */
     public void showEndScreen(Team winner) {
         var tm = LolPlugin.getInstance().getTeamManager();
+        syncHealingStats();
         var feat = LolPlugin.getInstance().getFeatManager();
 
         List<Component> lines = new ArrayList<>();

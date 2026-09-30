@@ -178,13 +178,13 @@ public class ItemRegistry {
         // BOOTS TIER 3 (SAISON 2025 - FEATS OF STRENGTH)
         // ════════════════════════════════════════════════════════════
 
-        reg(new LolItem("armored_advance","Armored Advance",    1200, Material.IRON_BOOTS,     TANK).ms(45).armor(25).passive("Plating","-12%% dégâts AA. Bouclier après dégâts physiques."));
-        reg(new LolItem("chainlaced_crushers","Chainlaced Crushers",1250,Material.CHAINMAIL_BOOTS,TANK).ms(45).mr(30).passive("Tenacity","-30%% durée CC. Bouclier après dégâts magiques."));
+        reg(new LolItem("armored_advance","Armored Advance",    1200, Material.IRON_BOOTS,     TANK).ms(45).armor(25).aaReduction(0.12).passive("Plating","-12%% dégâts AA. Bouclier après dégâts physiques."));
+        reg(new LolItem("chainlaced_crushers","Chainlaced Crushers",1250,Material.CHAINMAIL_BOOTS,TANK).ms(45).mr(30).tenacity(0.30).passive("Tenacity","-30%% durée CC. Bouclier après dégâts magiques."));
         reg(new LolItem("crimson_lucidity","Crimson Lucidity",  1200, Material.DIAMOND_BOOTS,  MAGE).ms(45).ah(20).passive("Flow","Après sort: +8%% MS 2s."));
-        reg(new LolItem("gunmetal_greaves","Gunmetal Greaves",  1200, Material.NETHERITE_BOOTS,ATTACK_SPEED).ms(45).as(0.50).passive("Iron Plating","-12%% dégâts AA."));
+        reg(new LolItem("gunmetal_greaves","Gunmetal Greaves",  1200, Material.NETHERITE_BOOTS,ATTACK_SPEED).ms(45).as(0.50).aaReduction(0.12).passive("Iron Plating","-12%% dégâts AA."));
         reg(new LolItem("spellslingers_shoes","Spellslinger's Shoes",1200,Material.GOLDEN_BOOTS,MAGE).ms(45).flatMagicPen(22));
         reg(new LolItem("swiftmarch",     "Swiftmarch",         1100, Material.LEATHER_BOOTS,  UTILITY).ms(60).passive("March","Hors combat: +5%% MS supplémentaire."));
-        reg(new LolItem("boots_swiftness","Boots of Swiftness", 1000, Material.LEATHER_BOOTS,  UTILITY).ms(55).passive("Slow Resist","-25%% durée ralentissements."));
+        reg(new LolItem("boots_swiftness","Boots of Swiftness", 1000, Material.LEATHER_BOOTS,  UTILITY).ms(55).slowResist(0.25).passive("Slow Resist","-25%% durée ralentissements."));
 
         // ════════════════════════════════════════════════════════════
         // ITEMS AD JUNGLE

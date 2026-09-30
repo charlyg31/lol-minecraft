@@ -222,6 +222,10 @@ public class ApiServer {
     /** GET /api/status → état du serveur */
     private void handleStatus(HttpExchange ex) throws java.io.IOException {
         if (!isAuthorized(ex)) { respond(ex, 401, err("unauthorized")); return; }
+        // Reste global : cette API donne une vue d'ensemble du serveur, pas l'état
+        // d'une partie précise. En mode multi-instances, elle ne reflète que le
+        // GameManager global (généralement inactif si toutes les parties tournent
+        // en instances isolées) — limite connue, cohérente avec son rôle de statut serveur.
         var gm = LolPlugin.getInstance().getGameManager();
         long elapsed = gm.isGameRunning() ? gm.getElapsedSeconds() : 0;
         int online = org.bukkit.Bukkit.getOnlinePlayers().size();
@@ -249,7 +253,7 @@ public class ApiServer {
                 "{\"name\":\"%s\",\"uuid\":\"%s\",\"champion\":%s,\"inGame\":%b}",
                 p.getName(), p.getUniqueId(),
                 champ != null ? "\"" + champ + "\"" : "null",
-                LolPlugin.getInstance().getGameManager().isGameRunning()));
+                fr.lolmc.instance.InstanceHelper.gameManager(p).isGameRunning()));
         }
         json.append("]}");
         respond(ex, 200, json.toString());

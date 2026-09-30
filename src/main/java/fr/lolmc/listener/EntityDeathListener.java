@@ -50,7 +50,7 @@ public class EntityDeathListener implements Listener {
                 case "caster" -> 55.0;
                 default       -> 60.0; // melee
             };
-            LolPlugin.getInstance().getRewardManager().grantProximityXP(p, xp);
+            fr.lolmc.instance.InstanceHelper.rewardManager(p).grantProximityXP(p, xp);
         }
     }
 
@@ -63,7 +63,7 @@ public class EntityDeathListener implements Listener {
         if (JungleManager.isJungleMonster(dead)) {
             e.getDrops().clear();
             e.setDroppedExp(0);
-            LolPlugin.getInstance().getJungleManager().onMonsterDeath(dead.getUniqueId(), killer);
+            fr.lolmc.instance.InstanceHelper.jungleManager(dead).onMonsterDeath(dead.getUniqueId(), killer);
             return;
         }
 
@@ -71,7 +71,7 @@ public class EntityDeathListener implements Listener {
         if (MinionManager.isMinion(dead)) {
             e.getDrops().clear();
             e.setDroppedExp(0);
-            LolPlugin.getInstance().getMinionManager().onMinionDeath(dead.getUniqueId());
+            fr.lolmc.instance.InstanceHelper.minionManager(dead).onMinionDeath(dead.getUniqueId());
             // XP partagée : alliés dans un rayon de 14 blocs du sbire
             double sharedXP = RewardManager.XP_MINION * 0.50; // 50% XP si pas le last-hit
             for (org.bukkit.entity.Player nearby : dead.getWorld().getNearbyPlayers(dead.getLocation(), 14)) {
@@ -131,8 +131,8 @@ public class EntityDeathListener implements Listener {
                 && championManager.hasChampion(victim)) {
             rewardManager.onChampionKill(killer, victim);
             // Annonce (Premier Sang, multi-kills)
-            LolPlugin.getInstance().getAnnouncementManager().announceKill(killer);
-            LolPlugin.getInstance().getAnnouncementManager().onPlayerDeath(victim);
+            fr.lolmc.instance.InstanceHelper.announcementManager(killer).announceKill(killer);
+            fr.lolmc.instance.InstanceHelper.announcementManager(killer).onPlayerDeath(victim);
             // MasterYi Highlander reset sur kill
             var killerChamp = championManager.getChampion(killer);
             if ("masteryi".equals(killerChamp.getId()))
@@ -151,15 +151,19 @@ public class EntityDeathListener implements Listener {
             if ("annie".equals(victimChamp.getId()))
                 fr.lolmc.champion.impl.mid.Annie.onAnnieDeath(victim);
             // Scoreboard de partie
+            // Scoreboard de partie — reste global : MatchScoreboard n'a pas encore été
+            // routé par instance dans tout le projet (des dizaines d'appelants), donc en
+            // mode multi-instances les scores de plusieurs parties simultanées se
+            // mélangeraient si on ne routait qu'ici. Limite connue du mode instances.
             LolPlugin.getInstance().getMatchScoreboard().addKill(killer);
             LolPlugin.getInstance().getMatchScoreboard().addDeath(victim);
             // Feat of Strength : Premier Sang
             var killerTeam = LolPlugin.getInstance().getTeamManager().getTeam(killer);
             if (killerTeam != null)
-                LolPlugin.getInstance().getFeatManager().claim(
+                fr.lolmc.instance.InstanceHelper.featManager(killer).claim(
                     fr.lolmc.game.FeatManager.Feat.FIRST_BLOOD, killerTeam, killer);
             // Timer de respawn
-            LolPlugin.getInstance().getGameManager().onPlayerDeath(victim);
+            fr.lolmc.instance.InstanceHelper.gameManager(killer).onPlayerDeath(victim);
             // Consommables : annule les potions de soin en cours à la mort
             var cm = LolPlugin.getInstance().getConsumableManager();
             if (cm != null) cm.onPlayerDeath(victim);

@@ -154,6 +154,18 @@ public class AbilityListener implements Listener {
         return true;
     }
 
+    // Anti-rebond dédié au clic droit (verrou séparé de canCast : un joueur peut enchaîner
+    // clic gauche puis clic droit légitimement en moins de 200ms, les deux gestes ne
+    // doivent pas se bloquer l'un l'autre).
+    private final java.util.Map<java.util.UUID, Long> lastRightClickTime = new java.util.HashMap<>();
+    private boolean canRightClick(Player p) {
+        long now = System.currentTimeMillis();
+        Long last = lastRightClickTime.get(p.getUniqueId());
+        if (last != null && (now - last) < 100) return false;
+        lastRightClickTime.put(p.getUniqueId(), now);
+        return true;
+    }
+
     // ══════════════════════════════════════════════════════════════
     // SYSTÈME D'INPUT LoL
     //   • CLIC GAUCHE  (air ou ennemi) → lance le sort du slot tenu (1-4)
@@ -233,6 +245,15 @@ public class AbilityListener implements Listener {
 
     @EventHandler
     public void onInteract(PlayerInteractEvent e) {
+        // Anti-rebond : un vrai bug Paper/Spigot documenté (SPIGOT-6122) déclenche
+        // PlayerInteractEvent DEUX FOIS pour la main principale quand le joueur tient un
+        // objet et clique droit sur un bloc (une seule fois pour RIGHT_CLICK_AIR). Sans
+        // ce filtre, une action qui bascule un état (changement de page, amélioration de
+        // sort) s'annule elle-même au second appel — le joueur ne voit alors aucun effet,
+        // alors que l'état a bien changé deux fois d'affilée.
+        if (e.getHand() != org.bukkit.inventory.EquipmentSlot.HAND) return;
+        if (!canRightClick(e.getPlayer())) return;
+
         // Œil du Héraut : clic droit → invoquer le Héraut
         var item = e.getItem();
         if (item != null && item.hasItemMeta() && item.getItemMeta()
@@ -242,7 +263,7 @@ public class AbilityListener implements Listener {
                 && (e.getAction() == Action.RIGHT_CLICK_AIR
                  || e.getAction() == Action.RIGHT_CLICK_BLOCK)) {
             e.setCancelled(true);
-            var jm2 = LolPlugin.getInstance().getJungleManager();
+            var jm2 = fr.lolmc.instance.InstanceHelper.jungleManager(e.getPlayer());
             if (jm2 != null && jm2.summonHerald(e.getPlayer())) {
                 item.setAmount(item.getAmount() - 1); // consommer l'Œil
             }
@@ -276,7 +297,7 @@ public class AbilityListener implements Listener {
             boolean isRecall = HotbarManager.isRecallItem(held);
             fr.lolmc.util.DebugLogger.log("Interact", "  -> isRecallItem=" + isRecall + " slot=" + slot);
             if (isRecall) {
-                LolPlugin.getInstance().getBaseManager().startRecall(caster);
+                fr.lolmc.instance.InstanceHelper.baseManager(caster).startRecall(caster);
                 return;
             }
             // Flash / actif / consommable / bouton page
@@ -301,11 +322,12 @@ public class AbilityListener implements Listener {
                 return;
             }
 
-            // 2. Entité (sbire, monstre de jungle) visée dans la portée AA
+            // 2. Entité (sbire, monstre de jungle) visée à distance → verrouillage (AA continues façon LoL)
             org.bukkit.entity.LivingEntity entity = getTargetedEntity(caster);
             if (entity != null) {
-                boolean hit = aam.tryAutoAttackEntity(caster, entity);
-                if (hit) { aam.toggleLock(caster, entity); return; }
+                aam.tryAutoAttackEntity(caster, entity);
+                aam.toggleLock(caster, entity);
+                return;
             }
 
             // 3. Structure ennemie dans la portée AA (annule le lock précédent)
@@ -336,7 +358,8 @@ public class AbilityListener implements Listener {
      */
     private org.bukkit.entity.LivingEntity getTargetedEntity(Player caster) {
         if (!manager.hasChampion(caster)) return null;
-        double range = manager.getChampion(caster).getAutoAttackRange();
+        double range = 30.0; // visée à distance façon LoL : le déplacement/hystérésis (AutoAttackManager.startAutoFire)
+                              // gère déjà l'attente jusqu'à ce que la vraie portée d'attaque soit atteinte
         var eye = caster.getEyeLocation();
         var dir = eye.getDirection();
         org.bukkit.entity.LivingEntity closest = null;
@@ -367,7 +390,7 @@ public class AbilityListener implements Listener {
         var champ = manager.getChampion(caster);
         double range = champ.getAutoAttackRange();
         var tm = LolPlugin.getInstance().getTeamManager();
-        var mm = LolPlugin.getInstance().getMapManager();
+        var mm = fr.lolmc.instance.InstanceHelper.mapManager(caster);
         if (mm == null) return false;
 
         GameStructure closest = null;
@@ -488,11 +511,12 @@ public class AbilityListener implements Listener {
             }
             case "consumable" -> {
                 String consId = HotbarManager.getId(held);
-                LolPlugin.getInstance().getShopListener().useConsumablePublic(caster, consId);
-                hotbar().removeConsumable(caster, consId);
+                if (LolPlugin.getInstance().getShopListener().useConsumablePublic(caster, consId)) {
+                    hotbar().removeConsumable(caster, consId);
+                }
                 hotbar().renderPage(caster, champ);
             }
-            case "recall" -> LolPlugin.getInstance().getBaseManager().startRecall(caster);
+            case "recall" -> fr.lolmc.instance.InstanceHelper.baseManager(caster).startRecall(caster);
             case "page" -> hotbar().switchPage(caster, champ);
         }
     }
@@ -513,7 +537,7 @@ public class AbilityListener implements Listener {
         String typeTag = fr.lolmc.game.MinionManager.getMinionTypeTag(damagerLe);
         // Dégâts bruts LoL avec scaling par vague (patch 26)
         // Mêlée : 69 + 1.5/vague | Caster : 39 + 0.75/vague | Canon : 100 + 3/vague
-        int wave = LolPlugin.getInstance().getMinionManager().getWaveCount();
+        int wave = fr.lolmc.instance.InstanceHelper.minionManager(victim).getWaveCount();
         double rawDmg = switch (typeTag != null ? typeTag : "melee") {
             case "cannon" -> 100.0 + wave * 3.0;
             case "super"  -> 190.0 + wave * 5.0;
@@ -723,11 +747,21 @@ public class AbilityListener implements Listener {
     }
 
     // ── Empêcher de dropper les items LoL ──
+    // Un simple e.setCancelled(true) ne suffit pas : un vrai bug Paper documenté
+    // (PaperMC/Paper#7726) supprime silencieusement l'objet, au lieu de le restaurer,
+    // s'il ne peut pas se recombiner avec une pile identique dans l'inventaire — c'est
+    // le cas de tous nos objets, qui ont chacun un ItemMeta unique (nom/lore/CD). On
+    // retire donc nous-mêmes l'entité créée, et on reconstruit la hotbar depuis la
+    // vraie source de vérité du plugin plutôt que de compter sur la restauration
+    // automatique de Bukkit.
     @EventHandler
     public void onDrop(PlayerDropItemEvent e) {
-        if (HotbarManager.isLolItem(e.getItemDrop().getItemStack())) {
-            e.setCancelled(true);
-        }
+        if (!manager.hasChampion(e.getPlayer())) return;
+        if (!HotbarManager.isLolItem(e.getItemDrop().getItemStack())) return;
+        e.setCancelled(true);
+        e.getItemDrop().remove();
+        Player p = e.getPlayer();
+        hotbar().renderPage(p, manager.getChampion(p));
     }
 
     // ── Nettoyage mémoire à la déconnexion ──
@@ -736,7 +770,7 @@ public class AbilityListener implements Listener {
         var bridge = LolPlugin.getInstance().getBridgeManager();
         if (bridge != null && bridge.isEnabled()) bridge.onPlayerJoin(e.getPlayer());
         // Restaurer l'état si reconnexion en pleine partie
-        var gm = LolPlugin.getInstance().getGameManager();
+        var gm = fr.lolmc.instance.InstanceHelper.gameManager(e.getPlayer());
         if (gm != null && gm.isRunning())
             org.bukkit.Bukkit.getScheduler().runTaskLater(LolPlugin.getInstance(),
                 () -> gm.onPlayerRejoin(e.getPlayer()), 40L);
@@ -767,7 +801,7 @@ public class AbilityListener implements Listener {
         Player p = e.getPlayer();
         // Si le joueur est en pleine partie : on GARDE son état (champion, équipe, objets)
         // pour qu'il puisse revenir. On ne fait qu'un nettoyage léger des caches transitoires.
-        var gm = LolPlugin.getInstance().getGameManager();
+        var gm = fr.lolmc.instance.InstanceHelper.gameManager(p);
         if (gm.isRunning() && gm.isParticipant(p.getUniqueId())) {
             lightCleanup(p);
         } else {
@@ -842,15 +876,6 @@ public class AbilityListener implements Listener {
     public void onConsume(PlayerItemConsumeEvent e) {
         if (manager.hasChampion(e.getPlayer())
                 && HotbarManager.isLolItem(e.getItem())) {
-            e.setCancelled(true);
-        }
-    }
-
-    /** Empêche de lâcher les items LoL au sol (touche Q). */
-    @EventHandler
-    public void onDropItem(PlayerDropItemEvent e) {
-        if (manager.hasChampion(e.getPlayer())
-                && HotbarManager.isLolItem(e.getItemDrop().getItemStack())) {
             e.setCancelled(true);
         }
     }

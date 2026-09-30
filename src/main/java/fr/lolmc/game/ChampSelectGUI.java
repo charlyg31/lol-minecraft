@@ -197,6 +197,24 @@ public class ChampSelectGUI implements Listener {
         Component title = e.getView().title();
         String titleStr = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
                 .plainText().serialize(title);
+
+        // ── Menu de ban (classé) : le clic bannit le champion choisi ──
+        if (title.equals(BAN_TITLE)) {
+            e.setCancelled(true);
+            if (!(e.getWhoClicked() instanceof Player banner)) return;
+            if (e.getClickedInventory() == null || !e.getClickedInventory().equals(e.getView().getTopInventory())) return;
+            int banSlot = e.getSlot();
+            if (banSlot < 0 || banSlot >= CHAMPIONS.length) return;
+            String banId = CHAMPIONS[banSlot];
+            if (isBanned(banId)) {
+                banner.sendMessage(Component.text("❌ " + capitalize(banId) + " est déjà banni.", NamedTextColor.RED));
+                return;
+            }
+            LolPlugin.getInstance().getChampSelectManager().onBanClick(banner, banId);
+            banner.closeInventory();
+            return;
+        }
+
         if (!title.equals(CHAMP_TITLE) && !title.equals(RUNE_TITLE)
                 && !titleStr.startsWith("🎨 Choisir un skin")) return;
         e.setCancelled(true);
@@ -293,7 +311,7 @@ public class ChampSelectGUI implements Listener {
         bannedChampions.add(championId);
         banRound++;
         Bukkit.broadcast(Component.text(
-                "🚫 " + championId + " est banni! (ban " + banRound + "/10)",
+                "🚫 " + championId + " est banni! (ban " + banRound + "/6)",
                 NamedTextColor.RED));
     }
 

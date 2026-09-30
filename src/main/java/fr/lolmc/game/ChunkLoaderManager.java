@@ -62,13 +62,14 @@ public class ChunkLoaderManager extends BukkitRunnable {
     }
 
     /**
-     * Méthode de détection personnalisable pour identifier tes sbires/monstres.
+     * Détecte les vrais sbires (MinionManager) et monstres de jungle (JungleManager),
+     * marqués via leur PersistentDataContainer respectif — jamais via des Scoreboard Tags,
+     * qui ne sont posés nulle part dans ce projet (le check précédent ne matchait donc jamais
+     * rien, laissant les entités éloignées des joueurs se figer une fois leur chunk déchargé).
      */
     private boolean isMinionOrMonster(Entity entity) {
-        if (!(entity instanceof LivingEntity)) return false;
-
-        // Détection via Scoreboard Tags posés au spawn des sbires/monstres
-        return entity.getScoreboardTags().contains("lol_minion") || entity.getScoreboardTags().contains("lol_monster");
+        if (!(entity instanceof LivingEntity le)) return false;
+        return fr.lolmc.game.MinionManager.isMinion(le) || fr.lolmc.game.JungleManager.isJungleMonster(entity);
     }
 
     /**

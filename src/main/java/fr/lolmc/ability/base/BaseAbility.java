@@ -166,6 +166,12 @@ public abstract class BaseAbility {
         ItemStack item = new ItemStack(icon);
         ItemMeta meta = item.getItemMeta();
         if (meta == null) return item;
+        // La quantité de cet objet sert uniquement à afficher les secondes de CD restantes
+        // (voir AbilityListener.updateCooldownDisplay) : ce n'est jamais un vrai nombre
+        // d'exemplaires. Sans ce verrou, Minecraft traite l'objet comme une vraie pile
+        // empilable et peut en scinder une partie (touche Q ne drope qu'une unité de la
+        // pile), créant un second exemplaire distinct au sol avec le CD figé dessus.
+        meta.setMaxStackSize(1);
 
         NamedTextColor slotColor = switch (slot) {
             case Q  -> NamedTextColor.AQUA;

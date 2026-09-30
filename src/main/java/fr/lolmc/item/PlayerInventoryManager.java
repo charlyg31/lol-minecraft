@@ -28,8 +28,22 @@ public class PlayerInventoryManager {
 
     public static final int[] ITEM_SLOTS = {5, 6, 7, 8, 18, 19};
 
+    /** Tous les ids d'objets de la catégorie "bottes" (aucune catégorie dédiée dans ItemCategory). */
+    public static final java.util.Set<String> BOOT_IDS = java.util.Set.of(
+            "armored_advance", "chainlaced_crushers", "crimson_lucidity", "gunmetal_greaves",
+            "spellslingers_shoes", "swiftmarch", "boots_swiftness", "boots_speed",
+            "sorcerers_shoes", "plated_steelcaps", "mercurys_treads", "berserkers_greaves", "ionian_boots");
+
     // Items équipés par joueur [0..5]
     private final LolItem[] equippedItems = new LolItem[6];
+
+    /** Vrai si le joueur possède déjà une paire de bottes (n'importe laquelle). */
+    public boolean hasBoots() {
+        for (LolItem item : equippedItems) {
+            if (item != null && BOOT_IDS.contains(item.getId())) return true;
+        }
+        return false;
+    }
 
     /**
      * Équipe un item dans le premier slot libre.
