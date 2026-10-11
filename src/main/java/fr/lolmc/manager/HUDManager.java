@@ -31,6 +31,11 @@ public class HUDManager {
                     if (!championManager.hasChampion(p)) continue;
                     BaseChampion champ = championManager.getChampion(p);
                     updateHUD(p, champ);
+                    // Filet de sécurité : toute source de dégâts qui met le HPSystem à 0 sans
+                    // passer par DamageUtil (feu, passifs, runes...) doit quand même tuer le joueur.
+                    if (champ.getHPSystem().isDead() && p.getGameMode() != org.bukkit.GameMode.SPECTATOR) {
+                        triggerDeath(p, null);
+                    }
                 }
             }
         }.runTaskTimer(LolPlugin.getInstance(), 0L, 2L);

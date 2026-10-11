@@ -372,6 +372,7 @@ public class Annie extends BaseChampion implements fr.lolmc.champion.base.Statef
                         for (Entity entity : tibbers.getNearbyEntities(3.5,3.5,3.5)) {
                             if (!(entity instanceof org.bukkit.entity.LivingEntity target)) continue;
                             if (entity.equals(c) || entity.equals(tibbers)) continue;
+                            if (!TargetingUtil.isEnemy(c, target)) continue; // jamais les alliés ni les neutres
                             TargetingUtil.dealDamage(c, target, auraDmg, TargetingUtil.DmgType.MAGICAL);
                             target.setVisualFire(net.kyori.adventure.util.TriState.TRUE);
                             new BukkitRunnable(){@Override public void run(){target.setVisualFire(net.kyori.adventure.util.TriState.FALSE);}}.runTaskLater(LolPlugin.getInstance(),60L);
