@@ -114,6 +114,7 @@ public class LolPlugin extends JavaPlugin {
     @Override
     public void onEnable() {
         instance = this;
+        getServer().getScheduler().runTaskLater(this, fr.lolmc.game.MinionManager::purgeAllWorlds, 100L);
         saveDefaultConfig();
         saveResource("champions.yml", false);
         fr.lolmc.util.Balance.load();
@@ -271,6 +272,7 @@ public class LolPlugin extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        fr.lolmc.game.MinionManager.purgeAllWorlds();
         // ── 1. Arrêt du runtime de partie (si en cours) ─────────────────────
         if (gameManager != null && gameManager.isRunning()) gameManager.stopGame();
         if (minionManager != null) minionManager.stopWaves();

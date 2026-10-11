@@ -82,6 +82,7 @@ public class MinionManager {
 
     public void startWaves() {
         if (spawning) return;
+        purgeAllWorlds();
         spawning = true;
 
         waveTask = new BukkitRunnable() {
@@ -524,13 +525,19 @@ public class MinionManager {
         }
         for (UUID id : minionDeco.keySet()) MobAnimator.unregister(id);
         minionDeco.clear();
-        // Retirer les sbires eux-mêmes
-        java.util.List<org.bukkit.World> __worlds = WorldContext.getGameWorld() != null
-                ? java.util.List.of(WorldContext.getGameWorld())
-                : java.util.List.of();
-            for (var world : __worlds) {
+        purgeAllWorlds();
+    }
+
+    /** Supprime sbires + décorations orphelines (restés après un arrêt serveur) dans TOUS les mondes. */
+    public static void purgeAllWorlds() {
+        if (KEY_MINION == null) return;
+        for (var world : org.bukkit.Bukkit.getWorlds()) {
             for (Entity e : world.getEntities()) {
                 if (e instanceof LivingEntity le && isMinion(le)) {
+                    e.remove();
+                } else if (e instanceof org.bukkit.entity.Display
+                        && fr.lolmc.util.MobAppearance.isDecoration(e)
+                        && e.getVehicle() == null) {
                     e.remove();
                 }
             }

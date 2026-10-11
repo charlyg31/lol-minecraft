@@ -63,7 +63,7 @@ public class LolRCommand extends Command implements TabExecutor {
             return;
         }
 
-        if (!rankedEnabled) {
+        if (!rankedEnabled && !(args.length > 0 && args[0].equalsIgnoreCase("stop"))) {
             player.sendMessage(new TextComponent("§c⚔ Les parties classées sont désactivées pour le moment."));
             return;
         }
@@ -71,7 +71,7 @@ public class LolRCommand extends Command implements TabExecutor {
         if (args.length == 0) { sendHelp(player); return; }
 
         switch (args[0].toLowerCase()) {
-            case "leave", "quitter" -> {
+            case "leave", "quitter", "stop" -> {
                 if (plugin.getQueueManager().isInQueue(player.getUniqueId())) {
                     plugin.getQueueManager().leave(player);
                     player.sendMessage(new TextComponent("§7Tu as quitté la file classée."));
@@ -133,7 +133,7 @@ public class LolRCommand extends Command implements TabExecutor {
         p.sendMessage(new TextComponent("  §a/lolr top adc"));
         p.sendMessage(new TextComponent("  §a/lolr mid jungle support"));
         p.sendMessage(new TextComponent("  §a/lolr all §7(tous les rôles)"));
-        p.sendMessage(new TextComponent("§e/lolr leave §8— §7Quitter la file classée"));
+        p.sendMessage(new TextComponent("§e/lolr stop §8— §7Arrêter la recherche (alias : leave)"));
         p.sendMessage(new TextComponent("§8(Pick + Ban en phase de sélection)"));
         if (!rankedEnabled)
             p.sendMessage(new TextComponent("§c⚠ Les parties classées sont actuellement désactivées."));

@@ -464,6 +464,13 @@ private void handleSolo(Player player, String[] args) {
     String champId = args.length >= 2 ? args[1].toLowerCase() : "garen";
     var plugin = LolPlugin.getInstance();
 
+    // Repart de zéro : arrête l'ancienne partie et purge les sbires orphelins
+    plugin.getMinionManager().stopWaves();
+    plugin.getJungleManager().stopJungle();
+    if (plugin.getGameManager().isRunning()) plugin.getGameManager().stopGame();
+    plugin.getGameManager().stopSystems();
+    fr.lolmc.game.MinionManager.purgeAllWorlds();
+
     plugin.getTeamManager().setTeam(player, fr.lolmc.team.TeamManager.Team.BLUE);
     plugin.getChampionManager().assignChampion(player, champId);
     var soloChamp = plugin.getChampionManager().getChampion(player);
