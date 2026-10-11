@@ -216,6 +216,10 @@ public class ChampSelectManager {
             player.sendActionBar(Component.text("Tu as déjà verrouillé!", NamedTextColor.RED));
             return;
         }
+        if (!player.hasPermission("lolmc.champion." + championId.toLowerCase())) {
+            player.sendActionBar(Component.text("❌ Tu n'as pas accès à ce champion.", NamedTextColor.RED));
+            return;
+        }
         chosenChampion.put(player.getUniqueId(), championId);
         player.sendActionBar(Component.text("✔ Champion: " + championId, NamedTextColor.GREEN));
     }

@@ -249,7 +249,7 @@ public class StructureDamageListener implements Listener {
         // En mode instances, n'annoncer qu'aux joueurs de CETTE partie (pas tout le serveur,
         // qui pourrait héberger d'autres parties en cours) ; sinon (mode partie unique), tout
         // le monde partagé.
-        Iterable<Player> audience = inst != null
+        java.util.Collection<? extends Player> audience = inst != null
                 ? inst.getOnlinePlayers() : LolPlugin.getInstance().getServer().getOnlinePlayers();
         for (Player p : audience) {
             p.showTitle(net.kyori.adventure.title.Title.title(

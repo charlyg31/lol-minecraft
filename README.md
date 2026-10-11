@@ -122,7 +122,9 @@ Par défaut (`use-instances: false`), une seule vraie partie tourne à la fois, 
 
 En activant `use-instances: true`, chaque match du matchmaking local copie le monde `world.template` dans un nouveau monde isolé (`lolmc_game_N`). Chaque instance a ses propres `GameManager`, `MinionManager`, `JungleManager`, `TurretManager`, `FogOfWarManager`, `RewardManager`, `AnnouncementManager`, `FeatManager`, `PassiveManager`, `BaseManager`.
 
-**Limite connue :** le tableau de score de fin de partie (`MatchScoreboard` — kills, morts, CS, or) reste partagé entre toutes les instances. Avec `max-instances: 1` (la valeur par défaut), ce n'est pas un problème ; avec plusieurs instances simultanées, les scores de différentes parties se mélangeraient. Ce mode n'a jamais été testé sur un vrai serveur en conditions réelles.
+**Limite connue :** le tableau de score de fin de partie (`MatchScoreboard` — kills, morts, CS, or) reste partagé entre toutes les instances. Avec `max-instances: 1` (la valeur par défaut), ce n'est pas un problème ; avec plusieurs instances simultanées, les scores de différentes parties se mélangeraient.
+
+**Nettoyage automatique :** un monde d'instance sans aucun joueur est supprimé (après 60 s pour une partie en cours, immédiatement pour un monde sans partie). Les mondes `lolmc_game_*` laissés par un crash sont supprimés au démarrage. Le monde template n'est jamais touché. Ce mode n'a jamais été testé sur un vrai serveur en conditions réelles.
 
 ---
 
@@ -172,9 +174,9 @@ Chaque champion a ses 4 sorts (Q/W/E/R) plus passif, avec scaling AP/AD, prévis
 
 ### Commandes admin — `/lola`
 
-`/lola <start|stop|set|position|lane|solo|give|level|gold|hp|resetcd|buff|spawn|wave|select|reload|debug|testgame|schem|road|jungle|shopnpc|mode|team|help>` (alias `/lolAdmin`)
+`/lola <start|stop|set|position|center|lane|solo|give|level|gold|hp|resetcd|buff|spawn|wave|select|reload|debug|testgame|schem|road|jungle|shopnpc|mode|team|permcheck|help>` (alias `/lolAdmin`)
 
-Les sous-commandes de configuration de carte (`set`, `position`, `lane`, `jungle`, `schem`, `road`, `shopnpc`) s'appliquent au monde template, avant toute partie. Les sous-commandes de test (`solo`, `give`, `buff`, `wave`, `hp`, `gold`, `level`, `resetcd`) agissent sur la partie en cours.
+Les sous-commandes de configuration de carte (`set`, `position`, `center`, `lane`, `jungle`, `schem`, `road`, `shopnpc`, `mode`) s'appliquent au monde template, avant toute partie. Les sous-commandes de test (`solo`, `give`, `buff`, `wave`, `hp`, `gold`, `level`, `resetcd`) agissent sur la partie en cours.
 
 ---
 
@@ -206,16 +208,72 @@ Trois backends au choix (`database.type` dans `config.yml`) : `sqlite` (par déf
 
 ## Permissions
 
-Déclarées dans `plugin.yml` du serveur de jeu :
+Les permissions sont déclarées dans `plugin.yml` du serveur de jeu et fonctionnent avec **LuckPerms** (ou tout autre plugin de permissions). Sans plugin de permissions, les valeurs par défaut s'appliquent : tout le monde joue, seuls les opérateurs administrent.
 
-- `lolmc.admin` (défaut : op) — commandes `/lola`, avec les sous-permissions `lolmc.admin.config` et `lolmc.admin.test`
-- `lolmc.player` (défaut : true) — commandes joueur, avec une sous-permission par commande (`lolmc.player.shop`, `.team`, `.party`, `.queue`, `.recall`, `.ping`, `.pick`, `.runes`, `.spell`, `.lock`, `.roles`, `.lobby`)
-- `lolmc.champion.use` (défaut : true) — jouer tous les champions, avec une sous-permission par champion pour restreindre individuellement
-- `lolmc.skin` (défaut : false) — accès à tous les skins, avec une permission par skin attribuable individuellement (32 skins déclarés)
+### Serveur de jeu (Paper)
 
-Côté proxy : `lolmc.play` (file et groupes via `/lol`/`/lolr`), `lolmc.bungee`, `lolmc.admin` (active/désactive le classé).
+| Permission | Défaut | Rôle |
+|------------|--------|------|
+| `lolmc.admin` | op | Toutes les commandes `/lola` (donne `lolmc.admin.config` et `lolmc.admin.test`) |
+| `lolmc.admin.config` | op | Configurer la carte : `set`, `position`, `center`, `lane`, `schem`, `road`, `jungle`, `shopnpc`, `mode` |
+| `lolmc.admin.test` | op | Commandes de test : `solo`, `give`, `level`, `gold`, `team`, `testgame`, `debug`, `spawn`, `buff`, `resetcd`, `hp`, `wave` |
+| `lolmc.player` | true | Toutes les commandes joueur (donne les 12 permissions ci-dessous) |
+| `lolmc.player.shop` | true | `/shop` |
+| `lolmc.player.team` | true | `/team` |
+| `lolmc.player.party` | true | `/party` |
+| `lolmc.player.queue` | true | `/queue` |
+| `lolmc.player.recall` | true | `/recall` |
+| `lolmc.player.ping` | true | `/ping` |
+| `lolmc.player.pick` | true | `/pick` et `/champion` |
+| `lolmc.player.runes` | true | `/runes` |
+| `lolmc.player.spell` | true | `/spell` |
+| `lolmc.player.lock` | true | `/lock` |
+| `lolmc.player.roles` | true | `/roles` (alias `/lobby`, `/play`) |
+| `lolmc.player.lobby` | true | Menu de préparation |
+| `lolmc.champion.use` | true | Jouer tous les champions (donne les 20 permissions suivantes) |
+| `lolmc.champion.<id>` | true | Jouer un champion précis (voir les identifiants ci-dessous) |
+| `lolmc.skin` | false | Tous les skins (donne les 32 permissions de skin) |
+| `lolmc.skin.<champion>.<skin>` | false | Un skin précis, par exemple `lolmc.skin.jinx.arcane` |
 
-**BungeeCord n'a pas de vrai système `default: true` déclaratif comme Bukkit** : une permission jamais explicitement accordée (par ce plugin ou par un plugin de permissions comme LuckPerms) renvoie toujours faux, y compris pour un joueur non-op. Sans rien de plus, `/lol` et `/lolr` répondraient donc « vous n'avez pas la permission » à tout le monde. `DefaultPermissionsListener` (dans `bungee-plugin`) accorde `lolmc.play` à la connexion — mais seulement si aucun plugin de permissions n'a déjà pris une décision explicite pour ce joueur, pour ne jamais écraser une vraie restriction posée ailleurs.
+Les commandes `/lola` utilisent la permission fine de leur catégorie : un modérateur peut avoir `lolmc.admin.test` sans pouvoir modifier la carte. Les sous-commandes `start`, `stop`, `select`, `reload`, `permcheck` et `help` demandent `lolmc.admin`. Les opérateurs passent toujours.
+
+**Identifiants de champion** (`lolmc.champion.<id>`) : `garen`, `darius`, `malphite`, `nasus`, `warwick`, `amumu`, `masteryi`, `leesin`, `annie`, `veigar`, `zed`, `yasuo`, `morgana`, `leona`, `blitzcrank`, `janna`, `ashe`, `sivir`, `jinx`, `missfortune`.
+
+La liste des skins est dans `plugin.yml` ; `/lola permcheck` vérifie que chaque skin du code a bien sa permission déclarée.
+
+### Proxy (BungeeCord)
+
+| Permission | Rôle |
+|------------|------|
+| `lolmc.play` | Utiliser `/lol` et `/lolr` (file et groupes) |
+| `lolmc.admin` | Activer ou couper les parties classées (`/lolr on` / `/lolr off`) |
+
+BungeeCord n'a pas de système `default: true` comme Bukkit : une permission jamais accordée renvoie toujours faux. `DefaultPermissionsListener` accorde donc `lolmc.play` à la connexion, mais seulement si aucun plugin de permissions n'a déjà pris une décision pour ce joueur, pour ne jamais écraser une restriction posée ailleurs.
+
+### Exemples LuckPerms
+
+LuckPerms s'installe sur chaque serveur Paper **et** sur le proxy (version Bungee, commandes `/lpb`). Pour partager les groupes entre les deux, utilise la même base de données de stockage.
+
+```
+# Proxy : autoriser la file à tout le monde (explicite, recommandé avec LuckPerms)
+/lpb group default permission set lolmc.play true
+
+# Proxy : réserver les parties classées aux admins
+/lpb group admin permission set lolmc.admin true
+
+# Jeu : administrateur complet
+/lp group admin permission set lolmc.admin true
+
+# Jeu : modérateur qui teste sans toucher à la carte
+/lp group moderateur permission set lolmc.admin.test true
+
+# Jeu : tous les skins pour les VIP, un seul skin pour un joueur
+/lp group vip permission set lolmc.skin true
+/lp user Pseudo permission set lolmc.skin.jinx.arcane true
+
+# Jeu : interdire un champion à un groupe (ex. champion du mois ou en test)
+/lp group default permission set lolmc.champion.zed false
+```
 
 ---
 
@@ -224,7 +282,9 @@ Côté proxy : `lolmc.play` (file et groupes via `/lol`/`/lolr`), `lolmc.bungee`
 1. Créer et construire le monde `lolmc_template` (le nom exact vient de `world.template`)
 2. Poser les structures, spawns, routes de sbires et camps de jungle avec les sous-commandes `/lola` correspondantes
 3. Tester avec `/lola testgame` ou `/lola solo`
-4. En mode instances, ce monde sera copié pour chaque nouvelle partie ; en mode par défaut, c'est le monde `world.name` qui est utilisé directement
+4. En mode instances, le dossier de ce monde est copié pour chaque nouvelle partie (Multiverse n'est pas obligatoire) ; en mode par défaut, c'est le monde `world.name` qui est utilisé directement
+
+En mode instances, sauvegarde et **décharge** `lolmc_template` avant de lancer des parties (`/mv unload lolmc_template` avec Multiverse), pour que la copie soit complète. Ne configure jamais la carte dans une copie `lolmc_game_N` : elle est supprimée à la fin de la partie.
 
 ---
 

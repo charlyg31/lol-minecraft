@@ -613,7 +613,7 @@ public class PassiveManager {
 
         // ── Rune Minion Dematerializer : exécute un sbire (3 charges), +6%/+3%/+3% dégât
         //    permanent contre les sbires (simplifié : universel, pas différencié par type) ──
-        if (MinionManager.isMinion(victim) && !victim.isDead()) {
+        if (fr.lolmc.game.MinionManager.isMinion(victim) && !victim.isDead()) {
             var rm = LolPlugin.getInstance().getRuneManager();
             if (rm != null && rm.getPage(attacker.getUniqueId()).has("minion_dematerializer")) {
                 var state = getState(attacker);
@@ -670,17 +670,17 @@ public class PassiveManager {
         }
 
         // ── Rylai's Crystal Scepter: les sorts ralentissent 25% pendant 1s ──
-        if (isAbility && hasAnyItem(caster,"rylais_crystal_scepter")) {
+        if (hasAnyItem(caster,"rylais_crystal_scepter")) {
             LolPlugin.getInstance().getCCManager().slow(victim, 20, 1); // amplifier 1 = Lenteur II ≈ 30% (le plus proche de 25% en granularité Minecraft)
         }
 
         // ── Chemtech Putrifier: les sorts réduisent les soins ennemis de 60% pendant 3s ──
-        if (isAbility && hasAnyItem(caster,"chemtech_putrifier")) {
+        if (hasAnyItem(caster,"chemtech_putrifier")) {
             vc.getStats().applyGrievousWounds(0.60, 3000L);
         }
 
         // ── Luden's Companion / Luden's Echo: Surge, éclair de 100+15%AP toutes les 12s ──
-        if (isAbility && hasAnyItem(caster,"ludens_companion","ludens_echo")) {
+        if (hasAnyItem(caster,"ludens_companion","ludens_echo")) {
             ItemState ludensState = getState(caster);
             if (!ludensState.isOnCooldown(ludensState.ludensLastUse, 12000L)) {
                 ludensState.ludensLastUse = System.currentTimeMillis();
@@ -828,11 +828,12 @@ public class PassiveManager {
                 victim.sendActionBar(Component.text("🛡 Gardien !", NamedTextColor.AQUA));
                 nearestAlly.sendActionBar(Component.text("🛡 Gardien (allié) !", NamedTextColor.AQUA));
                 final double gShield = guardShield;
+                final Player guardAlly = nearestAlly;
                 new BukkitRunnable() {
                     @Override public void run() {
                         stats.addShield(-gShield);
-                        if (championManager.hasChampion(nearestAlly))
-                            championManager.getChampion(nearestAlly).getStats().addShield(-gShield);
+                        if (championManager.hasChampion(guardAlly))
+                            championManager.getChampion(guardAlly).getStats().addShield(-gShield);
                     }
                 }.runTaskLater(LolPlugin.getInstance(), 40L);
             }

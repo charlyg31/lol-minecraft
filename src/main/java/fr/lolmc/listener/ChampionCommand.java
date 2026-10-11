@@ -45,6 +45,10 @@ public class ChampionCommand implements CommandExecutor, TabCompleter {
                     player.sendMessage("§cUsage: /champion pick <nom>");
                     return true;
                 }
+                if (!player.hasPermission("lolmc.champion." + args[1].toLowerCase())) {
+                    player.sendMessage("§c❌ Tu n'as pas accès à ce champion.");
+                    return true;
+                }
                 manager.assignChampion(player, args[1].toLowerCase());
             }
             case "list" -> sendList(player, args.length > 1 ? args[1] : null);

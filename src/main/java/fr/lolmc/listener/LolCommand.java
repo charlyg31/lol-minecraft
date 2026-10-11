@@ -105,12 +105,27 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
         }
 
         // /lola → commandes admin uniquement
-        if (!player.hasPermission("lolmc.admin") && !player.isOp()) {
+        if (!player.hasPermission("lolmc.admin") && !player.hasPermission("lolmc.admin.config")
+                && !player.hasPermission("lolmc.admin.test") && !player.isOp()) {
             player.sendMessage(Component.text("❌ Permission requise.", NamedTextColor.RED));
             return true;
         }
 
         if (args.length == 0) { sendHelp(player); return true; }
+
+        // Permission fine par sous-commande : lolmc.admin donne tout (enfants), sinon
+        // lolmc.admin.config (carte) ou lolmc.admin.test (tests) séparément.
+        String requiredPerm = switch (args[0].toLowerCase()) {
+            case "set", "position", "center", "lane", "schem", "road", "jungle", "shopnpc", "mode",
+                 "pos1", "pos2", "save" -> "lolmc.admin.config";
+            case "solo", "give", "level", "gold", "team", "testgame", "debug", "spawn", "buff",
+                 "resetcd", "hp", "wave" -> "lolmc.admin.test";
+            default -> "lolmc.admin";
+        };
+        if (!player.isOp() && !player.hasPermission(requiredPerm)) {
+            player.sendMessage(Component.text("❌ Permission requise : " + requiredPerm, NamedTextColor.RED));
+            return true;
+        }
 
         switch (args[0].toLowerCase()) {
             case "set" -> handleSet(player, args);

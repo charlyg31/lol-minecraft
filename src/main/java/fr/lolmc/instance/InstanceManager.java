@@ -7,6 +7,7 @@ import org.bukkit.World;
 import org.bukkit.WorldCreator;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
+import org.jetbrains.annotations.NotNull;
 
 import java.io.File;
 import java.io.IOException;
@@ -19,22 +20,22 @@ import java.util.logging.Logger;
 
 /**
  * Gestionnaire d'instances de partie.
- *
+ * <p>
  * Responsabilités :
  *  1. Copier le monde template (lolmc_template) → lolmc_game_N via Files.walkFileTree
  *  2. Charger le monde copié avec WorldCreator
  *  3. Créer et démarrer une GameInstance sur ce monde
  *  4. Mapper chaque joueur → son GameInstance
  *  5. Nettoyer et supprimer le monde à la fin de la partie
- *
+ * <p>
  * Convention de nommage :
  *   Template : world.template dans config.yml (défaut : lolmc_template)
  *   Instance : lolmc_game_1, lolmc_game_2… (compteur atomique, jamais réutilisé)
- *
+ * <p>
  * Isolation :
  *   - WorldContext.getInstanceOf(player) retourne le World de la GameInstance du joueur
  *   - Chaque GameInstance a ses propres managers → zéro fuite entre parties simultanées
- *
+ * <p>
  * Multiverse :
  *   Si Multiverse-Core est installé, on utilise son API pour charger/décharger.
  *   Sinon, on utilise WorldCreator natif Paper (fonctionne sans Multiverse).
@@ -221,7 +222,7 @@ public class InstanceManager {
                 instance.stop();
 
                 // Expulser les joueurs restants vers le spawn principal
-                World defaultWorld = Bukkit.getWorlds().get(0);
+                World defaultWorld = Bukkit.getWorlds().getFirst();
                 for (Player p : instance.getWorld().getPlayers()) {
                     p.teleport(defaultWorld.getSpawnLocation());
                 }
@@ -274,8 +275,6 @@ public class InstanceManager {
     public Collection<GameInstance> getAllInstances() {
         return Collections.unmodifiableCollection(instances.values());
     }
-
-    public int getActiveCount() { return instances.size(); }
 
     // ══════════════════════════════════════════════════════════════════════
     // OPÉRATIONS SUR LES MONDES
@@ -363,7 +362,7 @@ public class InstanceManager {
         // Copier récursivement
         Files.walkFileTree(srcPath, new SimpleFileVisitor<>() {
             @Override
-            public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+            public @NotNull FileVisitResult preVisitDirectory(@NotNull Path dir, @NotNull BasicFileAttributes attrs) throws IOException {
                 Path relative = srcPath.relativize(dir);
                 Path target   = destPath.resolve(relative);
                 Files.createDirectories(target);
@@ -371,7 +370,7 @@ public class InstanceManager {
             }
 
             @Override
-            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+            public @NotNull FileVisitResult visitFile(@NotNull Path file, @NotNull BasicFileAttributes attrs) throws IOException {
                 String name = file.getFileName().toString();
                 // Exclure les fichiers de verrou et identifiants uniques
                 if (name.equals("session.lock") || name.equals("uid.dat")
@@ -398,12 +397,12 @@ public class InstanceManager {
         try {
             Files.walkFileTree(worldPath, new SimpleFileVisitor<>() {
                 @Override
-                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+                public @NotNull FileVisitResult visitFile(@NotNull Path file, @NotNull BasicFileAttributes attrs) throws IOException {
                     Files.delete(file);
                     return FileVisitResult.CONTINUE;
                 }
                 @Override
-                public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
+                public @NotNull FileVisitResult postVisitDirectory(@NotNull Path dir, IOException exc) throws IOException {
                     Files.delete(dir);
                     return FileVisitResult.CONTINUE;
                 }
