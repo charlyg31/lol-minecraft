@@ -1,7 +1,7 @@
 package fr.lolmc.listener;
 
 import fr.lolmc.game.MinionManager;
-import io.papermc.paper.event.entity.EntitiesLoadEvent;
+import org.bukkit.event.world.EntitiesLoadEvent;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 
