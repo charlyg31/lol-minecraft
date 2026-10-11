@@ -53,10 +53,78 @@ public class InstanceManager {
 
     private final String templateWorldName;
 
+    // Mondes en cours de création (copie) ou de fermeture : le nettoyage ne doit pas y toucher.
+    private final Set<String> busyWorlds = ConcurrentHashMap.newKeySet();
+    // Instance id -> tick (temps serveur en ms) depuis lequel son monde est vide.
+    private final Map<Integer, Long> emptySince = new ConcurrentHashMap<>();
+    private static final long EMPTY_GRACE_MS = 60_000L;
+    private static final long CLEANUP_PERIOD_TICKS = 20L * 30;
+
     public InstanceManager(LolPlugin plugin) {
         this.plugin            = plugin;
         this.log               = plugin.getLogger();
         this.templateWorldName = plugin.getConfig().getString("world.template", "lolmc_template");
+        startCleanupTask();
+    }
+
+    /**
+     * Supprime tout monde d'instance existant sans joueur dedans :
+     * au démarrage (restes d'un crash), puis toutes les 30 s.
+     * Un monde d'une instance en cours n'est supprimé qu'après 60 s sans joueur.
+     */
+    private void startCleanupTask() {
+        Bukkit.getScheduler().runTaskTimer(plugin, this::cleanupEmptyWorlds, 20L, CLEANUP_PERIOD_TICKS);
+    }
+
+    private void cleanupEmptyWorlds() {
+        long now = System.currentTimeMillis();
+
+        // 1. Instances enregistrées dont le monde reste vide trop longtemps.
+        for (GameInstance inst : new ArrayList<>(instances.values())) {
+            if (inst.getState() == GameInstance.State.CREATING) continue;
+            if (inst.getWorld() != null && inst.getWorld().getPlayers().isEmpty()) {
+                long since = emptySince.computeIfAbsent(inst.getId(), _ -> now);
+                if (now - since >= EMPTY_GRACE_MS) {
+                    emptySince.remove(inst.getId());
+                    log.info("[InstanceManager] Instance #" + inst.getId() + " vide : suppression.");
+                    closeInstance(inst, 0L);
+                }
+            } else {
+                emptySince.remove(inst.getId());
+            }
+        }
+
+        // 2. Mondes chargés avec le préfixe, sans instance ni joueur.
+        Set<String> owned = new HashSet<>();
+        for (GameInstance inst : instances.values()) owned.add(inst.getWorldName());
+        for (World w : new ArrayList<>(Bukkit.getWorlds())) {
+            String name = w.getName();
+            if (!name.startsWith(INSTANCE_PREFIX) || owned.contains(name) || busyWorlds.contains(name)) continue;
+            if (!w.getPlayers().isEmpty()) continue;
+            busyWorlds.add(name);
+            if (unloadWorld(name)) {
+                Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+                    deleteWorldFolder(name);
+                    busyWorlds.remove(name);
+                });
+            } else {
+                busyWorlds.remove(name);
+            }
+        }
+
+        // 3. Dossiers restants sur le disque (non chargés, sans instance).
+        File[] dirs = Bukkit.getWorldContainer().listFiles(
+                f -> f.isDirectory() && f.getName().startsWith(INSTANCE_PREFIX));
+        if (dirs == null) return;
+        for (File dir : dirs) {
+            String name = dir.getName();
+            if (owned.contains(name) || busyWorlds.contains(name) || Bukkit.getWorld(name) != null) continue;
+            busyWorlds.add(name);
+            Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+                deleteWorldFolder(name);
+                busyWorlds.remove(name);
+            });
+        }
     }
 
     // ══════════════════════════════════════════════════════════════════════
@@ -77,6 +145,7 @@ public class InstanceManager {
         String worldName = INSTANCE_PREFIX + instanceId;
 
         log.info("[InstanceManager] Création instance #" + instanceId + " (" + worldName + ")");
+        busyWorlds.add(worldName);
 
         // 1. Copie asynchrone du monde template
         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
@@ -85,8 +154,10 @@ public class InstanceManager {
                 log.info("[InstanceManager] Copie terminée pour " + worldName);
             } catch (Exception e) {
                 log.severe("[InstanceManager] Erreur copie: " + e.getMessage());
-                Bukkit.getScheduler().runTask(plugin, () ->
-                        callback.accept(null)); // signaler l'échec
+                Bukkit.getScheduler().runTask(plugin, () -> {
+                    busyWorlds.remove(worldName);
+                    callback.accept(null); // signaler l'échec
+                });
                 return;
             }
 
@@ -95,6 +166,7 @@ public class InstanceManager {
                 World world = loadWorld(worldName);
                 if (world == null) {
                     log.severe("[InstanceManager] Impossible de charger " + worldName);
+                    busyWorlds.remove(worldName);
                     callback.accept(null);
                     return;
                 }
@@ -102,6 +174,7 @@ public class InstanceManager {
                 // 3. Créer la GameInstance
                 GameInstance instance = new GameInstance(instanceId, world);
                 instances.put(instanceId, instance);
+                busyWorlds.remove(worldName); // désormais protégé par instances
 
                 // 4. Enregistrer les joueurs
                 for (UUID uid : blue) {
@@ -156,6 +229,8 @@ public class InstanceManager {
                 // Supprimer les mappings joueurs
                 for (UUID uid : participantsCopy) playerMap.remove(uid);
                 instances.remove(id);
+                emptySince.remove(id);
+                busyWorlds.add(worldName);
 
                 // Décharger et supprimer le monde (asynchrone)
                 Bukkit.getScheduler().runTaskLater(plugin, () -> {
@@ -163,8 +238,11 @@ public class InstanceManager {
                     if (unloaded) {
                         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
                             deleteWorldFolder(worldName);
+                            busyWorlds.remove(worldName);
                             log.info("[InstanceManager] Instance #" + id + " supprimée.");
                         });
+                    } else {
+                        busyWorlds.remove(worldName); // le nettoyage périodique réessaiera
                     }
                 }, 60L); // 3s pour que tous les joueurs soient partis
             }
