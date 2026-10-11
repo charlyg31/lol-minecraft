@@ -117,6 +117,7 @@ public class LolPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new fr.lolmc.listener.OrphanPurgeListener(), this);
         getServer().getScheduler().runTaskLater(this, fr.lolmc.game.MinionManager::purgeAllWorlds, 100L);
         saveDefaultConfig();
+        mergeMissingConfigKeys();
         saveResource("champions.yml", false);
         fr.lolmc.util.Balance.load();
         fr.lolmc.util.DebugLogger.init();
@@ -269,6 +270,28 @@ public class LolPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new fr.lolmc.listener.ChatListener(), this);
         getServer().getPluginManager().registerEvents(
                 new EntityDeathListener(championManager, rewardManager), this);
+    }
+
+    /**
+     * Ajoute à config.yml les clés manquantes (valeurs par défaut du jar) sans toucher
+     * aux valeurs déjà présentes. Utile après une mise à jour du plugin.
+     */
+    private void mergeMissingConfigKeys() {
+        try {
+            var cfg = getConfig();
+            var defaults = cfg.getDefaults();
+            if (defaults == null) return;
+            int added = 0;
+            for (String key : defaults.getKeys(true)) {
+                if (!cfg.isSet(key) && !defaults.isConfigurationSection(key)) added++;
+            }
+            if (added == 0) return;
+            cfg.options().copyDefaults(true);
+            saveConfig();
+            getLogger().info("config.yml : " + added + " clé(s) manquante(s) ajoutée(s) avec la valeur par défaut.");
+        } catch (Exception e) {
+            getLogger().warning("Fusion de config.yml impossible : " + e.getMessage());
+        }
     }
 
     @Override
