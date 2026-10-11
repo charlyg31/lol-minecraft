@@ -71,6 +71,13 @@ public class BungeeQueueManager {
         if (prop != null) prop.cancel();
     }
 
+    /** Test : lance une partie immédiatement pour un seul joueur, sans passer par la file. */
+    public void launchSolo(ProxiedPlayer player, String role) {
+        queue.remove(player.getUniqueId());
+        plugin.getRoleManager().setRoles(player.getUniqueId(), List.of(role));
+        launchGame(new ArrayList<>(List.of(player.getUniqueId())), null, null);
+    }
+
     public boolean isInQueue(UUID uuid) { return queue.contains(uuid); }
     public int getQueueSize()           { return queue.size(); }
     public int getPlayersNeeded()       { return playersNeeded; }

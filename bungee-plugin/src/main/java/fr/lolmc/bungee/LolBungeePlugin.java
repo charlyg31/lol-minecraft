@@ -51,6 +51,7 @@ public class LolBungeePlugin extends Plugin {
         // Commandes
         getProxy().getPluginManager().registerCommand(this, new LolCommand(this));
         getProxy().getPluginManager().registerCommand(this, new LolRCommand(this));
+        getProxy().getPluginManager().registerCommand(this, new LolSoloCommand(this));
 
         // Listeners
         getProxy().getPluginManager().registerListener(this, new ServerSwitchListener(this, originTracker));
