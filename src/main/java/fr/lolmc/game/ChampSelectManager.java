@@ -61,6 +61,8 @@ public class ChampSelectManager {
 
     /** Surcharge avec mode ranked (pick+ban) ou normal (pick seul). */
     public void startSelection(Collection<UUID> players, boolean ranked) {
+        this.ranked = ranked;
+        prepareTeamsAndPlace(players);
         this.bannedChampions.clear();
         this.hasBanned.clear();
         ChampSelectGUI.resetBans();
@@ -68,6 +70,34 @@ public class ChampSelectManager {
             startBanPhaseInternal(players);
         } else {
             startPickPhase(players);
+        }
+    }
+
+    private boolean ranked = false;
+
+    /**
+     * Mode partie unique : place chaque joueur dans une équipe (alternées, BLEU d'abord) et
+     * le téléporte à son point de départ dans le monde de jeu. Sans ça, un joueur arrivé du
+     * proxy reste dans le monde par défaut : pas d'équipe, donc ni HUD, ni chrono, ni sorts.
+     */
+    private void prepareTeamsAndPlace(Collection<UUID> players) {
+        var plugin = LolPlugin.getInstance();
+        var im = plugin.getInstanceManager();
+        var tm = plugin.getTeamManager();
+        var map = plugin.getMapManager();
+        int i = 0;
+        for (UUID id : players) {
+            Player p = Bukkit.getPlayer(id);
+            if (p == null) continue;
+            if (im != null && im.getInstanceOf(p) != null) continue; // instance : déjà placé
+            fr.lolmc.team.TeamManager.Team team = tm.hasTeam(p) ? tm.getTeam(p)
+                    : (i % 2 == 0 ? fr.lolmc.team.TeamManager.Team.BLUE : fr.lolmc.team.TeamManager.Team.RED);
+            if (!tm.hasTeam(p)) tm.setTeam(p, team);
+            i++;
+            var spawn = map.getSpawn(team, 0);
+            if (spawn == null) spawn = map.getSpawn(team, 1);
+            if (spawn != null) p.teleport(spawn);
+            plugin.getMinimapManager().giveMinimap(p);
         }
     }
 
@@ -172,12 +202,22 @@ public class ChampSelectManager {
             if (p == null) continue;
             p.showBossBar(selectBar);
             p.sendMessage(Component.text("═══ SÉLECTION DE CHAMPION ═══", NamedTextColor.LIGHT_PURPLE));
-            p.sendMessage(Component.text("Choisis : /pick <champion>, /runes, /spell <sort1> <sort2>",
+            p.sendMessage(Component.text("Menu de sélection ouvert — /pick pour le rouvrir.",
                     NamedTextColor.AQUA));
-            p.sendMessage(Component.text("Puis /lock pour verrouiller. Tu as " + SELECT_DURATION + "s.",
+            p.sendMessage(Component.text("Clique un champion puis « Verrouiller ». Tu as " + SELECT_DURATION + "s.",
                     NamedTextColor.GRAY));
-            // Ouvrir le menu de sélection de champion
-            LolPlugin.getInstance().getChampSelectGUI().openChampionMenu(p);
+            // Ouvrir le menu après un court délai (le joueur vient d'arriver / de se téléporter),
+            // puis une 2e fois si une téléportation l'a fermé entre-temps.
+            final UUID pid = id;
+            for (long delay : new long[]{20L, 60L}) {
+                Bukkit.getScheduler().runTaskLater(LolPlugin.getInstance(), () -> {
+                    Player q = Bukkit.getPlayer(pid);
+                    if (q == null || phase != Phase.SELECTING || locked.contains(pid)) return;
+                    if (q.getOpenInventory().getType() == org.bukkit.event.inventory.InventoryType.CRAFTING) {
+                        LolPlugin.getInstance().getChampSelectGUI().openChampionMenu(q);
+                    }
+                }, delay);
+            }
         }
 
         startTimer();
@@ -284,6 +324,8 @@ public class ChampSelectManager {
             if (ssm != null) ssm.setSpells(p, spells[0], spells[1]);
 
             // Skin choisi
+            var champObj = cm.getChampion(p);
+            if (champObj != null) LolPlugin.getInstance().getHotbarManager().renderPage(p, champObj);
             String skinId = chosenSkin.getOrDefault(id, "base");
             LolPlugin.getInstance().getSkinManager().applySkin(p, champ, skinId);
 
@@ -300,8 +342,12 @@ public class ChampSelectManager {
         if (instance != null) {
             instance.start();
         } else {
-            LolPlugin.getInstance().getGameManager().startGame();
-            LolPlugin.getInstance().getMinionManager().startWaves();
+            var plugin = LolPlugin.getInstance();
+            plugin.getMapManager().resetAllStructures();
+            plugin.getPlantManager().spawnAll();
+            plugin.getMatchScoreboard().startMatch(ranked);
+            plugin.getGameManager().startGame();
+            plugin.getMinionManager().startWaves();
             LolPlugin.getInstance().getJungleManager().startJungle();
         }
 
