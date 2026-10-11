@@ -56,9 +56,12 @@ public final class WorldContext {
      * Sinon, retourne les joueurs du monde configuré.
      */
     public static Collection<Player> getGamePlayers() {
-        World w = getGameWorld();
-        if (w == null) return List.of();
-        return w.getPlayers();
+        // Monde de jeu configuré + mondes d'instances (copies du template)
+        List<Player> result = new java.util.ArrayList<>();
+        for (Player p : Bukkit.getOnlinePlayers()) {
+            if (isInGameWorld(p)) result.add(p);
+        }
+        return result;
     }
 
     /**

@@ -142,7 +142,43 @@ public class BridgeManager implements PluginMessageListener {
                     // Lancer la sélection sur le thread principal
                     Bukkit.getScheduler().runTask(plugin, () -> {
                         var csm = plugin.getChampSelectManager();
-                        csm.startSelection(connected, ranked);
+                        if (!plugin.getConfig().getBoolean("world.use-instances", false)) {
+                            csm.startSelection(connected, ranked);
+                            return;
+                        }
+                        // Mode instances : copie du monde template → monde de partie dédié
+                        List<UUID> blue = new java.util.ArrayList<>();
+                        List<UUID> red  = new java.util.ArrayList<>();
+                        for (int i = 0; i < connected.size(); i++) (i % 2 == 0 ? blue : red).add(connected.get(i));
+                        for (UUID id : connected) {
+                            Player pl = Bukkit.getPlayer(id);
+                            if (pl != null) pl.sendMessage(net.kyori.adventure.text.Component.text(
+                                    "⏳ Création de la partie...", net.kyori.adventure.text.format.NamedTextColor.YELLOW));
+                        }
+                        plugin.getInstanceManager().createInstance(blue, red, instance -> {
+                            if (instance == null) {
+                                for (UUID id : connected) {
+                                    Player pl = Bukkit.getPlayer(id);
+                                    if (pl != null) pl.sendMessage(net.kyori.adventure.text.Component.text(
+                                            "❌ Impossible de créer la partie.", net.kyori.adventure.text.format.NamedTextColor.RED));
+                                }
+                                return;
+                            }
+                            var mapMgr = instance.getMapManager();
+                            for (UUID id : connected) {
+                                Player pl = Bukkit.getPlayer(id);
+                                if (pl == null) continue;
+                                var team = blue.contains(id) ? fr.lolmc.team.TeamManager.Team.BLUE
+                                                             : fr.lolmc.team.TeamManager.Team.RED;
+                                var spawn = mapMgr.getSpawn(team, 0);
+                                if (spawn == null) spawn = mapMgr.getSpawn(team, 1);
+                                if (spawn != null) pl.teleport(spawn);
+                                else pl.teleport(instance.getWorld().getSpawnLocation());
+                                plugin.getMinimapManager().giveMinimap(pl);
+                            }
+                            Bukkit.getScheduler().runTaskLater(plugin,
+                                    () -> csm.startSelection(connected, ranked), 40L);
+                        });
                     });
                 }
             }
