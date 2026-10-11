@@ -45,6 +45,7 @@ public class AutoAttackManager {
     private final Map<UUID, UUID> lockedTargets = new HashMap<>();
     private final Map<UUID, Long> lockSetAt = new HashMap<>();
     private static final long TOGGLE_GRACE_MS = 500; // anti-spam du re-clic
+    private static final double LOCK_MAX_DISTANCE = 50.0; // au-delà, le lock est perdu même si la cible reste visible
     private org.bukkit.scheduler.BukkitTask autoFireTask;
 
     /** Verrouille la cible : les AA continueront automatiquement. */
@@ -264,8 +265,8 @@ public class AutoAttackManager {
 
                     double range = cm.getChampion(attacker).getAutoAttackRange();
                     double dist = attacker.getLocation().distance(target.getLocation());
-                    if (dist > range * 1.15) { it.remove(); continue; } // partie trop loin : lock perdu
-                    if (dist > range) continue;      // zone tampon (hystérésis LoL) : on attend
+                    if (dist > LOCK_MAX_DISTANCE) { it.remove(); continue; } // trop loin : lock perdu
+                    if (dist > range) continue;      // hors de portée : le lock reste, on attend de se rapprocher
                     if (!canAutoAttack(attacker)) continue; // cadence AS pas prête
 
                     if (target instanceof Player tp) tryAutoAttack(attacker, tp);

@@ -53,7 +53,8 @@ public class AbilityPreview {
     private static final Material LINE_BLOCK    = Material.YELLOW_STAINED_GLASS;
     private static final Material SHADOW_BLOCK  = Material.LIGHT_GRAY_STAINED_GLASS; // ombre de Zed
     private static final Material GROUND_BLOCK  = Material.YELLOW_STAINED_GLASS;
-    private static final float LINE_THICKNESS   = 0.08f;  // épaisseur de la "règle" (X/Y)
+    private static final float BAND_THICKNESS   = 0.06f;  // épaisseur de la bande posée au sol
+    private static final double BAND_LIFT       = 0.04;   // léger décollage pour éviter le z-fighting avec le sol
     private static final int   RING_SEGMENTS    = 24;     // segments composant l'anneau au sol
     private static final float RING_SEGMENT_LEN = 0.35f;  // longueur de chaque segment de l'anneau
     private static final float RING_THICKNESS   = 0.08f;
@@ -148,25 +149,15 @@ public class AbilityPreview {
      */
     private List<BlockDisplay> spawnDisplaysFor(Player player, PreviewType type, double width) {
         List<BlockDisplay> displays = new ArrayList<>();
-        Location spawnLoc = player.getEyeLocation();
+        Location spawnLoc = player.getLocation().clone();
+        spawnLoc.setYaw(0f);
+        spawnLoc.setPitch(0f);
 
         switch (type) {
             case SKILLSHOT -> {
-                // 1 ligne centrale + 2 lignes latérales si le couloir est large
+                // Une seule bande plate au sol, de la largeur du couloir.
+                // La bande de l'ombre de Zed est créée à la demande (voir updateSkillshot).
                 displays.add(makeLineDisplay(spawnLoc, LINE_BLOCK));
-                if (width > 1.0) {
-                    displays.add(makeLineDisplay(spawnLoc, LINE_BLOCK));
-                    displays.add(makeLineDisplay(spawnLoc, LINE_BLOCK));
-                }
-                // Ligne(s) fantôme pour l'ombre de Zed (créées mais invisibles
-                // tant qu'aucune ombre n'est active ; gérées dans updateSkillshot)
-                if (isZed(player)) {
-                    displays.add(makeLineDisplay(spawnLoc, SHADOW_BLOCK));
-                    if (width > 1.0) {
-                        displays.add(makeLineDisplay(spawnLoc, SHADOW_BLOCK));
-                        displays.add(makeLineDisplay(spawnLoc, SHADOW_BLOCK));
-                    }
-                }
             }
             case GROUND -> {
                 for (int i = 0; i < RING_SEGMENTS; i++) {
@@ -206,77 +197,64 @@ public class AbilityPreview {
     // ── Mise à jour par tick (repositionnement + réorientation) ───────────────
 
     /**
-     * Repositionne la ligne de skillshot selon le regard actuel du joueur.
-     * Une "règle" fine et longue orientée le long du vecteur direction,
-     * arrêtée au premier bloc solide rencontré (simule la collision).
+     * Affiche le couloir du skillshot comme une bande plate posée au sol, devant
+     * les pieds du joueur (bien plus lisible qu'une ligne partant de la tête).
+     * La direction est projetée à l'horizontale et la bande s'arrête au premier
+     * mur rencontré à hauteur de corps.
      */
     private void updateSkillshot(Player player, List<BlockDisplay> displays, double range, double width) {
-        Location eye = player.getEyeLocation();
-        Vector dir = eye.getDirection().normalize();
-        double actualRange = raycastRange(eye, dir, range);
+        Vector dir = flatDirection(player.getEyeLocation().getDirection());
+        Location feet = player.getLocation().clone();
+        double length = raycastRange(feet.clone().add(0, 0.6, 0), dir, range);
+        positionBand(displays.get(0), feet, dir, length, width);
 
-        int idx = 0;
-        idx = layoutCorridor(displays, idx, eye, dir, actualRange, width);
+        if (!isZed(player)) return;
 
-        // Ombre de Zed : réoriente les displays fantômes s'il y a une ombre active,
-        // sinon les téléporte hors du monde visible (aucune donnée "masquer" simple
-        // sur une entité déjà affichée : on l'éloigne pour ne rien montrer).
-        if (isZed(player)) {
-            var shadowLoc = fr.lolmc.champion.impl.mid.Zed.getShadowLocation(player.getUniqueId());
-            if (shadowLoc != null) {
-                Location shadowEye = shadowLoc.clone().add(0, 1.6, 0);
-                shadowEye.setDirection(dir);
-                double shadowRange = raycastRange(shadowEye, dir, range);
-                layoutCorridor(displays, idx, shadowEye, dir, shadowRange, width);
-            } else {
-                parkRemaining(displays, idx, eye);
+        // Ombre de Zed : une deuxième bande, partant de l'ombre, créée seulement
+        // tant qu'une ombre est active, puis supprimée.
+        var shadowLoc = fr.lolmc.champion.impl.mid.Zed.getShadowLocation(player.getUniqueId());
+        if (shadowLoc != null && shadowLoc.getWorld() != null) {
+            if (displays.size() < 2) {
+                BlockDisplay d = makeLineDisplay(shadowLoc, SHADOW_BLOCK);
+                d.setVisibleByDefault(false);
+                player.showEntity(LolPlugin.getInstance(), d);
+                displays.add(d);
             }
+            double shadowLen = raycastRange(shadowLoc.clone().add(0, 0.6, 0), dir, range);
+            positionBand(displays.get(1), shadowLoc, dir, shadowLen, width);
+        } else if (displays.size() > 1) {
+            BlockDisplay d = displays.remove(1);
+            if (d != null && !d.isDead()) d.remove();
         }
     }
 
-    /** Place la ligne centrale + latérales à partir de l'index donné. Retourne le prochain index libre. */
-    private int layoutCorridor(List<BlockDisplay> displays, int startIdx,
-                                Location origin, Vector dir, double length, double width) {
-        int idx = startIdx;
-        if (idx >= displays.size()) return idx;
-        positionLine(displays.get(idx++), origin, dir, length);
-
-        if (width > 1.0 && idx + 1 < displays.size()) {
-            Vector side = new Vector(-dir.getZ(), 0, dir.getX()).normalize();
-            double half = width / 2.0;
-            positionLine(displays.get(idx++), origin.clone().add(side.clone().multiply(half)), dir, length);
-            positionLine(displays.get(idx++), origin.clone().add(side.clone().multiply(-half)), dir, length);
-        }
-        return idx;
-    }
-
-    /** "Range" les displays restants loin du joueur (aucune ombre active à afficher). */
-    private void parkRemaining(List<BlockDisplay> displays, int fromIdx, Location eye) {
-        Location parked = eye.clone().add(0, -256, 0); // sous le monde, hors de vue
-        for (int i = fromIdx; i < displays.size(); i++) {
-            displays.get(i).teleport(parked);
-        }
+    /** Direction horizontale normalisée (repli vers l'avant si le joueur regarde pile en haut/bas). */
+    private Vector flatDirection(Vector dir) {
+        Vector flat = new Vector(dir.getX(), 0, dir.getZ());
+        if (flat.lengthSquared() < 1.0e-6) return new Vector(0, 0, 1);
+        return flat.normalize();
     }
 
     /**
-     * Positionne et étire un BlockDisplay pour qu'il forme une ligne fine de
-     * [length] blocs, partant de [origin] dans la direction [dir].
+     * Pose une bande plate (largeur × longueur) au sol, de [origin] vers [dir].
+     * L'entité garde une rotation neutre (yaw 0) ; l'orientation vient uniquement
+     * de la transformation, pour éviter de cumuler deux rotations.
      */
-    private void positionLine(BlockDisplay display, Location origin, Vector dir, double length) {
-        // Téléportation à l'origine de la ligne (coin du bloc = point de départ)
-        display.teleport(origin);
+    private void positionBand(BlockDisplay display, Location origin, Vector dir, double length, double width) {
+        Location at = origin.clone();
+        at.setY(origin.getY() + BAND_LIFT);
+        at.setYaw(0f);
+        at.setPitch(0f);
+        display.teleport(at);
 
-        // Orientation : yaw à partir de la direction horizontale (suffisant pour
-        // un skillshot au sol/à hauteur d'yeux ; évite les distorsions de pitch
-        // sur un bloc étiré, cf. convention déjà utilisée dans MobModel).
-        float yaw = (float) Math.toRadians(-Math.toDegrees(Math.atan2(dir.getX(), dir.getZ())));
-        Quaternionf rot = new Quaternionf().rotateY(yaw);
+        float angle = (float) Math.atan2(dir.getX(), dir.getZ());
+        Quaternionf rot = new Quaternionf().rotateY(angle);
 
-        // Le bloc est étiré sur Z (profondeur) pour former la longueur de la ligne,
-        // fin sur X/Y. La translation recentre le bloc sur la ligne (X/Y) tout en
-        // gardant Z=0 (le coin de départ correspond à l'origine du skillshot).
-        Vector3f translation = new Vector3f(-LINE_THICKNESS / 2f, -LINE_THICKNESS / 2f, 0f);
-        Vector3f scale = new Vector3f(LINE_THICKNESS, LINE_THICKNESS, (float) length);
+        // X = largeur (centrée sur l'axe), Y = épaisseur, Z = longueur vers l'avant.
+        // La translation est exprimée avant rotation : on recentre en X seulement.
+        Vector3f translation = new Vector3f();
+        new Vector3f((float) (-width / 2.0), 0f, 0f).rotate(rot, translation);
+        Vector3f scale = new Vector3f((float) width, BAND_THICKNESS, (float) Math.max(0.1, length));
 
         display.setTransformation(new Transformation(translation, rot, scale, new Quaternionf()));
     }

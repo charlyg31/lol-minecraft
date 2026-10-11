@@ -314,18 +314,21 @@ public class AbilityListener implements Listener {
         if (slot == 0) {
             var aam = LolPlugin.getInstance().getAutoAttackManager();
 
-            // 1. Joueur ennemi visé → verrouillage (AA continues façon LoL)
-            Player aimed = target != null ? target : getTargetedPlayer(caster);
+            // Un clic ne fait QUE verrouiller une cible ennemie visible (même hors de portée).
+            // Les auto-attaques partent ensuite toutes seules, uniquement quand la cible
+            // verrouillée est dans la portée d'attaque (voir AutoAttackManager.startAutoFire).
+
+            // 1. Champion ennemi visé
+            Player aimed = (target != null && isLockableEnemy(caster, target))
+                    ? target : getTargetedEnemyPlayer(caster);
             if (aimed != null) {
-                aam.tryAutoAttack(caster, aimed);
                 aam.toggleLock(caster, aimed);
                 return;
             }
 
-            // 2. Entité (sbire, monstre de jungle) visée à distance → verrouillage (AA continues façon LoL)
+            // 2. Sbire ennemi / monstre de jungle visé
             org.bukkit.entity.LivingEntity entity = getTargetedEntity(caster);
             if (entity != null) {
-                aam.tryAutoAttackEntity(caster, entity);
                 aam.toggleLock(caster, entity);
                 return;
             }
@@ -333,19 +336,8 @@ public class AbilityListener implements Listener {
             // 3. Structure ennemie dans la portée AA (annule le lock précédent)
             if (tryAttackStructure(caster)) { aam.clearLock(caster); return; }
 
-            // 4. Rien visé — annule le lock (comme le Stop de LoL) + animation
+            // 4. Rien de verrouillable : annule le lock (comme le Stop de LoL), aucune attaque
             aam.clearLock(caster);
-            if (aam.canAutoAttack(caster)) {
-                var champ = manager.getChampion(caster);
-                var aaType = AutoAttackManager.getAAType(champ);
-                if (aaType != AutoAttackManager.AAType.MELEE) {
-                    aam.triggerCooldown(caster);
-                    // Tir dans la direction du regard
-                    Location aim = caster.getEyeLocation()
-                        .add(caster.getEyeLocation().getDirection().multiply(15));
-                    aam.playAnimationToLocation(caster, aim, aaType, false);
-                }
-            }
 
         } else if (slot >= 1 && slot <= 4) {
             Player aimed = target != null ? target : getTargetedPlayer(caster);
@@ -370,6 +362,7 @@ public class AbilityListener implements Listener {
             if (!(entity instanceof org.bukkit.entity.LivingEntity le)) continue;
             if (entity instanceof Player) continue; // les joueurs sont gérés par getTargetedPlayer
             if (entity.equals(caster)) continue;
+            if (!isLockableEnemy(caster, le)) continue; // jamais un allié, un PNJ ou une cible cachée
             double dist = entity.getLocation().distance(caster.getLocation());
             if (dist > range) continue;
             // Angle vers l'entité
@@ -424,6 +417,30 @@ public class AbilityListener implements Listener {
     }
 
     /** Trouve le joueur visé par le caster (raycast simple, portée 30 blocs). */
+    /** Cible verrouillable : ennemi (champion, sbire adverse, monstre) et visible par le joueur. */
+    private boolean isLockableEnemy(Player caster, org.bukkit.entity.LivingEntity le) {
+        return fr.lolmc.util.TargetingUtil.isEnemy(caster, le) && caster.canSee(le);
+    }
+
+    /** Champion ennemi visible le plus proche du viseur (portée de lock : 30 blocs). */
+    private Player getTargetedEnemyPlayer(Player caster) {
+        var eye = caster.getEyeLocation();
+        var dir = eye.getDirection();
+        Player closest = null;
+        double closestDist = Double.MAX_VALUE;
+        for (Player other : caster.getWorld().getPlayers()) {
+            if (!isLockableEnemy(caster, other)) continue;
+            var toTarget = other.getLocation().add(0, 1, 0).toVector().subtract(eye.toVector());
+            double dist = toTarget.length();
+            if (dist > 30) continue;
+            if (toTarget.normalize().dot(dir) > 0.96 && dist < closestDist) {
+                closest = other;
+                closestDist = dist;
+            }
+        }
+        return closest;
+    }
+
     private Player getTargetedPlayer(Player caster) {
         var eye = caster.getEyeLocation();
         var dir = eye.getDirection();
@@ -552,7 +569,10 @@ public class AbilityListener implements Listener {
             double dmgReduced = rawDmg * (100.0 / (100.0 + Math.max(0, armor)));
             champ.getHPSystem().takeDamage(dmgReduced);
             var hud = LolPlugin.getInstance().getHUDManager();
-            if (hud != null) hud.updateHUD(victim, champ);
+            if (hud != null) {
+                hud.updateHUD(victim, champ);
+                if (champ.getHPSystem().isDead()) hud.triggerDeath(victim, null); // mort par un sbire
+            }
         }
     }
 
@@ -589,7 +609,10 @@ public class AbilityListener implements Listener {
         double reduced = rawDmg * (100.0 / (100.0 + Math.max(0, armor)));
         champ.getHPSystem().takeDamage(reduced);
         var hud = LolPlugin.getInstance().getHUDManager();
-        if (hud != null) hud.updateHUD(victim, champ);
+        if (hud != null) {
+            hud.updateHUD(victim, champ);
+            if (champ.getHPSystem().isDead()) hud.triggerDeath(victim, null); // mort par un monstre
+        }
     }
 
     // ── Clic gauche sur entité → AA (slot 0) ──
@@ -622,7 +645,8 @@ public class AbilityListener implements Listener {
             int slotM = caster.getInventory().getHeldItemSlot();
             ItemStack heldM = caster.getInventory().getItem(slotM);
             if ("ability".equals(HotbarManager.getType(heldM)) && slotM == 0) {
-                LolPlugin.getInstance().getAutoAttackManager().tryAutoAttackEntity(caster, le);
+                // Le coup ne fait que verrouiller : l'AA part seulement quand la cible est à portée
+                if (caster.canSee(le)) LolPlugin.getInstance().getAutoAttackManager().toggleLock(caster, le);
             }
             return;
         }
@@ -641,8 +665,7 @@ public class AbilityListener implements Listener {
 
         if (slot == 0) {
             var aam2 = LolPlugin.getInstance().getAutoAttackManager();
-            aam2.tryAutoAttack(caster, target);
-            aam2.toggleLock(caster, target);
+            if (caster.canSee(target)) aam2.toggleLock(caster, target); // verrouille seulement, pas d'AA directe
         } else if (slot >= 1 && slot <= 4) {
             // Le débounce est déjà appliqué en amont (onArmSwing / onLeftClick)
             manager.getChampion(caster).tryUseAbility(caster, slot, target);
