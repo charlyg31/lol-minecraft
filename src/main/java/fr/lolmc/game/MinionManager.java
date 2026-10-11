@@ -37,6 +37,8 @@ public class MinionManager {
         return gameInstance != null ? gameInstance.getMapManager() : LolPlugin.getInstance().getMapManager();
     }
 
+    /** UUID des sbires vivants de cette session (tout le reste = orphelins). */
+    public static final java.util.Set<UUID> LIVE = java.util.concurrent.ConcurrentHashMap.newKeySet();
     public static NamespacedKey KEY_MINION;
     public static NamespacedKey KEY_TEAM;
     public static NamespacedKey KEY_LANE;
@@ -222,6 +224,7 @@ public class MinionManager {
 
     /** Rend le sbire invisible et lui pose un modèle custom anime (façon jungle). */
     private void applyMinionModel(LivingEntity minion, MinionType type, Team team, float hitboxScale) {
+        LIVE.add(minion.getUniqueId());
         MobAppearance.makeInvisible(minion);
         MobAppearance.setSilent(minion, true);
         List<UUID> parts = minionModel(type, team).spawnOn(minion);
@@ -505,6 +508,7 @@ public class MinionManager {
 
     /** Appelé à la mort d'un sbire : retire son modèle et son animation. */
     public void onMinionDeath(UUID minionId) {
+        LIVE.remove(minionId);
         List<UUID> parts = minionDeco.remove(minionId);
         if (parts != null) {
             for (UUID pid : parts) {
@@ -516,7 +520,8 @@ public class MinionManager {
     }
 
     public void clearAllMinions() {
-        // Retirer les parties de modèle de chaque sbire + désenregistrer l'animation
+        // 1. Les sbires d'abord (monde quelconque), puis les modèles
+        purgeAllWorlds();
         for (List<UUID> parts : minionDeco.values()) {
             for (UUID pid : parts) {
                 Entity d = org.bukkit.Bukkit.getEntity(pid);
@@ -525,10 +530,23 @@ public class MinionManager {
         }
         for (UUID id : minionDeco.keySet()) MobAnimator.unregister(id);
         minionDeco.clear();
-        purgeAllWorlds();
+        LIVE.clear();
     }
 
-    /** Supprime sbires + décorations orphelines (restés après un arrêt serveur) dans TOUS les mondes. */
+    /** Supprime une entité chargée si c'est un sbire ou un modèle orphelin (pas de cette session). */
+    public static void purgeIfOrphan(Entity e) {
+        if (KEY_MINION == null) return;
+        if (e instanceof LivingEntity le && isMinion(le)) {
+            if (!LIVE.contains(e.getUniqueId())) e.remove();
+        } else if (e instanceof org.bukkit.entity.Display
+                && fr.lolmc.util.MobAppearance.isDecoration(e)) {
+            Entity v = e.getVehicle();
+            if (v == null || (v instanceof LivingEntity vl && isMinion(vl) && !LIVE.contains(v.getUniqueId()))) {
+                e.remove();
+            }
+        }
+    }
+
     public static void purgeAllWorlds() {
         if (KEY_MINION == null) return;
         for (var world : org.bukkit.Bukkit.getWorlds()) {
@@ -537,7 +555,8 @@ public class MinionManager {
                     e.remove();
                 } else if (e instanceof org.bukkit.entity.Display
                         && fr.lolmc.util.MobAppearance.isDecoration(e)
-                        && e.getVehicle() == null) {
+                        && (e.getVehicle() == null
+                            || (e.getVehicle() instanceof LivingEntity v && isMinion(v)))) {
                     e.remove();
                 }
             }

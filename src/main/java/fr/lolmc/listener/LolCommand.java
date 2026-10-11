@@ -220,6 +220,8 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
                 player.sendMessage(Component.text("✔ Partie lancée (structures, sbires, jungle, timer)!", NamedTextColor.GREEN));
             }
             case "stop" -> {
+                LolPlugin.getInstance().getMinionManager().stopWaves();
+                LolPlugin.getInstance().getJungleManager().stopJungle();
                 fr.lolmc.instance.InstanceHelper.minionManager(player).stopWaves();
                 fr.lolmc.instance.InstanceHelper.jungleManager(player).stopJungle();
                 LolPlugin.getInstance().getPlantManager().clearAll();

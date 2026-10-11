@@ -114,6 +114,7 @@ public class LolPlugin extends JavaPlugin {
     @Override
     public void onEnable() {
         instance = this;
+        getServer().getPluginManager().registerEvents(new fr.lolmc.listener.OrphanPurgeListener(), this);
         getServer().getScheduler().runTaskLater(this, fr.lolmc.game.MinionManager::purgeAllWorlds, 100L);
         saveDefaultConfig();
         saveResource("champions.yml", false);
