@@ -97,6 +97,14 @@ public class ChampSelectManager {
             var spawn = map.getSpawn(team, 0);
             if (spawn == null) spawn = map.getSpawn(team, 1);
             if (spawn != null) p.teleport(spawn);
+            var gw = fr.lolmc.util.WorldContext.getGameWorld();
+            if (gw == null || !gw.equals(p.getWorld())) {
+                String msg = "⚠ Monde de jeu ≠ monde du joueur : config world.name=\""
+                        + fr.lolmc.util.WorldContext.getGameWorldName() + "\", tu es dans \""
+                        + p.getWorld().getName() + "\". Chrono/HUD/tab inactifs.";
+                p.sendMessage(Component.text(msg, NamedTextColor.RED));
+                LolPlugin.getInstance().getLogger().warning(msg);
+            }
             plugin.getMinimapManager().giveMinimap(p);
         }
     }

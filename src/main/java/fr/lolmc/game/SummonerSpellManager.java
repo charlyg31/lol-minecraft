@@ -475,13 +475,17 @@ public class SummonerSpellManager {
      * Définit les sorts d'invocateur d'un joueur (appelé par BridgeManager).
      */
     public void setSpells(org.bukkit.entity.Player player, String spell1, String spell2) {
-        try {
-            Spell s1 = Spell.valueOf(spell1.toUpperCase());
-            Spell s2 = Spell.valueOf(spell2.toUpperCase());
-            playerSpells.put(player.getUniqueId(), new Spell[]{s1, s2});
-        } catch (IllegalArgumentException e) {
-            LolPlugin.getInstance().getLogger().warning(
-                "[Bridge] Sorts invalides: " + spell1 + ", " + spell2);
-        }
+        // FLASH est géré par FlashManager (hors de cet enum) : on le saute sans erreur.
+        Spell s1 = parseSpell(spell1);
+        Spell s2 = parseSpell(spell2);
+        if (s1 == null) s1 = (s2 == Spell.IGNITE) ? Spell.HEAL : Spell.IGNITE;
+        if (s2 == null) s2 = (s1 == Spell.IGNITE) ? Spell.HEAL : Spell.IGNITE;
+        playerSpells.put(player.getUniqueId(), new Spell[]{s1, s2});
+    }
+
+    private static Spell parseSpell(String name) {
+        if (name == null) return null;
+        try { return Spell.valueOf(name.toUpperCase()); }
+        catch (IllegalArgumentException e) { return null; }
     }
 }
