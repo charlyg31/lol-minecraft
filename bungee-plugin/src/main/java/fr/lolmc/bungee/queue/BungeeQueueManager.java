@@ -396,19 +396,19 @@ public class BungeeQueueManager {
         sendPluginMessage(carrier, gameServer, sb.toString());
     }
 
+    /**
+     * Envoie le JSON directement au serveur de jeu sur le canal lolmc:bridge.
+     * (ProxiedPlayer#sendData écrit vers le CLIENT, pas vers un serveur : le message
+     * "Forward" n'atteignait donc jamais le serveur de jeu.)
+     * Le message est mis en file si aucun joueur n'est encore connecté à ce serveur.
+     */
     private void sendPluginMessage(ProxiedPlayer carrier, String targetServer, String json) {
-        try (ByteArrayOutputStream baos = new ByteArrayOutputStream();
-             DataOutputStream out = new DataOutputStream(baos)) {
-            out.writeUTF("Forward");
-            out.writeUTF(targetServer);
-            out.writeUTF("lolmc:bridge");
-            byte[] data = json.getBytes(StandardCharsets.UTF_8);
-            out.writeShort(data.length);
-            out.write(data);
-            carrier.sendData("BungeeCord", baos.toByteArray());
-        } catch (IOException e) {
-            plugin.getLogger().warning("Erreur PluginMessage: " + e.getMessage());
+        ServerInfo info = ProxyServer.getInstance().getServerInfo(targetServer);
+        if (info == null) {
+            plugin.getLogger().warning("Serveur introuvable pour PluginMessage: " + targetServer);
+            return;
         }
+        info.sendData("lolmc:bridge", json.getBytes(StandardCharsets.UTF_8), true);
     }
 
     private ProxiedPlayer findCarrier(List<UUID> players) {
