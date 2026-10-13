@@ -125,7 +125,13 @@ En activant `use-instances: true`, chaque match copie le monde `world.template` 
 
 **Ce qui est propre à chaque instance :** `GameManager`, `MinionManager`, `JungleManager`, `TurretManager`, `FogOfWarManager`, `RewardManager`, `AnnouncementManager`, `FeatManager`, `PassiveManager`, `BaseManager`, ainsi que la sélection de champion (chrono, bans, choix), le vote d'abandon, le tab et les stats de fin de partie (écran de score et sauvegarde en base limités aux joueurs de la partie).
 
-**Limite connue :** `TeamManager` reste global (une seule table joueur → équipe) ; les endroits qui listent des équipiers (pings, buffs, chat d'équipe, wards…) filtrent par monde pour ne pas mélanger deux parties. Les commandes de test `/lola` (hors `/lola instance`) visent le monde template.
+**Monde template :** les instances sont copiées depuis `plugins/LolMC/template/` si ce dossier contient un monde (`level.dat` ou `region/`). Sinon, le plugin retombe sur le dossier du monde `world.template` à la racine du serveur (ancien comportement). `/lola template save` enregistre le monde **où tu te trouves** dans `plugins/LolMC/template/` (le monde est sauvegardé puis copié), le définit comme `world.template` et rattache `map.yml` (tours, nexus, spawns), `roads.yml` (chemins) et `jungle.yml` (camps) à ce monde (refusé dans un monde d'instance ou pendant une partie) ; `/lola template` affiche la source utilisée. On peut aussi y déposer à la main un dossier de monde.
+
+**Plantes :** chaque instance a ses propres plantes (positions copiées du template) ; leur chunk est maintenu chargé par un ticket de chunk du plugin tant que la partie dure, pour qu'elles poussent et repoussent même sans joueur à proximité.
+
+**Équipes :** `TeamManager` garde une table joueur → équipe unique, mais chaque lecture est limitée au monde du joueur : `areAllies`/`areEnemies` sont faux entre deux mondes, l'auto-équilibrage ne compte que les joueurs du même monde, et les listes d'équipiers (pings, buffs, chat d'équipe, wards…) filtrent par monde. Les deux parties ne se mélangent donc pas.
+
+**Commandes de test `/lola` :** `start`, `stop`, `solo`, `testgame`, `spawn`, `wave` et `mode` agissent sur la partie de l'admin : son instance s'il en est dans une, sinon le monde template. Les plantes (miel, cône, voyant) sont aussi recréées dans chaque instance.
 
 **BungeeTabListPlus :** si BTLP (avec son bridge Bukkit) est installé, LolMC enregistre les variables `lolmc_team`, `lolmc_champion`, `lolmc_kills`, `lolmc_deaths`, `lolmc_assists`, `lolmc_kda`, `lolmc_cs`, `lolmc_gold` et `lolmc_game` (à utiliser par ex. avec `${player lolmc_kda}`). Les valeurs sont propres à chaque joueur, donc à chaque instance. Les classes de l'API BTLP présentes dans `src/main/java/codecrafter47` sont de simples stubs de compilation, exclus du jar.
 
@@ -181,7 +187,7 @@ Chaque champion a ses 4 sorts (Q/W/E/R) plus passif, avec scaling AP/AD, prévis
 
 `/lola <start|stop|instance|set|position|center|lane|solo|give|level|gold|hp|resetcd|buff|spawn|wave|select|reload|debug|testgame|schem|road|jungle|shopnpc|mode|team|permcheck|help>` (alias `/lolAdmin`)
 
-Les sous-commandes de configuration de carte (`set`, `position`, `center`, `lane`, `jungle`, `schem`, `road`, `shopnpc`, `mode`) s'appliquent au monde template, avant toute partie. `/lola instance` liste les instances actives ; `/lola instance <n>` téléporte l'admin dans l'instance n, `/lola instance template` dans le monde template. Les sous-commandes de test (`solo`, `give`, `buff`, `wave`, `hp`, `gold`, `level`, `resetcd`) agissent sur la partie en cours.
+Les sous-commandes de configuration de carte (`set`, `position`, `center`, `lane`, `jungle`, `schem`, `road`, `shopnpc`, `mode`) s'appliquent au monde template, avant toute partie. `/lola template [save]` gère le monde template (voir plus bas). `/lola instance` liste les instances actives ; `/lola instance <n>` téléporte l'admin dans l'instance n, `/lola instance template` dans le monde template. Les sous-commandes de test (`solo`, `give`, `buff`, `wave`, `hp`, `gold`, `level`, `resetcd`) agissent sur la partie en cours.
 
 ---
 

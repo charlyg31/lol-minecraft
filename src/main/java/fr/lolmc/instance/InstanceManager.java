@@ -53,7 +53,7 @@ public class InstanceManager {
     // UUID joueur → GameInstance
     private final Map<UUID, GameInstance>   playerMap = new ConcurrentHashMap<>();
 
-    private final String templateWorldName;
+    private String templateWorldName;
 
     // Mondes en cours de création (copie) ou de fermeture : le nettoyage ne doit pas y toucher.
     private final Set<String> busyWorlds = ConcurrentHashMap.newKeySet();
@@ -182,7 +182,7 @@ public class InstanceManager {
         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
             try {
                 deleteWorldFolder(worldName); // restes d'une ancienne partie du même nom
-                copyWorldFolder(templateWorldName, worldName);
+                copyWorldFolder(worldName);
                 log.info("[InstanceManager] Copie terminée pour " + worldName);
             } catch (Exception e) {
                 log.severe("[InstanceManager] Erreur copie: " + e.getMessage());
@@ -380,35 +380,101 @@ public class InstanceManager {
      * Exclut session.lock, uid.dat et uid.dat.old.
      * Doit être appelé depuis un thread asynchrone.
      */
-    private void copyWorldFolder(String source, String dest) throws IOException {
-        File serverRoot = Bukkit.getWorldContainer();
-        Path srcPath    = new File(serverRoot, source).toPath();
-        Path destPath   = new File(serverRoot, dest).toPath();
+    // ══════════════════════════════════════════════════════════════════════
+    // MONDE TEMPLATE (source des copies)
+    // ══════════════════════════════════════════════════════════════════════
 
-        if (!Files.exists(srcPath)) {
-            throw new IOException("Monde template introuvable : " + source
-                    + " (chemin : " + srcPath.toAbsolutePath() + ")");
+    /** Nouveau nom de monde template (après /lola template save), persisté dans config.yml. */
+    public void setTemplateWorldName(String name) {
+        this.templateWorldName = name;
+        plugin.getConfig().set("world.template", name);
+        plugin.saveConfig();
+    }
+
+    /** Dossier du template dans le plugin : plugins/LolMC/template */
+    public Path pluginTemplateDir() {
+        return plugin.getDataFolder().toPath().resolve("template");
+    }
+
+    /** Un dossier est un monde exploitable s'il contient level.dat ou des régions. */
+    private static boolean looksLikeWorld(Path dir) {
+        return Files.isDirectory(dir) && (Files.exists(dir.resolve("level.dat"))
+                || Files.isDirectory(dir.resolve("region"))
+                || Files.isDirectory(dir.resolve("dimensions")));
+    }
+
+    /**
+     * Source des copies : 1) plugins/LolMC/template, 2) dossier du monde template à la racine du
+     * serveur (ancien comportement), 3) emplacement migré par Paper 26. Null si introuvable.
+     */
+    public Path resolveTemplateSource() {
+        Path inPlugin = pluginTemplateDir();
+        if (looksLikeWorld(inPlugin)) return inPlugin;
+        Path legacy = new File(Bukkit.getWorldContainer(), templateWorldName).toPath();
+        if (looksLikeWorld(legacy)) return legacy;
+        Path migrated = migratedDir(templateWorldName);
+        if (looksLikeWorld(migrated)) return migrated;
+        return null;
+    }
+
+    /** Texte décrivant la source utilisée (pour /lola template info). */
+    public String describeTemplateSource() {
+        Path src = resolveTemplateSource();
+        if (src == null) return "introuvable";
+        String where = src.equals(pluginTemplateDir()) ? "dossier du plugin" : "dossier du serveur (ancien emplacement)";
+        return where + " → " + src.toAbsolutePath();
+    }
+
+    /**
+     * Enregistre le monde template actuel (en jeu) dans plugins/LolMC/template.
+     * Sauvegarde le monde puis copie ses fichiers en asynchrone ; {@code done} est rappelé sur le thread principal.
+     */
+    public void snapshotTemplate(World world, java.util.function.Consumer<String> done) {
+        if (world == null) { done.accept("❌ Monde template introuvable (non chargé)."); return; }
+        world.save();
+        final Path src = world.getWorldFolder().toPath();
+        final Path dst = pluginTemplateDir();
+        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+            String msg;
+            try {
+                deleteTree(dst, "template (remplacement)");
+                copyTree(src, dst);
+                msg = "✔ Template enregistré dans " + dst.toAbsolutePath()
+                        + " (source : " + src.toAbsolutePath() + ").";
+            } catch (Exception e) {
+                log.severe("[InstanceManager] Snapshot template: " + e);
+                msg = "❌ Échec de l'enregistrement du template : " + e.getMessage();
+            }
+            final String out = msg;
+            Bukkit.getScheduler().runTask(plugin, () -> done.accept(out));
+        });
+    }
+
+    private void copyWorldFolder(String dest) throws IOException {
+        Path srcPath = resolveTemplateSource();
+        if (srcPath == null) {
+            throw new IOException("Monde template introuvable : ni " + pluginTemplateDir().toAbsolutePath()
+                    + " ni le dossier « " + templateWorldName + " » à la racine du serveur"
+                    + " (utilise /lola template save pour enregistrer le template)");
         }
+        copyTree(srcPath, new File(Bukkit.getWorldContainer(), dest).toPath());
+    }
 
-        // Copier récursivement
+    /** Copie récursive d'un monde (sans session.lock ni uid.dat). */
+    private void copyTree(Path srcPath, Path destPath) throws IOException {
         Files.walkFileTree(srcPath, new SimpleFileVisitor<>() {
             @Override
             public @NotNull FileVisitResult preVisitDirectory(@NotNull Path dir, @NotNull BasicFileAttributes attrs) throws IOException {
-                Path relative = srcPath.relativize(dir);
-                Path target   = destPath.resolve(relative);
-                Files.createDirectories(target);
+                Files.createDirectories(destPath.resolve(srcPath.relativize(dir)));
                 return FileVisitResult.CONTINUE;
             }
 
             @Override
             public @NotNull FileVisitResult visitFile(@NotNull Path file, @NotNull BasicFileAttributes attrs) throws IOException {
                 String name = file.getFileName().toString();
-                // Exclure les fichiers de verrou et identifiants uniques
-                if (name.equals("session.lock") || name.equals("uid.dat")
-                        || name.equals("uid.dat.old"))
+                if (name.equals("session.lock") || name.equals("uid.dat") || name.equals("uid.dat.old"))
                     return FileVisitResult.CONTINUE;
-                Path relative = srcPath.relativize(file);
-                Files.copy(file, destPath.resolve(relative),
+                Files.copy(file, destPath.resolve(srcPath.relativize(file)),
                         StandardCopyOption.REPLACE_EXISTING);
                 return FileVisitResult.CONTINUE;
             }

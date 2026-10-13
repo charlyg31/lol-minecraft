@@ -248,6 +248,26 @@ public class RoadManager {
         }
     }
 
+    /** Réécrit le monde de tous les points de route dans roads.yml puis recharge et réapplique. */
+    public void rebindWorld(String worldName) {
+        var sec = config.getConfigurationSection("roads");
+        if (sec != null) {
+            for (String lane : sec.getKeys(false)) {
+                List<String> out = new ArrayList<>();
+                for (String s : config.getStringList("roads." + lane)) {
+                    String[] parts = s.split(";");
+                    if (parts.length == 4) out.add(worldName + ";" + parts[1] + ";" + parts[2] + ";" + parts[3]);
+                }
+                config.set("roads." + lane, out);
+            }
+            try { config.save(roadFile); }
+            catch (Exception e) { LolPlugin.getInstance().getLogger().warning("Erreur sauvegarde roads.yml: " + e.getMessage()); }
+        }
+        roads.clear();
+        load();
+        applyToMinionManager();
+    }
+
     /** Recharge les routes dans le MinionManager au démarrage (LolPlugin.onEnable, avant
      *  toute instance de partie : reste sur le manager global, cohérent). */
     public void applyToMinionManager() {

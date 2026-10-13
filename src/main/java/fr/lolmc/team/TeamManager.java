@@ -61,8 +61,9 @@ public class TeamManager {
      * Assigne automatiquement le joueur à l'équipe la moins remplie.
      */
     public Team autoAssign(Player player) {
-        long blue = playerTeams.values().stream().filter(t -> t == Team.BLUE).count();
-        long red  = playerTeams.values().stream().filter(t -> t == Team.RED).count();
+        // Équilibrage au sein du même monde (= de la même partie) uniquement
+        long blue = getTeamMembers(Team.BLUE, player.getWorld()).stream().filter(id -> !id.equals(player.getUniqueId())).count();
+        long red  = getTeamMembers(Team.RED,  player.getWorld()).stream().filter(id -> !id.equals(player.getUniqueId())).count();
         Team team = (blue <= red) ? Team.BLUE : Team.RED;
         setTeam(player, team);
         return team;
@@ -72,12 +73,14 @@ public class TeamManager {
 
     /** true si les deux joueurs sont dans la même équipe. */
     public boolean areAllies(Player a, Player b) {
+        if (!a.getWorld().equals(b.getWorld())) return false; // parties différentes
         Team ta = getTeam(a), tb = getTeam(b);
         return ta != null && ta == tb;
     }
 
     /** true si les deux joueurs sont dans des équipes opposées. */
     public boolean areEnemies(Player a, Player b) {
+        if (!a.getWorld().equals(b.getWorld())) return false; // parties différentes
         Team ta = getTeam(a), tb = getTeam(b);
         return ta != null && tb != null && ta != tb;
     }

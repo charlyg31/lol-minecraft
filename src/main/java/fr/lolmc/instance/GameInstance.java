@@ -104,6 +104,7 @@ public class GameInstance {
     public void start() {
         state = State.RUNNING;
         mapManager.resetAllStructures();
+        LolPlugin.getInstance().getPlantManager().spawnAll(world);
         gameManager.startGame();
         minionManager.startWaves();
         jungleManager.startJungle();
@@ -114,6 +115,7 @@ public class GameInstance {
 
     public void stop() {
         state = State.FINISHED;
+        LolPlugin.getInstance().getPlantManager().clearAll(world);
         gameManager.stopGame();
         minionManager.stopWaves();
         jungleManager.stopJungle();

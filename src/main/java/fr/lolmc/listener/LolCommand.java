@@ -162,6 +162,7 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
             case "hp"      -> handleHp(player, args);
             case "wave"    -> handleWave(player);
             case "instance", "instances" -> handleInstance(player, args);
+            case "template" -> handleTemplate(player, args);
             case "help"    -> handleAdminHelp(player);
             case "reload" -> {
                 LolPlugin.getInstance().reloadConfig();
@@ -211,13 +212,13 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
             }
             case "start" -> {
                 player.sendMessage(Component.text("⚔ Lancement de la partie...", NamedTextColor.GOLD));
-                mapManager.resetAllStructures();
+                fr.lolmc.instance.InstanceHelper.mapManager(player).resetAllStructures();
                 fr.lolmc.instance.InstanceHelper.minionManager(player).startWaves();
                 fr.lolmc.instance.InstanceHelper.jungleManager(player).startJungle();
-                LolPlugin.getInstance().getPlantManager().spawnAll();
+                spawnPlantsFor(player);
                 fr.lolmc.instance.InstanceHelper.gameManager(player).startGame();
                 LolPlugin.getInstance().getMatchScoreboard().startMatch(
-                        LolPlugin.getInstance().getMatchScoreboard().isRanked());
+                        LolPlugin.getInstance().getMatchScoreboard().isRanked(), contextIds(player));
                 player.sendMessage(Component.text("✔ Partie lancée (structures, sbires, jungle, timer)!", NamedTextColor.GREEN));
             }
             case "stop" -> {
@@ -225,7 +226,7 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
                 LolPlugin.getInstance().getJungleManager().stopJungle();
                 fr.lolmc.instance.InstanceHelper.minionManager(player).stopWaves();
                 fr.lolmc.instance.InstanceHelper.jungleManager(player).stopJungle();
-                LolPlugin.getInstance().getPlantManager().clearAll();
+                clearPlantsFor(player);
                 fr.lolmc.instance.InstanceHelper.gameManager(player).stopGame();
                 // Instance de partie : fermeture immédiate (joueurs renvoyés au spawn, monde supprimé)
                 var stopInst = fr.lolmc.instance.InstanceHelper.instanceOf(player);
@@ -474,14 +475,19 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
 private void handleSolo(Player player, String[] args) {
     String champId = args.length >= 2 ? args[1].toLowerCase() : "garen";
     var plugin = LolPlugin.getInstance();
+    // Contexte de l'admin : son instance s'il en est dans une, sinon le monde de test (template)
+    var gm  = fr.lolmc.instance.InstanceHelper.gameManager(player);
+    var mm  = fr.lolmc.instance.InstanceHelper.minionManager(player);
+    var jm  = fr.lolmc.instance.InstanceHelper.jungleManager(player);
+    var map = fr.lolmc.instance.InstanceHelper.mapManager(player);
+    boolean inInstance = fr.lolmc.instance.InstanceHelper.instanceOf(player) != null;
 
-    // Repart de zéro : arrête l'ancienne partie et purge les sbires orphelins
-    plugin.getMinionManager().stopWaves();
-    plugin.getJungleManager().stopJungle();
-    if (plugin.getGameManager().isRunning()) plugin.getGameManager().stopGame();
-    plugin.getGameManager().stopSystems();
-    // Uniquement le monde de test (template) : les instances en cours ne sont pas touchées
-    var soloWorld = fr.lolmc.util.WorldContext.getGameWorld();
+    // Repart de zéro : arrête l'ancienne partie et purge les sbires orphelins (de CE monde seulement)
+    mm.stopWaves();
+    jm.stopJungle();
+    if (gm.isRunning()) gm.stopGame();
+    gm.stopSystems();
+    var soloWorld = inInstance ? player.getWorld() : fr.lolmc.util.WorldContext.getGameWorld();
     if (soloWorld != null) fr.lolmc.game.MinionManager.purgeWorld(soloWorld);
 
     plugin.getTeamManager().setTeam(player, fr.lolmc.team.TeamManager.Team.BLUE);
@@ -495,16 +501,17 @@ private void handleSolo(Player player, String[] args) {
     }
     plugin.getRuneManager().applyRuneStats(player);
     plugin.getGoldManager().addGold(player.getUniqueId(), 20000);
-    mapManager.resetAllStructures();
-    plugin.getMinionManager().startWaves();
-    plugin.getJungleManager().startJungle();
-    plugin.getPlantManager().spawnAll();
-    plugin.getGameManager().startGame();
+    map.resetAllStructures();
+    mm.startWaves();
+    jm.startJungle();
+    spawnPlantsFor(player);
+    gm.startGame();
     plugin.getMatchScoreboard().startMatch(false, java.util.Set.of(player.getUniqueId()));
-    var spawn = plugin.getMapManager().getSpawn(fr.lolmc.team.TeamManager.Team.BLUE, 1);
+    var spawn = map.getSpawn(fr.lolmc.team.TeamManager.Team.BLUE, 1);
     if (spawn != null) player.teleport(spawn);
 
-    player.sendMessage(Component.text("🧪 MODE SOLO lancé!", NamedTextColor.GREEN));
+    player.sendMessage(Component.text("🧪 MODE SOLO lancé!" + (inInstance ? " (instance #"
+            + fr.lolmc.instance.InstanceHelper.instanceOf(player).getId() + ")" : ""), NamedTextColor.GREEN));
     player.sendMessage(Component.text("Équipe BLEUE • Champion: " + champId, NamedTextColor.AQUA));
 }
 
@@ -553,12 +560,12 @@ private void handleSolo(Player player, String[] args) {
 
     private void handleTestGame(Player player) {
         var plugin = LolPlugin.getInstance();
-        mapManager.resetAllStructures();
-        plugin.getMinionManager().startWaves();
-        plugin.getJungleManager().startJungle();
-        plugin.getPlantManager().spawnAll();
-        plugin.getGameManager().startGame();
-        plugin.getMatchScoreboard().startMatch(false);
+        fr.lolmc.instance.InstanceHelper.mapManager(player).resetAllStructures();
+        fr.lolmc.instance.InstanceHelper.minionManager(player).startWaves();
+        fr.lolmc.instance.InstanceHelper.jungleManager(player).startJungle();
+        spawnPlantsFor(player);
+        fr.lolmc.instance.InstanceHelper.gameManager(player).startGame();
+        plugin.getMatchScoreboard().startMatch(false, contextIds(player));
         player.sendMessage(Component.text("🧪 Map lancée (structures, sbires, jungle, timer).", NamedTextColor.GREEN));
     }
 
@@ -573,7 +580,7 @@ private void handleSolo(Player player, String[] args) {
     private void handleMode(Player player, String[] args) {
         if (args.length < 2) { player.sendMessage("§cUsage: /lola mode <ranked|normal>"); return; }
         boolean ranked = args[1].equalsIgnoreCase("ranked") || args[1].equalsIgnoreCase("classe");
-        LolPlugin.getInstance().getMatchScoreboard().startMatch(ranked);
+        LolPlugin.getInstance().getMatchScoreboard().startMatch(ranked, contextIds(player));
         player.sendMessage(Component.text("✔ Mode de partie : " + (ranked ? "CLASSÉ" : "AMICAL"), NamedTextColor.GREEN));
     }
 
@@ -758,9 +765,10 @@ private void handleSolo(Player player, String[] args) {
 
     @Override
     public List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command cmd, @NotNull String alias, @NotNull String @NotNull [] args) {
-        if (args.length == 1) return List.of("set", "position", "lane", "schem", "road", "jungle", "shopnpc", "mode", "select", "solo", "give", "level", "gold", "team", "testgame", "debug", "reload", "start", "stop", "center", "instance"); // MODIFICATION : Injecté "schem"
+        if (args.length == 1) return List.of("set", "position", "lane", "schem", "road", "jungle", "shopnpc", "mode", "select", "solo", "give", "level", "gold", "team", "testgame", "debug", "reload", "start", "stop", "center", "instance", "template"); // MODIFICATION : Injecté "schem"
         if (args.length == 2) {
             return switch (args[0].toLowerCase()) {
+                case "template" -> List.of("save", "info");
                 case "instance", "instances" -> {
                     List<String> ids = new java.util.ArrayList<>();
                     for (var gi : LolPlugin.getInstance().getInstanceManager().getAllInstances()) ids.add(String.valueOf(gi.getId()));
@@ -806,19 +814,19 @@ private void handleSolo(Player player, String[] args) {
         }
 
         switch (type) {
-            case "minion_melee"  -> { plugin.getMinionManager().spawnTestMinion(loc, team, "melee");  player.sendMessage(Component.text("✔ Sbire mêlée spawné", NamedTextColor.GREEN)); }
-            case "minion_caster" -> { plugin.getMinionManager().spawnTestMinion(loc, team, "caster"); player.sendMessage(Component.text("✔ Sbire caster spawné", NamedTextColor.GREEN)); }
-            case "minion_cannon" -> { plugin.getMinionManager().spawnTestMinion(loc, team, "cannon"); player.sendMessage(Component.text("✔ Sbire canon spawné", NamedTextColor.GREEN)); }
-            case "minion_super"  -> { plugin.getMinionManager().spawnTestMinion(loc, team, "super");  player.sendMessage(Component.text("✔ Super-sbire spawné", NamedTextColor.GREEN)); }
-            case "dragon"        -> { plugin.getJungleManager().spawnTestMonster(loc, "DRAGON_INFERNAL"); player.sendMessage(Component.text("✔ Dragon spawné", NamedTextColor.RED)); }
-            case "baron"         -> { plugin.getJungleManager().spawnTestMonster(loc, "BARON");           player.sendMessage(Component.text("✔ Baron Nashor spawné", NamedTextColor.LIGHT_PURPLE)); }
-            case "herald"        -> { plugin.getJungleManager().spawnTestMonster(loc, "HERALD");          player.sendMessage(Component.text("✔ Héraut spawné", NamedTextColor.AQUA)); }
-            case "wolf"          -> { plugin.getJungleManager().spawnTestMonster(loc, "WOLF");            player.sendMessage(Component.text("✔ Loup spawné", NamedTextColor.GRAY)); }
-            case "blue"          -> { plugin.getJungleManager().spawnTestMonster(loc, "BLUE");            player.sendMessage(Component.text("✔ Blue Sentinel spawné", NamedTextColor.BLUE)); }
-            case "red"           -> { plugin.getJungleManager().spawnTestMonster(loc, "RED");             player.sendMessage(Component.text("✔ Red Brambleback spawné", NamedTextColor.RED)); }
-            case "gromp"         -> { plugin.getJungleManager().spawnTestMonster(loc, "GROMP");           player.sendMessage(Component.text("✔ Gromp spawné", NamedTextColor.GREEN)); }
-            case "raptor"        -> { plugin.getJungleManager().spawnTestMonster(loc, "RAPTOR");          player.sendMessage(Component.text("✔ Raptors spawnés", NamedTextColor.YELLOW)); }
-            case "krug"          -> { plugin.getJungleManager().spawnTestMonster(loc, "KRUG");            player.sendMessage(Component.text("✔ Krugs spawnés", NamedTextColor.GOLD)); }
+            case "minion_melee"  -> { fr.lolmc.instance.InstanceHelper.minionManager(player).spawnTestMinion(loc, team, "melee");  player.sendMessage(Component.text("✔ Sbire mêlée spawné", NamedTextColor.GREEN)); }
+            case "minion_caster" -> { fr.lolmc.instance.InstanceHelper.minionManager(player).spawnTestMinion(loc, team, "caster"); player.sendMessage(Component.text("✔ Sbire caster spawné", NamedTextColor.GREEN)); }
+            case "minion_cannon" -> { fr.lolmc.instance.InstanceHelper.minionManager(player).spawnTestMinion(loc, team, "cannon"); player.sendMessage(Component.text("✔ Sbire canon spawné", NamedTextColor.GREEN)); }
+            case "minion_super"  -> { fr.lolmc.instance.InstanceHelper.minionManager(player).spawnTestMinion(loc, team, "super");  player.sendMessage(Component.text("✔ Super-sbire spawné", NamedTextColor.GREEN)); }
+            case "dragon"        -> { fr.lolmc.instance.InstanceHelper.jungleManager(player).spawnTestMonster(loc, "DRAGON_INFERNAL"); player.sendMessage(Component.text("✔ Dragon spawné", NamedTextColor.RED)); }
+            case "baron"         -> { fr.lolmc.instance.InstanceHelper.jungleManager(player).spawnTestMonster(loc, "BARON");           player.sendMessage(Component.text("✔ Baron Nashor spawné", NamedTextColor.LIGHT_PURPLE)); }
+            case "herald"        -> { fr.lolmc.instance.InstanceHelper.jungleManager(player).spawnTestMonster(loc, "HERALD");          player.sendMessage(Component.text("✔ Héraut spawné", NamedTextColor.AQUA)); }
+            case "wolf"          -> { fr.lolmc.instance.InstanceHelper.jungleManager(player).spawnTestMonster(loc, "WOLF");            player.sendMessage(Component.text("✔ Loup spawné", NamedTextColor.GRAY)); }
+            case "blue"          -> { fr.lolmc.instance.InstanceHelper.jungleManager(player).spawnTestMonster(loc, "BLUE");            player.sendMessage(Component.text("✔ Blue Sentinel spawné", NamedTextColor.BLUE)); }
+            case "red"           -> { fr.lolmc.instance.InstanceHelper.jungleManager(player).spawnTestMonster(loc, "RED");             player.sendMessage(Component.text("✔ Red Brambleback spawné", NamedTextColor.RED)); }
+            case "gromp"         -> { fr.lolmc.instance.InstanceHelper.jungleManager(player).spawnTestMonster(loc, "GROMP");           player.sendMessage(Component.text("✔ Gromp spawné", NamedTextColor.GREEN)); }
+            case "raptor"        -> { fr.lolmc.instance.InstanceHelper.jungleManager(player).spawnTestMonster(loc, "RAPTOR");          player.sendMessage(Component.text("✔ Raptors spawnés", NamedTextColor.YELLOW)); }
+            case "krug"          -> { fr.lolmc.instance.InstanceHelper.jungleManager(player).spawnTestMonster(loc, "KRUG");            player.sendMessage(Component.text("✔ Krugs spawnés", NamedTextColor.GOLD)); }
             default -> player.sendMessage(Component.text("§cEntité inconnue: " + type, NamedTextColor.RED));
         }
     }
@@ -901,6 +909,74 @@ private void handleSolo(Player player, String[] args) {
 
     // ── /lola wave ────────────────────────────────────────────────────────
     // Force le spawn immédiat d'une vague de sbires
+    // ── /lola template [save|info] ─────────────────────────────────────────
+    // save : enregistre le monde où se trouve l'admin dans plugins/LolMC/template et y rattache map.yml/roads.yml/jungle.yml.
+    private void handleTemplate(Player player, String[] args) {
+        var im = LolPlugin.getInstance().getInstanceManager();
+        String sub = args.length >= 2 ? args[1].toLowerCase() : "info";
+        switch (sub) {
+            case "save" -> {
+                var w = player.getWorld();
+                if (w.getName().startsWith(fr.lolmc.instance.InstanceManager.INSTANCE_PREFIX)
+                        || fr.lolmc.instance.InstanceHelper.instanceOf(player) != null) {
+                    player.sendMessage(Component.text("❌ Impossible depuis un monde d'instance : place-toi dans la map à enregistrer.",
+                            NamedTextColor.RED));
+                    return;
+                }
+                if (im.getAllInstances().stream().anyMatch(i -> i.getState() == fr.lolmc.instance.GameInstance.State.RUNNING)) {
+                    player.sendMessage(Component.text("❌ Une partie est en cours : attends la fin avant de changer le template.",
+                            NamedTextColor.RED));
+                    return;
+                }
+                player.sendMessage(Component.text("⏳ Enregistrement du monde « " + w.getName() + " » comme template...",
+                        NamedTextColor.YELLOW));
+                final String name = w.getName();
+                im.snapshotTemplate(w, msg -> {
+                    boolean ok = msg.startsWith("✔");
+                    player.sendMessage(Component.text(msg, ok ? NamedTextColor.GREEN : NamedTextColor.RED));
+                    if (!ok) return;
+                    // Le template devient ce monde : chemins, tours, nexus, spawns et jungle suivent
+                    im.setTemplateWorldName(name);
+                    var lp = LolPlugin.getInstance();
+                    lp.getMapManager().rebindWorld(name);
+                    lp.getJungleManager().rebindWorld(name);
+                    lp.getRoadManager().rebindWorld(name);
+                    player.sendMessage(Component.text("✔ Tours, nexus, spawns, chemins et jungle de « " + name
+                            + " » seront utilisés par toutes les instances.", NamedTextColor.GREEN));
+                });
+            }
+            default -> {
+                player.sendMessage(Component.text("Source du template : " + im.describeTemplateSource(), NamedTextColor.YELLOW));
+                player.sendMessage(Component.text("§7/lola template save : enregistre le monde où tu es comme template (plugins/LolMC/template) et y rattache map/chemins/jungle",
+                        NamedTextColor.GRAY));
+            }
+        }
+    }
+
+    /** UUID des joueurs de la partie de l'admin (son instance, sinon tous les joueurs en jeu). */
+    private java.util.Set<java.util.UUID> contextIds(Player admin) {
+        var inst = fr.lolmc.instance.InstanceHelper.instanceOf(admin);
+        java.util.Collection<? extends Player> grp = inst != null
+                ? inst.getOnlinePlayers() : fr.lolmc.util.WorldContext.getGamePlayers();
+        java.util.Set<java.util.UUID> ids = new java.util.HashSet<>();
+        for (Player gp : grp) ids.add(gp.getUniqueId());
+        ids.add(admin.getUniqueId());
+        return ids;
+    }
+
+    /** Fait pousser les plantes dans le monde de la partie de l'admin (instance ou template). */
+    private void spawnPlantsFor(Player admin) {
+        var pm = LolPlugin.getInstance().getPlantManager();
+        if (fr.lolmc.instance.InstanceHelper.instanceOf(admin) != null) pm.spawnAll(admin.getWorld());
+        else pm.spawnAll();
+    }
+
+    private void clearPlantsFor(Player admin) {
+        var pm = LolPlugin.getInstance().getPlantManager();
+        if (fr.lolmc.instance.InstanceHelper.instanceOf(admin) != null) pm.clearAll(admin.getWorld());
+        else pm.clearAll();
+    }
+
     private void handleWave(Player player) {
         fr.lolmc.instance.InstanceHelper.minionManager(player).forceWave();
         player.sendMessage(Component.text("✔ Vague forcée!", NamedTextColor.GREEN));
@@ -960,6 +1036,7 @@ private void handleSolo(Player player, String[] args) {
         player.sendMessage(Component.text("═══ /lola — Commandes admin ═══", NamedTextColor.GOLD));
         String[][] cmds = {
                 {"/lola instance [n|template]", "Lister / rejoindre une instance de partie"},
+                {"/lola template [save|info]",   "Enregistrer / voir le template (plugins/LolMC/template)"},
                 {"/lola solo [champion]",        "Mode test solo (niveau 18, 20k or)"},
                 {"/lola give <champion>",         "Assigner un champion"},
                 {"/lola level <1-18>",            "Changer de niveau"},

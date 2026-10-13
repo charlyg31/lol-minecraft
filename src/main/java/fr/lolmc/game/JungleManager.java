@@ -234,13 +234,21 @@ public class JungleManager {
     public JungleManager(org.bukkit.World world) {
         this();
         this.scopedWorld = world;
-        if (world != null) remapCampsToWorld(world);
+        if (world != null) {
+            // Recharge les camps directement dans le monde de l'instance (indépendant du monde enregistré)
+            camps.clear();
+            load();
+        }
     }
 
     /** Instance : les camps de jungle.yml sont ceux du monde template, on les replace dans le monde de l'instance. */
-    private void remapCampsToWorld(org.bukkit.World w) {
-        camps.replaceAll((id, c) -> new CampSpawn(id, c.type,
-                new Location(w, c.location.getX(), c.location.getY(), c.location.getZ())));
+    /** Réécrit le monde de tous les camps dans jungle.yml puis recharge (sauvegarde d'un nouveau template). */
+    public void rebindWorld(String worldName) {
+        var sec = config.getConfigurationSection("camps");
+        if (sec != null) for (String id : sec.getKeys(false)) config.set("camps." + id + ".world", worldName);
+        save();
+        camps.clear();
+        load();
     }
 
     // ══════════════════════════════════════════════════════════════
@@ -1104,8 +1112,8 @@ public class JungleManager {
         for (String id : section.getKeys(false)) {
             String path = "camps." + id + ".";
             String worldName = config.getString(path + "world");
-            if (worldName == null) continue;
-            var world = LolPlugin.getInstance().getServer().getWorld(worldName);
+            var world = scopedWorld != null ? scopedWorld
+                    : (worldName == null ? null : LolPlugin.getInstance().getServer().getWorld(worldName));
             if (world == null) continue;
             MonsterType type = MonsterType.valueOf(config.getString(path + "type"));
             Location loc = new Location(world,

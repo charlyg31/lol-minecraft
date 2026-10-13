@@ -37,6 +37,9 @@ public class MapManager {
     private static final double NEXUS_HP = 5000;
     private static final double NEXUS_BASE_HP = 5500;
 
+    /** Monde imposé (instance) : ignore le nom de monde enregistré dans map.yml. */
+    private org.bukkit.World scopedWorld = null;
+
     public MapManager(SchematicManager schematics) {
         this.schematics = schematics;
         this.mapFile = new File(LolPlugin.getInstance().getDataFolder(), "map.yml");
@@ -59,6 +62,7 @@ public class MapManager {
      */
     public MapManager(SchematicManager schematics, org.bukkit.World instanceWorld) {
         this.schematics  = schematics;
+        this.scopedWorld = instanceWorld;
         // Utiliser la même map.yml que le template
         this.mapFile = new File(LolPlugin.getInstance().getDataFolder(), "map.yml");
         if (!mapFile.exists()) {
@@ -148,9 +152,7 @@ public class MapManager {
 
         for (String key : section.getKeys(false)) {
             String path = "structures." + key + ".";
-            String worldName = config.getString(path + "world");
-            if (worldName == null) continue;
-            var world = LolPlugin.getInstance().getServer().getWorld(worldName);
+            var world = resolveWorld(path);
             if (world == null) continue;
 
             Location center = new Location(world,
@@ -272,14 +274,31 @@ public class MapManager {
         return null;
     }
 
+    /** Monde d'une entrée : celui de l'instance si imposé, sinon celui enregistré dans map.yml. */
+    private org.bukkit.World resolveWorld(String path) {
+        if (scopedWorld != null) return scopedWorld;
+        String worldName = config.getString(path + "world");
+        return worldName == null ? null : LolPlugin.getInstance().getServer().getWorld(worldName);
+    }
+
+    /** Réécrit le monde de toutes les entrées (structures + spawns) puis recharge les spawns. */
+    public void rebindWorld(String worldName) {
+        for (String root : new String[]{"structures", "spawns"}) {
+            var sec = config.getConfigurationSection(root);
+            if (sec == null) continue;
+            for (String key : sec.getKeys(false)) config.set(root + "." + key + ".world", worldName);
+        }
+        save();
+        spawns.clear();
+        load();
+    }
+
     private void load() {
         var section = config.getConfigurationSection("spawns");
         if (section != null) {
             for (String key : section.getKeys(false)) {
                 String path = "spawns." + key + ".";
-                String worldName = config.getString(path + "world");
-                if (worldName == null) continue;
-                var world = LolPlugin.getInstance().getServer().getWorld(worldName);
+                var world = resolveWorld(path);
                 if (world == null) continue;
                 Location loc = new Location(world,
                         config.getDouble(path + "x"),

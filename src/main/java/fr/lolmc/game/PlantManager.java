@@ -58,6 +58,7 @@ public class PlantManager implements Listener {
         public final Location location;
         public boolean alive = false;
         public UUID markerId = null; // ArmorStand visuel
+        public boolean chunkTicket = false; // chunk maintenu chargé tant que la plante est active
 
         public Plant(String id, PlantType type, Location location) {
             this.id = id;
@@ -70,6 +71,8 @@ public class PlantManager implements Listener {
     private static final double EFFECT_RADIUS  = 4.0;   // rayon d'effet de zone
 
     private final Map<String, Plant> plants = new HashMap<>();
+    /** Plantes des mondes d'instance : nom du monde → copies des plantes configurées. */
+    private final Map<String, java.util.List<Plant>> instancePlants = new java.util.concurrent.ConcurrentHashMap<>();
     private int counter = 0;
 
     // ──────────────────────────────────────────────────────────────
@@ -97,15 +100,44 @@ public class PlantManager implements Listener {
         for (Plant p : plants.values()) growPlant(p);
     }
 
+    /** Fait pousser les plantes configurées dans un monde d'instance (copie des positions du template). */
+    public void spawnAll(org.bukkit.World world) {
+        if (world == null) { spawnAll(); return; }
+        clearAll(world);
+        java.util.List<Plant> list = new java.util.concurrent.CopyOnWriteArrayList<>();
+        for (Plant def : plants.values()) {
+            Location l = def.location.clone();
+            l.setWorld(world);
+            Plant copy = new Plant(def.id, def.type, l);
+            list.add(copy);
+            growPlant(copy);
+        }
+        instancePlants.put(world.getName(), list);
+    }
+
+    /** Retire les marqueurs des plantes d'un monde d'instance (fin de partie). */
+    public void clearAll(org.bukkit.World world) {
+        if (world == null) return;
+        java.util.List<Plant> list = instancePlants.remove(world.getName());
+        if (list != null) for (Plant p : list) { removeMarker(p); releaseChunk(p); }
+    }
+
     /** Retire tous les marqueurs (fin de partie). */
     public void clearAll() {
-        for (Plant p : plants.values()) removeMarker(p);
+        for (Plant p : plants.values()) { removeMarker(p); releaseChunk(p); }
     }
 
     private void growPlant(Plant p) {
         p.alive = true;
         if (p.location.getWorld() == null) return;
-        if (!p.location.isChunkLoaded()) return; // zone déchargée : on repoussera quand chargé
+        // Chunk loader : maintient le chunk de la plante chargé (ticket plugin) pour qu'elle pousse
+        // et repousse même si aucun joueur n'est à proximité.
+        if (!p.chunkTicket) {
+            p.location.getWorld().addPluginChunkTicket(
+                    p.location.getBlockX() >> 4, p.location.getBlockZ() >> 4, LolPlugin.getInstance());
+            p.chunkTicket = true;
+        }
+        p.location.getChunk(); // charge le chunk si besoin (thread principal)
 
         ArmorStand stand = (ArmorStand) p.location.getWorld()
                 .spawnEntity(p.location.clone().add(0, -1.4, 0), EntityType.ARMOR_STAND);
@@ -131,6 +163,16 @@ public class PlantManager implements Listener {
         }
     }
 
+    /** Libère le chunk maintenu chargé pour cette plante (fin de partie / monde fermé). */
+    private void releaseChunk(Plant p) {
+        if (!p.chunkTicket) return;
+        p.chunkTicket = false;
+        var w = p.location.getWorld();
+        if (w != null)
+            w.removePluginChunkTicket(p.location.getBlockX() >> 4, p.location.getBlockZ() >> 4,
+                    LolPlugin.getInstance());
+    }
+
     // ──────────────────────────────────────────────────────────────
     // DÉCLENCHEMENT
     // ──────────────────────────────────────────────────────────────
@@ -150,7 +192,12 @@ public class PlantManager implements Listener {
     private Plant nearestAlivePlant(Location loc) {
         Plant best = null;
         double bestD = TRIGGER_RADIUS * TRIGGER_RADIUS;
-        for (Plant p : plants.values()) {
+        java.util.List<Plant> candidates = new java.util.ArrayList<>(plants.values());
+        if (loc.getWorld() != null) {
+            java.util.List<Plant> inst = instancePlants.get(loc.getWorld().getName());
+            if (inst != null) candidates.addAll(inst);
+        }
+        for (Plant p : candidates) {
             if (!p.alive) continue;
             if (p.location.getWorld() == null
                     || !p.location.getWorld().equals(loc.getWorld())) continue;
@@ -172,7 +219,15 @@ public class PlantManager implements Listener {
 
         // Repousse après le délai
         new BukkitRunnable() {
-            @Override public void run() { growPlant(p); }
+            @Override public void run() {
+                // Ne repousse pas une plante d'instance si la partie est terminée entre-temps
+                var w = p.location.getWorld();
+                if (!plants.containsValue(p)) {
+                    var list = w != null ? instancePlants.get(w.getName()) : null;
+                    if (list == null || !list.contains(p)) return;
+                }
+                growPlant(p);
+            }
         }.runTaskLater(LolPlugin.getInstance(), p.type.regrowSeconds * 20L);
     }
 
