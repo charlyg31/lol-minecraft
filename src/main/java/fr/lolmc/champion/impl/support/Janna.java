@@ -16,7 +16,7 @@ import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.Vector;
 
-public class Janna extends BaseChampion {
+public final class Janna extends BaseChampion {
     public Janna() {
         super("janna", "Janna", ChampionRole.SUPPORT,
             new ChampionStats(570,49,0,28,30,0.625,0,325,5.5,11.5));

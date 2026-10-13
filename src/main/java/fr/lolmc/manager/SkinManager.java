@@ -40,7 +40,7 @@ import java.util.UUID;
  *   3. Copier value et signature dans skins.yml
  *   4. /lola reload pour recharger sans redémarrer
  */
-public class SkinManager {
+public final class SkinManager {
 
     private record Skin(String value, String signature) {}
 

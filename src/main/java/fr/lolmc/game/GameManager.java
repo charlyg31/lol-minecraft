@@ -455,7 +455,6 @@ public class GameManager {
         }
     }
 
-    /** Enregistre la destruction d'un inhibiteur (clé = team_lane). */
     /** Annonce aux seuls joueurs de cette partie. */
     private void announce(Component message) {
         if (gameInstance != null) {
@@ -465,6 +464,7 @@ public class GameManager {
         }
     }
 
+    /** Enregistre la destruction d'un inhibiteur (clé = team_lane). */
     public void onInhibitorDestroyed(String key) {
         inhibitorRespawnAt.put(key, System.currentTimeMillis() + INHIBITOR_RESPAWN_MS);
         // Annonce

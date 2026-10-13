@@ -16,7 +16,7 @@ import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.Vector;
 
-public class Darius extends BaseChampion implements fr.lolmc.champion.base.StatefulChampion {
+public final class Darius extends BaseChampion implements fr.lolmc.champion.base.StatefulChampion {
     public Darius() {
         super("darius", "Darius", ChampionRole.TOP,
             new ChampionStats(652,64,0,37,32,0.625,0,340,1.75,10.0));

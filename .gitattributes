@@ -1,0 +1,5 @@
+# Fins de ligne LF partout (évite les warnings « LF will be replaced by CRLF » de core.autocrlf)
+* text=auto eol=lf
+*.jar binary
+*.zip binary
+*.png binary

@@ -16,7 +16,7 @@ import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
 
-public class Sivir extends BaseChampion implements fr.lolmc.champion.base.StatefulChampion {
+public final class Sivir extends BaseChampion implements fr.lolmc.champion.base.StatefulChampion {
     public Sivir() {
         super("sivir", "Sivir", ChampionRole.ADC,
             new ChampionStats(600,58,0,26,30,0.625,0,335,5.0,3.2));

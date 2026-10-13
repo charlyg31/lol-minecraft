@@ -35,7 +35,7 @@ import java.util.logging.Logger;
  *     lobby-server: "lobby"    # nom du serveur BungeeCord du lobby
  *     game-server: "lolmc-01"  # nom de CE serveur dans BungeeCord
  */
-public class BridgeManager implements PluginMessageListener {
+public final class BridgeManager implements PluginMessageListener {
 
     public static final String CHANNEL_IN  = "lolmc:bridge";
     public static final String CHANNEL_OUT = "BungeeCord";

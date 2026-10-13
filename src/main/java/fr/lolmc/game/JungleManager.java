@@ -247,7 +247,6 @@ public class JungleManager {
         }
     }
 
-    /** Instance : les camps de jungle.yml sont ceux du monde template, on les replace dans le monde de l'instance. */
     /** Réécrit le monde de tous les camps dans jungle.yml puis recharge (sauvegarde d'un nouveau template). */
     public void rebindWorld(String worldName) {
         var sec = config.getConfigurationSection("camps");

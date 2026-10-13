@@ -14,7 +14,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.Vector;
 
-public class Amumu extends BaseChampion implements fr.lolmc.champion.base.StatefulChampion {
+public final class Amumu extends BaseChampion implements fr.lolmc.champion.base.StatefulChampion {
     public Amumu() {
         super("amumu", "Amumu", ChampionRole.JUNGLE,
                 new ChampionStats(685,57,0,33,32,0.736,0,335,1.25,9.0));

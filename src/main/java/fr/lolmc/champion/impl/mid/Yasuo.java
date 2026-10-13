@@ -17,7 +17,7 @@ import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.Vector;
 import java.util.*;
 
-public class Yasuo extends BaseChampion implements fr.lolmc.champion.base.StatefulChampion {
+public final class Yasuo extends BaseChampion implements fr.lolmc.champion.base.StatefulChampion {
     public Yasuo() {
         super("yasuo", "Yasuo", ChampionRole.MID,
             new ChampionStats(590,60,0,30,32,0.697,0,345,1.75,6.5));

@@ -25,6 +25,9 @@ public abstract class BaseChampion {
 
     public enum ChampionRole { TOP, JUNGLE, MID, SUPPORT, ADC }
 
+    // registerAbilities() est appelé volontairement depuis le constructeur : les sous-classes
+    // n'y utilisent que des valeurs constantes.
+    @SuppressWarnings("this-escape")
     public BaseChampion(String id, String displayName, ChampionRole role, ChampionStats stats) {
         this.id = id; this.displayName = displayName;
         this.role = role; this.stats = stats;

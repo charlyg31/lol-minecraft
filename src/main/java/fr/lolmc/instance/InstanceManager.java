@@ -40,7 +40,7 @@ import java.util.logging.Logger;
  *   Si Multiverse-Core est installé, on utilise son API pour charger/décharger.
  *   Sinon, on utilise WorldCreator natif Paper (fonctionne sans Multiverse).
  */
-public class InstanceManager {
+public final class InstanceManager {
 
     // Préfixe des mondes d'instances
     public static final String INSTANCE_PREFIX = "lolmc_game_";
@@ -377,11 +377,6 @@ public class InstanceManager {
     // COPIE / SUPPRESSION DU DOSSIER MONDE (I/O)
     // ══════════════════════════════════════════════════════════════════════
 
-    /**
-     * Copie le dossier du monde template vers un nouveau nom.
-     * Exclut session.lock, uid.dat et uid.dat.old.
-     * Doit être appelé depuis un thread asynchrone.
-     */
     // ══════════════════════════════════════════════════════════════════════
     // MONDE TEMPLATE (source des copies)
     // ══════════════════════════════════════════════════════════════════════
@@ -452,6 +447,11 @@ public class InstanceManager {
         });
     }
 
+    /**
+     * Copie le dossier du monde template vers un nouveau nom.
+     * Exclut session.lock, uid.dat et uid.dat.old.
+     * Doit être appelé depuis un thread asynchrone.
+     */
     private void copyWorldFolder(String dest) throws IOException {
         Path srcPath = resolveTemplateSource();
         if (srcPath == null) {

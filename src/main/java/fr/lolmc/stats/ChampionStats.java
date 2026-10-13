@@ -12,7 +12,7 @@ package fr.lolmc.stats;
  *   - armure >= 0 : dmg * 100 / (100 + armure_effective)
  *   - armure < 0  : dmg * (2 - 100 / (100 - armure_effective))
  */
-public class ChampionStats {
+public final class ChampionStats {
 
     // ── Stats de base (niveau 1) ──
     private final double baseMaxHP, baseAttackDamage, baseAbilityPower;

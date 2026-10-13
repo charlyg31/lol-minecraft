@@ -14,7 +14,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 
-public class Ashe extends BaseChampion {
+public final class Ashe extends BaseChampion {
     public Ashe() {
         super("ashe", "Ashe", ChampionRole.ADC,
             new ChampionStats(610,59,0,26,30,0.658,0,325,6.0,3.5));

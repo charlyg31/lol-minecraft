@@ -14,7 +14,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 
-public class Jinx extends BaseChampion implements fr.lolmc.champion.base.StatefulChampion {
+public final class Jinx extends BaseChampion implements fr.lolmc.champion.base.StatefulChampion {
     public Jinx() {
         super("jinx", "Jinx", ChampionRole.ADC,
                 new ChampionStats(630,59,0,26,30,0.625,0,325,5.25,3.8));

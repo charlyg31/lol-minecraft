@@ -15,7 +15,7 @@ import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
 
-public class Leona extends BaseChampion implements fr.lolmc.champion.base.StatefulChampion {
+public final class Leona extends BaseChampion implements fr.lolmc.champion.base.StatefulChampion {
     public Leona() {
         super("leona", "Leona", ChampionRole.SUPPORT,
             new ChampionStats(646,60,0,38,32,0.625,0,335,1.25,8.5));

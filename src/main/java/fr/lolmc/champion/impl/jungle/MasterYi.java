@@ -15,7 +15,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 
-public class MasterYi extends BaseChampion implements fr.lolmc.champion.base.StatefulChampion {
+public final class MasterYi extends BaseChampion implements fr.lolmc.champion.base.StatefulChampion {
     public MasterYi() {
         super("masteryi", "Master Yi", ChampionRole.JUNGLE,
             new ChampionStats(669,68,0,33,32,0.679,0,355,1.25,7.0));

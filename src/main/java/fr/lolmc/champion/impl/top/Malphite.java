@@ -15,7 +15,7 @@ import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.util.Vector;
 
-public class Malphite extends BaseChampion implements fr.lolmc.champion.base.StatefulChampion {
+public final class Malphite extends BaseChampion implements fr.lolmc.champion.base.StatefulChampion {
     public Malphite() {
         super("malphite", "Malphite", ChampionRole.TOP,
             new ChampionStats(644,62,0,37,32,0.736,0,335,1.25,7.0));

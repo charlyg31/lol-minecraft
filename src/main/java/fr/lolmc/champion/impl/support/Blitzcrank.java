@@ -15,7 +15,7 @@ import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.util.Vector;
 
-public class Blitzcrank extends BaseChampion implements fr.lolmc.champion.base.StatefulChampion {
+public final class Blitzcrank extends BaseChampion implements fr.lolmc.champion.base.StatefulChampion {
     public Blitzcrank() {
         super("blitzcrank", "Blitzcrank", ChampionRole.SUPPORT,
             new ChampionStats(600,62,0,37,32,0.625,0,325,1.25,7.5));

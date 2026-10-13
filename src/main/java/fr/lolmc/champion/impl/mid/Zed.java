@@ -18,7 +18,7 @@ import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.Vector;
 import java.util.*;
 
-public class Zed extends BaseChampion implements fr.lolmc.champion.base.StatefulChampion {
+public final class Zed extends BaseChampion implements fr.lolmc.champion.base.StatefulChampion {
     public Zed() {
         super("zed", "Zed", ChampionRole.MID,
                 new ChampionStats(654,63,0,32,32,0.651,0,345,1.25,7.0));

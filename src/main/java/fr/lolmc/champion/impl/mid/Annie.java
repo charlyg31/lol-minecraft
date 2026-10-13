@@ -17,7 +17,7 @@ import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
 import java.util.*;
 
-public class Annie extends BaseChampion implements fr.lolmc.champion.base.StatefulChampion {
+public final class Annie extends BaseChampion implements fr.lolmc.champion.base.StatefulChampion {
     public Annie() {
         super("annie", "Annie", ChampionRole.MID,
                 new ChampionStats(560,50,0,23,30,0.610,0,335,6.25,5.5));

@@ -15,7 +15,7 @@ import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
 
-public class MissFortune extends BaseChampion implements fr.lolmc.champion.base.StatefulChampion {
+public final class MissFortune extends BaseChampion implements fr.lolmc.champion.base.StatefulChampion {
     public MissFortune() {
         super("missfortune", "Miss Fortune", ChampionRole.ADC,
             new ChampionStats(640,52,0,28,30,0.656,0,325,5.5,3.8));

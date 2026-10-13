@@ -23,7 +23,7 @@ import java.util.concurrent.ConcurrentHashMap;
  *   - Les managers à état (stacks, timers, entités) sont instanciés séparément
  *   - InstanceManager.getInstanceOf(player) retrouve l'instance d'un joueur
  */
-public class GameInstance {
+public final class GameInstance {
 
     public enum State { CREATING, READY, RUNNING, FINISHED }
 

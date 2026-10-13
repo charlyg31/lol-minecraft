@@ -15,7 +15,7 @@ import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
 
-public class Garen extends BaseChampion {
+public final class Garen extends BaseChampion {
     public Garen() {
         super("garen", "Garen", ChampionRole.TOP,
             new ChampionStats(690,66,0,36,32,0.625,0,340,1.75,8.0));

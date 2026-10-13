@@ -16,7 +16,7 @@ import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
 
-public class Morgana extends BaseChampion {
+public final class Morgana extends BaseChampion {
     public Morgana() {
         super("morgana", "Morgana", ChampionRole.SUPPORT,
                 new ChampionStats(630,56,0,25,30,0.625,0,335,4.5,5.5));

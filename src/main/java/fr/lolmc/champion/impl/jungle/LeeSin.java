@@ -17,7 +17,7 @@ import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.Vector;
 import java.util.*;
 
-public class LeeSin extends BaseChampion implements fr.lolmc.champion.base.StatefulChampion {
+public final class LeeSin extends BaseChampion implements fr.lolmc.champion.base.StatefulChampion {
     public LeeSin() {
         super("leesin", "Lee Sin", ChampionRole.JUNGLE,
                 new ChampionStats(645,68,0,36,32,0.651,0,345,1.25,7.5));

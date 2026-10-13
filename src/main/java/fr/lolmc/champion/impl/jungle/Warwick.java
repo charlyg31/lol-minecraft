@@ -16,7 +16,7 @@ import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.Vector;
 
-public class Warwick extends BaseChampion {
+public final class Warwick extends BaseChampion {
     public Warwick() {
         super("warwick", "Warwick", ChampionRole.JUNGLE,
                 new ChampionStats(620,65,0,33,32,0.638,0,335,1.25,5.0));

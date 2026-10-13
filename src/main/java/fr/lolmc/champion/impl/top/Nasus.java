@@ -16,7 +16,7 @@ import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
 import java.util.*;
 
-public class Nasus extends BaseChampion implements fr.lolmc.champion.base.StatefulChampion {
+public final class Nasus extends BaseChampion implements fr.lolmc.champion.base.StatefulChampion {
     public Nasus() {
         super("nasus", "Nasus", ChampionRole.TOP,
             new ChampionStats(631,67,0,34,32,0.638,0,350,1.25,9.0));

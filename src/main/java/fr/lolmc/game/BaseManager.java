@@ -23,7 +23,7 @@ import java.util.UUID;
  * - Recall : canalisation de 8s qui téléporte à la base (interrompu par les dégâts).
  * - Anneau de soin : zone autour de la base qui régénère HP et ressource.
  */
-public class BaseManager {
+public final class BaseManager {
 
     // Recall en cours : UUID → tâche
     private final Map<UUID, BukkitRunnable> activeRecalls = new HashMap<>();

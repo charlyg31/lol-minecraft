@@ -14,7 +14,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
 import java.util.*;
 
-public class Veigar extends BaseChampion implements fr.lolmc.champion.base.StatefulChampion {
+public final class Veigar extends BaseChampion implements fr.lolmc.champion.base.StatefulChampion {
     public Veigar() {
         super("veigar", "Veigar", ChampionRole.MID,
                 new ChampionStats(550,52,0,18,30,0.625,0,340,5.5,6.0));
