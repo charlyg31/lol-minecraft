@@ -50,6 +50,22 @@ public class GUIListener implements Listener {
         String champId = gui.getChampionIdFromSlot(slot);
         if (champId == null) return;
 
+        // En partie ou en sélection, le champion est verrouillé : sinon on contournait bans et
+        // doublons, et l'or revenait à 500 (re-choisir son champion après avoir tout dépensé)
+        boolean locked = (fr.lolmc.instance.InstanceHelper.gameManager(player).isGameRunning()
+                && manager.hasChampion(player))
+                || LolPlugin.getInstance().getChampSelectManager().isParticipant(player.getUniqueId());
+        if (locked && !player.hasPermission("lolmc.admin.test")) {
+            player.closeInventory();
+            player.sendMessage(Component.text(
+                "❌ Impossible de changer de champion pendant une partie ou une sélection.", NamedTextColor.RED));
+            return;
+        }
+        if (!player.hasPermission("lolmc.champion." + champId.toLowerCase())) {
+            player.sendMessage(Component.text("❌ Tu n'as pas accès à ce champion.", NamedTextColor.RED));
+            return;
+        }
+
         // Assigner le champion
         manager.assignChampion(player, champId);
         player.closeInventory();

@@ -11,11 +11,14 @@ import java.util.UUID;
 public class GoldManager {
 
     private final Map<UUID, Integer> gold = new HashMap<>();
+    // Or total gagné dans la partie (hors or de départ et remboursements), comme le « team gold » LoL
+    private final Map<UUID, Integer> earned = new HashMap<>();
 
     private static final int START_GOLD = 500;
 
     public void initPlayer(UUID uuid) {
         gold.put(uuid, START_GOLD);
+        earned.put(uuid, 0);
     }
 
     public int getGold(UUID uuid) {
@@ -24,6 +27,17 @@ public class GoldManager {
 
     public void addGold(UUID uuid, int amount) {
         gold.merge(uuid, amount, Integer::sum);
+        if (amount > 0) earned.merge(uuid, amount, Integer::sum);
+    }
+
+    /** Rend de l'or (vente, achat annulé) : ne compte pas comme de l'or gagné. */
+    public void refundGold(UUID uuid, int amount) {
+        gold.merge(uuid, amount, Integer::sum);
+    }
+
+    /** Or total gagné depuis le début de la partie (dépensé ou non). */
+    public int getEarned(UUID uuid) {
+        return earned.getOrDefault(uuid, 0);
     }
 
     public boolean spendGold(UUID uuid, int amount) {
@@ -35,6 +49,7 @@ public class GoldManager {
 
     public void removePlayer(UUID uuid) {
         gold.remove(uuid);
+        earned.remove(uuid);
     }
 
 

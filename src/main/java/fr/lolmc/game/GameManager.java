@@ -299,7 +299,7 @@ public class GameManager {
                 var goldManager = LolPlugin.getInstance().getGoldManager();
                 var cm = LolPlugin.getInstance().getChampionManager();
                 for (Player p : players()) {
-                    if (cm.hasChampion(p) && !isDead(p)) {
+                    if (cm.hasChampion(p)) { // l'or passif continue pendant la mort (LoL)
                         // Accumuler l'or fractionnaire (1.02/demi-sec) et verser les entiers
                         double acc = goldAccumulator.getOrDefault(p.getUniqueId(), 0.0)
                                 + PASSIVE_GOLD_PER_HALFSEC;

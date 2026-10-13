@@ -22,7 +22,38 @@ public class EntityDeathListener implements Listener {
         this.championManager = championManager;
     }
 
-    /** XP de proximité : quand un sbire meurt, tous les champions alliés dans 14 blocs reçoivent de l'XP. */
+    /** XP d'un sbire selon son type (la même pour le last-hit et la proximité). */
+    private static double minionXP(String typeTag) {
+        return switch (typeTag != null ? typeTag : "melee") {
+            case "caster" -> RewardManager.XP_MINION_CASTER;
+            case "cannon" -> RewardManager.XP_MINION_CANNON;
+            case "super"  -> RewardManager.XP_MINION_SUPER;
+            default       -> RewardManager.XP_MINION;
+        };
+    }
+
+    /** Champions ennemis du sbire, vivants, à moins de 14 blocs : ils se partagent son XP. */
+    private java.util.List<Player> minionXpEarners(LivingEntity le, fr.lolmc.team.TeamManager.Team minionTeam) {
+        var list = new java.util.ArrayList<Player>();
+        for (Player p : le.getWorld().getPlayers()) {
+            if (!championManager.hasChampion(p)) continue;
+            if (p.getGameMode() == org.bukkit.GameMode.SPECTATOR) continue; // mort
+            fr.lolmc.team.TeamManager.Team pTeam = LolPlugin.getInstance().getTeamManager().getTeam(p);
+            if (pTeam == null || pTeam == minionTeam) continue; // allié du sbire
+            if (p.getLocation().distance(le.getLocation()) > 14.0) continue;
+            list.add(p);
+        }
+        return list;
+    }
+
+    /** Nombre de champions qui se partagent l'XP (le tueur compte toujours). */
+    private static int xpShareCount(java.util.List<Player> earners, Player killer) {
+        int n = earners.size();
+        if (killer != null && !earners.contains(killer)) n++;
+        return Math.max(1, n);
+    }
+
+    /** XP de proximité : quand un sbire meurt, les champions ennemis dans 14 blocs se partagent son XP. */
     @EventHandler
     public void onMinionDeath(EntityDeathEvent e) {
         org.bukkit.entity.LivingEntity le = e.getEntity();
@@ -30,24 +61,15 @@ public class EntityDeathListener implements Listener {
         fr.lolmc.team.TeamManager.Team minionTeam = fr.lolmc.game.MinionManager.getMinionTeam(le);
         if (minionTeam == null) return;
 
-        // XP pour les champions ennemis proches (rayon 14 blocs comme LoL)
-        // On exclut le killer (il reçoit son XP via onMinionKill)
+        // XP partagée entre les champions ennemis proches (rayon 14 blocs comme LoL) ; le
+        // killer reçoit sa part via onMinionKill. Avant : XP entière pour chacun (et pour les morts).
         Player killer = le.getKiller();
-        for (Player p : le.getWorld().getPlayers()) {
+        if (killer != null && !championManager.hasChampion(killer)) killer = null;
+        var earners = minionXpEarners(le, minionTeam);
+        double xp = RewardManager.sharedXP(
+                minionXP(fr.lolmc.game.MinionManager.getMinionTypeTag(le)), xpShareCount(earners, killer));
+        for (Player p : earners) {
             if (p.equals(killer)) continue; // le killer a déjà son XP
-            if (!championManager.hasChampion(p)) continue;
-            fr.lolmc.team.TeamManager.Team pTeam = LolPlugin.getInstance().getTeamManager().getTeam(p);
-            if (pTeam == null || pTeam == minionTeam) continue; // allié du sbire
-            if (p.getLocation().distance(le.getLocation()) > 14.0) continue;
-            // XP de proximité : 80% de l'XP normale (divisé par les joueurs proches)
-            // Simplifié : XP fixe de proximité (LoL ~50-60 XP selon le type)
-            String typeTag = fr.lolmc.game.MinionManager.getMinionTypeTag(le);
-            double xp = switch (typeTag != null ? typeTag : "melee") {
-                case "cannon" -> 92.0;
-                case "super"  -> 97.0;
-                case "caster" -> 55.0;
-                default       -> 60.0; // melee
-            };
             fr.lolmc.instance.InstanceHelper.rewardManager(p).grantProximityXP(p, xp);
         }
     }
@@ -77,12 +99,9 @@ public class EntityDeathListener implements Listener {
                 int gold = "caster".equals(minionType) ? RewardManager.GOLD_MINION_CASTER
                          : "cannon".equals(minionType) ? RewardManager.GOLD_MINION_CANNON
                          : RewardManager.GOLD_MINION_MELEE;
-                double xp = switch (minionType != null ? minionType : "melee") {
-                    case "caster" -> RewardManager.XP_MINION_CASTER;
-                    case "cannon" -> RewardManager.XP_MINION_CANNON;
-                    case "super"  -> RewardManager.XP_MINION_SUPER;
-                    default       -> RewardManager.XP_MINION;
-                };
+                var minionTeam = MinionManager.getMinionTeam(dead);
+                double xp = RewardManager.sharedXP(minionXP(minionType),
+                        minionTeam != null ? xpShareCount(minionXpEarners(dead, minionTeam), killer) : 1);
                 fr.lolmc.instance.InstanceHelper.rewardManager(killer).onMinionKill(killer, gold, xp);
             }
         }
@@ -112,19 +131,23 @@ public class EntityDeathListener implements Listener {
         java.util.UUID killerUUID = (killer != null) ? killer.getUniqueId() : null;
         var assistants = rewards.getAssistants(victim.getUniqueId(), killerUUID);
         var tm = plugin.getTeamManager();
+        var validAssists = new java.util.ArrayList<Player>();
         for (java.util.UUID aid : assistants) {
             var assistant = plugin.getServer().getPlayer(aid);
             if (assistant != null && assistant.isOnline()
                     && championManager.hasChampion(assistant)
-                    && tm.getTeam(assistant) != tm.getTeam(victim)) {
-                plugin.getGoldManager().addGold(aid, RewardManager.GOLD_ASSIST);
-                rewards.grantProximityXP(assistant, RewardManager.XP_ASSIST);
-                assistant.sendActionBar(net.kyori.adventure.text.Component.text(
-                    String.format("🤝 ASSIST! +%d or +%.0f XP", RewardManager.GOLD_ASSIST, RewardManager.XP_ASSIST),
-                    net.kyori.adventure.text.format.NamedTextColor.YELLOW));
-                plugin.getMatchScoreboard().addAssist(assistant);
-                plugin.getRuneManager().onTakedown(assistant, victim);
-            }
+                    && tm.getTeam(assistant) != tm.getTeam(victim)) validAssists.add(assistant);
+        }
+        // Avant le kill : la prime de la victime n'est pas encore remise à zéro
+        int assistGold = rewards.getAssistGoldEach(victim.getUniqueId(), validAssists.size());
+        for (Player assistant : validAssists) {
+            plugin.getGoldManager().addGold(assistant.getUniqueId(), assistGold);
+            rewards.grantProximityXP(assistant, RewardManager.XP_ASSIST);
+            assistant.sendActionBar(net.kyori.adventure.text.Component.text(
+                String.format("🤝 ASSIST! +%d or +%.0f XP", assistGold, RewardManager.XP_ASSIST),
+                net.kyori.adventure.text.format.NamedTextColor.YELLOW));
+            plugin.getMatchScoreboard().addAssist(assistant);
+            plugin.getRuneManager().onTakedown(assistant, victim);
         }
 
         // ── Suivi commun à toutes les morts ──

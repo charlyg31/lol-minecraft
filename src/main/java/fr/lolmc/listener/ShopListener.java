@@ -304,7 +304,7 @@ public class ShopListener implements Listener {
         // 6. Équipement de l'item final
         if (!inv.equipItem(player, champ, item)) {
             // ROLLBACK en cas d'échec d'équipement
-            goldManager.addGold(player.getUniqueId(), effectiveCost);
+            goldManager.refundGold(player.getUniqueId(), effectiveCost);
             for (java.util.Map.Entry<Integer, LolItem> entry : removedComponents.entrySet()) {
                 LolItem comp = entry.getValue();
                 inv.equipItem(player, champ, comp); // réapplique ses stats (pas de second applyStats)
@@ -356,7 +356,7 @@ public class ShopListener implements Listener {
             hb.removeItem(player, soldItem.getId());
             hb.renderPage(player, champ);
         }
-        goldManager.addGold(player.getUniqueId(), refund);
+        goldManager.refundGold(player.getUniqueId(), refund);
         hudManager.updateHUD(player, champ);
         player.sendActionBar(Component.text(
                 "💰 Or: " + goldManager.getGold(player.getUniqueId()),

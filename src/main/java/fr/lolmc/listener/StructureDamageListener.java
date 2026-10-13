@@ -100,13 +100,12 @@ public class StructureDamageListener implements Listener {
         // Plaques
         var tm = fr.lolmc.instance.InstanceHelper.turretManager(player);
         String structKey = structure.getType().name() + "_" + structure.getTeam() + "_" + structure.getLane();
-        if (structure.getType() == Type.TURRET && tm.hasPlating(structKey)) {
-            damage *= 0.60;
-            tm.tickPlating(structKey);
-            fr.lolmc.instance.InstanceHelper.rewardManager(player).onTurretHit(player, structure);
-        }
+        boolean plated = structure.getType() == Type.TURRET && structure.getIndex() == 1
+                && tm.hasPlating(structKey);
+        if (plated) damage *= 0.60;
 
         boolean phaseChanged = structure.takeDamage(damage);
+        if (plated) breakPlates(player, structure, structKey, tm);
         player.playSound(player.getLocation(), Sound.BLOCK_ANVIL_HIT, 0.5f, 1.2f);
 
         // Rune Demolish : 3 AA sur une tourelle consomment les stacks pour un dégât bonus (45s CD)
@@ -179,14 +178,12 @@ public class StructureDamageListener implements Listener {
         // Turret Plating : -40% degats si plaques actives + or de plaque au frappeur
         var tm = fr.lolmc.instance.InstanceHelper.turretManager(player);
         String structKey = structure.getType().name() + "_" + structure.getTeam() + "_" + structure.getLane();
-        if (structure.getType() == Type.TURRET && tm.hasPlating(structKey)) {
-            damage *= 0.60;
-            tm.tickPlating(structKey, player);
-            // Or de plaque (avant 14min, max 5 par tour)
-            fr.lolmc.instance.InstanceHelper.rewardManager(player).onTurretHit(player, structure);
-        }
+        boolean plated = structure.getType() == Type.TURRET && structure.getIndex() == 1
+                && tm.hasPlating(structKey);
+        if (plated) damage *= 0.60;
 
         boolean phaseChanged = structure.takeDamage(damage);
+        if (plated) breakPlates(player, structure, structKey, tm);
         player.playSound(player.getLocation(), Sound.BLOCK_ANVIL_HIT, 0.5f, 1.2f);
 
         if (structure.isDestroyed()) {
@@ -237,6 +234,22 @@ public class StructureDamageListener implements Listener {
         if (structure.getType() == Type.NEXUS_BASE) endMatch(attacking, ref);
     }
 
+    /**
+     * Plaques (tourelle extérieure, avant 14 min) : une plaque tombe tous les 20 % de PV perdus,
+     * et rapporte son or au joueur qui la fait tomber. Avant, chaque coup retirait une plaque :
+     * 5 auto-attaques = 625 or.
+     */
+    private void breakPlates(Player player, GameStructure structure, String structKey,
+                             fr.lolmc.game.TurretManager tm) {
+        int max = fr.lolmc.game.TurretManager.MAX_PLATING;
+        int shouldRemain = (int) Math.ceil(structure.getCurrentHP() / structure.getMaxHP() * max - 1e-9);
+        var rewards = fr.lolmc.instance.InstanceHelper.rewardManager(player);
+        while (tm.hasPlating(structKey) && tm.getPlatingLeft(structKey) > shouldRemain) {
+            tm.tickPlating(structKey);
+            rewards.onPlateDestroyed(player, tm.getPlatingLeft(structKey));
+        }
+    }
+
     private void onStructureDestroyed(GameStructure structure, Player destroyer) {
         String name = structureName(structure);
         Team enemyTeam = structure.getTeam();
@@ -263,11 +276,7 @@ public class StructureDamageListener implements Listener {
                 "💥 " + name + " (" + enemyTeam.name() + ") détruit par " + destroyer.getName() + "!",
                 NamedTextColor.GOLD));
 
-        // Or de récompense (comme LoL)
-        var goldManager = LolPlugin.getInstance().getGoldManager();
-        if (structure.getType() == Type.TURRET) {
-            goldManager.addGold(destroyer.getUniqueId(), 250);
-        }
+        // (l'or du last-hit est versé par RewardManager.onTurretDestroyed : avant, +250 en double)
 
         // Effet visuel de destruction
         Location c = structure.getCenter().clone().add(0.5, 1, 0.5);

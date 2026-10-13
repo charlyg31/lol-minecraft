@@ -19,6 +19,7 @@ public class PlayerSnapshot {
     public final int level;
     public final int[] abilityRanks;   // Q W E R + passif
     public final double currentXP;
+    public final int skillPoints;
     public final int gold;
     public final List<String> itemIds;
     public final String spell1;
@@ -36,6 +37,7 @@ public class PlayerSnapshot {
         this.level         = champ != null ? champ.getLevelSystem().getLevel() : 1;
         this.abilityRanks  = champ != null ? champ.getLevelSystem().getAbilityRanks().clone() : new int[5];
         this.currentXP     = champ != null ? champ.getLevelSystem().getCurrentXP() : 0;
+        this.skillPoints   = champ != null ? champ.getLevelSystem().getSkillPoints() : 0;
         this.gold          = LolPlugin.getInstance().getGoldManager().getGold(uuid);
 
         // Items équipés
@@ -66,6 +68,8 @@ public class PlayerSnapshot {
         champ.getLevelSystem().setLevel(level);
         champ.getLevelSystem().setAbilityRanks(abilityRanks);
         champ.getLevelSystem().setCurrentXP(currentXP);
+        // setLevel ajoute (niveau - 1) points : sans ça, chaque reconnexion offrait des points gratuits
+        champ.getLevelSystem().setSkillPoints(skillPoints);
         champ.getStats().setChampionLevel(level);
 
         // HP

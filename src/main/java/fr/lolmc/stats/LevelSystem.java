@@ -145,7 +145,8 @@ public class LevelSystem {
             int cur = abilityRanks[4];
             return level >= req[cur];
         }
-        return true;
+        // Même règle que levelUpAbility : un sort de base ne dépasse pas ceil(niveau/2)
+        return abilityRanks[slot] + 1 <= (level + 1) / 2;
     }
 
     // ── Reset (nouvelle partie) ───────────────────────────────────
@@ -166,5 +167,6 @@ public class LevelSystem {
     public double getCurrentXP()   { return currentXP; }
     public double getXPToNext()    { return level >= MAX_LEVEL ? 0 : xpForLevel(level); }
     public int getSkillPoints()    { return skillPoints; }
+    public void setSkillPoints(int points) { this.skillPoints = Math.max(0, points); }
     public double getXPRatio()     { return level >= MAX_LEVEL ? 1.0 : currentXP / xpForLevel(level); }
 }

@@ -48,8 +48,6 @@ public class RewardManager {
     // XP structures
     public static final double XP_TURRET    = 100;
     public static final double XP_INHIBITOR = 150;
-    // Plaques par tourelle
-    private final java.util.Map<String, Integer> turretPlates = new java.util.concurrent.ConcurrentHashMap<>();
     public static final int GOLD_ASSIST = 150;
 
     public static final double XP_MINION = 60;         // mêlée (LoL 60.45)
@@ -144,11 +142,32 @@ public class RewardManager {
 
     // ── Kill de champion ──────────────────────────────────────────
 
+    /** Prime actuelle d'un champion (selon sa série de kills). */
+    public int getBounty(java.util.UUID player) {
+        return BOUNTY[Math.min(killStreak.getOrDefault(player, 0), BOUNTY.length - 1)];
+    }
+
+    /**
+     * Or d'assistance par joueur : la moitié de l'or du kill (base + prime), partagée entre les
+     * assistants (LoL). Avant : 150 chacun, quel que soit leur nombre.
+     */
+    public int getAssistGoldEach(java.util.UUID victim, int assistCount) {
+        if (assistCount <= 0) return 0;
+        return (int) Math.round((GOLD_CHAMPION_KILL + getBounty(victim)) * 0.5 / assistCount);
+    }
+
+    /**
+     * XP d'un sbire partagée entre {@code n} champions proches : 100 % seul, puis l'XP est
+     * divisée avec un bonus de partage (65 % chacun à 2, 43 % à 3, 33 % à 4, 26 % à 5, comme LoL).
+     */
+    public static double sharedXP(double xp, int n) {
+        return n <= 1 ? xp : xp * 1.3 / n;
+    }
+
     public void onChampionKill(Player killer, Player victim) {
         if (!championManager.hasChampion(killer)) return;
         // Bounty de la victime
-        int victimStreak = killStreak.getOrDefault(victim.getUniqueId(), 0);
-        int bounty = BOUNTY[Math.min(victimStreak, BOUNTY.length - 1)];
+        int bounty = getBounty(victim.getUniqueId());
         int totalGold = GOLD_CHAMPION_KILL + bounty;
         // First blood : 400 or au lieu de 300 (LoL)
         var ann = siblingAnnouncementManager();
@@ -266,7 +285,7 @@ public class RewardManager {
     public int getObjectiveBounty(fr.lolmc.team.TeamManager.Team attackingTeam) {
         final int baseBonus = 125; // → bounty max 250 (2× base)
         var tm = LolPlugin.getInstance().getTeamManager();
-        var gm = LolPlugin.getInstance().getGoldManager();
+        var gm = goldManager;
         if (gm == null) return 0;
         long teamGold = 0, enemyGold = 0;
         var participants = gameInstance != null ? gameInstance.getParticipants() : siblingGameManager().getParticipants();
@@ -274,8 +293,9 @@ public class RewardManager {
             var p = org.bukkit.Bukkit.getPlayer(id);
             if (p == null) continue;
             var t = tm.getTeam(p);
-            if (t == attackingTeam) teamGold += gm.getGold(id);
-            else if (t != null)     enemyGold += gm.getGold(id);
+            // Or GAGNÉ (et non l'or en poche) : une équipe qui a acheté ses objets n'est pas « en retard »
+            if (t == attackingTeam) teamGold += gm.getEarned(id);
+            else if (t != null)     enemyGold += gm.getEarned(id);
         }
         long deficit = enemyGold - teamGold;
         if (deficit < 3000) return 0;
@@ -283,17 +303,16 @@ public class RewardManager {
         return (int) Math.min(baseBonus * 2L, baseBonus * deficit / 6000L);
     }
 
-    /** Plaque de tourelle : +125 or avant 14min, max 5 par tour. */
-    public void onTurretHit(Player attacker, GameStructure turret) {
+    /**
+     * Plaque de tourelle détruite : +125 or avant 14 min. Le décompte des plaques est tenu par
+     * TurretManager (une plaque tombe tous les 20 % de PV) ; avant, chaque coup en retirait une.
+     */
+    public void onPlateDestroyed(Player attacker, int platesLeft) {
         if (gameStartMs == 0) return;
         if (System.currentTimeMillis() - gameStartMs > TURRET_PLATE_DURATION) return;
-        String tid = turret.getId();
-        int plates = turretPlates.getOrDefault(tid, TURRET_PLATE_MAX);
-        if (plates <= 0) return;
-        turretPlates.put(tid, plates - 1);
         goldManager.addGold(attacker.getUniqueId(), GOLD_TURRET_PLATE);
         attacker.sendActionBar(net.kyori.adventure.text.Component.text(
-            "🏛 Plaque! +" + GOLD_TURRET_PLATE + " or (" + (plates-1) + " restantes)",
+            "🏛 Plaque! +" + GOLD_TURRET_PLATE + " or (" + platesLeft + " restantes)",
             net.kyori.adventure.text.format.NamedTextColor.GOLD));
     }
 

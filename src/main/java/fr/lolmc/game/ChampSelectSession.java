@@ -576,6 +576,10 @@ public class ChampSelectSession {
 
             String champ = finalChamp.getOrDefault(id, "garen");
             cm.assignChampion(p, champ);
+            // Or de départ (500) et objets vides : avant, l'or n'était jamais initialisé
+            // (0 à la première partie, puis l'or restant de la partie précédente)
+            LolPlugin.getInstance().getShopListener().getOrCreate(p).clear();
+            LolPlugin.getInstance().getShopListener().initPlayer(p);
 
             // Position de départ selon le rôle (fontaine : positions 1-5 configurées par /lola position)
             var role = LolPlugin.getInstance().getRoleQueueManager().getAssignedRole(id);

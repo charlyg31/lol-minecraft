@@ -39,7 +39,7 @@ public class TurretManager {
     private final double baseDamage;       // dégâts de base d'un tir
     // Turret Plating : 5 plaques par tourelle, actives jusqu'à 14min
     private final java.util.Map<String, Integer> platingLeft = new java.util.concurrent.ConcurrentHashMap<>();
-    private static final int MAX_PLATING = 5;
+    public static final int MAX_PLATING = 5;
     private static final long PLATING_END_MS = 14 * 60 * 1000L;
     private long gameStartMs = 0;
     /** Début de partie : démarre la fenêtre des plaques (14 min) et remet toutes les plaques. */
@@ -256,7 +256,7 @@ public class TurretManager {
     }
 
     /**
-     * Décrémente une plaque. L'or est distribué par RewardManager.onTurretHit()
+     * Décrémente une plaque. L'or est distribué par RewardManager.onPlateDestroyed()
      * pour éviter la duplication.
      */
     public void tickPlating(String key) {
