@@ -13,9 +13,9 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * Logique de rôles pour /lol en groupe :
  *
- *   Chaque membre choisit ses rôles souhaités via /lol <rôle1> <rôle2>...
- *   Le groupe est prêt à jouer quand TOUS les membres ont choisi leurs rôles
- *   ET qu'il n'y a pas de conflit (assez de postes couverts).
+ *   Chaque membre choisit ses rôles souhaités via /lol <rôle1> <rôle2>... (statut « prêt »).
+ *   C'est le CHEF qui lance la recherche (/lol start, ou en choisissant ses propres rôles),
+ *   une fois que TOUS les membres sont prêts et qu'il n'y a pas de conflit de postes.
  *
  *   Règles de conflit :
  *   - Si le groupe fait 5 : chaque poste doit être couvert par au moins 1 membre
@@ -66,6 +66,9 @@ public class BungeePartyManager {
 
         UUID lid = playerToLeader.get(leader.getUniqueId());
         List<UUID> members = parties.get(lid);
+        if (members != null && partyInQueue(members)) {
+            send(leader, "§cLe groupe est en file : quittez-la (§e/lol leave§c) avant d'inviter."); return;
+        }
         int maxSize = plugin.getConfig().getInt("max-party-size", 5);
         if (members != null && members.size() >= maxSize) {
             send(leader, "§cGroupe plein ! (" + maxSize + "/" + maxSize + ")"); return;
@@ -90,6 +93,13 @@ public class BungeePartyManager {
         if (lid == null) { send(player, "§cPas d'invitation en cours."); return false; }
         List<UUID> members = parties.get(lid);
         if (members == null) { send(player, "§cLe groupe n'existe plus."); return false; }
+        if (inParty(player.getUniqueId())) {
+            send(player, "§cTu es déjà dans un groupe (§e/lol party leave§c d'abord)."); return false;
+        }
+        int maxSize = plugin.getConfig().getInt("max-party-size", 5);
+        if (members.size() >= maxSize) { send(player, "§cLe groupe est plein."); return false; }
+        if (partyInQueue(members)) { send(player, "§cLe groupe est en file d'attente, réessaie plus tard."); return false; }
+        if (plugin.getQueueManager().isInQueue(player.getUniqueId())) plugin.getQueueManager().leave(player);
         members.add(player.getUniqueId());
         playerToLeader.put(player.getUniqueId(), lid);
         ready.put(player.getUniqueId(), false);
@@ -133,6 +143,7 @@ public class BungeePartyManager {
         if (targetUUID == null) { send(leader, "§c" + targetName + " n'est pas dans le groupe."); return; }
         if (targetUUID.equals(leader.getUniqueId())) { send(leader, "§cTu ne peux pas t'exclure toi-même. Utilise §e/lol party leave§c."); return; }
 
+        dequeueParty(members, foundName + " a été exclu");
         members.remove(targetUUID);
         playerToLeader.remove(targetUUID);
         memberRoles.remove(targetUUID);
@@ -154,6 +165,7 @@ public class BungeePartyManager {
         if (lid == null) { send(player, "§7Tu n'es pas dans un groupe."); return; }
 
         List<UUID> members = parties.get(lid);
+        if (members != null) dequeueParty(members, player.getName() + " a quitté le groupe");
         if (members != null) members.remove(uid);
         memberRoles.remove(uid);
         ready.remove(uid);
@@ -185,6 +197,7 @@ public class BungeePartyManager {
         UUID lid = leader.getUniqueId();
         List<UUID> members = parties.remove(lid);
         if (members == null) return;
+        dequeueParty(members, "le groupe a été dissous");
         for (UUID uid : members) {
             playerToLeader.remove(uid);
             memberRoles.remove(uid);
@@ -254,6 +267,35 @@ public class BungeePartyManager {
         String rolesStr = String.join("/", roles);
         broadcastParty(lid, "§f" + player.getName() + " §7est prêt : §a" + rolesStr);
 
+        // Seul le chef lance la recherche : un membre ne fait que se déclarer prêt
+        if (!lid.equals(uid)) {
+            if (allReady(members)) {
+                ProxiedPlayer leader = ProxyServer.getInstance().getPlayer(lid);
+                if (leader != null) send(leader, "§a✔ Tout le groupe est prêt : lance la recherche avec §e/lol start§a.");
+                send(player, "§7En attente du chef pour lancer la recherche.");
+            }
+            return false;
+        }
+        return tryLaunch(player);
+    }
+
+    /**
+     * Le chef lance la recherche : tous les membres doivent être prêts et les postes compatibles.
+     * @return true si le groupe peut rejoindre la file
+     */
+    public boolean tryLaunch(ProxiedPlayer leader) {
+        UUID lid = playerToLeader.get(leader.getUniqueId());
+        if (lid == null) return false;
+        if (!lid.equals(leader.getUniqueId())) { send(leader, "§cSeul le chef lance la recherche."); return false; }
+        List<UUID> members = parties.get(lid);
+        if (members == null) return false;
+        if (partyInQueue(members)) { send(leader, "§7Le groupe est déjà en file."); return false; }
+        if (!Boolean.TRUE.equals(ready.get(lid))) {
+            send(leader, "§cChoisis d'abord tes rôles : §e/lol <rôles>§c.");
+            return false;
+        }
+        ProxiedPlayer player = leader;
+
         // Vérifier si tout le groupe est prêt
         for (UUID m : members) {
             if (!Boolean.TRUE.equals(ready.get(m))) {
@@ -276,9 +318,9 @@ public class BungeePartyManager {
         if (conflict != null) {
             broadcastParty(lid, "§c⚠ Conflit de rôles : " + conflict);
             broadcastParty(lid, "§7Refaites §e/lol <rôles> §7pour corriger.");
-            // Remettre tout le monde non-prêt
-            for (UUID m : members) ready.put(m, false);
-            memberRoles.clear();
+            // Remettre les membres de CE groupe non-prêts (avant : les rôles de tous les groupes
+            // du serveur étaient effacés)
+            for (UUID m : members) { ready.put(m, false); memberRoles.remove(m); }
             return false;
         }
 
@@ -407,6 +449,31 @@ public class BungeePartyManager {
     // ══════════════════════════════════════════════════════════════════════
     // UTILITAIRES
     // ══════════════════════════════════════════════════════════════════════
+
+    private boolean allReady(List<UUID> members) {
+        for (UUID m : members) if (!Boolean.TRUE.equals(ready.get(m))) return false;
+        return true;
+    }
+
+    private boolean partyInQueue(List<UUID> members) {
+        var qm = plugin.getQueueManager();
+        if (qm == null) return false;
+        for (UUID m : members) if (qm.isInQueue(m)) return true;
+        return false;
+    }
+
+    /** Retire tout le groupe de la file (composition modifiée) et remet les membres non-prêts. */
+    private void dequeueParty(List<UUID> members, String reason) {
+        boolean wasQueued = partyInQueue(members);
+        for (UUID m : new ArrayList<>(members)) {
+            ready.put(m, false);
+            if (wasQueued) plugin.getQueueManager().leave(m);
+        }
+        if (wasQueued) for (UUID m : members) {
+            ProxiedPlayer p = ProxyServer.getInstance().getPlayer(m);
+            if (p != null) send(p, "§eRecherche annulée : " + reason + ". Le chef doit la relancer.");
+        }
+    }
 
     public boolean inParty(UUID uuid)              { return playerToLeader.containsKey(uuid); }
     public boolean isLeader(ProxiedPlayer p)       { return p.getUniqueId().equals(playerToLeader.get(p.getUniqueId())); }

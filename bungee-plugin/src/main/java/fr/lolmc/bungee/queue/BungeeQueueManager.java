@@ -90,7 +90,11 @@ public class BungeeQueueManager {
     }
 
     public synchronized void leave(ProxiedPlayer player) {
-        UUID uid = player.getUniqueId();
+        leave(player.getUniqueId());
+    }
+
+    /** Retire un joueur de la file (déconnexion, groupe modifié…). */
+    public synchronized void leave(UUID uid) {
         queue.remove(uid);
         rankedOf.remove(uid);
         // Annuler une proposition en attente si le joueur quitte
@@ -322,6 +326,15 @@ public class BungeeQueueManager {
         if (redRoles != null)  roles.putAll(redRoles);
         final String rolesCsv = String.join(",", roles.entrySet().stream()
                 .map(e -> e.getKey() + "=" + e.getValue()).toList());
+
+        // Groupes partis en partie : statut « prêt » remis à zéro (sinon, après la partie, le
+        // premier /lol relançait tout le groupe avec les anciens rôles)
+        Set<UUID> leaders = new HashSet<>();
+        for (UUID uid : allPlayers) {
+            UUID lid = partyManager.getLeader(uid);
+            if (lid != null) leaders.add(lid);
+        }
+        for (UUID lid : leaders) partyManager.resetReady(lid);
 
         // GAME_READY après 6s (2s connect + 4s chargement)
         ProxyServer.getInstance().getScheduler().schedule(plugin, () -> {

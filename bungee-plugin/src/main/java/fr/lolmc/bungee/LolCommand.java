@@ -57,6 +57,17 @@ public class LolCommand extends Command implements TabExecutor {
 
         switch (args[0].toLowerCase()) {
             case "party", "p"        -> handleParty(player, args);
+            case "start", "lancer", "go" -> {
+                BungeePartyManager pm = plugin.getPartyManager();
+                if (!pm.inParty(player.getUniqueId())) {
+                    player.sendMessage(new TextComponent("§7En solo, utilise §e/lol <rôles>§7."));
+                } else if (pm.tryLaunch(player)) {
+                    for (UUID uid : pm.getPartyMembers(player.getUniqueId())) {
+                        ProxiedPlayer member = ProxyServer.getInstance().getPlayer(uid);
+                        if (member != null) plugin.getQueueManager().join(member);
+                    }
+                }
+            }
             case "leave", "quitter", "stop" -> handleLeave(player);
             case "accepte", "accept", "oui", "yes" -> plugin.getQueueManager().acceptFill(player);
             case "refuse", "refuser", "non", "no"  -> plugin.getQueueManager().refuseFill(player);
@@ -195,6 +206,7 @@ public class LolCommand extends Command implements TabExecutor {
         p.sendMessage(new TextComponent("§e/lol party kick <joueur>    §8— §7Exclure (chef)"));
         p.sendMessage(new TextComponent("§e/lol party promote <joueur> §8— §7Donner le chef (chef)"));
         p.sendMessage(new TextComponent("§e/lol party disband          §8— §7Dissoudre le groupe (chef)"));
+        p.sendMessage(new TextComponent("§e/lol start                  §8— §7Lancer la recherche du groupe (chef, tous prêts)"));
         p.sendMessage(new TextComponent("§e/lol party info             §8— §7Voir le statut du groupe"));
         p.sendMessage(new TextComponent("§7Une fois prêts, chaque membre fait §e/lol <rôles>§7."));
         p.sendMessage(new TextComponent("§7La file se lance automatiquement quand tout le monde est prêt."));

@@ -79,6 +79,18 @@ public class LolRCommand extends Command implements TabExecutor {
                     player.sendMessage(new TextComponent("§7Tu n'es pas en file classée."));
                 }
             }
+            case "start", "lancer", "go" -> {
+                // Chef de groupe : lancer la recherche classée quand tout le groupe est prêt
+                BungeePartyManager pm = plugin.getPartyManager();
+                if (!pm.inParty(player.getUniqueId())) {
+                    player.sendMessage(new TextComponent("§7En solo, utilise §e/lolr <rôles>§7."));
+                } else if (pm.tryLaunch(player)) {
+                    for (UUID uid : pm.getPartyMembers(player.getUniqueId())) {
+                        ProxiedPlayer member = ProxyServer.getInstance().getPlayer(uid);
+                        if (member != null) plugin.getQueueManager().join(member, true);
+                    }
+                }
+            }
             case "all" -> handleQueue(player, List.of("TOP","JUNGLE","MID","ADC","SUPPORT"));
             default    -> handleQueueArgs(player, args);
         }
@@ -131,6 +143,7 @@ public class LolRCommand extends Command implements TabExecutor {
         p.sendMessage(new TextComponent("  §a/lolr mid jungle support"));
         p.sendMessage(new TextComponent("  §a/lolr all §7(tous les rôles)"));
         p.sendMessage(new TextComponent("§e/lolr stop §8— §7Arrêter la recherche (alias : leave)"));
+        p.sendMessage(new TextComponent("§e/lolr start §8— §7Lancer la recherche du groupe (chef)"));
         p.sendMessage(new TextComponent("§8(Pick + Ban en phase de sélection)"));
         if (!rankedEnabled)
             p.sendMessage(new TextComponent("§c⚠ Les parties classées sont actuellement désactivées."));

@@ -44,6 +44,9 @@ max-party-size: 5           # taille maximale d'un groupe
 | `/lol leave` · `/lol stop` (alias `/lol quitter`) | Quitter la file (arrêter la recherche) |
 | `/lol accept` / `/lol refuse` | Accepter ou refuser une proposition de partie |
 | `/lol party invite/accept/decline/leave/kick/promote/disband/liste` | Gestion du groupe |
+| `/lol start` | Chef de groupe : lancer la recherche quand tous les membres ont choisi leurs rôles |
+
+**En groupe** : chaque membre choisit ses rôles avec `/lol <rôles>` (statut « prêt ») ; c'est le **chef** qui lance la recherche (`/lol start`, ou en choisissant ses propres rôles) une fois que tout le monde est prêt et que les postes sont compatibles. Le groupe reste toujours dans la même équipe. Si un membre quitte ou est exclu pendant la recherche, elle est annulée pour tout le groupe.
 
 Rôles valides : `top` · `jungle` · `mid` · `adc` · `support`
 
@@ -51,7 +54,7 @@ Rôles valides : `top` · `jungle` · `mid` · `adc` · `support`
 
 **File classée — `/lolr`**
 
-Mêmes règles de rôles que `/lol`, mais avec bans et pick en début de partie. La file classée est séparée de la file normale : un joueur de `/lol` n'est jamais placé dans une partie classée. `/lolr stop` quitte la file classée. Une sous-commande admin (`/lolr on` / `/lolr off`) active ou coupe les parties classées côté proxy.
+Mêmes règles de rôles que `/lol`, mais avec bans et pick en début de partie. La file classée est séparée de la file normale : un joueur de `/lol` n'est jamais placé dans une partie classée. `/lolr stop` quitte la file classée, `/lolr start` lance la recherche classée du groupe (chef). Une sous-commande admin (`/lolr on` / `/lolr off`) active ou coupe les parties classées côté proxy.
 
 ### Fonctionnalités
 

@@ -15,9 +15,11 @@ import net.md_5.bungee.event.EventHandler;
 public class ServerSwitchListener implements Listener {
 
     private final OriginTracker   tracker;
+    private final LolBungeePlugin plugin;
 
     public ServerSwitchListener(LolBungeePlugin plugin, OriginTracker tracker) {
         this.tracker = tracker;
+        this.plugin = plugin;
     }
 
     @EventHandler
@@ -36,7 +38,10 @@ public class ServerSwitchListener implements Listener {
 
     @EventHandler
     public void onDisconnect(PlayerDisconnectEvent e) {
-        // Nettoyer si le joueur se déconnecte complètement
+        // Nettoyer si le joueur se déconnecte complètement : origine, file et groupe
+        // (avant : un chef déconnecté gardait son groupe et les joueurs restaient en file)
         tracker.cleanup(e.getPlayer().getUniqueId());
+        plugin.getQueueManager().leave(e.getPlayer());
+        plugin.getPartyManager().cleanup(e.getPlayer().getUniqueId());
     }
 }
