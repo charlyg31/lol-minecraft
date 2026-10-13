@@ -28,10 +28,14 @@ public class ResourceSystem {
     // Flow Yasuo : se remplit en marchant (0.1/tick)
     // Fury : se remplit en attaquant (+8/AA), décroît hors combat
 
+    /** Régénération de base (les objets en donnent un pourcentage, LoL). */
+    private final double baseRegenPer5s;
+
     public ResourceSystem(ResourceType type, double maxResource, double regenPer5s) {
         this.type = type;
         this.maxResource = maxResource;
         this.regenPer5s = regenPer5s;
+        this.baseRegenPer5s = regenPer5s;
         // Démarrer plein sauf Furie
         this.currentResource = (type == ResourceType.FURY) ? 0 : maxResource;
     }
@@ -95,6 +99,7 @@ public class ResourceSystem {
     }
     /** Augmente/réduit la regen par 5s */
     public void addRegen(double v) { regenPer5s = Math.max(0, regenPer5s + v); }
+    public double getBaseRegenPer5s() { return baseRegenPer5s; }
 
     /**
      * Ratio 0.0..1.0 pour la barre EXP.

@@ -54,8 +54,10 @@ public class ShopListener implements Listener {
         shopGUI.open(player);
     }
 
-    /** LoL : en partie, la boutique n'est accessible qu'à la fontaine (shop.base-only). */
+    /** LoL : en partie, la boutique n'est accessible qu'à la fontaine (shop.base-only), ou mort. */
     public boolean canShopHere(Player player) {
+        // Un champion mort peut acheter et vendre où qu'il soit (LoL)
+        if (player.getGameMode() == org.bukkit.GameMode.SPECTATOR && championManager.hasChampion(player)) return true;
         var gm = fr.lolmc.instance.InstanceHelper.gameManager(player);
         boolean baseOnly = LolPlugin.getInstance().getConfig()
                 .getBoolean("shop.base-only", true);
@@ -202,9 +204,39 @@ public class ShopListener implements Listener {
         if (itemId != null) { shopGUI.openDetail(player, itemId); } // ouvre la fiche/recette
     }
 
+    /** Prix réel d'un objet pour ce joueur (composants possédés déduits), pour l'affichage. */
+    public int effectiveCost(Player player, LolItem item) {
+        if (item.getCategory() == ItemCategory.CONSUMABLE) return item.getGoldCost();
+        return getOrCreate(player).effectiveCost(item);
+    }
+
+    /**
+     * Règles d'unicité de LoL : une seule paire de bottes, un seul objet de jungle, une seule ligne
+     * d'objets de support, pas deux fois le même objet légendaire. Les objets consommés par la
+     * recette ne comptent pas (on peut améliorer ses bottes). Renvoie le message de refus, ou null.
+     */
+    private String limitViolation(PlayerInventoryManager inv, LolItem item, java.util.List<Integer> consumed) {
+        LolItem.Tier t = item.getTier();
+        for (int i = 0; i < 6; i++) {
+            LolItem owned = inv.getItem(i);
+            if (owned == null || consumed.contains(i)) continue;
+            LolItem.Tier ot = owned.getTier();
+            if (t == LolItem.Tier.BOOTS && ot == LolItem.Tier.BOOTS) return "Une seule paire de bottes.";
+            if (t == LolItem.Tier.JUNGLE && ot == LolItem.Tier.JUNGLE) return "Un seul objet de jungle.";
+            if (t == LolItem.Tier.SUPPORT_QUEST && ot == LolItem.Tier.SUPPORT_QUEST) return "Un seul objet de support.";
+            if (t == LolItem.Tier.LEGENDARY && owned.getId().equals(item.getId()))
+                return "Tu possèdes déjà " + item.getDisplayName() + ".";
+        }
+        return null;
+    }
+
     /** Achète un item (vérifie la recette, l'or dynamique et la place). Retourne true si l'achat a réussi. */
     private boolean purchase(Player player, LolItem item) {
         if (item == null) return false;
+        if (!item.isPurchasable()) {
+            player.sendActionBar(Component.text("❌ Cet objet s'obtient par transformation.", NamedTextColor.RED));
+            return false;
+        }
 
         BaseChampion champ = championManager.getChampion(player);
         PlayerInventoryManager inv = getOrCreate(player);
@@ -218,6 +250,12 @@ public class ShopListener implements Listener {
                     || hb.getConsumables(player).contains("refillable_potion2"))) {
                 player.sendActionBar(Component.text("❌ Tu possèdes déjà une fiole rechargeable (elle se recharge à la base).",
                         NamedTextColor.RED));
+                return false;
+            }
+            // Limites LoL : 5 potions de soin, 2 balises de contrôle
+            int max = switch (item.getId()) { case "health_potion" -> 5; case "control_ward" -> 2; default -> 99; };
+            if (java.util.Collections.frequency(hb.getConsumables(player), item.getId()) >= max) {
+                player.sendActionBar(Component.text("❌ Maximum " + max + " × " + item.getDisplayName() + ".", NamedTextColor.RED));
                 return false;
             }
             int gold = goldManager.getGold(player.getUniqueId());
@@ -239,22 +277,16 @@ public class ShopListener implements Listener {
 
         // ── GESTION DES ITEMS NORMAUX (Avec Arbre de Recette Dynamique) ──
 
-        // 1. Trouver TOUS les composants requis déjà possédés dans l'inventaire
-        java.util.List<Integer> slotsToConsume = new java.util.ArrayList<>();
+        // 1. Composants possédés, en descendant l'arbre de recette (comme LoL)
+        java.util.List<Integer> slotsToConsume = inv.recipeSlots(item);
         int totalDiscount = 0;
+        for (int i : slotsToConsume) totalDiscount += inv.getItem(i).getGoldCost();
 
-        if (item.getBuildsFrom() != null) {
-            for (String componentId : item.getBuildsFrom()) {
-                for (int i = 0; i < 6; i++) {
-                    LolItem owned = inv.getItem(i);
-                    // Si on possède le composant et qu'on ne l'a pas déjà marqué pour destruction
-                    if (owned != null && owned.getId().equals(componentId) && !slotsToConsume.contains(i)) {
-                        slotsToConsume.add(i);
-                        totalDiscount += owned.getGoldCost();
-                        break; // On passe au composant requis suivant de la liste
-                    }
-                }
-            }
+        String refusal = limitViolation(inv, item, slotsToConsume);
+        if (refusal != null) {
+            player.sendActionBar(Component.text("❌ " + refusal, NamedTextColor.RED));
+            player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 1f, 1f);
+            return false;
         }
 
         // 2. Calcul du coût effectif (Prix total - Réduction accumulée des composants possédés)
@@ -403,7 +435,11 @@ public class ShopListener implements Listener {
         ConsumableManager cm = LolPlugin.getInstance().getConsumableManager();
         if (cm == null) return false;
         return switch (id) {
-            case "health_potion", "health_potion2", "cappa_juice", "cappa_juice2" -> cm.useHealthPotion(player);
+            case "health_potion", "health_potion2" -> cm.useHealthPotion(player);
+            case "cappa_juice", "cappa_juice2" -> { // patch 26 : « ce jus ne fait rien »
+                player.sendActionBar(Component.text("🍯 Délicieux. Ça ne fait rien.", NamedTextColor.GOLD));
+                yield true;
+            }
             case "refillable_potion", "refillable_potion2" -> {
                 cm.useRefillablePotion(player);
                 yield false;

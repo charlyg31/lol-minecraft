@@ -245,8 +245,95 @@ public class PassiveManager {
     // ════════════════════════════════════════════════════════
     // ÉVÉNEMENT: ATTAQUE DE BASE (AUTO-ATTACK)
     // ════════════════════════════════════════════════════════
+    // ════════════════════════════════════════════════════════
+    // QUÊTE DE SUPPORT (wiki, patch 26.19-26.20)
+    // Atlas : 3 or / 10 s, Richesses partagées 18 or ; 400 or gagnés → Boussole runique
+    // Boussole : 5 or / 10 s, 21 or ; 800 or gagnés → Trésor des mondes, améliorable gratuitement
+    // ════════════════════════════════════════════════════════
+
+    /** Objet de la ligne de support porté par le joueur, ou null. */
+    private LolItem supportItem(Player p) {
+        for (LolItem it : shopListener.getOrCreate(p).getEquippedItems())
+            if (it != null && it.getTier() == LolItem.Tier.SUPPORT_QUEST) return it;
+        return null;
+    }
+
+    /** Allié le plus proche à moins de 1050 unités, ou null. */
+    private Player nearestAlly(Player p) {
+        Player best = null; double bd = 10.5 * 10.5;
+        for (Player a : p.getWorld().getPlayers()) {
+            if (a.equals(p) || !championManager.hasChampion(a) || a.getGameMode() == org.bukkit.GameMode.SPECTATOR
+                    || !LolPlugin.getInstance().getTeamManager().areAllies(p, a)) continue;
+            double d = a.getLocation().distanceSquared(p.getLocation());
+            if (d < bd) { bd = d; best = a; }
+        }
+        return best;
+    }
+
+    /** Consomme une charge de Richesses partagées (près d'un allié) : 18 ou 21 or. */
+    private boolean useSharedRiches(Player p, boolean oncePerHit) {
+        LolItem it = supportItem(p);
+        if (it == null) return false;
+        ItemState st = getState(p);
+        long now = System.currentTimeMillis();
+        if (st.sharedRichesCharges <= 0 || (oncePerHit && now - st.lastSharedRiches < 250)) return false;
+        if (nearestAlly(p) == null) return false;
+        st.sharedRichesCharges--;
+        st.lastSharedRiches = now;
+        int gold = "world_atlas".equals(it.getId()) ? 18 : 21;
+        LolPlugin.getInstance().getGoldManager().addGold(p.getUniqueId(), gold);
+        st.supportQuestGold += gold;
+        p.sendActionBar(Component.text("💰 Richesses partagées +" + gold + " or", NamedTextColor.GOLD));
+        return true;
+    }
+
+    /**
+     * Dernier coup sur un sbire avec une charge de Richesses partagées près d'un allié : le
+     * support gagne 18/21 or et l'allié le plus proche reçoit l'or du sbire. Renvoie cet allié.
+     */
+    public Player sharedRichesMinion(Player killer) {
+        if (supportItem(killer) == null) return null;
+        Player ally = nearestAlly(killer);
+        return ally != null && useSharedRiches(killer, false) ? ally : null;
+    }
+
+    /** Or passif, charges et transformations de la quête (appelé chaque seconde). */
+    private void tickSupportQuest(Player p, BaseChampion champ, ItemState st) {
+        LolItem it = supportItem(p);
+        if (it == null) return;
+        if (st.sharedRichesCharges < 3 && ++st.sharedRichesTimer >= 20) { st.sharedRichesCharges++; st.sharedRichesTimer = 0; }
+        if (++st.supportGoldTimer >= 10) {
+            st.supportGoldTimer = 0;
+            int g = (int) Math.round(it.getGoldPer10());
+            if (g > 0) { LolPlugin.getInstance().getGoldManager().addGold(p.getUniqueId(), g); st.supportQuestGold += g; }
+        }
+        String next = switch (it.getId()) {
+            case "world_atlas" -> st.supportQuestGold >= 400 ? "runic_compass" : null;
+            case "runic_compass" -> st.supportQuestGold >= 800 ? "bounty_worlds" : null;
+            default -> null;
+        };
+        if (next == null) return;
+        LolItem upgrade = ItemRegistry.get(next);
+        var inv = shopListener.getOrCreate(p);
+        if (upgrade == null) return;
+        for (int i = 0; i < 6; i++) {
+            if (inv.getItem(i) != it) continue;
+            inv.removeItemNoRefund(champ, i);
+            inv.equipItem(p, champ, upgrade);
+            var hb = LolPlugin.getInstance().getHotbarManager();
+            hb.removeItem(p, it.getId());
+            hb.addItem(p, upgrade.getId());
+            hb.renderPage(p, champ);
+            st.supportQuestGold = 0;
+            p.sendMessage(Component.text("🧭 Quête de support : " + it.getDisplayName() + " → "
+                    + upgrade.getDisplayName() + " !", NamedTextColor.GOLD));
+            break;
+        }
+    }
+
     public void onAutoAttack(Player attacker, Player victim) {
         if (!championManager.hasChampion(attacker) || !championManager.hasChampion(victim)) return;
+        useSharedRiches(attacker, true); // attaque sur un champion ennemi
         BaseChampion ac = championManager.getChampion(attacker);
         BaseChampion vc = championManager.getChampion(victim);
         ChampionStats as = ac.getStats();
@@ -618,6 +705,7 @@ public class PassiveManager {
     // ════════════════════════════════════════════════════════
     public void onAbilityDamage(Player caster, Player victim, double rawDamage, boolean isMagical) {
         if (!championManager.hasChampion(caster) || !championManager.hasChampion(victim)) return;
+        useSharedRiches(caster, true); // une charge par sort au plus
         BaseChampion ac = championManager.getChampion(caster);
         BaseChampion vc = championManager.getChampion(victim);
         ChampionStats as = ac.getStats();
@@ -989,14 +1077,8 @@ public class PassiveManager {
         // ── Dead Man's Plate reset stacks ──
         if (hasAnyItem(killer,"dead_mans_plate")) getState(killer).deadManStacks = 0;
 
-        // ── Or partagé (World Atlas, Bounty, etc.) : +or aux alliés proches ──
-        if (hasAnyItem(killer,"world_atlas","bounty_worlds","celestial_opposition","solstice_sleigh","spectral_sickle")) {
-            for(Player ally:killer.getWorld().getPlayers()){
-                if(!ally.equals(killer) && LolPlugin.getInstance().getTeamManager().areAllies(killer,ally)
-                        && championManager.hasChampion(ally) && ally.getLocation().distance(killer.getLocation())<10.0)
-                    LolPlugin.getInstance().getGoldManager().addGold(ally.getUniqueId(),50);
-            }
-        }
+        // (Les objets de support ne donnent plus 50 or aux alliés à chaque kill : effet inventé.
+        // Leur or vient des Richesses partagées et de l'or passif, voir la quête de support.)
 
         hudManager.updateHUD(killer, champ);
     }
@@ -1551,6 +1633,7 @@ public class PassiveManager {
     private void processPeriodicPassives(Player p, BaseChampion champ, ItemState state) {
         HPSystem hp = champ.getHPSystem();
         ChampionStats stats = champ.getStats();
+        tickSupportQuest(p, champ, state);
 
         // ── Warmog's: regen 5% HP max/s hors combat si >1000 HP bonus ──
         if (hasAnyItem(p,"warmogs_armor","warmogs") && !hp.isInCombat()

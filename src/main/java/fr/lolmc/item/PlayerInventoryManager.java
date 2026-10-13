@@ -40,9 +40,40 @@ public class PlayerInventoryManager {
     /** Vrai si le joueur possède déjà une paire de bottes (n'importe laquelle). */
     public boolean hasBoots() {
         for (LolItem item : equippedItems) {
-            if (item != null && BOOT_IDS.contains(item.getId())) return true;
+            if (item != null && (item.getTier() == LolItem.Tier.BOOTS || BOOT_IDS.contains(item.getId()))) return true;
         }
         return false;
+    }
+
+    /**
+     * Emplacements des objets possédés qui entrent dans la recette de {@code item}, en descendant
+     * l'arbre comme LoL : si un composant direct manque, ses propres composants possédés comptent
+     * (ex. une Épée longue réduit le prix du Couperet noir via la Dague dentelée). Avant, seuls les
+     * composants directs étaient déduits.
+     */
+    public java.util.List<Integer> recipeSlots(LolItem item) {
+        java.util.List<Integer> taken = new java.util.ArrayList<>();
+        collectRecipe(item, taken);
+        return taken;
+    }
+
+    private void collectRecipe(LolItem item, java.util.List<Integer> taken) {
+        for (String cid : item.getBuildsFrom()) {
+            int found = -1;
+            for (int i = 0; i < 6; i++) {
+                if (equippedItems[i] != null && equippedItems[i].getId().equals(cid) && !taken.contains(i)) { found = i; break; }
+            }
+            if (found >= 0) { taken.add(found); continue; }
+            LolItem comp = ItemRegistry.get(cid);
+            if (comp != null) collectRecipe(comp, taken);
+        }
+    }
+
+    /** Prix réel d'un objet pour ce joueur (prix total moins les composants possédés). */
+    public int effectiveCost(LolItem item) {
+        int discount = 0;
+        for (int slot : recipeSlots(item)) discount += equippedItems[slot].getGoldCost();
+        return Math.max(0, item.getGoldCost() - discount);
     }
 
     /**
@@ -61,7 +92,7 @@ public class PlayerInventoryManager {
     }
 
     /**
-     * Vend l'item du slot donné (remboursement 70%).
+     * Vend l'item du slot donné (prix de revente officiel : 70 %, 40 % pour les objets de départ).
      */
     public int sellItem(Player player, BaseChampion champ, int slotIndex) {
         if (slotIndex < 0 || slotIndex >= 6 || equippedItems[slotIndex] == null) return 0;
@@ -72,7 +103,7 @@ public class PlayerInventoryManager {
         if (hp.getCurrentHP() > hp.getMaxHP()) hp.setCurrentHP(hp.getMaxHP());
 
         equippedItems[slotIndex] = null;
-        return (int)(item.getGoldCost() * 0.70);
+        return item.getSellValue();
     }
 
     /**

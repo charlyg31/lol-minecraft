@@ -28,6 +28,12 @@ public class LolItem {
     private final Material icon;
     private final ItemCategory category;
 
+    // ── Rang LoL (règles de la boutique : une paire de bottes, un objet de jungle, etc.) ──
+    public enum Tier { STARTER, CONSUMABLE, TRINKET, BOOTS, JUNGLE, SUPPORT_QUEST, BASIC, EPIC, LEGENDARY }
+    private Tier tier = Tier.BASIC;
+    private int sellValue = -1;          // prix de revente officiel (-1 : 70 % du prix)
+    private boolean purchasable = true;  // false : obtenu par transformation (Muramana, Fimbulvetr…)
+
     // ── Recette (arborescence) : IDs des composants qui construisent cet item ──
     private final java.util.List<String> buildsFrom = new java.util.ArrayList<>();
 
@@ -66,6 +72,11 @@ public class LolItem {
     private double bonusMana;
     private double bonusHPRegen;
     private double bonusManaRegen;
+    private double hpRegenPct;      // % de la régénération de PV de base (LoL)
+    private double manaRegenPct;    // % de la régénération de mana de base (LoL)
+    private double moveSpeedPct;    // % de vitesse de déplacement
+    private double healShieldPower; // puissance des soins et boucliers
+    private double goldPer10;       // or toutes les 10 s (quête de support)
 
     // ── Passif (description) ──
     private String passiveName;
@@ -126,28 +137,18 @@ public class LolItem {
         if (bonusManaRegen > 0 && res.getType() == ResourceSystem.ResourceType.MANA) {
             res.addRegen(bonusManaRegen);
         }
+        // Régénérations en % de la base, vitesse en %, puissance des soins (stats des objets LoL)
+        if (hpRegenPct > 0) hp.setHpRegen(hp.getHpRegenPer5s() + hpRegenPct * hp.getBaseHpRegenPer5s());
+        if (manaRegenPct > 0 && res.getType() == ResourceSystem.ResourceType.MANA)
+            res.addRegen(manaRegenPct * res.getBaseRegenPer5s());
+        if (moveSpeedPct > 0) stats.multiplyMS(1 + moveSpeedPct);
+        if (healShieldPower > 0) stats.addHealShieldPower(healShieldPower);
 
-        // Passifs spéciaux
-        applyPassive(stats);
+        // Coiffe de Rabadon : +30 % de puissance totale (Opus magique)
+        if ("rabadons_deathcap".equals(id)) stats.multiplyAP(RABADON);
     }
 
-    /**
-     * Applique les effets passifs qui modifient les stats de base.
-     * Ex: Rabadon's +35% AP, Manamune +2% AD/mana, etc.
-     */
-    private void applyPassive(ChampionStats stats) {
-        if (passiveName == null) return;
-        switch (passiveName) {
-            case "Amplification"  -> stats.multiplyAP(1.35);   // Rabadon's +35% AP
-            case "Dominance"      -> stats.addBonusCritDamage(0.30); // Infinity Edge +30%
-            case "Last Whisper"   -> stats.addBonusArmorPenPercent(0.20);
-            case "Void"           -> stats.addBonusMagicPen(0.40);
-            case "Haunting"       -> stats.addBonusFlatMagicPen(15);
-            case "Forbidden", "Staff","Dawncore","Moonstone","Whispering" -> {} // soin% géré par HUDManager
-            case "Awe"            -> {} // dynamique via HUDManager
-            case "Smite"          -> {} // jungle PassiveManager
-        }
-    }
+    private static final double RABADON = 1.30;
 
     /**
      * Retire les stats (vente de l'item).
@@ -179,16 +180,14 @@ public class LolItem {
             res.addMaxResource(-bonusMana);
         if (bonusManaRegen > 0 && res.getType() == ResourceSystem.ResourceType.MANA)
             res.addRegen(-bonusManaRegen);
-
-        // Retirer les passifs multiplicatifs
-        removePassive(stats);
-    }
-
-    private void removePassive(ChampionStats stats) {
-        if (passiveName == null) return;
-        // Rabadon's : annuler le ×1.35 appliqué à l'achat
-        // multiplyAP(1/1.35) annule exactement multiplyAP(1.35)
-        if (passiveName.equals("Amplification")) stats.multiplyAP(1.0 / 1.35);
+        if (hpRegenPct > 0) hp.setHpRegen(Math.max(0, hp.getHpRegenPer5s() - hpRegenPct * hp.getBaseHpRegenPer5s()));
+        if (manaRegenPct > 0 && res.getType() == ResourceSystem.ResourceType.MANA)
+            res.addRegen(-manaRegenPct * res.getBaseRegenPer5s());
+        if (moveSpeedPct > 0) stats.multiplyMS(1.0 / (1 + moveSpeedPct));
+        if (healShieldPower > 0) stats.addHealShieldPower(-healShieldPower);
+        // Avant : seule la Coiffe était annulée ; la Lame d'infini, le Bâton du vide ou le Dernier
+        // souffle revendus laissaient leur bonus « de passif » pour toute la partie
+        if ("rabadons_deathcap".equals(id)) stats.multiplyAP(1.0 / RABADON);
     }
 
     // ── ItemStack Minecraft ───────────────────────────────────────
@@ -235,8 +234,13 @@ public class LolItem {
         if (bonusOmnivamp > 0)     lore.add(stat("💚 Omnivamp",            "+" + pct(bonusOmnivamp), NamedTextColor.GREEN));
         if (bonusAbilityHaste > 0) lore.add(stat("⏱ Hâte de compétence",  "+" + (int)bonusAbilityHaste, NamedTextColor.AQUA));
         if (bonusMoveSpeed > 0)    lore.add(stat("👟 Vitesse déplacement", "+" + (int)bonusMoveSpeed, NamedTextColor.GREEN));
+        if (moveSpeedPct > 0)      lore.add(stat("👟 Vitesse déplacement", "+" + pct(moveSpeedPct), NamedTextColor.GREEN));
         if (bonusMana > 0)         lore.add(stat("💧 Mana",                "+" + (int)bonusMana, NamedTextColor.BLUE));
         if (bonusHPRegen > 0)      lore.add(stat("💚 Regen HP/5s",         "+" + (int)bonusHPRegen, NamedTextColor.GREEN));
+        if (hpRegenPct > 0)        lore.add(stat("💚 Régén. PV de base",   "+" + pct(hpRegenPct), NamedTextColor.GREEN));
+        if (manaRegenPct > 0)      lore.add(stat("💧 Régén. mana de base", "+" + pct(manaRegenPct), NamedTextColor.BLUE));
+        if (healShieldPower > 0)   lore.add(stat("✚ Soins et boucliers",  "+" + pct(healShieldPower), NamedTextColor.AQUA));
+        if (goldPer10 > 0)         lore.add(stat("💰 Or / 10 s",           "+" + (int)goldPer10, NamedTextColor.GOLD));
 
         // Passif
         if (passiveName != null) {
@@ -263,7 +267,9 @@ public class LolItem {
         }
 
         lore.add(sep());
-        lore.add(Component.text("💰 Coût: " + goldCost + " or", NamedTextColor.GOLD)
+        lore.add(Component.text(purchasable ? "💰 Coût: " + goldCost + " or" : "✦ Obtenu par transformation", NamedTextColor.GOLD)
+                .decoration(TextDecoration.ITALIC, false));
+        lore.add(Component.text("Revente : " + getSellValue() + " or", NamedTextColor.DARK_GRAY)
                 .decoration(TextDecoration.ITALIC, false));
 
         meta.lore(lore);
@@ -284,7 +290,7 @@ public class LolItem {
                 .append(Component.text(val, color).decoration(TextDecoration.ITALIC, false));
     }
 
-    private String pct(double v) { return (int)(v * 100) + "%"; }
+    private String pct(double v) { return Math.round(v * 1000) / 10.0 % 1 == 0 ? (int)Math.round(v * 100) + "%" : Math.round(v * 1000) / 10.0 + "%"; }
     // ── Builder fluent ────────────────────────────────────────────
 
     public LolItem ad(double v)           { bonusAD = v;           return this; }
@@ -310,6 +316,14 @@ public class LolItem {
     public LolItem mana(double v)         { bonusMana = v;         return this; }
     public LolItem hpRegen(double v)      { bonusHPRegen = v;      return this; }
     public LolItem manaRegen(double v)    { bonusManaRegen = v;    return this; }
+    public LolItem hpRegenPct(double v)   { hpRegenPct = v;        return this; }
+    public LolItem manaRegenPct(double v) { manaRegenPct = v;      return this; }
+    public LolItem msPct(double v)        { moveSpeedPct = v;      return this; }
+    public LolItem healShieldPower(double v) { healShieldPower = v; return this; }
+    public LolItem goldPer10(double v)    { goldPer10 = v;         return this; }
+    public LolItem tier(Tier t)           { tier = t;              return this; }
+    public LolItem sell(int v)            { sellValue = v;         return this; }
+    public LolItem unpurchasable()        { purchasable = false;   return this; }
     public LolItem passive(String name, String desc) {
         this.passiveName = name; this.passiveDescription = desc; return this;
     }
@@ -336,4 +350,9 @@ public class LolItem {
     public double getBonusAD()       { return bonusAD; }
     public double getBonusAP()       { return bonusAP; }
     public double getBonusHP()       { return bonusHP; }
+    public Tier getTier()            { return tier; }
+    public boolean isPurchasable()   { return purchasable; }
+    public double getGoldPer10()     { return goldPer10; }
+    /** Prix de revente officiel (LoL : 70 % en général, 40 % pour les objets de départ). */
+    public int getSellValue()        { return sellValue >= 0 ? sellValue : (int) (goldCost * 0.70); }
 }

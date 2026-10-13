@@ -11,6 +11,12 @@ import java.util.UUID;
 public class ItemState {
 
     // ── Spellblade (Trinity, Lich Bane, Sheen, Divine Sunderer, Essence Reaver) ──
+    // Quête de support (Atlas → Boussole runique → Trésor des mondes)
+    public int sharedRichesCharges = 1;         // charges de Richesses partagées (max 3, +1 / 20 s)
+    public int sharedRichesTimer = 0;           // secondes depuis la dernière charge
+    public int supportGoldTimer = 0;            // secondes depuis le dernier or passif (toutes les 10 s)
+    public int supportQuestGold = 0;            // or gagné par l'objet de support (quête)
+    public long lastSharedRiches = 0;           // une charge par attaque ou sort
     public boolean spellbladePrimed = false;    // true après avoir lancé un sort
     public long spellbladeTime = 0;             // timestamp du prime (expire 10s)
 

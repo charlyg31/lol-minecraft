@@ -103,7 +103,18 @@ public class EntityDeathListener implements Listener {
                 var minionTeam = MinionManager.getMinionTeam(dead);
                 double xp = RewardManager.sharedXP(fr.lolmc.util.MobCombat.getXP(dead, minionXP(minionType)),
                         minionTeam != null ? xpShareCount(minionXpEarners(dead, minionTeam), killer) : 1);
-                fr.lolmc.instance.InstanceHelper.rewardManager(killer).onMinionKill(killer, gold, xp);
+                // Richesses partagées (objet de support) : l'allié le plus proche prend l'or du sbire
+                var pmS = fr.lolmc.LolPlugin.getInstance().getPassiveManager();
+                Player ally = pmS != null ? pmS.sharedRichesMinion(killer) : null;
+                var rw = fr.lolmc.instance.InstanceHelper.rewardManager(killer);
+                if (ally != null) {
+                    rw.onMinionKill(killer, 0, xp);
+                    fr.lolmc.LolPlugin.getInstance().getGoldManager().addGold(ally.getUniqueId(), gold);
+                    ally.sendActionBar(net.kyori.adventure.text.Component.text("💰 +" + gold + " or (Richesses partagées)",
+                            net.kyori.adventure.text.format.NamedTextColor.GOLD));
+                } else {
+                    rw.onMinionKill(killer, gold, xp);
+                }
             }
         }
     }

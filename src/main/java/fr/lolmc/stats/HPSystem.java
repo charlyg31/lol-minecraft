@@ -32,10 +32,14 @@ public class HPSystem {
 
     private fr.lolmc.stats.ChampionStats stats; // référence pour GW
 
+    /** Régénération de base du champion (les objets en donnent un pourcentage, LoL). */
+    private final double baseHpRegenPer5s;
+
     public HPSystem(double maxHP, double hpRegenPer5s) {
         this.maxHP = maxHP;
         this.currentHP = maxHP; // démarrer full HP
         this.hpRegenPer5s = hpRegenPer5s;
+        this.baseHpRegenPer5s = hpRegenPer5s;
         this.lastDamageTime = 0;
     }
 
@@ -131,6 +135,7 @@ public class HPSystem {
         return max;
     }
     public double getHpRegenPer5s()    { return hpRegenPer5s; }
+    public double getBaseHpRegenPer5s() { return baseHpRegenPer5s; }
     public void setMaxHP(double v)     {
         itemBonusHP = v - (stats != null ? stats.getFinalMaxHP() : maxHP);
         currentHP = Math.min(currentHP, getMaxHP());

@@ -52,7 +52,7 @@ public class ConsumableManager {
     }
 
     // ════════════════════════════════════════════════════════
-    // POTION DE VIE (50g — soigne 150 HP sur 15s)
+    // POTION DE SOIN (50 or — 120 PV sur 15 s, patch 26.20)
     // ════════════════════════════════════════════════════════
     public boolean useHealthPotion(Player player) {
         if (!championManager.hasChampion(player)) return false;
@@ -67,14 +67,14 @@ public class ConsumableManager {
             return false;
         }
 
-        player.sendActionBar(Component.text("🧪 Potion de vie (150 HP sur 15s)", NamedTextColor.RED));
-        double healPerTick = 150.0 / 15.0; // 10 HP/s
+        player.sendActionBar(Component.text("🧪 Potion de soin (120 PV sur 15 s)", NamedTextColor.RED));
+        double healPerTick = 120.0 / 15.0; // 8 PV/s
 
         // Rune Time Warp Tonic : 30% du soin total instantané + 5% vitesse pendant l'effet
         var rmTonic = LolPlugin.getInstance().getRuneManager();
         boolean hasTonic = rmTonic != null && rmTonic.getPage(player.getUniqueId()).has("time_warp_tonic");
         if (hasTonic) {
-            hp.heal(150.0 * 0.30);
+            hp.heal(120.0 * 0.30);
             double tonicBonus = champ.getStats().getFinalMovementSpeed() * 0.05;
             champ.getStats().addBonusMoveSpeed(tonicBonus);
             player.sendActionBar(Component.text("⏱ Tonique Temporel !", NamedTextColor.AQUA));
@@ -107,7 +107,7 @@ public class ConsumableManager {
     }
 
     // ════════════════════════════════════════════════════════
-    // FIOLE RECHARGEABLE (150g — 2 charges, 125 HP/12s chacune)
+    // POTION RECHARGEABLE (150 or — 2 charges, 100 PV/12 s chacune)
     // ════════════════════════════════════════════════════════
     public void giveRefillable(Player player) {
         refillableCharges.put(player.getUniqueId(), 2);
@@ -124,7 +124,7 @@ public class ConsumableManager {
 
         BaseChampion champ = championManager.getChampion(player);
         HPSystem hp = champ.getHPSystem();
-        double healPerTick = 125.0 / 12.0;
+        double healPerTick = 100.0 / 12.0; // patch 26.20
 
         player.sendActionBar(Component.text(
             String.format("🧪 Fiole rechargeable (%d charge(s) restante(s))", charges - 1),
@@ -152,31 +152,24 @@ public class ConsumableManager {
         HPSystem hp = champ.getHPSystem();
         ResourceSystem res = champ.getResourceSystem();
 
-        // Vérifier si mana plein pour le +50 mana max permanent
-        boolean manaFull = res.getCurrent() >= res.getMax();
-        if (manaFull && res.getType() == ResourceSystem.ResourceType.MANA) {
-            res.addMaxResource(50);
-        }
-
-        // Soin progressif
-        double hpPerTick = 150.0 / 15.0;
-        double manaPerTick = 100.0 / 15.0;
-
+        // Patch 26.20 : 20 (+1.5 % PV max) PV sur 5 s, jusqu'à ×2 selon les PV manquants, et +30 PV
+        // max permanents (avant : 150 PV, 100 mana et +50 mana max, valeurs d'une ancienne version)
+        double missing = 1.0 - hp.getCurrentHP() / Math.max(1, hp.getMaxHP());
+        double total = (20 + hp.getMaxHP() * 0.015) * (1 + Math.max(0, Math.min(1, missing)));
+        champ.getStats().addBonusHP(30);
+        double hpPerTick = total / 10.0;
         new BukkitRunnable() {
             int ticks = 0;
             @Override public void run() {
-                if (ticks >= 15 || !player.isOnline()) { cancel(); return; }
+                if (ticks >= 10 || !player.isOnline()) { cancel(); return; }
                 hp.heal(hpPerTick);
-                if (res.getType() == ResourceSystem.ResourceType.MANA)
-                    res.setCurrent(res.getCurrent() + manaPerTick);
                 hudManager.updateHUD(player, champ);
                 ticks++;
             }
-        }.runTaskTimer(LolPlugin.getInstance(), 0L, 20L);
+        }.runTaskTimer(LolPlugin.getInstance(), 0L, 10L);
 
         player.sendActionBar(Component.text(
-            "🍪 Biscuit! +150 HP +100 mana" + (manaFull ? " +50 mana max permanent!" : ""),
-            NamedTextColor.GOLD));
+            String.format("🍪 Biscuit ! +%.0f PV sur 5 s, +30 PV max", total), NamedTextColor.GOLD));
         return true;
     }
 
@@ -186,7 +179,7 @@ public class ConsumableManager {
 
     /** Élixir de Fureur (AD) — +30 AD + lifesteal */
     public boolean useElixirWrath(Player player) {
-        return activateElixir(player, "wrath", new double[]{30, 0, 0, 0}, 0.15);
+        return activateElixir(player, "wrath", new double[]{30, 0, 0, 0}, 0.12); // 12 % de vampirisme physique
     }
 
     /** Élixir de Fer (Tank) — +300 HP + tenacité */
@@ -360,9 +353,9 @@ public class ConsumableManager {
 
     public static ItemStack buildConsumable(String id) {
         return switch (id) {
-            case "health_potion", "health_potion2"      -> buildItem(Material.POTION,          "🧪 Potion de vie",        "Soigne 150 HP sur 15s.",                 NamedTextColor.RED,    50);
-            case "refillable_potion", "refillable_potion2" -> buildItem(Material.GLASS_BOTTLE,  "🧪 Fiole rechargeable",   "2 charges — Soigne 125 HP/12s chacune.", NamedTextColor.GREEN,  150);
-            case "biscuit", "biscuit_will"               -> buildItem(Material.COOKIE,           "🍪 Biscuit de la Volonté","Soigne 150 HP + 100 mana. +50 mana max si mana plein.", NamedTextColor.GOLD, 0);
+            case "health_potion", "health_potion2"      -> buildItem(Material.POTION,          "🧪 Potion de soin",       "Rend 120 PV en 15 s.",                   NamedTextColor.RED,    50);
+            case "refillable_potion", "refillable_potion2" -> buildItem(Material.GLASS_BOTTLE,  "🧪 Potion rechargeable",  "2 charges — Rend 100 PV en 12 s. Se recharge à la boutique.", NamedTextColor.GREEN,  150);
+            case "biscuit", "biscuit_will"               -> buildItem(Material.COOKIE,           "🍪 Biscuit de longévité", "Rend des PV en 5 s (plus si PV bas) et +30 PV max.", NamedTextColor.GOLD, 0);
             case "elixir_wrath", "elixir_wrath2"         -> buildItem(Material.DRAGON_BREATH,    "⚔ Élixir de Fureur",      "+30 AD + vol de vie 3 minutes.",         NamedTextColor.RED,    500);
             case "elixir_iron", "elixir_iron2"           -> buildItem(Material.FERMENTED_SPIDER_EYE,"🛡 Élixir de Fer",   "+300 HP + Ténacité 3 minutes.",          NamedTextColor.GRAY,   500);
             case "elixir_sorcery", "elixir_sorcery2"     -> buildItem(Material.MAGENTA_DYE,      "✨ Élixir de Sorcellerie","+50 AP 3 minutes.",                      NamedTextColor.BLUE,   500);
@@ -370,7 +363,7 @@ public class ConsumableManager {
             case "control_ward", "control_ward2"         -> buildItem(Material.PINK_CANDLE,       "🔮 Control Ward",         "Révèle et détruit wards ennemies (75g).",NamedTextColor.AQUA,   75);
             case "oracle_lens", "oracle_lens2"           -> buildItem(Material.SPYGLASS,          "🔍 Lentille Oracle",      "Révèle wards proches 10s.",              NamedTextColor.YELLOW, 0);
             case "farsight", "farsight2"                 -> buildItem(Material.COMPASS,           "🔭 Vision Lointaine",     "Place ward révélatrice à longue portée.",NamedTextColor.YELLOW, 0);
-            case "cappa_juice", "cappa_juice2"           -> buildItem(Material.HONEY_BOTTLE,      "🍯 Cappa Juice",          "Soigne 40% HP max sur 120s.",            NamedTextColor.GOLD,   700);
+            case "cappa_juice", "cappa_juice2"           -> buildItem(Material.HONEY_BOTTLE,      "🍯 Jus chapi-chapo",      "Ce jus ne fait rien.",                   NamedTextColor.GOLD,   300);
             default -> new ItemStack(Material.BARRIER);
         };
     }

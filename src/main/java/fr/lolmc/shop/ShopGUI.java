@@ -236,12 +236,15 @@ public class ShopGUI {
 
     private ItemStack buyButton(Player player, LolItem item) {
         int gold = getGold(player);
-        boolean afford = gold >= item.getGoldCost();
+        // Prix réel : composants possédés déduits (avant : prix total, « Or insuffisant » à tort)
+        var sl = fr.lolmc.LolPlugin.getInstance().getShopListener();
+        int cost = sl != null ? sl.effectiveCost(player, item) : item.getGoldCost();
+        boolean afford = gold >= cost;
         ItemStack b = new ItemStack(afford ? Material.EMERALD_BLOCK : Material.REDSTONE_BLOCK);
         ItemMeta m = b.getItemMeta();
         if (m == null) return b;
         m.displayName(Component.text((afford ? "✔ Acheter — " : "✘ Or insuffisant — ")
-            + item.getGoldCost() + " or",
+            + cost + " or",
             afford ? NamedTextColor.GREEN : NamedTextColor.RED)
             .decoration(TextDecoration.ITALIC, false));
         List<Component> lore = new ArrayList<>();
@@ -249,8 +252,11 @@ public class ShopGUI {
             .decoration(TextDecoration.ITALIC, false));
         lore.add(Component.text("Ton or : " + gold, NamedTextColor.GOLD)
             .decoration(TextDecoration.ITALIC, false));
+        if (cost < item.getGoldCost())
+            lore.add(Component.text("Composants possédés déduits (prix total " + item.getGoldCost() + ")",
+                NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
         if (!afford)
-            lore.add(Component.text("Il te manque " + (item.getGoldCost()-gold) + " or",
+            lore.add(Component.text("Il te manque " + (cost-gold) + " or",
                 NamedTextColor.RED).decoration(TextDecoration.ITALIC, false));
         m.lore(lore);
         b.setItemMeta(m);
