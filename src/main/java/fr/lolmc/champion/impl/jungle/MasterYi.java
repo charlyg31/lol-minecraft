@@ -38,7 +38,7 @@ public final class MasterYi extends BaseChampion implements fr.lolmc.champion.ba
         = new java.util.concurrent.ConcurrentHashMap<>();
 
     static class AA extends BasicAttackAbility {
-        AA(){super("masteryi",Material.IRON_SWORD,6.0f,DamageType.PHYSICAL);}
+        AA(){super("masteryi",Material.IRON_SWORD,2.5f,DamageType.PHYSICAL);} // mêlée (avant : 6 blocs)
         @Override protected void onHit(Player c, ChampionStats s, org.bukkit.entity.LivingEntity tgt, double dmg) {
             // Style Wuju : vrais dégâts bonus à l'impact (18-50 + 35 % AD bonus)
             if (wujuUntil.getOrDefault(c.getUniqueId(), 0L) > System.currentTimeMillis()) {
@@ -68,13 +68,21 @@ public final class MasterYi extends BaseChampion implements fr.lolmc.champion.ba
             Location dest=safeTeleport(c.getLocation(),tgt.getLocation());
             c.teleport(dest);
             double[] base=fr.lolmc.util.Balance.base("q_masteryi",new double[]{20,40,60,80,100});double dmg=base[getLevel()-1]+s.getFinalAD()*0.70; // wiki
-            TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.PHYSICAL);
-            fr.lolmc.util.VisualEffectUtil.impactBurst(c.getWorld(),
-                    tgt.getLocation(), Material.WHITE_STAINED_GLASS, 0.25f, 0.5, 6, 5L);
+            // Wiki : Frappe Alpha touche jusqu'à 4 ennemis (la cible et 3 autres autour d'elle)
+            var struck=new java.util.ArrayList<org.bukkit.entity.LivingEntity>(); struck.add(tgt);
+            for(var e2 : TargetingUtil.entitiesInRadius(c, tgt.getLocation(), 6.0)){
+                if(struck.size()>=4) break;
+                if(!e2.equals(tgt)) struck.add(e2);
+            }
+            for(var e2 : struck){
+                TargetingUtil.dealDamage(c, e2, dmg, TargetingUtil.DmgType.PHYSICAL);
+                fr.lolmc.util.VisualEffectUtil.impactBurst(c.getWorld(),
+                        e2.getLocation().add(0,1,0), Material.WHITE_STAINED_GLASS, 0.25f, 0.5, 6, 5L);
+            }
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] base=fr.lolmc.util.Balance.base("q_masteryi",new double[]{20,40,60,80,100});
-            return String.format("%.0f dégâts physiques (+70%%AD). Dash sur la cible, intouchable.",base[getLevel()-1]+s.getFinalAD()*0.70);
+            return String.format("%.0f dégâts physiques (+70%%AD) à la cible et 3 ennemis proches. Dash, intouchable.",base[getLevel()-1]+s.getFinalAD()*0.70);
         }
     }
 

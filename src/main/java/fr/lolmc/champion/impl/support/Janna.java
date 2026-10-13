@@ -54,13 +54,14 @@ public final class Janna extends BaseChampion {
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : skillshot tornade en ligne, 60/90/120/150/180 + 50% AP, knockup les ennemis traversés
             double[] base=fr.lolmc.util.Balance.base("q_janna",new double[]{55,85,115,145,175});double dmg=base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("q_janna","ap",0.5);
-            var hits=TargetingUtil.skillshot(c, 11.0, 1.2, true); // 1100 unités, traverse
-            if(hits.isEmpty()){c.sendActionBar(Component.text("🌪 Tornade lancée!",NamedTextColor.WHITE));return;}
-            for(var __t : hits){
-                TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);
-                fr.lolmc.LolPlugin.getInstance().getCCManager().setAirborne(__t, 10); // projeté 0.5 s (wiki, sans charge)
-                if(__t instanceof Player __p)__p.sendActionBar(Component.text("🌪 Bourrasque! Knockup",NamedTextColor.WHITE));
-            }
+            // Projectile réel : tornade de 1100 unités à ~900/s qui traverse
+            TargetingUtil.launchSkillshot(c, c.getLocation().add(0,0.6,0), c.getEyeLocation().getDirection().setY(0), 11.0, 1.2, true, 9.0,
+                    new org.bukkit.inventory.ItemStack(Material.WHITE_STAINED_GLASS), 1.5f, Material.WHITE_STAINED_GLASS,
+                    __t -> {
+                        TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);
+                        fr.lolmc.LolPlugin.getInstance().getCCManager().setAirborne(__t, 10); // projeté 0.5 s (wiki, sans charge)
+                        if(__t instanceof Player __p)__p.sendActionBar(Component.text("🌪 Bourrasque! Knockup",NamedTextColor.WHITE));
+                    }, null);
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_PHANTOM_FLAP, 1f, 1.3f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
@@ -77,6 +78,14 @@ public final class Janna extends BaseChampion {
             // LoL : envoie un élémentaire qui inflige des dégâts + ralentit. 60/105/150/195/240 + 60% AP
             org.bukkit.entity.LivingEntity tgt = (t!=null && TargetingUtil.isEnemy(c,t))?t:TargetingUtil.getTargetedEnemy(c,6.2); if(tgt==null){cancelCast();c.sendActionBar(Component.text("💨 Aucune cible",NamedTextColor.GRAY));return;} // 550 unités
             double[] base=fr.lolmc.util.Balance.base("w_janna",new double[]{55,105,155,205,255});double dmg=base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("w_janna","ap",0.6);
+            // Élémentaire d'air à tête chercheuse (1600 unités/s)
+            final org.bukkit.entity.LivingEntity ftgt=tgt;
+            TargetingUtil.launchHoming(c, c.getEyeLocation(), tgt, 16.0,
+                    new org.bukkit.inventory.ItemStack(Material.FEATHER), 0.8f, Material.WHITE_STAINED_GLASS, true, () -> zephyrHit(c, s, ftgt, dmg));
+            c.getWorld().playSound(c.getLocation(), Sound.ENTITY_PHANTOM_AMBIENT, 1f, 1.4f);
+        }
+
+        private void zephyrHit(Player c, ChampionStats s, org.bukkit.entity.LivingEntity tgt, double dmg){
             TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.MAGICAL);
             if(tgt instanceof Player __p)
                 fr.lolmc.LolPlugin.getInstance().getCCManager().slowPct(__p, new double[]{0.20,0.24,0.28,0.32,0.36}[getLevel()-1]+0.06*s.getFinalAP()/100.0, 40); // wiki
@@ -84,7 +93,6 @@ public final class Janna extends BaseChampion {
             c.addPotionEffect(new PotionEffect(PotionEffectType.SPEED,40,1,false,true));
             fr.lolmc.util.VisualEffectUtil.impactBurst(tgt.getWorld(),
                     tgt.getLocation().add(0,1,0), Material.WHITE_STAINED_GLASS, 0.28f, 0.5, 8, 6L);
-            c.getWorld().playSound(c.getLocation(), Sound.ENTITY_PHANTOM_AMBIENT, 1f, 1.4f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] base=fr.lolmc.util.Balance.base("w_janna",new double[]{55,105,155,205,255});

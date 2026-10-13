@@ -72,6 +72,14 @@ public final class Malphite extends BaseChampion implements fr.lolmc.champion.ba
             org.bukkit.entity.LivingEntity tgt = (t!=null && TargetingUtil.isEnemy(c,t))?t:TargetingUtil.getTargetedEnemy(c,6.9); if(tgt==null){cancelCast();c.sendActionBar(Component.text("🪨 Aucune cible",NamedTextColor.GRAY));return;}
             double[] base=fr.lolmc.util.Balance.base("q_malphite",new double[]{70,120,170,220,270});
             double dmg=base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("q_malphite","ap",0.6);
+            // Éclat de roche à tête chercheuse (1200 unités/s)
+            final org.bukkit.entity.LivingEntity ftgt=tgt;
+            TargetingUtil.launchHoming(c, c.getEyeLocation(), tgt, 12.0,
+                    new org.bukkit.inventory.ItemStack(Material.COBBLESTONE), 0.7f, Material.STONE, true, () -> shardHit(c, ftgt, dmg));
+            c.getWorld().playSound(c.getLocation(), Sound.BLOCK_STONE_BREAK, 1f, 0.8f);
+        }
+
+        private void shardHit(Player c, org.bukkit.entity.LivingEntity tgt, double dmg){
             TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.MAGICAL);
             // LoL : slow 30/35/40/45/50% sur 3s (60 ticks), Malphite vole la vitesse
             int qrank=getLevel()-1;
@@ -81,7 +89,6 @@ public final class Malphite extends BaseChampion implements fr.lolmc.champion.ba
             fr.lolmc.LolPlugin.getInstance().getCCManager().speedPct(c, slowPct, 60);
             fr.lolmc.util.VisualEffectUtil.impactBurst(tgt.getWorld(),
                     tgt.getLocation().add(0,1,0), Material.STONE, 0.28f, 0.3, 6, 5L);
-            c.getWorld().playSound(c.getLocation(), Sound.BLOCK_STONE_BREAK, 1f, 0.8f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] base=fr.lolmc.util.Balance.base("q_malphite",new double[]{70,120,170,220,270});
@@ -119,10 +126,18 @@ public final class Malphite extends BaseChampion implements fr.lolmc.champion.ba
             // LoL : 60/95/130/165/200 + 60% AP + 40% armure, slow AS 30-50% sur 3s
             double[] eBase={60,95,130,165,200};
             double dmg=eBase[getLevel()-1]+s.getFinalAP()*0.6+s.getFinalArmor()*0.4;
+            // Wiki : vitesse d'attaque réduite de 30-50 % pendant 3 s (avant : potion de lenteur,
+            // qui ralentissait le déplacement et laissait la vitesse d'attaque intacte)
+            double asMult=1.0-new double[]{0.30,0.35,0.40,0.45,0.50}[getLevel()-1];
+            var cmE=LolPlugin.getInstance().getChampionManager();
             for(var __t : TargetingUtil.enemiesAround(c, 4.0)){
                 TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);
-                if(__t instanceof Player __p)
-                    __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,60,0,false,true)); // ralentit AS 3s
+                if(__t instanceof Player __p && cmE.hasChampion(__p)){
+                    var st=cmE.getChampion(__p).getStats();
+                    st.multiplyAS(asMult);
+                    new org.bukkit.scheduler.BukkitRunnable(){@Override public void run(){ st.multiplyAS(1.0/asMult); }}
+                            .runTaskLater(LolPlugin.getInstance(), 60L);
+                }
             }
             fr.lolmc.util.VisualEffectUtil.impactBurst(c.getWorld(),
                     c.getLocation(), Material.STONE, 0.32f, 2.0, 10, 8L);

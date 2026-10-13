@@ -62,36 +62,26 @@ public final class Blitzcrank extends BaseChampion implements fr.lolmc.champion.
             resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : SKILLSHOT signature. Attrape le 1er ennemi, 110-310 + 120% AP, stun + tire vers Blitz
-            var hits=TargetingUtil.skillshot(c, 11.2, 0.7, false); // 1115 unités
-            if(hits.isEmpty()){c.sendActionBar(Component.text("🪝 Grappin manqué!",NamedTextColor.GRAY));return;}
-            var tgt=hits.getFirst();
             double[] base=fr.lolmc.util.Balance.base("q_blitzcrank",new double[]{110,160,210,260,310});double dmg=base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("q_blitzcrank","ap",1.5);
-            // Animation : une seule ligne étirée qui suit le grappin (au lieu
-            // d'une trainée de particules répétée à chaque tick).
-            org.bukkit.Location hookStart = c.getEyeLocation();
-            org.bukkit.Location hookEnd = tgt.getLocation().add(0,1,0);
-            double hookDist = hookStart.distance(hookEnd);
-            org.bukkit.util.Vector hookDir = hookEnd.toVector().subtract(hookStart.toVector()).normalize();
-            long hookSteps = Math.max(3L, (long)(hookDist / 0.6)); // délai de voyage réel du grappin
-            fr.lolmc.util.VisualEffectUtil.skillshotLine(hookStart, hookDir, hookDist,
-                    Material.YELLOW_STAINED_GLASS, 0.12f, hookSteps);
+            // Projectile réel : la main du grappin part à 1800 unités/s et ramène le 1er ennemi
+            TargetingUtil.launchSkillshot(c, c.getEyeLocation(), c.getEyeLocation().getDirection(), 11.2, 0.7, false, 18.0,
+                    new org.bukkit.inventory.ItemStack(Material.IRON_CHAIN), 0.9f, Material.YELLOW_STAINED_GLASS,
+                    finalTgt -> {
+                        TargetingUtil.dealDamage(c, finalTgt, dmg, TargetingUtil.DmgType.MAGICAL);
+                        // Ramené jusque devant Blitzcrank (avant : poussée qui s'arrêtait à mi-chemin)
+                        TargetingUtil.pullTo(finalTgt, c, 1.5, 25.0);
+                        if(finalTgt instanceof Player __p){
+                            fr.lolmc.LolPlugin.getInstance().getCCManager().stun(__p, 13); // étourdi 0.65 s (wiki)
+                            __p.sendActionBar(Component.text("🪝 ATTRAPÉ! Grappin Fusée",NamedTextColor.YELLOW));
+                        }
+                        // Chaîne tendue entre Blitzcrank et sa prise
+                        var hs=c.getEyeLocation(); var he=finalTgt.getLocation().add(0,1,0);
+                        fr.lolmc.util.VisualEffectUtil.skillshotLine(hs, he.toVector().subtract(hs.toVector()).normalize(),
+                                hs.distance(he), Material.YELLOW_STAINED_GLASS, 0.1f, 8L);
+                        finalTgt.getWorld().playSound(finalTgt.getLocation(), Sound.ENTITY_GENERIC_EXPLODE, 0.5f, 1.8f);
+                    },
+                    hits -> { if(hits.isEmpty()) c.sendActionBar(Component.text("🪝 Grappin manqué!",NamedTextColor.GRAY)); });
             c.getWorld().playSound(c.getLocation(), Sound.BLOCK_PISTON_EXTEND, 1f, 0.8f);
-            // Dégâts et attraction après le voyage
-            final var finalTgt = tgt;
-            new org.bukkit.scheduler.BukkitRunnable(){
-                @Override public void run(){
-                    TargetingUtil.dealDamage(c, finalTgt, dmg, TargetingUtil.DmgType.MAGICAL);
-                    Vector pull=c.getLocation().toVector().subtract(finalTgt.getLocation().toVector()).normalize().multiply(2.0);
-                    pull.setY(0.3); finalTgt.setVelocity(pull);
-                    if(finalTgt instanceof Player __p){
-                        fr.lolmc.LolPlugin.getInstance().getCCManager().stun(__p, 13); // étourdi 0.65 s (wiki)
-                        __p.sendActionBar(Component.text("🪝 ATTRAPÉ! Grappin Fusée",NamedTextColor.YELLOW));
-                    }
-                    fr.lolmc.util.VisualEffectUtil.impactBurst(finalTgt.getWorld(),
-                            finalTgt.getLocation().add(0,1,0), Material.YELLOW_STAINED_GLASS, 0.28f, 0.4, 8, 6L);
-                    finalTgt.getWorld().playSound(finalTgt.getLocation(), Sound.ENTITY_GENERIC_EXPLODE, 0.5f, 1.8f);
-                }
-            }.runTaskLater(LolPlugin.getInstance(), hookSteps);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] base=fr.lolmc.util.Balance.base("q_blitzcrank",new double[]{110,160,210,260,310});
@@ -162,7 +152,7 @@ public final class Blitzcrank extends BaseChampion implements fr.lolmc.champion.
             }
             c.getWorld().strikeLightningEffect(c.getLocation());
             fr.lolmc.util.VisualEffectUtil.groundRing(c.getWorld(),
-                    c.getLocation().add(0,1,0), 3.0, Material.YELLOW_STAINED_GLASS, 20, 0.35f, 0.1f, 10L);
+                    c.getLocation().add(0,1,0), 6.0, Material.YELLOW_STAINED_GLASS, 32, 0.6f, 0.1f, 10L); // rayon réel (600)
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_LIGHTNING_BOLT_THUNDER, 1f, 1.2f);
         }
         @Override public String getDynamicDescription(ChampionStats s){

@@ -362,6 +362,13 @@ public class MinionManager {
                     }
                 }
 
+                // Mage / canon : attaque à distance (projectile), sans la frappe vanilla au contact
+                if (!tooFar && isRangedMinion(z)) {
+                    LivingEntity foe = rangedAggroTarget(z);
+                    if (foe == null) foe = findNearbyEnemy(z, team);
+                    if (foe != null) { rangedAttack(z, team, foe); continue; }
+                }
+
                 // Aggro forcée en cours (champion attaqué) → ne pas retarget
                 if (fr.lolmc.game.AggroManager.hasMinionAggro(z)
                         && z.getTarget() instanceof Player) {
@@ -390,6 +397,67 @@ public class MinionManager {
                     if (next != null) z.getPathfinder().moveTo(next, 1.0);
                 }
             }
+        }
+    }
+
+    // Prochain tir et cible d'aggro (champion qui a frappé un allié) des sbires à distance
+    private final Map<UUID, Long> nextShot = new HashMap<>();
+    private final Map<UUID, UUID> aggroFoe = new HashMap<>();
+
+    private static boolean isRangedMinion(LivingEntity m) {
+        String t = getMinionTypeTag(m);
+        return "caster".equals(t) || "cannon".equals(t);
+    }
+
+    /** Champion à punir pendant l'aggro (la cible vanilla est effacée pour ne pas frapper au contact). */
+    private LivingEntity rangedAggroTarget(Zombie z) {
+        if (!fr.lolmc.game.AggroManager.hasMinionAggro(z)) { aggroFoe.remove(z.getUniqueId()); return null; }
+        if (z.getTarget() instanceof Player ap) aggroFoe.put(z.getUniqueId(), ap.getUniqueId());
+        UUID id = aggroFoe.get(z.getUniqueId());
+        Player p = id != null ? org.bukkit.Bukkit.getPlayer(id) : null;
+        if (p == null || p.getGameMode() == org.bukkit.GameMode.SPECTATOR || !p.getWorld().equals(z.getWorld())
+                || p.getLocation().distanceSquared(z.getLocation()) > 100) return null;
+        return p;
+    }
+
+    /**
+     * Mage (portée 550, projectile 650 unités/s) et canon (portée 300, 1200 unités/s) : ils
+     * s'arrêtent à portée et tirent à leur vitesse d'attaque ; les dégâts tombent à l'impact.
+     * Avant, ils marchaient jusqu'au contact et frappaient comme des sbires de mêlée.
+     */
+    private void rangedAttack(Zombie z, Team team, LivingEntity foe) {
+        boolean cannon = "cannon".equals(getMinionTypeTag(z));
+        double range = cannon ? 4.3 : 6.8;
+        z.setTarget(null);
+        Location from = z.getLocation(), to = foe.getLocation();
+        if (from.distanceSquared(to) > range * range) { z.getPathfinder().moveTo(to, 1.0); return; }
+        z.getPathfinder().stopPathfinding();
+        z.setRotation((float) Math.toDegrees(Math.atan2(-(to.getX() - from.getX()), to.getZ() - from.getZ())), 0f);
+        long now = System.currentTimeMillis();
+        Long next = nextShot.get(z.getUniqueId());
+        if (next != null && now < next) return;
+        nextShot.put(z.getUniqueId(), now + (long) (1000 / Math.max(0.1, fr.lolmc.util.MobCombat.getAttackSpeed(z))));
+        MobAnimator.triggerAttack(z.getUniqueId());
+        Material glass = team == Team.BLUE ? Material.LIGHT_BLUE_STAINED_GLASS : Material.ORANGE_STAINED_GLASS;
+        double ad = fr.lolmc.util.MobCombat.getAD(z), onHit = getOnHitPct(z);
+        fr.lolmc.util.TargetingUtil.launchHoming(null, from.clone().add(0, cannon ? 0.6 : 0.9, 0), foe,
+                cannon ? 12.0 : 6.5, new org.bukkit.inventory.ItemStack(cannon ? Material.FIRE_CHARGE : glass),
+                cannon ? 0.5f : 0.4f, glass, false, () -> minionShotHit(foe, ad, onHit));
+        z.getWorld().playSound(from, cannon ? org.bukkit.Sound.ENTITY_GENERIC_EXPLODE : org.bukkit.Sound.ENTITY_BLAZE_SHOOT,
+                cannon ? 0.3f : 0.4f, cannon ? 1.6f : 1.8f);
+    }
+
+    /** Impact d'un tir de sbire : 60 % de l'AD contre un champion, AD + % des PV actuels contre un sbire. */
+    private static void minionShotHit(LivingEntity foe, double ad, double onHitPct) {
+        if (foe.isDead() || !foe.isValid()) return;
+        if (foe instanceof Player p) {
+            if (!LolPlugin.getInstance().getChampionManager().hasChampion(p)
+                    || p.getGameMode() == org.bukkit.GameMode.SPECTATOR) return;
+            fr.lolmc.util.DamageUtil.damage(null, p, ad * MINION_DAMAGE_VS_CHAMPIONS_STRUCTURES, false,
+                    fr.lolmc.util.DamageUtil.Type.PHYSICAL);
+        } else if (isMinion(foe) && !fr.lolmc.util.VirtualHP.isDying(foe)) {
+            fr.lolmc.util.MobCombat.damage(null, foe, ad + onHitPct * fr.lolmc.util.VirtualHP.getCurrent(foe),
+                    fr.lolmc.util.DamageUtil.Type.PHYSICAL);
         }
     }
 
@@ -556,10 +624,15 @@ public class MinionManager {
         Material trim = (team == Team.BLUE) ? Material.LIGHT_BLUE_CONCRETE : Material.ORANGE_CONCRETE;
         return switch (type) {
             // ⚔ Sbire de mêlée : petit corps + épée
+            // 💣 Sbire canon : chariot sur roues + fût (avant : modèle vide, sbire invisible)
             case CANNON -> new MobModel()
-                    
-                    
-                    ;
+                    .box(body, 0f, 0.15f, 0.0f, 0.75f, 0.4f, 0.95f)                 // châssis
+                    .box(trim, 0f, 0.55f, -0.1f, 0.55f, 0.35f, 0.6f)                // tourelle
+                    .box(Material.POLISHED_BLACKSTONE, 0f, 0.62f, 0.45f, 0.24f, 0.24f, 0.75f) // fût
+                    .cube(Material.BLACK_CONCRETE, -0.42f, 0.0f,  0.3f, 0.3f)       // roues
+                    .cube(Material.BLACK_CONCRETE,  0.42f, 0.0f,  0.3f, 0.3f)
+                    .cube(Material.BLACK_CONCRETE, -0.42f, 0.0f, -0.3f, 0.3f)
+                    .cube(Material.BLACK_CONCRETE,  0.42f, 0.0f, -0.3f, 0.3f);
                 case MELEE -> new MobModel()
                     .box(body, 0f, 0.0f, 0.0f, 0.45f, 0.55f, 0.4f)      // corps
                     .box(body, 0f, 0.55f, 0.0f, 0.4f, 0.4f, 0.4f)       // tête
@@ -592,6 +665,8 @@ public class MinionManager {
     /** Appelé à la mort d'un sbire : retire son modèle et son animation. */
     public void onMinionDeath(UUID minionId) {
         LIVE.remove(minionId);
+        nextShot.remove(minionId);
+        aggroFoe.remove(minionId);
         List<UUID> parts = minionDeco.remove(minionId);
         if (parts != null) {
             for (UUID pid : parts) {

@@ -326,6 +326,7 @@ public abstract class BaseAbility {
 
     public String       getId()         { return id; }
     public String       getName()       { return name; }
+    public Material     getIcon()       { return icon; }
     public AbilitySlot  getSlot()       { return slot; }
     public double       getRange()      { return range; }
     public int          getLevel()      { return level; }

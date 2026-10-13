@@ -114,6 +114,18 @@ public final class VirtualHP {
         entity.setHealth(Math.max(1.0, cur / max * vanillaMax));
 
         HealthBar.update(entity, cur, max);
+        // Un monstre frappé par un champion se réveille et riposte (camp entier)
+        if (killer != null && fr.lolmc.game.JungleManager.isJungleMonster(entity))
+            fr.lolmc.game.MonsterAbilities.onDamaged(entity, killer);
         return cur;
+    }
+
+    /** Rend tous ses PV à l'entité (monstre qui rentre à son camp). */
+    public static void healFull(LivingEntity entity) {
+        if (entity.isDead() || !has(entity)) return;
+        double max = getMax(entity);
+        entity.getPersistentDataContainer().set(keyCur(), PersistentDataType.DOUBLE, max);
+        entity.setHealth(Compat.maxHealthOf(entity));
+        HealthBar.update(entity, max, max);
     }
 }

@@ -52,15 +52,33 @@ public final class Sivir extends BaseChampion implements fr.lolmc.champion.base.
             var cmW = LolPlugin.getInstance().getChampionManager();
             int wr = cmW.hasChampion(c) ? Math.max(1, cmW.getChampion(c).getAbility(2).getLevel()) : 1;
             double bouncePct = new double[]{0.40,0.425,0.45,0.475,0.50}[Math.min(wr,5)-1];
-            int bounces = 0;
-            for (var e : fr.lolmc.util.TargetingUtil.entitiesInRadius(c, tgt.getLocation(), 5.0)) {
-                if (e.equals(tgt) || bounces >= 8) continue; // jusqu'à 8 rebonds (LoL)
-                fr.lolmc.util.DamageUtil.damageEntity(c, e, s.getFinalAD() * bouncePct, false, fr.lolmc.util.DamageUtil.Type.PHYSICAL);
-                fr.lolmc.util.VisualEffectUtil.impact(e.getWorld(),
-                        e.getLocation().add(0,1,0), Material.WHITE_STAINED_GLASS, 0.22f, 3L);
-                bounces++;
-            }
+            var struck = new java.util.HashSet<java.util.UUID>();
+            struck.add(tgt.getUniqueId());
+            bounce(c, tgt, s.getFinalAD() * bouncePct, struck, 8); // jusqu'à 8 rebonds (LoL)
         }
+    }
+
+    /**
+     * Ricochet : la lame file de cible en cible (l'ennemi non touché le plus proche, à 5 blocs) et
+     * chaque rebond frappe à son arrivée. Avant, tous les ennemis autour prenaient le coup en même temps.
+     */
+    static void bounce(Player c, org.bukkit.entity.LivingEntity from, double dmg, java.util.Set<java.util.UUID> struck, int left) {
+        if (left <= 0 || !c.isOnline() || !from.isValid()) return;
+        org.bukkit.entity.LivingEntity next = null;
+        double best = 25;
+        for (var e : TargetingUtil.entitiesInRadius(c, from.getLocation(), 5.0)) {
+            if (struck.contains(e.getUniqueId())) continue;
+            double d = e.getLocation().distanceSquared(from.getLocation());
+            if (d < best) { best = d; next = e; }
+        }
+        if (next == null) return;
+        struck.add(next.getUniqueId());
+        final var tgt = next;
+        TargetingUtil.launchHoming(c, from.getLocation().add(0, 1, 0), tgt, 20.0,
+                new org.bukkit.inventory.ItemStack(Material.IRON_AXE), 0.5f, Material.WHITE_STAINED_GLASS, true, () -> {
+            DamageUtil.damageEntity(c, tgt, dmg, false, DamageUtil.Type.PHYSICAL);
+            bounce(c, tgt, dmg, struck, left - 1);
+        });
     }
 
     static class Q extends BaseAbility {
@@ -72,15 +90,20 @@ public final class Sivir extends BaseChampion implements fr.lolmc.champion.base.
             // +60 % AP) à l'aller et au retour. Avant : sort ciblé à 6.5 blocs.
             double[] base=fr.lolmc.util.Balance.base("q_sivir",new double[]{60,85,110,135,160});
             double dmg=base[getLevel()-1]+s.getBonusAD()*0.70+s.getFinalAP()*0.60;
-            var hits=TargetingUtil.skillshot(c, 12.5, 0.9, true);
-            for(var e : hits) DamageUtil.abilityDamageEntity(c, e, dmg);
-            new BukkitRunnable(){@Override public void run(){
-                for(var e : hits){
-                    if(e.isDead()) continue;
-                    DamageUtil.abilityDamageEntity(c, e, dmg);
-                    fr.lolmc.util.VisualEffectUtil.impact(c.getWorld(), e.getLocation(), Material.WHITE_STAINED_GLASS, 0.25f, 4L);
-                }
-            }}.runTaskLater(LolPlugin.getInstance(),15L);
+            // Projectile réel : la lame part (1450/s), traverse, puis revient vers Sivir (1200/s)
+            var out=c.getEyeLocation().getDirection();
+            var axe=new org.bukkit.inventory.ItemStack(Material.IRON_AXE);
+            TargetingUtil.launchSkillshot(c, c.getEyeLocation(), out, 12.5, 0.9, true, 14.5, axe, 1.0f, null, null,
+                    e -> DamageUtil.abilityDamageEntity(c, e, dmg),
+                    (hits, end) -> {
+                        // Retour depuis là où la lame s'est arrêtée (avant : toujours depuis 12.5 blocs,
+                        // même si elle avait heurté un mur)
+                        if(!c.isOnline() || !end.getWorld().equals(c.getWorld())) return;
+                        var back=c.getEyeLocation().toVector().subtract(end.toVector());
+                        if(back.lengthSquared()<1e-6) return;
+                        TargetingUtil.launchSkillshot(c, end, back, back.length(), 0.9, true, 12.0, axe, 1.0f, null,
+                                e -> DamageUtil.abilityDamageEntity(c, e, dmg), null);
+                    });
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 1.3f);
         }
         @Override public String getDynamicDescription(ChampionStats s){

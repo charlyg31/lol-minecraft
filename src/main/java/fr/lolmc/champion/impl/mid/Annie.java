@@ -56,7 +56,9 @@ public final class Annie extends BaseChampion implements fr.lolmc.champion.base.
     private static final Map<UUID, Long>    enrageUntil = new java.util.concurrent.ConcurrentHashMap<>();
 
     // ── Pyromanie ─────────────────────────────────────────────────
-    public static void onSpellCast(UUID id) {
+    public static void onSpellCast(UUID id, int slot) {
+        // Le Bouclier en Fusion n'inflige pas de dégâts : il ne consomme pas l'étourdissement chargé
+        if (slot == 3 && hasPyromancyStun(id)) return;
         int stacks = pyroStacks.merge(id, 1, Integer::sum);
         if (stacks >= 4) pyroStacks.put(id, 0);
     }
@@ -165,25 +167,26 @@ public final class Annie extends BaseChampion implements fr.lolmc.champion.base.
             if(target==null){cancelCast();c.sendActionBar(Component.text("Aucune cible",NamedTextColor.GRAY));return;}
             double[] base=fr.lolmc.util.Balance.base("q_annie",new double[]{80,125,170,215,260});
             double dmg=base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("q_annie","ap",0.80);
-            if(hasPyromancyStun(c.getUniqueId())){
-                var cc=LolPlugin.getInstance().getCCManager();
-                int lvl=LolPlugin.getInstance().getChampionManager().hasChampion(c)?LolPlugin.getInstance().getChampionManager().getChampion(c).getLevelSystem().getLevel():1;
-                if(cc!=null) cc.stun(target, pyroStunTicks(lvl));
-            }
-            TargetingUtil.dealDamage(c, target, dmg, TargetingUtil.DmgType.MAGICAL);
-            // Kill vérifié après les dégâts (avant : sur les dégâts bruts, sans la RM)
-            boolean kills = target.isDead() || TargetingUtil.getRealHealth(target) <= 0;
-            if(kills){
-                // Remboursement de 50 % : appliqué au CD que BaseChampion déclenche juste après ce cast,
-                // puis retour au CD normal (sinon la réduction restait et se cumulait à chaque kill)
-                setDynamicCooldown(getCurrentCooldown(s)*0.5);
-                new org.bukkit.scheduler.BukkitRunnable(){@Override public void run(){ setDynamicCooldown(-1); }}
-                        .runTaskLater(LolPlugin.getInstance(), 1L);
-                var cm=LolPlugin.getInstance().getChampionManager();
-                if(cm.hasChampion(c)&&cm.getChampion(c).getResourceSystem()!=null)cm.getChampion(c).getResourceSystem().addCurrent(60);
-            }
-            fr.lolmc.util.VisualEffectUtil.impactBurst(target.getWorld(),
-                    target.getLocation().add(0,1,0), Material.ORANGE_STAINED_GLASS, 0.28f, 0.5, 7, 6L);
+            final boolean stun=hasPyromancyStun(c.getUniqueId()); // chargé au lancer
+            final double cost=getResourceCost();
+            final BaseAbility q=this;
+            // Boule de feu à tête chercheuse (1400 unités/s)
+            TargetingUtil.launchHoming(c, c.getEyeLocation(), target, 14.0,
+                    new org.bukkit.inventory.ItemStack(Material.FIRE_CHARGE), 0.8f, Material.ORANGE_STAINED_GLASS, true, () -> {
+                if(stun){
+                    var cc=LolPlugin.getInstance().getCCManager();
+                    int lvl=LolPlugin.getInstance().getChampionManager().hasChampion(c)?LolPlugin.getInstance().getChampionManager().getChampion(c).getLevelSystem().getLevel():1;
+                    if(cc!=null) cc.stun(target, pyroStunTicks(lvl));
+                }
+                TargetingUtil.dealDamage(c, target, dmg, TargetingUtil.DmgType.MAGICAL);
+                // Kill : la moitié de la recharge et le mana sont rendus (wiki)
+                if(target.isDead() || TargetingUtil.getRealHealth(target) <= 0){
+                    q.reduceCooldown(c, q.getRemainingCooldown(c)*0.5);
+                    var cm=LolPlugin.getInstance().getChampionManager();
+                    if(cm.hasChampion(c)&&cm.getChampion(c).getResourceSystem()!=null)cm.getChampion(c).getResourceSystem().addCurrent(cost);
+                }
+            });
+            c.getWorld().playSound(c.getLocation(), Sound.ENTITY_BLAZE_SHOOT, 1f, 1.3f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] base=fr.lolmc.util.Balance.base("q_annie",new double[]{80,125,170,215,260});

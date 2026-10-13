@@ -43,15 +43,18 @@ public final class VisualEffectUtil {
      * @param lifetimeTicks durée avant disparition automatique
      */
     public static void impact(World world, Location loc, Material block, float size, long lifetimeTicks) {
+        // Animé (interpolation des Display, sans particules) : naît à 15 % de sa taille, grossit en
+        // tournant, puis se rétracte avant de disparaître
+        Quaternionf spin = randomRotation();
         var d = world.spawn(loc, BlockDisplay.class, disp -> {
             disp.setBlock(block.createBlockData());
             disp.setBrightness(new Display.Brightness(15, 15));
             disp.setPersistent(false);
-            disp.setInterpolationDuration(2);
-            disp.setInterpolationDelay(0);
-            disp.setTransformation(centeredCube(size));
+            disp.setTransformation(cube(size * 0.15f, new Vector3f(), new Quaternionf()));
         });
-        despawnAfter(d, lifetimeTicks);
+        animateLife(d, lifetimeTicks,
+                cube(size, new Vector3f(), spin),
+                cube(0f, new Vector3f(), new Quaternionf(spin).rotateY((float) Math.PI / 2)));
     }
 
     /**
@@ -61,11 +64,21 @@ public final class VisualEffectUtil {
      */
     public static void impactBurst(World world, Location center, Material block,
                                     float size, double spread, int count, long lifetimeTicks) {
+        // Les éclats partent du centre et s'envolent vers l'extérieur (avant : cubes figés)
         for (int i = 0; i < count; i++) {
-            double ox = (Math.random() - 0.5) * 2 * spread;
-            double oy = (Math.random() - 0.5) * 2 * spread * 0.5;
-            double oz = (Math.random() - 0.5) * 2 * spread;
-            impact(world, center.clone().add(ox, oy, oz), block, size, lifetimeTicks);
+            Vector3f off = new Vector3f((float) ((Math.random() - 0.5) * 2 * spread),
+                    (float) ((Math.random() - 0.5) * spread + spread * 0.3),
+                    (float) ((Math.random() - 0.5) * 2 * spread));
+            Quaternionf spin = randomRotation();
+            var d = world.spawn(center, BlockDisplay.class, disp -> {
+                disp.setBlock(block.createBlockData());
+                disp.setBrightness(new Display.Brightness(15, 15));
+                disp.setPersistent(false);
+                disp.setTransformation(cube(size * 0.3f, new Vector3f(), new Quaternionf()));
+            });
+            animateLife(d, lifetimeTicks,
+                    cube(size, off, spin),
+                    cube(0f, new Vector3f(off).mul(1.4f), new Quaternionf(spin).rotateX((float) Math.PI)));
         }
     }
 
@@ -80,23 +93,19 @@ public final class VisualEffectUtil {
             double angle = (2 * Math.PI * i) / segments;
             double x = center.getX() + radius * Math.cos(angle);
             double z = center.getZ() + radius * Math.sin(angle);
-            Location segLoc = new Location(world, x, center.getY(), z);
             float tangentYaw = (float) (angle + Math.PI / 2.0);
-
-            var d = world.spawn(segLoc, BlockDisplay.class, disp -> {
+            Quaternionf rot = new Quaternionf().rotateY(tangentYaw);
+            // Le segment part du centre (20 % du rayon) et s'écarte jusqu'au rayon, puis s'affine
+            Vector3f startOff = new Vector3f((float) (x - center.getX()) * 0.2f, 0f, (float) (z - center.getZ()) * 0.2f);
+            Vector3f endOff = new Vector3f((float) (x - center.getX()), 0f, (float) (z - center.getZ()));
+            var d = world.spawn(center, BlockDisplay.class, disp -> {
                 disp.setBlock(block.createBlockData());
                 disp.setBrightness(new Display.Brightness(15, 15));
                 disp.setPersistent(false);
-                disp.setInterpolationDuration(2);
-                disp.setInterpolationDelay(0);
-                Quaternionf rot = new Quaternionf().rotateY(tangentYaw);
-                disp.setTransformation(new Transformation(
-                        new Vector3f(-segLen / 2f, 0f, -thickness / 2f),
-                        rot,
-                        new Vector3f(segLen, thickness, thickness),
-                        new Quaternionf()));
+                disp.setTransformation(segment(startOff, rot, segLen * 0.3f, thickness));
             });
-            despawnAfter(d, lifetimeTicks);
+            animateLife(d, lifetimeTicks, segment(endOff, rot, segLen, thickness),
+                    segment(new Vector3f(endOff).mul(1.08f), rot, segLen, 0f));
         }
     }
 
@@ -168,20 +177,20 @@ public final class VisualEffectUtil {
      */
     public static void skillshotLine(Location origin, Vector dir, double length,
                                       Material block, float thickness, long lifetimeTicks) {
+        float yaw = (float) Math.toRadians(-Math.toDegrees(Math.atan2(dir.getX(), dir.getZ())));
+        Quaternionf rot = new Quaternionf().rotateY(yaw);
+        Vector3f translation = new Vector3f(-thickness / 2f, -thickness / 2f, 0f);
         var d = origin.getWorld().spawn(origin, BlockDisplay.class, disp -> {
             disp.setBlock(block.createBlockData());
             disp.setBrightness(new Display.Brightness(15, 15));
             disp.setPersistent(false);
-            disp.setInterpolationDuration(0);
-            disp.setInterpolationDelay(0);
-
-            float yaw = (float) Math.toRadians(-Math.toDegrees(Math.atan2(dir.getX(), dir.getZ())));
-            Quaternionf rot = new Quaternionf().rotateY(yaw);
-            Vector3f translation = new Vector3f(-thickness / 2f, -thickness / 2f, 0f);
-            Vector3f scale = new Vector3f(thickness, thickness, (float) length);
-            disp.setTransformation(new Transformation(translation, rot, scale, new Quaternionf()));
+            disp.setTransformation(new Transformation(translation, rot,
+                    new Vector3f(thickness, thickness, 0.01f), new Quaternionf()));
         });
-        despawnAfter(d, lifetimeTicks);
+        // Le trait s'étire de l'origine jusqu'au bout, puis s'affine avant de disparaître
+        animateLife(d, lifetimeTicks,
+                new Transformation(translation, rot, new Vector3f(thickness, thickness, (float) length), new Quaternionf()),
+                new Transformation(new Vector3f(), rot, new Vector3f(0f, 0f, (float) length), new Quaternionf()));
     }
 
     /**
@@ -215,7 +224,90 @@ public final class VisualEffectUtil {
         return list;
     }
 
+    // ── Projectiles de sort (TargetingUtil.launchSkillshot) ─────────────────
+
+    /**
+     * Crée l'objet visuel d'un projectile : ItemDisplay orienté dans la direction du tir, dont
+     * les déplacements sont lissés par le client (teleportDuration) et qui tourne sur lui-même.
+     */
+    public static ItemDisplay spawnProjectile(Location start, Vector dir, ItemStack item, float size) {
+        Location at = start.clone().setDirection(dir);
+        return start.getWorld().spawn(at, ItemDisplay.class, disp -> {
+            disp.setItemStack(item);
+            disp.setBrightness(new Display.Brightness(15, 15));
+            disp.setPersistent(false);
+            disp.setTeleportDuration(1);
+            disp.setTransformation(itemTf(size * 0.4f, new Quaternionf()));
+        });
+    }
+
+    /** Avance le projectile (déplacement lissé) et le fait tourner autour de son axe. */
+    public static void moveProjectile(ItemDisplay proj, Location pos, Vector dir, float size, int age) {
+        if (proj.isDead()) return;
+        proj.teleport(pos.clone().setDirection(dir));
+        proj.setInterpolationDelay(0);
+        proj.setInterpolationDuration(1);
+        proj.setTransformation(itemTf(age < 2 ? size * 0.4f + size * 0.3f * age : size,
+                new Quaternionf().rotateZ(age * 0.6f)));
+    }
+
+    /** Fin du projectile : il se rétracte, avec un petit éclat à l'endroit de l'impact. */
+    public static void endProjectile(ItemDisplay proj, Location pos, Material burst) {
+        if (proj.isDead()) return;
+        proj.setInterpolationDelay(0);
+        proj.setInterpolationDuration(3);
+        proj.setTransformation(itemTf(0f, new Quaternionf().rotateZ(3f)));
+        new BukkitRunnable() { @Override public void run() { if (!proj.isDead()) proj.remove(); } }
+                .runTaskLater(LolPlugin.getInstance(), 3L);
+        if (burst != null) impactBurst(pos.getWorld(), pos, burst, 0.18f, 0.4, 5, 7L);
+    }
+
     // ── Helpers internes ────────────────────────────────────────────────────
+
+    /**
+     * Cycle de vie animé d'un Display : 1 tick après l'apparition, interpolation vers
+     * {@code full} ; peu avant la fin, interpolation vers {@code gone} ; puis suppression.
+     */
+    private static void animateLife(Display d, long lifetimeTicks, Transformation full, Transformation gone) {
+        long life = Math.max(3, lifetimeTicks);
+        int grow = (int) Math.max(1, Math.min(4, life / 3));
+        int fade = (int) Math.max(1, Math.min(4, life / 3));
+        new BukkitRunnable() { @Override public void run() {
+            if (d.isDead()) return;
+            d.setInterpolationDelay(0); d.setInterpolationDuration(grow); d.setTransformation(full);
+        }}.runTaskLater(LolPlugin.getInstance(), 1L);
+        new BukkitRunnable() { @Override public void run() {
+            if (d.isDead()) return;
+            d.setInterpolationDelay(0); d.setInterpolationDuration(fade); d.setTransformation(gone);
+        }}.runTaskLater(LolPlugin.getInstance(), Math.max(2, life - fade));
+        new BukkitRunnable() { @Override public void run() { if (!d.isDead()) d.remove(); } }
+                .runTaskLater(LolPlugin.getInstance(), life + 1);
+    }
+
+    /** Transformation d'un ItemDisplay (déjà centré sur son origine). */
+    private static Transformation itemTf(float size, Quaternionf rot) {
+        return new Transformation(new Vector3f(), rot, new Vector3f(size, size, size), new Quaternionf());
+    }
+
+    private static Quaternionf randomRotation() {
+        return new Quaternionf().rotateXYZ((float) (Math.random() * Math.PI), (float) (Math.random() * Math.PI),
+                (float) (Math.random() * Math.PI));
+    }
+
+    /** Cube centré sur (offset), tourné de {@code rot}. */
+    private static Transformation cube(float size, Vector3f offset, Quaternionf rot) {
+        // La rotation s'applique autour du centre du cube : on centre via la translation
+        Vector3f half = new Vector3f(-size / 2f, -size / 2f, -size / 2f);
+        new Quaternionf(rot).transform(half);
+        return new Transformation(new Vector3f(offset).add(half), rot, new Vector3f(size, size, size), new Quaternionf());
+    }
+
+    /** Segment d'anneau (longueur {@code len}, épaisseur {@code th}) centré sur {@code offset}. */
+    private static Transformation segment(Vector3f offset, Quaternionf rot, float len, float th) {
+        Vector3f half = new Vector3f(-len / 2f, 0f, -th / 2f);
+        new Quaternionf(rot).transform(half);
+        return new Transformation(new Vector3f(offset).add(half), rot, new Vector3f(len, th, th), new Quaternionf());
+    }
 
     private static Transformation centeredCube(float size) {
         return new Transformation(

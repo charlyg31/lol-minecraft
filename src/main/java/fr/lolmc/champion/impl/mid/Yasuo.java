@@ -33,6 +33,8 @@ public final class Yasuo extends BaseChampion implements fr.lolmc.champion.base.
     }
 
     public static final Map<UUID,Integer> qCasts=new java.util.concurrent.ConcurrentHashMap<>();
+    // Les charges de Tempête d'Acier se perdent 6 s après la dernière (wiki ; avant : jamais)
+    private static final Map<UUID,Long> qStackUntil=new java.util.concurrent.ConcurrentHashMap<>();
 
     // ── Mur du Vent : segment au sol qui détruit les projectiles ennemis (skillshots, AA à distance) ──
     private record WindWall(fr.lolmc.team.TeamManager.Team team, org.bukkit.World world,
@@ -69,7 +71,7 @@ public final class Yasuo extends BaseChampion implements fr.lolmc.champion.base.
     // E : chaque cible ne peut être traversée qu'une fois par 10/9/8/7/6 s (LoL)
     private static final Map<String,Long> eLockout=new java.util.concurrent.ConcurrentHashMap<>();
     /** Reinitialise l'etat de ce joueur (fin de partie / deconnexion). */
-    @Override public void resetState(UUID id){ qCasts.remove(id); eStacks.remove(id); eLastCast.remove(id); }
+    @Override public void resetState(UUID id){ qCasts.remove(id); qStackUntil.remove(id); eStacks.remove(id); eLastCast.remove(id); }
     @Override public void resetAllState(){ qCasts.clear(); eStacks.clear(); eLastCast.clear(); walls.clear(); eLockout.clear(); }
 
     // Passif Voie du Vagabond : au double crit chance passif (déjà configuré via ChampionStats)
@@ -98,26 +100,32 @@ public final class Yasuo extends BaseChampion implements fr.lolmc.champion.base.
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // 2 coups touchés → le 3e Q est une tornade (avant : chaque lancer, même raté, comptait)
-            int qStacks=qCasts.getOrDefault(c.getUniqueId(),0);
+            int qStacks=qStackUntil.getOrDefault(c.getUniqueId(),0L)>System.currentTimeMillis()
+                    ? qCasts.getOrDefault(c.getUniqueId(),0) : 0;
             // LoL : coup d'estoc en ligne. 20/45/70/95/120 + 100% AD (peut critiquer)
             double[] base=fr.lolmc.util.Balance.base("q_yasuo",new double[]{20,45,70,95,120});double dmg=base[getLevel()-1]+s.getFinalAD()*fr.lolmc.util.Balance.ratio("q_yasuo","ad",1.05);
             boolean tornado = qStacks>=2;
             if(tornado){
                 // Tornade : skillshot plus long qui projette en l'air
-                var hits=TargetingUtil.skillshot(c, 11.5, 1.5, true); // 1150 unités
+                // Projectile réel : tornade de 1150 unités à 1200/s qui traverse
                 var ccQ = LolPlugin.getInstance().getCCManager();
-                for(var __t : hits){
-                    TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.PHYSICAL);
-                    if(ccQ!=null) ccQ.setAirborne(__t, 18); // projeté 0.9 s (wiki)
-                    if(__t instanceof Player __p)__p.sendActionBar(Component.text("🌪 TORNADE Yasuo!",NamedTextColor.YELLOW));
-                }
+                TargetingUtil.launchSkillshot(c, c.getLocation().add(0,0.6,0), c.getEyeLocation().getDirection().setY(0), 11.5, 1.5, true, 12.0,
+                        new org.bukkit.inventory.ItemStack(Material.WHITE_STAINED_GLASS), 1.6f, Material.WHITE_STAINED_GLASS,
+                        __t -> {
+                            TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.PHYSICAL);
+                            if(ccQ!=null) ccQ.setAirborne(__t, 18); // projeté 0.9 s (wiki)
+                            if(__t instanceof Player __p)__p.sendActionBar(Component.text("🌪 TORNADE Yasuo!",NamedTextColor.YELLOW));
+                        }, null);
                 qCasts.put(c.getUniqueId(),0);
                 c.getWorld().playSound(c.getLocation(), Sound.ENTITY_ENDER_DRAGON_FLAP, 1f, 1.2f);
             } else {
                 // Estoc en ligne droite
                 var hits=TargetingUtil.skillshot(c, 5.0, 1.0, true);
                 for(var __t : hits) TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.PHYSICAL);
-                if(!hits.isEmpty()) qCasts.put(c.getUniqueId(), Math.min(2, qStacks+1));
+                if(!hits.isEmpty()){
+                    qCasts.put(c.getUniqueId(), Math.min(2, qStacks+1));
+                    qStackUntil.put(c.getUniqueId(), System.currentTimeMillis()+6000L);
+                }
                 c.getWorld().playSound(c.getLocation(), Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 1.1f);
             }
         }

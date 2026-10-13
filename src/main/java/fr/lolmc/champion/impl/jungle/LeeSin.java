@@ -88,15 +88,24 @@ public final class LeeSin extends BaseChampion implements fr.lolmc.champion.base
                 return;
             }
             double[] base=fr.lolmc.util.Balance.base("q_leesin",new double[]{60,90,120,150,180});double dmg=base[getLevel()-1]+s.getBonusAD()*fr.lolmc.util.Balance.ratio("q_leesin","ad",0.9);
-            var hits=TargetingUtil.skillshot(c, 12.0, 0.8, false);
-            if(hits.isEmpty()){c.sendActionBar(Component.text("🌊 Onde Sonique manquée!",NamedTextColor.GRAY));return;}
-            var tgt=hits.getFirst();
+            // Projectile réel (1200 unités à 1800/s). La recharge attend son résultat : manqué →
+            // recharge tout de suite ; touché → 3 s pour la 2e activation (Coup Résonnant)
+            deferCooldown();
+            final BaseAbility q = this;
+            TargetingUtil.launchSkillshot(c, c.getEyeLocation(), c.getEyeLocation().getDirection(), 12.0, 0.6, false, 18.0,
+                    new org.bukkit.inventory.ItemStack(Material.ECHO_SHARD), 0.8f, Material.LIGHT_GRAY_STAINED_GLASS,
+                    tgt -> sonicHit(c, s, tgt, dmg, q),
+                    hits -> { if(hits.isEmpty()){
+                        c.sendActionBar(Component.text("🌊 Onde Sonique manquée!",NamedTextColor.GRAY));
+                        q.triggerCooldown(c, s);
+                    } });
+            c.getWorld().playSound(c.getLocation(), Sound.ENTITY_WARDEN_SONIC_BOOM, 0.6f, 1.5f);
+        }
+
+        private void sonicHit(Player c, ChampionStats s, org.bukkit.entity.LivingEntity tgt, double dmg, BaseAbility q){
             TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.PHYSICAL);
             sonicTarget.put(c.getUniqueId(), tgt.getUniqueId());
-            // Recharge différée : la 2e activation (Coup Résonnant) reste possible 3 s ; avant, la
-            // recharge partait au 1er lancer et la marque expirait avant de pouvoir relancer
-            deferCooldown();
-            final BaseAbility q = this; final UUID markedId = tgt.getUniqueId();
+            final UUID markedId = tgt.getUniqueId();
             new BukkitRunnable(){@Override public void run(){
                 if(markedId.equals(sonicTarget.get(c.getUniqueId()))){
                     sonicTarget.remove(c.getUniqueId());
@@ -106,7 +115,6 @@ public final class LeeSin extends BaseChampion implements fr.lolmc.champion.base
             if(tgt instanceof Player _tp)_tp.sendActionBar(Component.text("🌊 Onde Sonique! (recast pour dash)",NamedTextColor.YELLOW));
             fr.lolmc.util.VisualEffectUtil.impact(c.getWorld(),
                     tgt.getLocation().add(0,1,0), Material.LIGHT_GRAY_STAINED_GLASS, 0.4f, 5L);
-            c.getWorld().playSound(c.getLocation(), Sound.ENTITY_WARDEN_SONIC_BOOM, 0.6f, 1.5f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] base=fr.lolmc.util.Balance.base("q_leesin",new double[]{60,90,120,150,180});

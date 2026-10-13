@@ -346,8 +346,15 @@ public class TurretManager {
         warmup.put(id, Math.min(3, stacks + 1));
         lastChampionHit.put(id, System.currentTimeMillis());
 
-        shootBeam(beamFrom, victim.getLocation().add(0, 1, 0));
+        // Tir à tête chercheuse (1200 unités/s, imblocable) : dégâts à l'impact
+        fr.lolmc.util.TargetingUtil.launchHoming(null, beamFrom, victim, 12.0,
+                new org.bukkit.inventory.ItemStack(Material.WHITE_STAINED_GLASS), 0.7f, Material.WHITE_STAINED_GLASS, false,
+                () -> turretShotHit(victim, damage));
+        beamFrom.getWorld().playSound(beamFrom, Sound.ENTITY_ARROW_SHOOT, 0.6f, 0.8f);
+    }
 
+    private void turretShotHit(Player victim, double damage) {
+        if (victim.getGameMode() == org.bukkit.GameMode.SPECTATOR) return;
         // Dégâts physiques (30 % de pénétration d'armure), puis DamageUtil en vrais dégâts pour
         // les boucliers, Zhonya, le récap et la MORT (avant : PV retirés directement, sans
         // jamais déclencher la mort du champion)
@@ -363,17 +370,18 @@ public class TurretManager {
     }
 
     private void fireAtMinion(GameStructure turret, Location beamFrom, LivingEntity minion) {
-        shootBeam(beamFrom, minion.getLocation().add(0, 0.5, 0));
         // Un tir retire un % des PV max selon le type (wiki LoL) : mêlée 3 tirs, caster 2,
-        // canon 8, super-sbire 20
+        // canon 8, super-sbire 20 — appliqué à l'impact du tir à tête chercheuse
         double pct = switch (String.valueOf(MinionManager.getMinionTypeTag(minion))) {
             case "caster" -> 0.70;
             case "cannon" -> 0.14;
             case "super"  -> 0.05;
             default       -> 0.45;
         };
-        fr.lolmc.util.MobCombat.damage(null, minion,
-                fr.lolmc.util.VirtualHP.getMax(minion) * pct, fr.lolmc.util.DamageUtil.Type.TRUE);
+        fr.lolmc.util.TargetingUtil.launchHoming(null, beamFrom, minion, 12.0,
+                new org.bukkit.inventory.ItemStack(Material.WHITE_STAINED_GLASS), 0.6f, Material.WHITE_STAINED_GLASS, false,
+                () -> fr.lolmc.util.MobCombat.damage(null, minion,
+                        fr.lolmc.util.VirtualHP.getMax(minion) * pct, fr.lolmc.util.DamageUtil.Type.TRUE));
     }
 
     private void shootBeam(Location from, Location to) {

@@ -50,9 +50,14 @@ public final class Morgana extends BaseChampion {
             resourceCost = 50;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // Wiki : skillshot de 1300 unités, enracine 2-3 s (avant : sort ciblé à 6.5 blocs, 2 s)
-            var hits=TargetingUtil.skillshot(c, 13.0, 0.7, false);
-            if(hits.isEmpty()){c.sendActionBar(Component.text("🕸 Entrave manquée!",NamedTextColor.GRAY));return;}
-            var tgt=hits.getFirst();
+            // Projectile réel : 1300 unités à 1200/s
+            TargetingUtil.launchSkillshot(c, c.getEyeLocation(), c.getEyeLocation().getDirection(), 13.0, 0.7, false, 12.0,
+                    new org.bukkit.inventory.ItemStack(Material.PURPLE_STAINED_GLASS), 0.8f, Material.PURPLE_STAINED_GLASS,
+                    tgt -> bindingHit(c, s, tgt),
+                    hits -> { if(hits.isEmpty()) c.sendActionBar(Component.text("🕸 Entrave manquée!",NamedTextColor.GRAY)); });
+        }
+
+        private void bindingHit(Player c, ChampionStats s, org.bukkit.entity.LivingEntity tgt){
             double[] base=fr.lolmc.util.Balance.base("q_morgana",new double[]{80,135,190,245,300});double dmg=base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("q_morgana","ap",0.9);
             DamageUtil.abilityDamageMagicEntity(c, tgt, dmg);
             siphon(c, tgt, dmg);
@@ -83,9 +88,8 @@ public final class Morgana extends BaseChampion {
                     double[] tickMin={9,15.5,22,28.5,35};
                     double baseTick=tickMin[getLevel()-1]+s.getFinalAP()*0.10;
                     for(var __t : TargetingUtil.entitiesInRadius(c, loc, 3.5)){
-                        double missingPct=0;
-                        var cm=LolPlugin.getInstance().getChampionManager();
-                        if(__t instanceof Player __tp && cm.hasChampion(__tp)){var hp=cm.getChampion(__tp).getHPSystem();missingPct=1.0-hp.getHPRatio();}
+                        // PV manquants de toute cible (avant : champions seulement)
+                        double missingPct=1.0-TargetingUtil.getRealHealth(__t)/Math.max(1, TargetingUtil.getRealMaxHealth(__t));
                         double dmg=baseTick*(1.0+missingPct); // jusqu'à x2 sur cible basse vie
                         TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);
                         siphon(c, __t, dmg);
@@ -131,6 +135,8 @@ public final class Morgana extends BaseChampion {
     }
 
     static class R extends BaseAbility {
+        /** Distance de rupture des chaînes (1050 unités + rayons). */
+        static final double BREAK = 11.8;
         R(){super("r_morgana","Chaînes de la Corruption",Material.IRON_NUGGET,AbilitySlot.R,
                 new double[]{110,100,90},20,5,DamageType.MAGICAL);
             resourceCost = 100;}
@@ -153,13 +159,24 @@ public final class Morgana extends BaseChampion {
             fr.lolmc.LolPlugin.getInstance().getCCManager().speedPct(c, new double[]{0.20,0.40,0.60}[r], 60); // wiki
             int stunTicks=new int[]{30,35,40}[r];
             fr.lolmc.util.VisualEffectUtil.groundRing(c.getWorld(),
-                    c.getLocation(), 3.0, Material.PURPLE_STAINED_GLASS, 20, 0.35f, 0.1f, 12L);
+                    c.getLocation(), 6.9, Material.PURPLE_STAINED_GLASS, 32, 0.6f, 0.1f, 12L); // rayon réel (625)
+            // Chaînes visibles entre Morgana et chaque champion enchaîné (rupture au-delà de 1050)
+            new BukkitRunnable(){ int n=0;
+                @Override public void run(){
+                    if(n++>=12 || !c.isOnline()){cancel();return;}
+                    for(var e : chained){
+                        if(e.isDead() || !e.getWorld().equals(c.getWorld()) || e.getLocation().distance(c.getLocation())>BREAK) continue;
+                        var from=c.getLocation().add(0,1,0); var to=e.getLocation().add(0,1,0);
+                        fr.lolmc.util.VisualEffectUtil.skillshotLine(from, to.toVector().subtract(from.toVector()).normalize(),
+                                from.distance(to), Material.PURPLE_STAINED_GLASS, 0.08f, 6L);
+                    }
+                }}.runTaskTimer(LolPlugin.getInstance(), 0L, 5L);
             new BukkitRunnable(){@Override public void run(){
                 if(!c.isOnline()) return;
                 var cc=LolPlugin.getInstance().getCCManager();
                 for(var e : chained){
                     if(e.isDead() || !e.getWorld().equals(c.getWorld())
-                            || e.getLocation().distance(c.getLocation())>6.9) continue; // chaîne rompue
+                            || e.getLocation().distance(c.getLocation())>BREAK) continue; // chaîne rompue (1050, wiki ; avant : 625)
                     TargetingUtil.dealDamage(c, e, dmg, TargetingUtil.DmgType.MAGICAL);
                     siphon(c, e, dmg);
                     if(cc!=null) cc.stun(e, stunTicks);

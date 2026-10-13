@@ -57,6 +57,9 @@ public final class Garen extends BaseChampion {
             if (cc != null) cc.silence(tgt, 30);
             // +35 % vitesse pendant 1.4/1.95/2.5/3.05/3.6 s (wiki)
             double[] msDur={1.4,1.95,2.5,3.05,3.6};
+            // Wiki : Coup Décisif retire aussi tous les ralentissements subis par Garen
+            fr.lolmc.LolPlugin.getInstance().getCCManager().clearSlows(c.getUniqueId());
+            c.removePotionEffect(PotionEffectType.SLOWNESS);
             fr.lolmc.LolPlugin.getInstance().getCCManager().speedPct(c, 0.35, (int)(msDur[getLevel()-1]*20));
             if(tgt instanceof Player _tp)_tp.sendActionBar(Component.text("⚠ Silence — Garen Q",NamedTextColor.RED));
             fr.lolmc.util.VisualEffectUtil.impact(c.getWorld(),

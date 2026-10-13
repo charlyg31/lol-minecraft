@@ -100,8 +100,10 @@ public final class MobAnimator {
     }
 
     private static void animate(Anim a) {
-        a.mob.setRotation(a.mob.getLocation().getYaw(), a.mob.getLocation().getPitch());
         Location loc = a.mob.getLocation();
+        // Les passagers ne prennent pas l'orientation de leur monture : sans ça, le modèle restait
+        // tourné vers le sud et les sbires marchaient de côté ou à reculons
+        float yaw = loc.getYaw();
         boolean moving = a.lastLoc != null
                 && a.lastLoc.getWorld().equals(loc.getWorld())
                 && a.lastLoc.distanceSquared(loc) > 0.0009; // ~0.03 bloc
@@ -124,6 +126,9 @@ public final class MobAnimator {
             Transformation b = a.base.get(i);
             Vector3f tr = new Vector3f(b.getTranslation()).add(0f, (float) bobY, 0f);
             Vector3f sc = new Vector3f(b.getScale()).mul(scalePulse);
+            if (Math.abs(d.getLocation().getYaw() - yaw) > 2f) d.setRotation(yaw, 0f);
+            if (Math.abs(d.getLocation().getYaw() - yaw) > 2f) d.setRotation(yaw, 0f);
+            if (Math.abs(d.getLocation().getYaw() - yaw) > 2f) d.setRotation(yaw, 0f);
             d.setInterpolationDelay(0);
             d.setInterpolationDuration(INTERVAL);
             d.setTransformation(new Transformation(tr, b.getLeftRotation(), sc, b.getRightRotation()));

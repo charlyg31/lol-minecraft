@@ -303,27 +303,46 @@ public class AutoAttackManager {
         boolean crit = Math.random() < champ.getStats().getFinalCritChance();
         if (crit) rawDamage *= champ.getStats().getFinalCritDamage();
 
-        // Animation selon le type d'AA du champion
         AAType type = getAAType(champ);
-        playAnimation(attacker, target, type, crit);
-
-        // Projectile arrêté par un Mur du Vent ennemi (Yasuo)
-        if (type != AAType.MELEE && fr.lolmc.champion.impl.mid.Yasuo.blocksProjectile(attacker,
-                attacker.getEyeLocation(), target.getLocation().add(0, 1, 0))) return true;
-
-        // Dégâts (les attaques de base sont physiques dans LoL, même celles des mages)
-        DamageUtil.damage(attacker, target, rawDamage, false, DamageUtil.Type.PHYSICAL);
-
-        // Passif d'attaque du champion (onHit), puis passifs d'objets
-        if (champ.getAbility(0) instanceof fr.lolmc.ability.base.BasicAttackAbility baa)
-            baa.applyOnHit(attacker, champ.getStats(), target, rawDamage);
-        // La cible réagit à l'attaque subie (Caprice d'Amumu, Bouclier en Fusion d'Annie)
-        cm.getChampion(target).onBasicAttacked(target, attacker);
-        fr.lolmc.champion.impl.mid.Annie.onShieldedAttacked(target, attacker);
-        var pm = LolPlugin.getInstance().getPassiveManager();
-        if (pm != null) pm.onAutoAttack(attacker, target);
-
+        final double dmg = rawDamage;
+        Runnable hit = () -> {
+            if (!cm.hasChampion(attacker) || !cm.hasChampion(target)
+                    || target.getGameMode() == GameMode.SPECTATOR) return;
+            // Dégâts (les attaques de base sont physiques dans LoL, même celles des mages)
+            DamageUtil.damage(attacker, target, dmg, false, DamageUtil.Type.PHYSICAL);
+            // Passif d'attaque du champion (onHit), puis passifs d'objets
+            if (champ.getAbility(0) instanceof fr.lolmc.ability.base.BasicAttackAbility baa)
+                baa.applyOnHit(attacker, champ.getStats(), target, dmg);
+            // La cible réagit à l'attaque subie (Caprice d'Amumu, Bouclier en Fusion d'Annie)
+            cm.getChampion(target).onBasicAttacked(target, attacker);
+            fr.lolmc.champion.impl.mid.Annie.onShieldedAttacked(target, attacker);
+            var pm = LolPlugin.getInstance().getPassiveManager();
+            if (pm != null) pm.onAutoAttack(attacker, target);
+        };
+        fireBasicAttack(attacker, champ, target, type, crit, hit);
         return true;
+    }
+
+    /**
+     * Mêlée : animation et coup immédiats. Distance : projectile à tête chercheuse (≈2500 unités/s)
+     * qui applique le coup à l'arrivée et peut être arrêté par un Mur du Vent (avant : orbe purement
+     * décoratif, dégâts appliqués au tir).
+     */
+    private void fireBasicAttack(Player attacker, BaseChampion champ, LivingEntity target, AAType type,
+                                 boolean crit, Runnable hit) {
+        if (type == AAType.MELEE) {
+            playAnimation(attacker, target, type, crit);
+            hit.run();
+            return;
+        }
+        Material icon = champ.getAbility(0) != null ? champ.getAbility(0).getIcon() : Material.ARROW;
+        if (icon == Material.CROSSBOW || icon == Material.BOW) icon = Material.ARROW;
+        Material burst = crit ? Material.ORANGE_STAINED_GLASS
+                : type == AAType.MAGE ? Material.PURPLE_STAINED_GLASS : Material.WHITE_STAINED_GLASS;
+        fr.lolmc.util.TargetingUtil.launchHoming(attacker, attacker.getEyeLocation(), target, 25.0,
+                new org.bukkit.inventory.ItemStack(icon), crit ? 0.8f : 0.6f, burst, true, hit);
+        attacker.getWorld().playSound(attacker.getLocation(),
+                type == AAType.MAGE ? Sound.ENTITY_BLAZE_SHOOT : Sound.ENTITY_ARROW_SHOOT, 0.6f, crit ? 0.8f : 1.2f);
     }
 
     /**
@@ -349,24 +368,18 @@ public class AutoAttackManager {
         if (crit) rawDamage *= champ.getStats().getFinalCritDamage();
 
         AAType type = getAAType(champ);
-        playAnimation(attacker, target, type, crit);
-
-        target.playHurtAnimation(attacker.getLocation().getYaw());
-        if (type != AAType.MELEE && fr.lolmc.champion.impl.mid.Yasuo.blocksProjectile(attacker,
-                attacker.getEyeLocation(), target.getLocation().add(0, 1, 0))) return true;
-        // Sbire/monstre : armure, bonus anti-sbires, PV virtuels ; coup fatal attribué (last-hit)
-        boolean killed = fr.lolmc.util.MobCombat.damage(attacker, target, rawDamage, fr.lolmc.util.DamageUtil.Type.PHYSICAL);
-        if (champ.getAbility(0) instanceof fr.lolmc.ability.base.BasicAttackAbility baa)
-            baa.applyOnHit(attacker, champ.getStats(), target, rawDamage);
-        if (killed) {
-            var pmKill = LolPlugin.getInstance().getPassiveManager();
-            if (pmKill != null) pmKill.onAutoAttackEntity(attacker, target);
-            return true;
-        }
-
-        var pm = LolPlugin.getInstance().getPassiveManager();
-        if (pm != null) pm.onAutoAttackEntity(attacker, target);
-
+        final double dmg = rawDamage;
+        Runnable hit = () -> {
+            if (target.isDead() || !cm.hasChampion(attacker)) return;
+            target.playHurtAnimation(attacker.getLocation().getYaw());
+            // Sbire/monstre : armure, bonus anti-sbires, PV virtuels ; coup fatal attribué (last-hit)
+            fr.lolmc.util.MobCombat.damage(attacker, target, dmg, fr.lolmc.util.DamageUtil.Type.PHYSICAL);
+            if (champ.getAbility(0) instanceof fr.lolmc.ability.base.BasicAttackAbility baa)
+                baa.applyOnHit(attacker, champ.getStats(), target, dmg);
+            var pm = LolPlugin.getInstance().getPassiveManager();
+            if (pm != null) pm.onAutoAttackEntity(attacker, target);
+        };
+        fireBasicAttack(attacker, champ, target, type, crit, hit);
         return true;
     }
 

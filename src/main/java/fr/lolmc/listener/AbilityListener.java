@@ -591,39 +591,15 @@ public class AbilityListener implements Listener {
         fr.lolmc.util.DamageUtil.damageEntity(annie, victim, dmg, false, fr.lolmc.util.DamageUtil.Type.MAGICAL);
     }
 
-    /** Dégâts d'un monstre de jungle sur un joueur — remplace le vanilla par les valeurs LoL. */
+    /**
+     * Coups vanilla des monstres de jungle (contact des slimes, frappes des golems…) : annulés.
+     * Leurs attaques LoL (aggro, cadence, portée, projectiles) sont gérées par MonsterAbilities ;
+     * avant, Gromp et le Rouge blessaient au simple contact, sans avoir été attaqués.
+     */
     @EventHandler
     public void onJungleMonsterAttackPlayer(EntityDamageByEntityEvent e) {
-        if (!(e.getEntity() instanceof Player victim)) return;
-        if (!(e.getDamager() instanceof org.bukkit.entity.LivingEntity damager)) return;
-        if (!fr.lolmc.game.JungleManager.isJungleMonster(damager)) return;
-        e.setCancelled(true);
-        if (!manager.hasChampion(victim)) return;
-
-        // Dégâts LoL par type de monstre (patch 26, valeurs approximées)
-        fr.lolmc.game.JungleManager.MonsterType type = fr.lolmc.game.JungleManager.getMonsterType(damager);
-        if (type == null) return;
-        // AD du monstre (wiki LoL, selon le niveau moyen à son apparition) ; à défaut, valeurs fixes
-        // Une frappe vanilla par seconde → × vitesse d'attaque LoL
-        double mobAd = fr.lolmc.util.MobCombat.getAD(damager) * fr.lolmc.util.MobCombat.getAttackSpeed(damager);
-        double rawDmg = mobAd > 0 ? mobAd : switch (type) {
-            case BARON          -> 600.0;
-            case DRAGON_ELDER   -> 250.0;
-            case DRAGON_INFERNAL, DRAGON_OCEAN, DRAGON_MOUNTAIN,
-                 DRAGON_CLOUD, DRAGON_CHEMTECH -> 150.0;
-            case HERALD         -> 200.0;
-            case RED_BUFF, BLUE_BUFF -> 80.0;
-            case GROMP          -> 60.0;
-            case MURKWOLF       -> 40.0;  // gros loup
-            case RAPTOR         -> 30.0;  // gros raptor
-            case KRUG           -> 50.0;
-            case SCUTTLE_CRAB   -> 0.0;   // le crabe n'attaque pas (LoL)
-            case VOIDGRUB       -> 30.0;
-        };
-
-        // DamageUtil : armure, boucliers, Zhonya, mort
-        if (rawDmg <= 0) return;
-        fr.lolmc.util.DamageUtil.damage(null, victim, rawDmg, false, fr.lolmc.util.DamageUtil.Type.PHYSICAL);
+        if (e.getDamager() instanceof org.bukkit.entity.LivingEntity damager
+                && fr.lolmc.game.JungleManager.isJungleMonster(damager)) e.setCancelled(true);
     }
 
     // ── Clic gauche sur entité → AA (slot 0) ──

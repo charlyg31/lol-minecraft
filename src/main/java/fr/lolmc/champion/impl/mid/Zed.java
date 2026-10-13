@@ -58,8 +58,10 @@ public final class Zed extends BaseChampion implements fr.lolmc.champion.base.St
             org.bukkit.entity.Entity e = org.bukkit.Bukkit.getEntity(entityId);
             if (e != null) e.remove();
         }
-        shadows.clear(); wCooldowns.clear(); shadowEntities.clear();
+        shadows.clear(); wCooldowns.clear(); shadowEntities.clear(); contemptReady.clear();
     }
+
+    private static final Map<String, Long> contemptReady = new java.util.concurrent.ConcurrentHashMap<>();
 
     static class AA extends BasicAttackAbility {
         AA(){super("zed",Material.IRON_SWORD,2.5f,DamageType.PHYSICAL);}
@@ -68,7 +70,11 @@ public final class Zed extends BaseChampion implements fr.lolmc.champion.base.St
             double realMax = TargetingUtil.getRealMaxHealth(tgt);
             double realCur = TargetingUtil.getRealHealth(tgt);
 
-            if(realCur < realMax * 0.5){
+            // Une même cible ne subit le passif qu'une fois toutes les 10 s (wiki ; avant : à
+            // chaque attaque, soit 5-10 % des PV max par coup)
+            String key=c.getUniqueId()+":"+tgt.getUniqueId();
+            if(realCur < realMax * 0.5 && contemptReady.getOrDefault(key,0L) <= System.currentTimeMillis()){
+                contemptReady.put(key, System.currentTimeMillis()+10_000L);
                 // 5/7.5/10% PV max selon niveau (1/7/17) — LoL
                 var cm=LolPlugin.getInstance().getChampionManager();
                 int lvl=cm.hasChampion(c)?cm.getChampion(c).getLevelSystem().getLevel():1;
@@ -92,23 +98,25 @@ public final class Zed extends BaseChampion implements fr.lolmc.champion.base.St
             // Wiki : 80-240 (+100 % AD bonus), 60 % aux suivants ; portée 925
             double dmgFirst=baseFirst[rank]+s.getBonusAD();
             double dmgNext=baseNext[rank]+s.getBonusAD()*0.6;
-            var hits=TargetingUtil.skillshot(c, 9.9, 0.6, true);
-            boolean first=true;
-            var alreadyHit=new java.util.HashSet<UUID>();
-            for(var __t : hits){
-                TargetingUtil.dealDamage(c, __t, first?dmgFirst:dmgNext, TargetingUtil.DmgType.PHYSICAL);
-                alreadyHit.add(__t.getUniqueId());
-                first=false;
-            }
-            // L'ombre lance aussi un Shuriken dans la même direction (LoL) ; une cible déjà
-            // touchée ne prend que les dégâts réduits
+            // Projectiles réels (925 unités à 1700/s) ; le 1er ennemi touché prend les dégâts pleins,
+            // les suivants 60 %. L'ombre lance aussi un Shuriken dans la même direction (LoL) ; une
+            // cible déjà touchée par l'autre ne prend que les dégâts réduits.
+            var alreadyHit=java.util.concurrent.ConcurrentHashMap.<UUID>newKeySet();
+            var dir=c.getEyeLocation().getDirection();
+            java.util.function.Consumer<Location> throwFrom = from -> {
+                final boolean[] first={true};
+                TargetingUtil.launchSkillshot(c, from, dir, 9.9, 0.6, true, 17.0,
+                        new org.bukkit.inventory.ItemStack(Material.NETHER_STAR), 0.7f, Material.GRAY_STAINED_GLASS,
+                        __t -> {
+                            boolean full = first[0] && alreadyHit.add(__t.getUniqueId());
+                            if(!full) alreadyHit.add(__t.getUniqueId());
+                            first[0]=false;
+                            TargetingUtil.dealDamage(c, __t, full?dmgFirst:dmgNext, TargetingUtil.DmgType.PHYSICAL);
+                        }, null);
+            };
+            throwFrom.accept(c.getEyeLocation());
             Location shadow=shadows.get(c.getUniqueId());
-            if(shadow!=null && shadow.getWorld().equals(c.getWorld())){
-                var dir=c.getEyeLocation().getDirection();
-                for(var __t : TargetingUtil.skillshotFrom(c, shadow.clone().add(0,1.6,0), dir, 9.9, 0.6, true)){
-                    TargetingUtil.dealDamage(c, __t, alreadyHit.add(__t.getUniqueId()) ? dmgFirst : dmgNext, TargetingUtil.DmgType.PHYSICAL);
-                }
-            }
+            if(shadow!=null && shadow.getWorld().equals(c.getWorld())) throwFrom.accept(shadow.clone().add(0,1.6,0));
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_ARROW_SHOOT, 1f, 1.3f);
         }
         @Override public String getDynamicDescription(ChampionStats s){

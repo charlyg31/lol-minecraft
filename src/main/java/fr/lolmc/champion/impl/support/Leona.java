@@ -124,9 +124,11 @@ public final class Leona extends BaseChampion implements fr.lolmc.champion.base.
                     // les retirer une seconde fois faisait perdre 20 armure/RM pour toute la partie)
                     if (hit) new BukkitRunnable() {
                         @Override public void run() {
+                            // Retire exactement le bonus accordé (avant : 20 fixes, Leona gardait le
+                            // reste du bonus pour toute la partie à chaque Éclipse qui touchait)
                             if (__cm.hasChampion(c)) {
-                                __cm.getChampion(c).getStats().addBonusArmor(-20);
-                                __cm.getChampion(c).getStats().addBonusMR(-20);
+                                __cm.getChampion(c).getStats().addBonusArmor(-res);
+                                __cm.getChampion(c).getStats().addBonusMR(-res);
                             }
                         }
                     }.runTaskLater(LolPlugin.getInstance(), 60L);
@@ -147,11 +149,22 @@ public final class Leona extends BaseChampion implements fr.lolmc.champion.base.
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : skillshot ligne 60-200 + 40% AP, dash sur le DERNIER ennemi touché + root 0.5s
             double[] base=fr.lolmc.util.Balance.base("e_leona",new double[]{60,95,130,165,200});double dmg=base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("e_leona","ap",0.4);
-            var hits=TargetingUtil.skillshot(c, 9.0, 1.0, true); // traverse, touche tous
-            if(hits.isEmpty()){c.sendActionBar(Component.text("⚔ Lame manquée!",NamedTextColor.GRAY));return;}
-            for(var __t : hits){ TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL); applyMark(c, __t); }
-            // Dash sur le dernier ennemi touché + root
-            var last=hits.getLast();
+            // Projectile réel : lame de 900 unités à 2000/s qui traverse ; à la fin, Leona fonce
+            // sur le dernier ennemi touché
+            TargetingUtil.launchSkillshot(c, c.getEyeLocation(), c.getEyeLocation().getDirection(), 9.0, 1.0, true, 20.0,
+                    new org.bukkit.inventory.ItemStack(Material.GOLDEN_SWORD), 1.0f, Material.YELLOW_STAINED_GLASS,
+                    __t -> { TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL); applyMark(c, __t); },
+                    hits -> {
+                        // Wiki : Leona fonce sur le dernier CHAMPION touché (pas sur un sbire)
+                        org.bukkit.entity.LivingEntity champ=null;
+                        for(var h : hits) if(h instanceof Player) champ=h;
+                        if(champ==null){c.sendActionBar(Component.text(hits.isEmpty()?"⚔ Lame manquée!":"⚔ Aucun champion touché",NamedTextColor.GRAY));return;}
+                        zenithDash(c, champ);
+                    });
+        }
+
+        private void zenithDash(Player c, org.bukkit.entity.LivingEntity last){
+            if(!c.isOnline() || last.isDead()) return;
             dashTo(c, last, -1.0);
             if(last instanceof Player __p){
                 fr.lolmc.LolPlugin.getInstance().getCCManager().root(__p, 10); // root 0.5s

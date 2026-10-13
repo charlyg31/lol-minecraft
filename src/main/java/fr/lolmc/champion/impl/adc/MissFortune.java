@@ -63,22 +63,33 @@ public final class MissFortune extends BaseChampion implements fr.lolmc.champion
             // Wiki : 20-120 (+100 % AD +35 % AP) ; la balle ricoche avec les mêmes dégâts, critique
             // (×1.5) si la 1re cible meurt
             double[] base=fr.lolmc.util.Balance.base("q_missfortune",new double[]{20,45,70,95,120});double d1=base[getLevel()-1]+s.getFinalAD()+s.getFinalAP()*0.35;
+            // Balle à tête chercheuse (1400 unités/s), puis ricochet vers la cible derrière
+            final org.bukkit.entity.LivingEntity ftgt=tgt;
+            TargetingUtil.launchHoming(c, c.getEyeLocation(), tgt, 14.0,
+                    new org.bukkit.inventory.ItemStack(Material.IRON_NUGGET), 0.6f, Material.WHITE_STAINED_GLASS, true, () -> doubleUpHit(c, ftgt, d1));
+            c.getWorld().playSound(c.getLocation(), Sound.ENTITY_FIREWORK_ROCKET_BLAST, 1f, 1.5f);
+        }
+
+        private void doubleUpHit(Player c, org.bukkit.entity.LivingEntity tgt, double d1){
             TargetingUtil.dealDamage(c, tgt, d1, TargetingUtil.DmgType.PHYSICAL);
             double d2 = (tgt.isDead() || TargetingUtil.getRealHealth(tgt) <= 0) ? d1*1.5 : d1;
+            // Ricochet vers un ennemi DERRIÈRE la 1re cible (cône), champions en priorité (avant :
+            // l'ennemi le plus proche, même devant ou à côté)
             org.bukkit.entity.LivingEntity second=null; double best=Double.MAX_VALUE;
+            org.bukkit.util.Vector fwd=tgt.getLocation().toVector().subtract(c.getLocation().toVector()).setY(0);
             for(var __t : TargetingUtil.entitiesInRadius(c, tgt.getLocation(), 5.0)){
                 if(__t.equals(tgt)) continue;
-                double dd=__t.getLocation().distance(tgt.getLocation());
+                org.bukkit.util.Vector to=__t.getLocation().toVector().subtract(tgt.getLocation().toVector()).setY(0);
+                if(fwd.lengthSquared()>1e-6 && to.lengthSquared()>1e-6 && fwd.angle(to)>Math.toRadians(45)) continue;
+                double dd=to.length()-(__t instanceof Player ? 100 : 0);
                 if(dd<best){best=dd;second=__t;}
             }
             if(second!=null){
-                TargetingUtil.dealDamage(c, second, d2, TargetingUtil.DmgType.PHYSICAL);
-                fr.lolmc.util.VisualEffectUtil.impact(second.getWorld(),
-                        second.getLocation().add(0,1,0), Material.WHITE_STAINED_GLASS, 0.25f, 4L);
+                final org.bukkit.entity.LivingEntity sec=second; final double fd2=d2;
+                TargetingUtil.launchHoming(c, tgt.getLocation().add(0,1,0), second, 14.0,
+                        new org.bukkit.inventory.ItemStack(Material.IRON_NUGGET), 0.6f, Material.WHITE_STAINED_GLASS, true,
+                        () -> TargetingUtil.dealDamage(c, sec, fd2, TargetingUtil.DmgType.PHYSICAL));
             }
-            fr.lolmc.util.VisualEffectUtil.impact(tgt.getWorld(),
-                    tgt.getLocation().add(0,1,0), Material.WHITE_STAINED_GLASS, 0.3f, 4L);
-            c.getWorld().playSound(c.getLocation(), Sound.ENTITY_FIREWORK_ROCKET_BLAST, 1f, 1.5f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] base=fr.lolmc.util.Balance.base("q_missfortune",new double[]{20,45,70,95,120});
@@ -147,23 +158,37 @@ public final class MissFortune extends BaseChampion implements fr.lolmc.champion
                     +s.getFinalAD()*fr.lolmc.util.Balance.ratio("r_missfortune","ad",0.6)+s.getFinalAP()*fr.lolmc.util.Balance.ratio("r_missfortune","ap",0.25);
             int[] waveCount={14,16,18};
             final int totalWaves=waveCount[Math.min(getLevel()-1,2)];
+            // Canalisation (wiki) : cône FIXE dans la direction du lancer, interrompue si Miss
+            // Fortune se déplace ou est neutralisée (avant : elle marchait en arrosant où elle visait)
+            final Location origin=c.getLocation().clone();
+            final org.bukkit.util.Vector aim=c.getEyeLocation().getDirection().setY(0);
+            if(aim.lengthSquared()<1e-6) aim.setX(1);
+            aim.normalize();
+            var ccR=LolPlugin.getInstance().getCCManager();
             new BukkitRunnable(){
                 int waves=0;
                 @Override public void run(){
-                    if(waves>=totalWaves){cancel();return;} // 12-16 vagues sur 3s
-                    // Vague en cône devant
-                    var targets=TargetingUtil.enemiesInCone(c, 14.5, 30);
+                    if(waves>=totalWaves || !c.isOnline() || c.getGameMode()==GameMode.SPECTATOR
+                            || !c.getWorld().equals(origin.getWorld()) || c.getLocation().distanceSquared(origin)>1.0
+                            || (ccR!=null && (ccR.isStunned(c.getUniqueId()) || ccR.isAirborne(c.getUniqueId())))){
+                        cancel();return;
+                    }
+                    var targets=new java.util.ArrayList<org.bukkit.entity.LivingEntity>();
+                    for(var __t : TargetingUtil.entitiesInRadius(c, origin, 14.5)){
+                        org.bukkit.util.Vector to=__t.getLocation().toVector().subtract(origin.toVector()).setY(0);
+                        if(to.lengthSquared()>1e-6 && aim.angle(to)<=Math.toRadians(17)) targets.add(__t);
+                    }
                     for(var __t : targets){
                         double dmg=perWave;
                         // Chaque vague peut critiquer
                         if(Math.random()<s.getFinalCritChance()) dmg*=1.3;
                         TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.PHYSICAL);
                     }
-                    // Animation : balles en éventail devant
-                    var dir=c.getEyeLocation().getDirection().normalize();
-                    for(double d=1; d<=9; d+=1){
-                        fr.lolmc.util.VisualEffectUtil.impact(c.getWorld(),
-                                c.getEyeLocation().add(dir.clone().multiply(d)), Material.WHITE_STAINED_GLASS, 0.2f, 3L);
+                    // Balles qui partent dans le cône (purement visuelles : la vague touche toute la zone)
+                    for(int k=0;k<3;k++){
+                        var d=aim.clone().rotateAroundY(Math.toRadians((Math.random()-0.5)*34));
+                        TargetingUtil.launchSkillshot(c, c.getEyeLocation(), d, 14.5, 0.2, true, 35.0,
+                                new org.bukkit.inventory.ItemStack(Material.IRON_NUGGET), 0.4f, null, null, null);
                     }
                     c.getWorld().playSound(c.getLocation(), Sound.ENTITY_FIREWORK_ROCKET_BLAST, 0.8f, 1.5f);
                     waves++;

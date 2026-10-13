@@ -93,6 +93,9 @@ public final class MobModel {
                     disp.setBlock(p.block.createBlockData());
                     disp.setTransformation(baseT);
                     disp.setBrightness(new Display.Brightness(15, 15)); // toujours bien visible
+                    disp.setTeleportDuration(4); // rotation lissée (le modèle suit l'orientation du mob)
+                    disp.setTeleportDuration(4); // rotation lissée (le modèle suit l'orientation du mob)
+                    disp.setTeleportDuration(4); // rotation lissée (le modèle suit l'orientation du mob)
                     disp.setPersistent(true);
                     disp.getPersistentDataContainer().set(
                             MobAppearance.decoKey(), PersistentDataType.BYTE, (byte) 1);
@@ -106,7 +109,33 @@ public final class MobModel {
             }
         }
         // Enregistrer le modele pour l'animation (respiration / marche / attaque)
-        if (!displays.isEmpty()) MobAnimator.register(base, displays, baseTransforms);
+        if (!displays.isEmpty()) {
+            MobAnimator.register(base, displays, baseTransforms);
+            fitToGround(base, displays, baseTransforms);
+        }
         return ids;
+    }
+
+    /**
+     * Les parties sont des passagers : elles se placent au point d'attache du mob de base, dont
+     * la hauteur dépend du mob (slime, silverfish, ravageur, warden…) et de son échelle. Avant,
+     * un décalage fixe de 1,6 bloc enfonçait la plupart des modèles dans le sol ou les faisait
+     * flotter. On mesure le point réel une fois le modèle monté et l'échelle appliquée.
+     */
+    private static void fitToGround(LivingEntity base, List<BlockDisplay> displays, List<Transformation> baseTransforms) {
+        org.bukkit.Bukkit.getScheduler().runTaskLater(LolPlugin.getInstance(), () -> {
+            if (!base.isValid() || !displays.getFirst().isValid()) return;
+            float attach = (float) (displays.getFirst().getLocation().getY() - base.getLocation().getY());
+            float shift = 1.6f - attach;
+            if (Math.abs(shift) < 0.02f) return;
+            for (int i = 0; i < displays.size(); i++) {
+                Transformation t = baseTransforms.get(i);
+                Transformation fixed = new Transformation(new Vector3f(t.getTranslation()).add(0f, shift, 0f),
+                        t.getLeftRotation(), t.getScale(), t.getRightRotation());
+                baseTransforms.set(i, fixed);
+                BlockDisplay d = displays.get(i);
+                if (d.isValid()) d.setTransformation(fixed);
+            }
+        }, 3L);
     }
 }

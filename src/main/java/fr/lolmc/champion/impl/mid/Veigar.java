@@ -73,10 +73,16 @@ public final class Veigar extends BaseChampion implements fr.lolmc.champion.base
             double[] base=fr.lolmc.util.Balance.base("q_veigar",new double[]{80,120,160,200,240});
             double[] apR={0.50,0.55,0.60,0.65,0.70};
             double dmg=base[getLevel()-1]+s.getFinalAP()*apR[getLevel()-1];
-            var hits=TargetingUtil.skillshot(c, 10.5, 0.7, true); // 1050 unités
-            int touched=0;
-            for(var __t : hits){
-                if(touched>=2) break;
+            // Projectile réel (1050 unités à 2200/s), touche 2 ennemis au plus
+            final int[] touched={0};
+            TargetingUtil.launchSkillshot(c, c.getEyeLocation(), c.getEyeLocation().getDirection(), 10.5, 0.7, true, 22.0,
+                    new org.bukkit.inventory.ItemStack(Material.AMETHYST_SHARD), 0.8f, Material.PURPLE_STAINED_GLASS,
+                    __t -> { if(touched[0]++ < 2) balefulHit(c, s, __t, dmg); }, null);
+            c.getWorld().playSound(c.getLocation(), Sound.ENTITY_EVOKER_CAST_SPELL, 1f, 1.3f);
+        }
+
+        private void balefulHit(Player c, ChampionStats s, org.bukkit.entity.LivingEntity __t, double dmg){
+            {
                 TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);
                 onChampionHit(c, s, __t);
                 boolean killed = __t.isDead() || TargetingUtil.getRealHealth(__t) <= 0;
@@ -87,9 +93,7 @@ public final class Veigar extends BaseChampion implements fr.lolmc.champion.base
                     gainStacks(c, s, big?3:1);
                     c.sendActionBar(Component.text("📈 Malfaisance! Total stacks: "+apStacks.getOrDefault(c.getUniqueId(),0),NamedTextColor.DARK_PURPLE));
                 }
-                touched++;
             }
-            c.getWorld().playSound(c.getLocation(), Sound.ENTITY_EVOKER_CAST_SPELL, 1f, 1.3f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] base=fr.lolmc.util.Balance.base("q_veigar",new double[]{80,120,160,200,240});
@@ -145,20 +149,17 @@ public final class Veigar extends BaseChampion implements fr.lolmc.champion.base
             fr.lolmc.util.VisualEffectUtil.groundRing(fcenter.getWorld(), fcenter, r,
                     Material.PURPLE_STAINED_GLASS, 20, 0.35f, 0.1f, 10L);
             new BukkitRunnable(){@Override public void run(){
-                List<org.bukkit.block.Block> cage=new ArrayList<>();
-                for(int dx=-r;dx<=r;dx++) for(int dz=-r;dz<=r;dz++) {
-                    if(Math.abs(dx)==r||Math.abs(dz)==r) {
-                        org.bukkit.block.Block b=fcenter.clone().add(dx,0,dz).getBlock();
-                        if(b.getType().isAir()) { b.setType(Material.IRON_BARS); cage.add(b); }
-                    }
-                }
+                // Barreaux affichés (entités) : avant, de vrais blocs de fer étaient posés dans la
+                // map, bloquaient le passage dans les deux sens et restaient si le serveur s'arrêtait
+                fr.lolmc.util.VisualEffectUtil.groundRing(fcenter.getWorld(), fcenter.clone().add(0,0.05,0), r,
+                        Material.IRON_BARS, 28, 0.95f, 1.4f, 60L);
                 // Surveiller les ennemis qui touchent le périmètre pendant 3s (60 ticks)
                 var cc=LolPlugin.getInstance().getCCManager();
                 final java.util.Set<UUID> stunned=new java.util.HashSet<>();
                 new BukkitRunnable(){
                     int t=0;
                     @Override public void run(){
-                        if(t>=60){cage.forEach(b->b.setType(Material.AIR));cancel();return;}
+                        if(t>=60){cancel();return;}
                         for(var e : TargetingUtil.entitiesInRadius(c, fcenter, r+0.5)){
                             double dist=e.getLocation().distance(fcenter);
                             if(dist>=r-1 && !stunned.contains(e.getUniqueId())){
@@ -188,6 +189,14 @@ public final class Veigar extends BaseChampion implements fr.lolmc.champion.base
             // Wiki : 175/250/325 (+65/70/75 % AP), jusqu'à ×2 selon les PV manquants (max à 66.7 %)
             double[] base=fr.lolmc.util.Balance.base("r_veigar",new double[]{175,250,325});int rr=Math.min(getLevel()-1,2);
             double baseDmg=base[rr]+s.getFinalAP()*new double[]{0.65,0.70,0.75}[rr];
+            // Orbe à tête chercheuse : les dégâts dépendent des PV manquants À L'IMPACT
+            final org.bukkit.entity.LivingEntity ftgt=tgt;
+            TargetingUtil.launchHoming(c, c.getEyeLocation(), tgt, 10.0,
+                    new org.bukkit.inventory.ItemStack(Material.NETHER_STAR), 1.0f, Material.PURPLE_STAINED_GLASS, true, () -> burstHit(c, s, ftgt, baseDmg));
+            c.getWorld().playSound(c.getLocation(), Sound.ENTITY_WITHER_SHOOT, 1.5f, 0.6f);
+        }
+
+        private void burstHit(Player c, ChampionStats s, org.bukkit.entity.LivingEntity tgt, double baseDmg){
             double missingPct=1.0-(TargetingUtil.getRealHealth(tgt)/Math.max(1, TargetingUtil.getRealMaxHealth(tgt)));
             double dmg=baseDmg*(1.0+Math.min(1.0, missingPct/0.6667));
             tgt.getWorld().strikeLightningEffect(tgt.getLocation());
@@ -196,7 +205,6 @@ public final class Veigar extends BaseChampion implements fr.lolmc.champion.base
             TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.MAGICAL);
             onChampionHit(c, s, tgt);
             if(tgt instanceof Player _tp)_tp.sendMessage(Component.text("☠ EXPLOSION PRIMORDIALE!",NamedTextColor.DARK_PURPLE));
-            c.getWorld().playSound(c.getLocation(), Sound.ENTITY_WITHER_SHOOT, 1.5f, 0.6f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] base=fr.lolmc.util.Balance.base("r_veigar",new double[]{175,250,325});int r=Math.min(getLevel()-1,2);

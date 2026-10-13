@@ -161,6 +161,146 @@ public final class TargetingUtil {
         return hit;
     }
 
+    /**
+     * Skillshot en projectile RÉEL (LoL) : il avance à {@code speed} blocs/s, peut être esquivé,
+     * s'arrête sur un mur ou un Mur du Vent ennemi, et appelle {@code onHit} au contact de chaque
+     * ennemi (le premier seulement si {@code pierce} est faux), puis {@code onEnd} avec la liste
+     * des ennemis touchés. Avant, tous les skillshots touchaient instantanément.
+     *
+     * @param origin    point de départ (ex. yeux du lanceur, ombre de Zed)
+     * @param visual    objet affiché (ItemDisplay) ; null = aucun
+     */
+    public static void launchSkillshot(Player caster, Location origin, Vector direction, double range,
+                                       double width, boolean pierce, double speed,
+                                       org.bukkit.inventory.ItemStack visual, float size, Material burst,
+                                       java.util.function.Consumer<LivingEntity> onHit,
+                                       java.util.function.Consumer<List<LivingEntity>> onEnd) {
+        launchSkillshot(caster, origin, direction, range, width, pierce, speed, visual, size, burst, null, onHit,
+                (hits, at) -> { if (onEnd != null) onEnd.accept(hits); });
+    }
+
+    /**
+     * Variante : {@code canHit} restreint les cibles percutées (ex. champions seulement pour les
+     * ultimes d'Ashe et de Jinx, qui traversent les sbires) et {@code onEnd} reçoit aussi le point
+     * où le projectile s'est arrêté (retour de la Lame Boomerang de Sivir).
+     */
+    public static void launchSkillshot(Player caster, Location origin, Vector direction, double range,
+                                       double width, boolean pierce, double speed,
+                                       org.bukkit.inventory.ItemStack visual, float size, Material burst,
+                                       java.util.function.Predicate<LivingEntity> canHit,
+                                       java.util.function.Consumer<LivingEntity> onHit,
+                                       java.util.function.BiConsumer<List<LivingEntity>, Location> onEnd) {
+        Location start = origin.clone();
+        Vector dir = direction.clone().normalize();
+        List<LivingEntity> hit = new ArrayList<>();
+        var proj = visual != null ? VisualEffectUtil.spawnProjectile(start, dir, visual, size) : null;
+        new org.bukkit.scheduler.BukkitRunnable() {
+            double travelled = 0;
+            int age = 0;
+            Location pos = start.clone();
+
+            @Override public void run() {
+                if (!caster.isOnline()) { finish(false); return; }
+                double perTick = speed / 20.0, moved = 0;
+                while (moved < perTick && travelled < range) {
+                    double st = Math.min(0.5, Math.min(perTick - moved, range - travelled));
+                    Location next = pos.clone().add(dir.clone().multiply(st));
+                    if (next.getBlock().getType().isSolid()
+                            || fr.lolmc.champion.impl.mid.Yasuo.blocksProjectile(caster, pos, next)) {
+                        finish(true); return; // s'arrête devant l'obstacle
+                    }
+                    pos = next; moved += st; travelled += st;
+                    for (var e : pos.getWorld().getNearbyLivingEntities(pos, width + 1.5)) {
+                        if (hit.contains(e) || !isEnemy(caster, e) || (canHit != null && !canHit.test(e))) continue;
+                        if (e.getLocation().add(0, 1, 0).distance(pos) > width + 0.5) continue;
+                        hit.add(e);
+                        if (onHit != null) onHit.accept(e);
+                        if (!pierce) { finish(true); return; }
+                    }
+                }
+                if (proj != null) VisualEffectUtil.moveProjectile(proj, pos, dir, size, age++);
+                if (travelled >= range) finish(false);
+            }
+
+            private void finish(boolean impact) {
+                cancel();
+                if (proj != null) VisualEffectUtil.endProjectile(proj, pos, impact ? burst : null);
+                if (onEnd != null) onEnd.accept(hit, pos.clone());
+            }
+        }.runTaskTimer(LolPlugin.getInstance(), 0L, 1L);
+    }
+
+    /**
+     * Attire une cible jusqu'à {@code stopDist} blocs de {@code puller} en la faisant glisser à
+     * {@code speed} blocs/s (grappin de Blitzcrank, Appréhension de Darius) ; elle monte les marches
+     * et s'arrête contre un mur. Avant, une simple poussée la laissait souvent à mi-chemin.
+     */
+    public static void pullTo(LivingEntity target, Player puller, double stopDist, double speed) {
+        new org.bukkit.scheduler.BukkitRunnable() {
+            int t = 0;
+            @Override public void run() {
+                if (target.isDead() || !target.isValid() || !puller.isOnline()
+                        || !target.getWorld().equals(puller.getWorld()) || t++ > 30) { cancel(); return; }
+                Location from = target.getLocation();
+                Vector d = puller.getLocation().toVector().subtract(from.toVector()).setY(0);
+                double dist = d.length();
+                if (dist <= stopDist) { cancel(); return; }
+                Location next = from.clone().add(d.normalize().multiply(Math.min(speed / 20.0, dist - stopDist)));
+                if (blocked(next)) {
+                    next.add(0, 1, 0);
+                    if (blocked(next)) { cancel(); return; }
+                }
+                target.teleport(next);
+            }
+            private boolean blocked(Location l) {
+                return l.getBlock().getType().isSolid() || l.clone().add(0, 1, 0).getBlock().getType().isSolid();
+            }
+        }.runTaskTimer(LolPlugin.getInstance(), 0L, 1L);
+    }
+
+    /**
+     * Projectile à tête chercheuse (LoL : attaques à distance, sorts ciblés, tirs de tourelle) :
+     * il suit sa cible à {@code speed} blocs/s et applique {@code onArrive} à l'impact. Il se
+     * perd si la cible meurt ou disparaît, et, si {@code blockable}, s'arrête sur un Mur du Vent
+     * ennemi. {@code caster} peut être null (tourelle).
+     */
+    public static void launchHoming(Player caster, Location origin, LivingEntity target, double speed,
+                                    org.bukkit.inventory.ItemStack visual, float size, Material burst,
+                                    boolean blockable, Runnable onArrive) {
+        Location start = origin.clone();
+        var proj = visual != null ? VisualEffectUtil.spawnProjectile(start,
+                target.getLocation().add(0, 1, 0).toVector().subtract(start.toVector()), visual, size) : null;
+        new org.bukkit.scheduler.BukkitRunnable() {
+            Location pos = start.clone();
+            int age = 0;
+            @Override public void run() {
+                if (target.isDead() || !target.isValid() || !target.getWorld().equals(pos.getWorld())
+                        || (caster != null && !caster.isOnline()) || age > 200) {
+                    end(false); return;
+                }
+                Location aim = target.getLocation().add(0, 1, 0);
+                Vector to = aim.toVector().subtract(pos.toVector());
+                double dist = to.length(), step = speed / 20.0;
+                Location next = dist <= step ? aim : pos.clone().add(to.clone().normalize().multiply(step));
+                if (blockable && caster != null
+                        && fr.lolmc.champion.impl.mid.Yasuo.blocksProjectile(caster, pos, next)) {
+                    pos = next; end(false); return;
+                }
+                pos = next;
+                if (proj != null) VisualEffectUtil.moveProjectile(proj, pos, to.lengthSquared() > 1e-6 ? to : new Vector(0, 0, 1), size, age);
+                age++;
+                if (dist <= step) {
+                    if (onArrive != null) onArrive.run();
+                    end(true);
+                }
+            }
+            private void end(boolean impact) {
+                cancel();
+                if (proj != null) VisualEffectUtil.endProjectile(proj, pos, impact ? burst : null);
+            }
+        }.runTaskTimer(LolPlugin.getInstance(), 0L, 1L);
+    }
+
     // ══════════════════════════════════════════════════════════════
     // MODE 3 : ZONE AU SOL (autour d'un point visé)
     // ══════════════════════════════════════════════════════════════

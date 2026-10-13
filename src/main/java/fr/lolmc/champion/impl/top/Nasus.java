@@ -200,8 +200,8 @@ public final class Nasus extends BaseChampion implements fr.lolmc.champion.base.
                         cancel();return;
                     }
                     for(var __t : TargetingUtil.entitiesInRadius(c, c.getLocation(), 4.0)){
-                        double tgtMaxHP = 200; // défaut sbire/monstre
-                        if(__t instanceof Player __p && cm.hasChampion(__p)) tgtMaxHP=cm.getChampion(__p).getHPSystem().getMaxHP();
+                        // PV max réels de la cible (avant : 200 pour tout sbire ou monstre)
+                        double tgtMaxHP = TargetingUtil.getRealMaxHealth(__t);
                         double dmg=Math.min(tgtMaxHP*(pctHP+s.getFinalAP()/100*0.01), 240); // plafond 240/s (wiki)
                         TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);
                     }

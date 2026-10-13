@@ -73,22 +73,27 @@ public final class Ashe extends BaseChampion {
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : tire des flèches en cône. 60/95/130/165/200 + 100% AD, applique Tir de Givre (ralentit)
             double[] base=fr.lolmc.util.Balance.base("w_ashe",new double[]{60,95,130,165,200});double dmg=base[getLevel()-1]+s.getBonusAD()*fr.lolmc.util.Balance.ratio("w_ashe","ad",1.0); // AD bonus (wiki)
-            var targets=TargetingUtil.enemiesInCone(c, 12.0, 45); // 1200 unités
-            for(var __t : targets){
-                TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.PHYSICAL);
-                if(__t instanceof Player __p) fr.lolmc.LolPlugin.getInstance().getCCManager().slowPct(__p, frostShot(c), 40);
-            }
-            // Animation : flèches en éventail devant
+            // Wiki : 7/8/9/10/11 flèches en éventail (40°), 2000 unités/s, chacune s'arrête au 1er
+            // ennemi ; un même ennemi n'est touché qu'une fois par volée
+            int arrows=7+getLevel()-1;
             var dir=c.getEyeLocation().getDirection().normalize();
-            for(double d=1; d<=8; d+=0.7){
-                fr.lolmc.util.VisualEffectUtil.impact(c.getWorld(),
-                        c.getEyeLocation().add(dir.clone().multiply(d)), Material.WHITE_STAINED_GLASS, 0.2f, 3L);
+            var struck=java.util.concurrent.ConcurrentHashMap.<java.util.UUID>newKeySet();
+            for(int i=0;i<arrows;i++){
+                double ang=Math.toRadians(-20+40.0*i/(arrows-1));
+                var d=dir.clone().rotateAroundY(ang);
+                TargetingUtil.launchSkillshot(c, c.getEyeLocation(), d, 12.0, 0.4, false, 20.0,
+                        new org.bukkit.inventory.ItemStack(Material.ARROW), 0.6f, Material.WHITE_STAINED_GLASS,
+                        __t -> {
+                            if(!struck.add(__t.getUniqueId())) return;
+                            TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.PHYSICAL);
+                            if(__t instanceof Player __p) fr.lolmc.LolPlugin.getInstance().getCCManager().slowPct(__p, frostShot(c), 40);
+                        }, null);
             }
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_ARROW_SHOOT, 1f, 1.2f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] base=fr.lolmc.util.Balance.base("w_ashe",new double[]{60,95,130,165,200});
-            return String.format("Cône de flèches: %.0f dégâts (+100%%AD bonus) + ralentit.",base[getLevel()-1]+s.getBonusAD());
+            return String.format("%d flèches en éventail: %.0f dégâts (+100%%AD bonus) + ralentit.",7+getLevel()-1,base[getLevel()-1]+s.getBonusAD());
         }
     }
 
@@ -105,29 +110,18 @@ public final class Ashe extends BaseChampion {
             var tm = LolPlugin.getInstance().getTeamManager();
             var fogMgr = fr.lolmc.instance.InstanceHelper.fogOfWarManager(c);
             var casterTeam = tm.getTeam(c);
-            var hawkDisplay = start.getWorld().spawn(start, org.bukkit.entity.BlockDisplay.class, disp -> {
-                disp.setBlock(Material.YELLOW_STAINED_GLASS.createBlockData());
-                disp.setBrightness(new org.bukkit.entity.Display.Brightness(15, 15));
-                disp.setPersistent(false);
-                disp.setInterpolationDuration(1);
-                disp.setInterpolationDelay(0);
-                float size = 0.22f;
-                disp.setTransformation(new org.bukkit.util.Transformation(
-                        new org.joml.Vector3f(-size / 2f, -size / 2f, -size / 2f),
-                        new org.joml.Quaternionf(),
-                        new org.joml.Vector3f(size, size, size),
-                        new org.joml.Quaternionf()));
-            });
+            // Faucon affiché comme un projectile lissé (avant : cube jaune téléporté à chaque tick)
+            var hawkDisplay = fr.lolmc.util.VisualEffectUtil.spawnProjectile(start, dir, new org.bukkit.inventory.ItemStack(Material.FEATHER), 0.9f);
             new org.bukkit.scheduler.BukkitRunnable() {
                 int step = 0;
                 final org.bukkit.Location pos = start.clone();
                 @Override public void run() {
                     if (step >= maxSteps || !c.isOnline()) {
-                        if (!hawkDisplay.isDead()) hawkDisplay.remove();
+                        fr.lolmc.util.VisualEffectUtil.endProjectile(hawkDisplay, pos, null);
                         cancel(); return;
                     }
                     pos.add(dir.clone().multiply(0.5));
-                    hawkDisplay.teleport(pos);
+                    fr.lolmc.util.VisualEffectUtil.moveProjectile(hawkDisplay, pos, dir, 0.9f, 0);
                     // Révèle la zone survolée pour l'équipe d'Ashe pendant 0.5s
                     // (fenêtre glissante qui suit le faucon le long de son trajet)
                     if (fogMgr != null && casterTeam != null) {
@@ -149,7 +143,7 @@ public final class Ashe extends BaseChampion {
                     step++;
                     // S'arrêter sur un bloc solide
                     if (pos.getBlock().getType().isSolid()) {
-                        if (!hawkDisplay.isDead()) hawkDisplay.remove();
+                        fr.lolmc.util.VisualEffectUtil.endProjectile(hawkDisplay, pos, null);
                         cancel();
                     }
                 }
@@ -169,11 +163,18 @@ public final class Ashe extends BaseChampion {
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : skillshot longue portée. Stun 1-3.5s selon distance parcourue. Zone autour = 50% dégâts + slow
             double[] base=fr.lolmc.util.Balance.base("r_ashe",new double[]{200,400,600});int rr=Math.min(getLevel()-1,2);double dmg=base[rr]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("r_ashe","ap",1.2);
-            var hits=TargetingUtil.skillshot(c, 25.0, 1.2, false); // s'arrête au 1er champion
-            if(hits.isEmpty()){c.sendActionBar(Component.text("❄ Flèche tirée (aucune cible touchée)",NamedTextColor.AQUA));return;}
-            var main=hits.getFirst();
+            // Projectile réel : flèche de cristal (≈1800 unités/s), s'arrête au 1er ennemi
+            final Location from=c.getLocation();
+            TargetingUtil.launchSkillshot(c, c.getEyeLocation(), c.getEyeLocation().getDirection(), 25.0, 1.2, false, 18.0,
+                    new org.bukkit.inventory.ItemStack(Material.BLUE_ICE), 0.8f, Material.LIGHT_BLUE_STAINED_GLASS,
+                    e -> e instanceof Player, // ne percute que les champions (wiki)
+                    main -> arrowHit(c, s, main, dmg, from.distance(main.getLocation())),
+                    (hits, at) -> { if(hits.isEmpty()) c.sendActionBar(Component.text("❄ Flèche tirée (aucune cible touchée)",NamedTextColor.AQUA)); });
+            c.getWorld().playSound(c.getLocation(), Sound.ENTITY_ARROW_SHOOT, 1.2f, 0.6f);
+        }
+
+        private void arrowHit(Player c, ChampionStats s, org.bukkit.entity.LivingEntity main, double dmg, double dist){
             // Distance parcourue → durée du stun (1 à 3.5s = 20 à 70 ticks)
-            double dist=c.getLocation().distance(main.getLocation());
             int stunTicks=(int)Math.min(70, 20+dist*2.5);
             TargetingUtil.dealDamage(c, main, dmg, TargetingUtil.DmgType.MAGICAL);
             // Vrai stun (immobilise + empêche d'agir, réduit par la ténacité)

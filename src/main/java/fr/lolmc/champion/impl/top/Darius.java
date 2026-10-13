@@ -180,9 +180,13 @@ public final class Darius extends BaseChampion implements fr.lolmc.champion.base
             new BukkitRunnable(){@Override public void run(){
                 boolean killed=wTgt.isDead()||wTgt.getHealth()<=0;
                 if(!killed && wTgt instanceof Player pt){var cm=LolPlugin.getInstance().getChampionManager(); if(cm.hasChampion(pt)) killed=cm.getChampion(pt).getHPSystem().isDead();}
-                if(killed){ wThis.setDynamicCooldown(0.001); wThis.triggerCooldown(c);
-                    new BukkitRunnable(){@Override public void run(){wThis.setDynamicCooldown(-1);}}.runTaskLater(LolPlugin.getInstance(),1L);
-                    c.sendActionBar(Component.text("🪓 Frappe Estropiante reset!",NamedTextColor.DARK_RED)); }
+                if(killed){
+                    // Wiki : un kill rend le mana et la moitié de la recharge (avant : recharge remise à zéro)
+                    wThis.reduceCooldown(c, wThis.getRemainingCooldown(c)*0.5);
+                    var cmW=LolPlugin.getInstance().getChampionManager();
+                    if(cmW.hasChampion(c)&&cmW.getChampion(c).getResourceSystem()!=null)
+                        cmW.getChampion(c).getResourceSystem().addCurrent(wThis.getResourceCost());
+                    c.sendActionBar(Component.text("🪓 Frappe Estropiante : mana rendu, -50% de recharge",NamedTextColor.DARK_RED)); }
             }}.runTaskLater(LolPlugin.getInstance(),1L);
             fr.lolmc.util.VisualEffectUtil.impact(c.getWorld(),
                     tgt.getLocation().add(0,1,0), Material.WHITE_STAINED_GLASS, 0.32f, 5L);
@@ -190,7 +194,7 @@ public final class Darius extends BaseChampion implements fr.lolmc.champion.base
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] adMult={1.40,1.45,1.50,1.55,1.60};
-            return String.format("Attaque renforcée: %.0f dégâts (%.0f%%AD) + slow 90%% 1s. Reset si kill.",s.getFinalAD()*adMult[getLevel()-1],adMult[getLevel()-1]*100);
+            return String.format("Attaque renforcée: %.0f dégâts (%.0f%%AD) + slow 90%% 1s. Kill : mana rendu, -50%% de recharge.",s.getFinalAD()*adMult[getLevel()-1],adMult[getLevel()-1]*100);
         }
     }
 
@@ -203,8 +207,7 @@ public final class Darius extends BaseChampion implements fr.lolmc.champion.base
             var targets=TargetingUtil.enemiesInCone(c, 6.0, 50); // 535 unités, 50° (wiki)
             if(targets.isEmpty()){c.sendActionBar(Component.text("🪝 Personne à attraper",NamedTextColor.GRAY));return;}
             for(var __t : targets){
-                Vector pull=c.getLocation().toVector().subtract(__t.getLocation().toVector()).normalize().multiply(1.2);
-                pull.setY(0.3); __t.setVelocity(pull);
+                TargetingUtil.pullTo(__t, c, 1.6, 22.0); // attiré devant Darius (avant : simple poussée)
                 if(__t instanceof Player __p){
                     fr.lolmc.LolPlugin.getInstance().getCCManager().slowPct(__p, 0.40, 20); // 40 % 1 s (wiki)
                     __p.sendActionBar(Component.text("🪝 Appréhension!",NamedTextColor.DARK_RED));

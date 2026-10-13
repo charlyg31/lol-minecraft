@@ -128,9 +128,15 @@ public final class Jinx extends BaseChampion implements fr.lolmc.champion.base.S
             resourceCost = 20;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             double[] base=fr.lolmc.util.Balance.base("w_jinx",new double[]{10,60,110,160,210});double dmg=base[getLevel()-1]+s.getFinalAD()*fr.lolmc.util.Balance.ratio("w_jinx","ad",1.4);
-            var hits=TargetingUtil.skillshot(c, 15.0, 0.6, false); // 1500 unités
-            if(hits.isEmpty()){c.sendActionBar(Component.text("⚡ Zap manqué!",NamedTextColor.GRAY));return;}
-            var main=hits.getFirst();
+            // Projectile réel : 1500 unités à 3300/s
+            TargetingUtil.launchSkillshot(c, c.getEyeLocation(), c.getEyeLocation().getDirection(), 15.0, 0.6, false, 33.0,
+                    new org.bukkit.inventory.ItemStack(Material.LIGHTNING_ROD), 0.8f, Material.YELLOW_STAINED_GLASS,
+                    main -> zapHit(c, s, main, dmg),
+                    hits -> { if(hits.isEmpty()) c.sendActionBar(Component.text("⚡ Zap manqué!",NamedTextColor.GRAY)); });
+            c.getWorld().playSound(c.getLocation(), Sound.ENTITY_FIREWORK_ROCKET_BLAST, 1f, 1.4f);
+        }
+
+        private void zapHit(Player c, ChampionStats s, org.bukkit.entity.LivingEntity main, double dmg){
             TargetingUtil.dealDamage(c, main, dmg, TargetingUtil.DmgType.PHYSICAL);
             // Slow 40/50/60/70/80% selon rang (2s = 40 ticks)
             if(main instanceof Player __p){
@@ -138,7 +144,6 @@ public final class Jinx extends BaseChampion implements fr.lolmc.champion.base.S
             }
             fr.lolmc.util.VisualEffectUtil.impactBurst(main.getWorld(),
                     main.getLocation().add(0,1,0), Material.YELLOW_STAINED_GLASS, 0.25f, 0.5, 6, 6L);
-            c.getWorld().playSound(c.getLocation(), Sound.ENTITY_FIREWORK_ROCKET_BLAST, 1f, 1.4f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] base=fr.lolmc.util.Balance.base("w_jinx",new double[]{10,60,110,160,210});
@@ -177,10 +182,17 @@ public final class Jinx extends BaseChampion implements fr.lolmc.champion.base.S
                 new double[]{75,65,55},25,5,DamageType.PHYSICAL);
             resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            var hits=TargetingUtil.skillshot(c, 30.0, 1.2, false);
-            if(hits.isEmpty()){c.sendActionBar(Component.text("🚀 Roquette tirée (aucune cible)",NamedTextColor.GRAY));return;}
-            var main=hits.getFirst();
-            double dist=c.getLocation().distance(main.getLocation());
+            // Projectile réel : roquette (≈2000 unités/s) qui explose sur le 1er champion
+            final Location from=c.getLocation();
+            TargetingUtil.launchSkillshot(c, c.getEyeLocation(), c.getEyeLocation().getDirection(), 30.0, 1.2, false, 20.0,
+                    new org.bukkit.inventory.ItemStack(Material.FIREWORK_ROCKET), 1.2f, Material.ORANGE_STAINED_GLASS,
+                    e -> e instanceof Player, // explose sur le 1er champion (wiki), traverse les sbires
+                    main -> rocketHit(c, s, main, from.distance(main.getLocation())),
+                    (hits, at) -> { if(hits.isEmpty()) c.sendActionBar(Component.text("🚀 Roquette tirée (aucune cible)",NamedTextColor.GRAY)); });
+            c.getWorld().playSound(c.getLocation(), Sound.ENTITY_FIREWORK_ROCKET_LAUNCH, 1.5f, 0.6f);
+        }
+
+        private void rocketHit(Player c, ChampionStats s, org.bukkit.entity.LivingEntity main, double dist){
             // Wiki : 10 % → 100 % des dégâts sur les 1500 premières unités ; max 200/350/500
             // (+120 % AD bonus) + 25/30/35 % des PV manquants ; 80 % autour de la cible
             double distMult=Math.min(1.0, 0.1+0.9*dist/15.0);

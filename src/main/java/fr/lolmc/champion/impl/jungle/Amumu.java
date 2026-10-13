@@ -61,9 +61,15 @@ public final class Amumu extends BaseChampion implements fr.lolmc.champion.base.
                 new double[]{16,15,14,13,12},20,0,DamageType.MAGICAL);
             resourceCost = 50; maxCharges = 2; chargeLockout = 3;} // 2 charges, 3 s entre deux (wiki)
         @Override public void cast(Player c,ChampionStats s,Player t){
-            var hits=TargetingUtil.skillshot(c, 11.0, 0.8, false); // 1100 unités
-            if(hits.isEmpty()){c.sendActionBar(Component.text("🧻 Bandage manqué!",NamedTextColor.GRAY));return;}
-            var tgt=hits.getFirst();
+            // Projectile réel : 1100 unités à 2000 unités/s (esquivable)
+            TargetingUtil.launchSkillshot(c, c.getEyeLocation(), c.getEyeLocation().getDirection(), 11.0, 0.8, false, 20.0,
+                    new org.bukkit.inventory.ItemStack(Material.STRING), 0.7f, Material.WHITE_STAINED_GLASS,
+                    tgt -> bandageHit(c, s, tgt),
+                    hits -> { if(hits.isEmpty()) c.sendActionBar(Component.text("🧻 Bandage manqué!",NamedTextColor.GRAY)); });
+            c.getWorld().playSound(c.getLocation(), Sound.ENTITY_FISHING_BOBBER_THROW, 1f, 0.8f);
+        }
+
+        private void bandageHit(Player c, ChampionStats s, org.bukkit.entity.LivingEntity tgt){
             dashTo(c, tgt, -1.2); // tiré vers la cible
             double[] base=fr.lolmc.util.Balance.base("q_amumu",new double[]{70,95,120,145,170});double dmg=base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("q_amumu","ap",0.85);
             TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.MAGICAL);
