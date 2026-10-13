@@ -44,6 +44,7 @@ public class InstanceManager {
 
     // Préfixe des mondes d'instances
     public static final String INSTANCE_PREFIX = "lolmc_game_";
+    private volatile String mainWorldName = null;
 
     private final LolPlugin            plugin;
     private final Logger               log;
@@ -113,6 +114,21 @@ public class InstanceManager {
             }
         }
 
+        // 3a. Restes migrés par Paper 26+ (<monde>/dimensions/minecraft/lolmc_game_N)
+        File[] migrated = migratedDir("x").getParent().toFile().listFiles(
+                f -> f.isDirectory() && f.getName().startsWith(INSTANCE_PREFIX));
+        if (migrated != null) {
+            for (File dir : migrated) {
+                String name = dir.getName();
+                if (owned.contains(name) || busyWorlds.contains(name) || Bukkit.getWorld(name) != null) continue;
+                busyWorlds.add(name);
+                Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+                    deleteWorldFolder(name);
+                    busyWorlds.remove(name);
+                });
+            }
+        }
+
         // 3. Dossiers restants sur le disque (non chargés, sans instance).
         File[] dirs = Bukkit.getWorldContainer().listFiles(
                 f -> f.isDirectory() && f.getName().startsWith(INSTANCE_PREFIX));
@@ -151,6 +167,7 @@ public class InstanceManager {
         // 1. Copie asynchrone du monde template
         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
             try {
+                deleteWorldFolder(worldName); // restes d'une ancienne partie du même nom
                 copyWorldFolder(templateWorldName, worldName);
                 log.info("[InstanceManager] Copie terminée pour " + worldName);
             } catch (Exception e) {
@@ -390,10 +407,26 @@ public class InstanceManager {
      */
     private void deleteWorldFolder(String worldName) {
         File serverRoot = Bukkit.getWorldContainer();
-        Path worldPath  = new File(serverRoot, worldName).toPath();
+        deleteTree(new File(serverRoot, worldName).toPath(), worldName);
+        // Paper 26+ range les mondes API dans <monde principal>/dimensions/minecraft/<nom>
+        deleteTree(migratedDir(worldName), worldName + " (dimensions)");
+    }
 
+    /** Emplacement où Paper 26+ migre un monde créé par l'API. */
+    private Path migratedDir(String worldName) {
+        String main = mainWorldName;
+        if (main == null) {
+            // Lu sur le thread principal (premier appel) ; les appels asynchrones utilisent la valeur en cache
+            main = Bukkit.isPrimaryThread() && !Bukkit.getWorlds().isEmpty()
+                    ? Bukkit.getWorlds().getFirst().getName() : "world";
+            mainWorldName = main;
+        }
+        return new File(Bukkit.getWorldContainer(), main).toPath()
+                .resolve("dimensions").resolve("minecraft").resolve(worldName);
+    }
+
+    private void deleteTree(Path worldPath, String label) {
         if (!Files.exists(worldPath)) return;
-
         try {
             Files.walkFileTree(worldPath, new SimpleFileVisitor<>() {
                 @Override
@@ -407,9 +440,9 @@ public class InstanceManager {
                     return FileVisitResult.CONTINUE;
                 }
             });
-            log.info("[InstanceManager] Dossier supprimé : " + worldName);
+            log.info("[InstanceManager] Dossier supprimé : " + label);
         } catch (IOException e) {
-            log.warning("[InstanceManager] Erreur suppression " + worldName + ": " + e.getMessage());
+            log.warning("[InstanceManager] Erreur suppression " + label + ": " + e.getMessage());
         }
     }
 
