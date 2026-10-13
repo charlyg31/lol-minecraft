@@ -163,7 +163,6 @@ public class ItemState {
     public boolean opportunityReady = false;
     public boolean prowlerBonusDmg = false;
     public boolean stopwatchUsed = false;
-    public boolean atakhanRevive = false;   // Atakhan Vorace : résurrection 1x
     public boolean hullbreakerActive = false;
     public boolean swiftmarchActive = false;
     public int rodStacks = 0;

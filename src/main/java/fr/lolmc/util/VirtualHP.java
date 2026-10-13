@@ -9,7 +9,7 @@ import org.bukkit.persistence.PersistentDataType;
 /**
  * HP virtuels pour les entités dépassant la limite Minecraft de 1024.
  *
- * Mojang cape l'attribut max_health à [1, 1024] : Baron 8500, Atakhan 9000,
+ * Mojang cape l'attribut max_health à [1, 1024] : Baron 8500, 
  * Elder 5000, canon 1257 étaient silencieusement clampés à 1024.
  *
  * Principe :

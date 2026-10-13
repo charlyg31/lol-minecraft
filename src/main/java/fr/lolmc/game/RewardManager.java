@@ -28,40 +28,41 @@ public class RewardManager {
     private final GoldManager goldManager;
 
     // Récompenses (proches de LoL)
-    public static final int GOLD_MINION_MELEE = 21;   // sbire mêlée (valeur LoL exacte)
-    public static final int GOLD_MINION_CASTER = 14;  // sbire caster (valeur LoL exacte)
-    public static final int GOLD_MINION_CANNON = 60;  // sbire canon/siège (60-90 selon temps)
-    public static final int GOLD_CHAMPION_KILL = 300; // kill de base (valeur LoL)
-    // Or global (distribué à toute l'équipe) pour destruction de structures
-    // Tourelles — or global par type (LoL)
-    public static final int GOLD_TURRET_T1_GLOBAL = 600; // T1 extérieure
-    public static final int GOLD_TURRET_T2_GLOBAL = 750; // T2 intérieure
-    public static final int GOLD_TURRET_T3_GLOBAL = 875; // T3 inhibiteur
-    public static final int GOLD_TURRET_KILLER    = 150; // bonus last-hit
-    public static final int GOLD_TURRET_PLATE     = 125; // plaque (avant 14min, LoL)
+    // Valeurs par défaut (les sbires portent leur or/XP réels, fixés à leur apparition)
+    public static final int GOLD_MINION_MELEE = 20;   // sbire mêlée (wiki LoL)
+    public static final int GOLD_MINION_CASTER = 14;  // sbire caster (wiki LoL)
+    public static final int GOLD_MINION_CANNON = 50;  // canon/super : 50 puis +1 par amélioration
+    // Tourelles (Faille de l'invocateur, wiki LoL) : or GLOBAL à toute l'équipe (morts compris),
+    // pas d'or local ni d'XP ; première tourelle de la partie : +300 partagés entre les proches
+    public static final int GOLD_TURRET_OUTER_GLOBAL     = 50;
+    public static final int GOLD_TURRET_INNER_GLOBAL     = 25;
+    public static final int GOLD_TURRET_INHIBITOR_GLOBAL = 25;
+    public static final int GOLD_TURRET_NEXUS_GLOBAL     = 50;
+    public static final int GOLD_FIRST_TURRET            = 300;
+    // Plaque (tourelle extérieure, avant 14 min) : 120 or partagés entre les champions proches
+    public static final int GOLD_TURRET_PLATE     = 120;
     public static final int TURRET_PLATE_MAX      = 5;
     public static final long TURRET_PLATE_DURATION = 14 * 60 * 1000L;
-    // Inhibiteur
-    public static final int GOLD_INHIBITOR_GLOBAL = 400;
-    public static final int GOLD_INHIBITOR_KILLER = 25;
-    // Nexus
-    // XP structures
-    public static final double XP_TURRET    = 100;
-    public static final double XP_INHIBITOR = 150;
-    public static final int GOLD_ASSIST = 150;
+    // Inhibiteur : 50 or au seul last-hit
+    public static final int GOLD_INHIBITOR_KILLER = 50;
+    // Rayon « local » (1200 unités LoL ; 14 blocs = 1500 unités pour l'XP des sbires)
+    public static final double LOCAL_RADIUS = 11.0;
 
-    public static final double XP_MINION = 60;         // mêlée (LoL 60.45)
-    public static final double XP_MINION_CASTER = 30;  // caster (LoL 29.76)
-    public static final double XP_MINION_CANNON = 93;  // canon (LoL 93)
-    public static final double XP_MINION_SUPER  = 97;  // super-sbire
-    public static final double XP_CHAMPION_KILL = 200;
-    public static final double XP_ASSIST = 100;
+    public static final double XP_MINION = 62;         // mêlée (wiki LoL)
+    public static final double XP_MINION_CASTER = 31;  // caster
+    public static final double XP_MINION_CANNON = 75;  // canon
+    public static final double XP_MINION_SUPER  = 75;  // super-sbire
+    /** XP d'un kill solo selon le niveau de la victime (1 à 18), valeurs LoL (patch 10.8). */
+    private static final double[] KILL_XP = {42, 114, 144, 174, 204, 234, 308, 392, 486, 590,
+                                             640, 690, 740, 790, 840, 890, 940, 990};
 
-    // ── Bounty système (serie de kills = plus d'or à la mort) ────────────
-    // killStreak[uuid] = nombre de kills consécutifs sans mourir
-    private final java.util.Map<java.util.UUID, Integer> killStreak = new java.util.concurrent.ConcurrentHashMap<>();
-    // Table bounty LoL : 0 kills = 0, 1=100, 2=200, 3=300, 4=400, 5=500, 6+=500 (plafond)
-    private static final int[] BOUNTY = {0, 100, 200, 300, 400, 500, 500};
+    // ── Primes (bounty) : système LoL actuel (sans paliers de séries depuis 14.21) ──────
+    // Écart de prime par rapport à la prime de base : monte avec l'or gagné (kills, farm),
+    // baisse à chaque mort (et peut passer sous la base, jusqu'à 50 or minimum).
+    private final java.util.Map<java.util.UUID, Double> bountyOffset = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final int SHUTDOWN_BUFFER = 100; // au-delà de base + 100 : or de « Shut Down »
+    private static final int MIN_BOUNTY = 50;
+    private boolean firstTurretDone = false;
 
     // ── Système d'assists ─────────────────────────────────────────────────
     // Map<victim_uuid, Map<attacker_uuid, lastDamageTimestamp>>
@@ -106,17 +107,8 @@ public class RewardManager {
         return result;
     }
 
-    // ── Or des sbires croissant par tranche de temps ──────────────────────
-    // En LoL : +0.5 or/sbire toutes les 90s à partir de 1:15, plafonné vers 15min
     private long gameStartMs = 0;
     public void setGameStart() { gameStartMs = System.currentTimeMillis(); }
-
-    private int getMinionGoldBonus() {
-        if (gameStartMs == 0) return 0;
-        long elapsed = (System.currentTimeMillis() - gameStartMs) / 1000L;
-        // +1 or toutes les 90s (arrondi à l'entier, max +10)
-        return (int) Math.min(10, elapsed / 90);
-    }
 
     public RewardManager(ChampionManager championManager, GoldManager goldManager) {
         this.championManager = championManager;
@@ -127,9 +119,11 @@ public class RewardManager {
 
     public void onMinionKill(Player killer, int goldAmount, double xpAmount) {
         if (!championManager.hasChampion(killer)) return;
-        int bonus = getMinionGoldBonus();
-        int total = goldAmount + bonus;
+        // (l'or du canon/super augmente avec les améliorations, fixé à l'apparition du sbire ;
+        // mêlée et caster ne changent pas — avant : +1 or toutes les 90 s pour tous)
+        int total = goldAmount;
         goldManager.addGold(killer.getUniqueId(), total);
+        accrueFarmBounty(killer.getUniqueId(), total);
         grantXP(killer, xpAmount);
         // CS tracker
         var msb = LolPlugin.getInstance().getMatchScoreboard();
@@ -142,18 +136,89 @@ public class RewardManager {
 
     // ── Kill de champion ──────────────────────────────────────────
 
-    /** Prime actuelle d'un champion (selon sa série de kills). */
+    /** Prime de base d'un kill : 300 jusqu'au niveau 6, puis +10 par niveau (420 au niveau 18). */
+    public static int baseKillGold(int level) {
+        return 300 + Math.max(0, level - 6) * 10;
+    }
+
+    private int levelOf(java.util.UUID id) {
+        Player p = org.bukkit.Bukkit.getPlayer(id);
+        return p != null && championManager.hasChampion(p)
+                ? championManager.getChampion(p).getLevelSystem().getLevel() : 1;
+    }
+
+    /** Plafond d'un seul kill au-dessus de la base : +700 (prime totale 1000 au niveau 1). */
+    private static int maxAboveBase(int level, int base) {
+        return level <= 1 ? 1000 - base : 700;
+    }
+
+    /** Or que rapporte le kill de ce champion (prime de base ± écart, plafonnée, 50 minimum). */
     public int getBounty(java.util.UUID player) {
-        return BOUNTY[Math.min(killStreak.getOrDefault(player, 0), BOUNTY.length - 1)];
+        int level = levelOf(player);
+        int base = baseKillGold(level);
+        double off = Math.min(bountyOffset.getOrDefault(player, 0.0), maxAboveBase(level, base));
+        return (int) Math.round(Math.max(MIN_BOUNTY, base + off));
+    }
+
+    /** Prime gagnée par un kill ou une assistance : 1 or de prime pour 3 or gagnés. */
+    public void accrueTakedownBounty(java.util.UUID player, int goldEarned) {
+        bountyOffset.merge(player, goldEarned / 3.0, Double::sum);
+    }
+
+    /** Prime gagnée en farmant : 1 pour 20 or (1 pour 7 tant que la prime est sous la base). */
+    private void accrueFarmBounty(java.util.UUID player, int goldEarned) {
+        double off = bountyOffset.getOrDefault(player, 0.0);
+        bountyOffset.put(player, off + goldEarned / (off < 0 ? 7.0 : 20.0));
     }
 
     /**
-     * Or d'assistance par joueur : la moitié de l'or du kill (base + prime), partagée entre les
-     * assistants (LoL). Avant : 150 chacun, quel que soit leur nombre.
+     * Mort de la victime : l'or de Shut Down versé (au-delà de base + 100) est retiré, puis la
+     * prime baisse de 1 pour 3,5 or distribués au tueur et aux assistants (minimum 50 or).
+     * Ce qui dépasse le plafond d'un kill reste pour le kill suivant.
+     */
+    private void depreciateBounty(java.util.UUID victim, int paidAboveBase, int distributed) {
+        int base = baseKillGold(levelOf(victim));
+        double off = bountyOffset.getOrDefault(victim, 0.0);
+        off -= Math.max(0, paidAboveBase - SHUTDOWN_BUFFER);
+        off -= distributed / 3.5;
+        bountyOffset.put(victim, Math.max(off, MIN_BOUNTY - base));
+    }
+
+    /**
+     * Or d'assistance par joueur : la moitié de la prime versée, plafonnée à la moitié de la
+     * prime de base (150 à 210), partagée à parts égales entre les assistants (LoL).
      */
     public int getAssistGoldEach(java.util.UUID victim, int assistCount) {
         if (assistCount <= 0) return 0;
-        return (int) Math.round((GOLD_CHAMPION_KILL + getBounty(victim)) * 0.5 / assistCount);
+        double pool = Math.min(getBounty(victim) * 0.5, baseKillGold(levelOf(victim)) * 0.5);
+        // Début de partie : 50 % jusqu'à 0:55, puis +0,416 % par seconde jusqu'à 100 % à 2:55 (wiki)
+        long secs = gameStartMs == 0 ? Long.MAX_VALUE : (System.currentTimeMillis() - gameStartMs) / 1000L;
+        pool *= Math.min(1.0, 0.5 + 0.00416 * Math.max(0, secs - 55));
+        return (int) Math.round(pool / assistCount);
+    }
+
+    /**
+     * XP d'un kill pour un participant (tueur ou assistant) : l'XP du niveau de la victime,
+     * partagée à parts égales entre les participants, modifiée par l'écart de niveau
+     * (±20 % par niveau d'écart au-delà du premier, au moins 40 %).
+     */
+    public double getKillXP(java.util.UUID victim, Player receiver, int participants) {
+        int victimLevel = levelOf(victim);
+        double xp = KILL_XP[Math.max(1, Math.min(18, victimLevel)) - 1];
+        // Kill partagé : le total vaut 66,6 % (niv. 1-6), 82 % (7-8) ou 90 % (9-18) de l'XP solo (wiki)
+        if (participants > 1) {
+            xp *= victimLevel <= 6 ? 0.666 : victimLevel <= 8 ? 0.82 : 0.90;
+            xp /= participants;
+        }
+        int diff = levelOf(receiver.getUniqueId()) - victimLevel;
+        if (diff >= 2) xp *= Math.max(0.4, 1 - 0.2 * (diff - 1));
+        else if (diff <= -2) xp *= 1 + 0.2 * (-diff - 1);
+        return xp;
+    }
+
+    /** XP de kill/assistance (appelé pour les assistants depuis EntityDeathListener). */
+    public void grantKillXP(Player receiver, double xp) {
+        grantXP(receiver, xp);
     }
 
     /**
@@ -164,23 +229,63 @@ public class RewardManager {
         return n <= 1 ? xp : xp * 1.3 / n;
     }
 
-    public void onChampionKill(Player killer, Player victim) {
-        if (!championManager.hasChampion(killer)) return;
-        // Bounty de la victime
-        int bounty = getBounty(victim.getUniqueId());
-        int totalGold = GOLD_CHAMPION_KILL + bounty;
-        // First blood : 400 or au lieu de 300 (LoL)
-        var ann = siblingAnnouncementManager();
-        if (ann != null && !ann.isFirstBloodDone()) {
-            totalGold += 100; // 300 base + 100 = 400
+    /**
+     * Kill d'un champion : prime de la victime (+100 au Premier Sang) et XP au tueur, puis la
+     * prime de la victime baisse. {@code assistCount} et {@code assistGoldEach} : assistances déjà
+     * versées (or distribué) ; {@code xpSharers} : champions qui se partagent l'XP.
+     */
+    /**
+     * Part du Shut Down supprimée après 6:00 quand l'équipe du tueur ne gagne pas nettement (LoL :
+     * 30 / 60 / 90 / 100 % près de l'équilibre). Riot ne publie pas les seuils : APPROXIMATION
+     * sur l'avance en or gagné de l'équipe du tueur, d'après l'ordre de grandeur de l'ancien
+     * système (3 % à 24 % d'écart) : < 2 % → 100 %, < 4 % → 90 %, < 6 % → 60 %, < 8 % → 30 %.
+     */
+    private double shutdownSuppression(fr.lolmc.team.TeamManager.Team killerTeam) {
+        if (gameStartMs == 0 || killerTeam == null) return 0;
+        if (System.currentTimeMillis() - gameStartMs < 6 * 60 * 1000L) return 0;
+        var tm = LolPlugin.getInstance().getTeamManager();
+        long mine = 0, theirs = 0;
+        var participants = gameInstance != null ? gameInstance.getParticipants() : siblingGameManager().getParticipants();
+        for (java.util.UUID id : participants) {
+            Player p = org.bukkit.Bukkit.getPlayer(id);
+            if (p == null) continue;
+            var t = tm.getTeam(p);
+            if (t == killerTeam) mine += goldManager.getEarned(id);
+            else if (t != null) theirs += goldManager.getEarned(id);
         }
+        if (mine + theirs <= 0) return 1.0;
+        double lead = (double) (mine - theirs) / Math.max(1, theirs); // avance relative
+        if (lead < 0.02) return 1.0;
+        if (lead < 0.04) return 0.9;
+        if (lead < 0.06) return 0.6;
+        if (lead < 0.08) return 0.3;
+        return 0;
+    }
+
+    public void onChampionKill(Player killer, Player victim, int assistCount, int assistGoldEach, int xpSharers) {
+        if (!championManager.hasChampion(killer)) return;
+        java.util.UUID vid = victim.getUniqueId();
+        int base = baseKillGold(levelOf(vid));
+        int bounty = getBounty(vid);
+        // Shut Down (au-delà de base + 100) réduit si l'équipe du tueur ne gagne pas nettement ;
+        // la part supprimée reste sur la victime (elle n'est retirée que si elle est versée)
+        int shutdown = Math.max(0, bounty - base - SHUTDOWN_BUFFER);
+        int suppressed = (int) Math.round(shutdown
+                * shutdownSuppression(LolPlugin.getInstance().getTeamManager().getTeam(killer)));
+        bounty -= suppressed;
+        int totalGold = bounty;
+        var ann = siblingAnnouncementManager();
+        if (ann != null && !ann.isFirstBloodDone()) totalGold += 100; // Premier Sang
+        double xp = getKillXP(vid, killer, xpSharers);
+
         goldManager.addGold(killer.getUniqueId(), totalGold);
-        grantXP(killer, XP_CHAMPION_KILL);
-        // Reset streak de la victime, incrémenter celle du tueur
-        killStreak.put(victim.getUniqueId(), 0);
-        killStreak.merge(killer.getUniqueId(), 1, Integer::sum);
-        // (les séries « KILLING SPREE »… sont annoncées par AnnouncementManager)
-        String goldMsg = bounty > 0 ? String.format("⚔ KILL! +%d or (+%d bounty) +%.0f XP", totalGold, bounty, XP_CHAMPION_KILL) : String.format("⚔ KILL! +%d or +%.0f XP", totalGold, XP_CHAMPION_KILL);
+        grantXP(killer, xp);
+        accrueTakedownBounty(killer.getUniqueId(), totalGold);
+        depreciateBounty(vid, bounty - base, bounty + assistGoldEach * assistCount);
+
+        String goldMsg = bounty > base
+                ? String.format("⚔ KILL! +%d or (Shut Down +%d) +%.0f XP", totalGold, bounty - base, xp)
+                : String.format("⚔ KILL! +%d or +%.0f XP", totalGold, xp);
         killer.sendActionBar(net.kyori.adventure.text.Component.text(goldMsg, NamedTextColor.GOLD));
 
         // Déclencher les passifs on-kill (Hubris, Axiom Arc...)
@@ -193,9 +298,36 @@ public class RewardManager {
     public void onJungleMonsterKill(Player killer, int goldAmount, double xpAmount) {
         if (!championManager.hasChampion(killer)) return;
         goldManager.addGold(killer.getUniqueId(), goldAmount);
+        accrueFarmBounty(killer.getUniqueId(), goldAmount);
         grantXP(killer, xpAmount);
         killer.sendActionBar(Component.text(
                 String.format("🌿 +%d or  +%.0f XP", goldAmount, xpAmount), NamedTextColor.GREEN));
+    }
+
+    /**
+     * Récompenses d'un monstre épique : or au tueur, or et XP « globaux » à chaque membre de
+     * l'équipe (morts compris), XP « locale » partagée entre les alliés vivants proches.
+     */
+    public void onEpicKill(Player killer, org.bukkit.Location loc, int killerGold, int globalGold,
+                           double localXp, double globalXp) {
+        if (!championManager.hasChampion(killer)) return;
+        var team = LolPlugin.getInstance().getTeamManager().getTeam(killer);
+        if (killerGold > 0) goldManager.addGold(killer.getUniqueId(), killerGold);
+        if ((globalGold > 0 || globalXp > 0) && team != null) {
+            var participants = gameInstance != null ? gameInstance.getParticipants() : siblingGameManager().getParticipants();
+            for (java.util.UUID id : participants) {
+                Player p = org.bukkit.Bukkit.getPlayer(id);
+                if (p == null || !championManager.hasChampion(p)
+                        || LolPlugin.getInstance().getTeamManager().getTeam(p) != team) continue;
+                if (globalGold > 0) goldManager.addGold(id, globalGold);
+                if (globalXp > 0) grantXP(p, globalXp);
+            }
+        }
+        if (localXp > 0 && team != null && loc != null) {
+            var near = localChampions(loc, team, killer);
+            for (Player p : near) grantXP(p, localXp / near.size());
+        }
+        killer.sendActionBar(Component.text(String.format("🐉 +%d or", killerGold + globalGold), NamedTextColor.GOLD));
     }
 
     // ── XP & montée de niveau ─────────────────────────────────────
@@ -272,10 +404,35 @@ public class RewardManager {
             if (hud != null) hud.updateHUD(player, champ);
         }
     }
-    /** Fin de la série de kills (bounty) d'un joueur mort sans tueur champion. */
-    public void resetStreak(java.util.UUID player) { killStreak.put(player, 0); }
+    public void resetKillStreaks() { bountyOffset.clear(); firstTurretDone = false; gameStartMs = 0; }
 
-    public void resetKillStreaks() { killStreak.clear(); gameStartMs = 0; }
+    /** Champions vivants de {@code team} à moins de LOCAL_RADIUS de {@code loc} (+ {@code always}). */
+    private java.util.List<Player> localChampions(org.bukkit.Location loc,
+                                                  fr.lolmc.team.TeamManager.Team team, Player always) {
+        var list = new java.util.ArrayList<Player>();
+        var tm = LolPlugin.getInstance().getTeamManager();
+        var participants = gameInstance != null ? gameInstance.getParticipants() : siblingGameManager().getParticipants();
+        for (java.util.UUID id : participants) {
+            Player p = org.bukkit.Bukkit.getPlayer(id);
+            if (p == null || !championManager.hasChampion(p) || tm.getTeam(p) != team) continue;
+            boolean near = p.getGameMode() != org.bukkit.GameMode.SPECTATOR
+                    && p.getWorld().equals(loc.getWorld())
+                    && p.getLocation().distance(loc) <= LOCAL_RADIUS;
+            if (near || p.equals(always)) list.add(p);
+        }
+        return list;
+    }
+
+    /** Partage {@code gold} à parts égales (or « local » LoL). */
+    private void splitGold(java.util.List<Player> players, int gold, String label) {
+        if (players.isEmpty()) return;
+        int each = (int) Math.round((double) gold / players.size());
+        for (Player p : players) {
+            goldManager.addGold(p.getUniqueId(), each);
+            p.sendActionBar(net.kyori.adventure.text.Component.text(
+                    label + " +" + each + " or", NamedTextColor.GOLD));
+        }
+    }
 
     /**
      * Objective bounty (comeback LoL) : si l'équipe de l'attaquant a
@@ -304,21 +461,23 @@ public class RewardManager {
     }
 
     /**
-     * Plaque de tourelle détruite : +125 or avant 14 min. Le décompte des plaques est tenu par
-     * TurretManager (une plaque tombe tous les 20 % de PV) ; avant, chaque coup en retirait une.
+     * Plaque de tourelle détruite (avant 14 min) : 120 or partagés entre les champions vivants
+     * proches et celui qui la fait tomber. Le décompte des plaques est tenu par TurretManager.
      */
-    public void onPlateDestroyed(Player attacker, int platesLeft) {
+    public void onPlateDestroyed(Player attacker, GameStructure turret, int platesLeft) {
         if (gameStartMs == 0) return;
         if (System.currentTimeMillis() - gameStartMs > TURRET_PLATE_DURATION) return;
-        goldManager.addGold(attacker.getUniqueId(), GOLD_TURRET_PLATE);
-        attacker.sendActionBar(net.kyori.adventure.text.Component.text(
-            "🏛 Plaque! +" + GOLD_TURRET_PLATE + " or (" + platesLeft + " restantes)",
-            net.kyori.adventure.text.format.NamedTextColor.GOLD));
+        var team = LolPlugin.getInstance().getTeamManager().getTeam(attacker);
+        splitGold(localChampions(turret.getCenter(), team, attacker), GOLD_TURRET_PLATE,
+                "🏛 Plaque (" + platesLeft + " restantes)");
     }
 
-    /** Distribue l'or et l'XP quand une tourelle est détruite. */
-    public void onTurretDestroyed(Player lastHit, fr.lolmc.team.TeamManager.Team attackingTeam, int turretIndex) {
-        // Bounty d'objectif (comeback) : bonus si l'équipe attaquante est en retard
+    /**
+     * Tourelle détruite : or global à toute l'équipe selon le niveau de la tourelle (50/25/25/50,
+     * morts compris), +300 partagés entre les proches pour la première tourelle de la partie,
+     * et bounty d'objectif (comeback). Pas d'XP (LoL).
+     */
+    public void onTurretDestroyed(Player lastHit, fr.lolmc.team.TeamManager.Team attackingTeam, GameStructure turret) {
         int objBounty = getObjectiveBounty(attackingTeam);
         if (objBounty > 0 && lastHit != null) {
             goldManager.addGold(lastHit.getUniqueId(), objBounty);
@@ -326,29 +485,27 @@ public class RewardManager {
                 "💰 Bounty d'objectif +" + objBounty + " or (comeback)!",
                 NamedTextColor.GOLD));
         }
-        int globalGold = switch (turretIndex) {
-            case 1  -> GOLD_TURRET_T1_GLOBAL;
-            case 2  -> GOLD_TURRET_T2_GLOBAL;
-            default -> GOLD_TURRET_T3_GLOBAL;
+        int globalGold = switch (turret.getTier()) {
+            case OUTER     -> GOLD_TURRET_OUTER_GLOBAL;
+            case INNER     -> GOLD_TURRET_INNER_GLOBAL;
+            case INHIBITOR -> GOLD_TURRET_INHIBITOR_GLOBAL;
+            case NEXUS     -> GOLD_TURRET_NEXUS_GLOBAL;
         };
         String teamName = attackingTeam == fr.lolmc.team.TeamManager.Team.BLUE ? "Bleue" : "Rouge";
         var participants2 = gameInstance != null ? gameInstance.getParticipants() : siblingGameManager().getParticipants();
         for (java.util.UUID id : participants2) {
             var p = org.bukkit.Bukkit.getPlayer(id);
             if (p == null) continue;
-            if (LolPlugin.getInstance().getTeamManager().getTeam(p) == attackingTeam) {
+            if (LolPlugin.getInstance().getTeamManager().getTeam(p) == attackingTeam)
                 goldManager.addGold(id, globalGold);
-                grantXP(p, XP_TURRET);
-            }
         }
-        if (lastHit != null) {
-            goldManager.addGold(lastHit.getUniqueId(), GOLD_TURRET_KILLER);
-            lastHit.sendActionBar(net.kyori.adventure.text.Component.text(
-                "🏛 Tourelle T" + turretIndex + "! +" + (globalGold + GOLD_TURRET_KILLER) + " or",
-                net.kyori.adventure.text.format.NamedTextColor.GOLD));
+        if (!firstTurretDone) {
+            firstTurretDone = true;
+            splitGold(localChampions(turret.getCenter(), attackingTeam, lastHit), GOLD_FIRST_TURRET,
+                    "🏛 Première tourelle !");
         }
         announce(net.kyori.adventure.text.Component.text(
-            "🏛 Tourelle T" + turretIndex + " détruite! +" + globalGold + " or — Équipe " + teamName,
+            "🏛 Tourelle détruite! +" + globalGold + " or — Équipe " + teamName,
             net.kyori.adventure.text.format.NamedTextColor.YELLOW));
     }
 
@@ -358,30 +515,18 @@ public class RewardManager {
                 : fr.lolmc.util.WorldContext.getGameWorld(), message);
     }
 
-    public void onTurretDestroyed(Player lastHit, fr.lolmc.team.TeamManager.Team attackingTeam) {
-        onTurretDestroyed(lastHit, attackingTeam, 1);
-    }
 
-    /** Distribue l'or et l'XP quand un inhibiteur est détruit. */
+    /** Inhibiteur détruit : 50 or au seul last-hit (LoL), pas d'or global ni d'XP. */
     public void onInhibitorDestroyed(Player lastHit, fr.lolmc.team.TeamManager.Team attackingTeam) {
         String teamName = attackingTeam == fr.lolmc.team.TeamManager.Team.BLUE ? "Bleue" : "Rouge";
-        var participants2 = gameInstance != null ? gameInstance.getParticipants() : siblingGameManager().getParticipants();
-        for (java.util.UUID id : participants2) {
-            var p = org.bukkit.Bukkit.getPlayer(id);
-            if (p == null) continue;
-            if (LolPlugin.getInstance().getTeamManager().getTeam(p) == attackingTeam) {
-                goldManager.addGold(id, GOLD_INHIBITOR_GLOBAL);
-                grantXP(p, XP_INHIBITOR);
-            }
-        }
         if (lastHit != null) {
             goldManager.addGold(lastHit.getUniqueId(), GOLD_INHIBITOR_KILLER);
             lastHit.sendActionBar(net.kyori.adventure.text.Component.text(
-                "💎 Inhibiteur! +" + (GOLD_INHIBITOR_GLOBAL + GOLD_INHIBITOR_KILLER) + " or",
+                "💎 Inhibiteur! +" + GOLD_INHIBITOR_KILLER + " or",
                 net.kyori.adventure.text.format.NamedTextColor.AQUA));
         }
         announce(net.kyori.adventure.text.Component.text(
-            "💎 Inhibiteur détruit! +" + GOLD_INHIBITOR_GLOBAL + " or — Équipe " + teamName,
+            "💎 Inhibiteur détruit — Équipe " + teamName,
             net.kyori.adventure.text.format.NamedTextColor.AQUA));
     }
 

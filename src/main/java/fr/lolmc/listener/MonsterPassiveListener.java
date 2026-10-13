@@ -14,8 +14,25 @@ import org.bukkit.event.entity.EntityDamageByEntityEvent;
 public class MonsterPassiveListener implements Listener {
 
     /**
+     * Sbire contre sbire : AD × vitesse d'attaque (une frappe vanilla par seconde) + un % des PV
+     * actuels de la cible (mêlée 2 %, caster 3,5 %, canon 5 %, wiki), réduits par son armure. Avant, c'étaient
+     * les dégâts vanilla du Husk (3 PV) : une vague mettait plus de 2 minutes à en tuer une autre.
+     */
+    @EventHandler(priority = org.bukkit.event.EventPriority.NORMAL, ignoreCancelled = true)
+    public void onMinionHitsMinion(EntityDamageByEntityEvent e) {
+        if (!(e.getDamager() instanceof LivingEntity d) || !fr.lolmc.game.MinionManager.isMinion(d)) return;
+        if (!(e.getEntity() instanceof LivingEntity t) || !fr.lolmc.game.MinionManager.isMinion(t)) return;
+        if (fr.lolmc.util.VirtualHP.isDying(t)) return;
+        e.setCancelled(true);
+        if (fr.lolmc.game.MinionManager.getMinionTeam(d) == fr.lolmc.game.MinionManager.getMinionTeam(t)) return;
+        double dmg = fr.lolmc.util.MobCombat.getAD(d) * fr.lolmc.util.MobCombat.getAttackSpeed(d)
+                + fr.lolmc.game.MinionManager.getOnHitPct(d) * fr.lolmc.util.VirtualHP.getCurrent(t);
+        fr.lolmc.util.MobCombat.damage(null, t, dmg, fr.lolmc.util.DamageUtil.Type.PHYSICAL);
+    }
+
+    /**
      * Convertit les dégâts vanilla en dégâts virtuels pour les entités
-     * à HP virtuels (Baron 8500, Atakhan 9000, Elder 5000, canon 1257...).
+     * à HP virtuels (Baron 8500, Elder 5000, canon 1257...).
      * Laisse passer le coup fatal (isDying) pour EntityDeathEvent.
      */
     @EventHandler(priority = org.bukkit.event.EventPriority.HIGHEST, ignoreCancelled = true)

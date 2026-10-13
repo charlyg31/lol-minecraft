@@ -72,6 +72,14 @@ public class MinionManager {
     public static NamespacedKey KEY_MINION;
     public static NamespacedKey KEY_TEAM;
     public static NamespacedKey KEY_LANE;
+    public static NamespacedKey KEY_TYPE;
+    public static NamespacedKey KEY_ONHIT;
+
+    /** Bonus contre les sbires d'un sbire (% des PV actuels de la cible). */
+    public static double getOnHitPct(LivingEntity e) {
+        Double v = KEY_ONHIT != null ? e.getPersistentDataContainer().get(KEY_ONHIT, PersistentDataType.DOUBLE) : null;
+        return v != null ? v : 0;
+    }
 
     // Waypoints par lane : "top" → liste de points que les sbires suivent
     private final Map<String, List<Location>> blueLaneWaypoints = new HashMap<>();
@@ -82,12 +90,55 @@ public class MinionManager {
     // Intervalle entre vagues : 30s = 600 ticks
     // ATTENTION : ces délais comptent depuis l'appel à startWaves() ;
     //             startWaves() doit être appelé exactement au début de la partie.
-    private static final long WAVE_PERIOD      = 600L;   // 30s = 600 ticks
-    private static final long FIRST_WAVE_DELAY = 1300L;  // 1:05 = 65s = 1300 ticks
+    // Wiki LoL (26.01) : première vague à 0:30, puis toutes les 30 s, 25 s dès 14:00, 20 s dès 30:00
+    private static final long FIRST_WAVE_DELAY = 600L;   // 0:30 = 600 ticks
     private static final int MINIONS_PER_WAVE = 6;
-    private static final double MINION_HP = 477;        // mêlée (LoL 477)
-    private static final double CASTER_HP = 296;        // caster (LoL 296)
-    private static final double CANNON_HP = 1257;
+    /**
+     * Statistiques d'un sbire à son apparition : formules du wiki LoL (infobox, patch 26.09),
+     * n = numéro d'amélioration (1 à 0:30, puis +1 toutes les 90 s). {@code onHitPct} : bonus
+     * contre les sbires, en % des PV actuels de la cible.
+     */
+    private record MinionStats(double hp, double ad, double attackSpeed, double armor, double mr,
+                               int gold, double xp, double onHitPct) {}
+
+    /** Nombre d'améliorations des sbires depuis le début de la partie. */
+    private int upgrades() {
+        long s = siblingGameManager() != null ? siblingGameManager().getElapsedSeconds() : 0;
+        return s < 30 ? 0 : (int) ((s - 30) / 90) + 1;
+    }
+
+    private MinionStats statsFor(MinionType type) {
+        int n = Math.max(1, upgrades());
+        // Or du canon et du super-sbire : 50 à 0:30 puis +1 par amélioration (59 à 14:00, 66 à 25:00)
+        int bigGold = 49 + n;
+        return switch (type) {
+            // PV 430 + 35n (max 1550) ; AD 11 jusqu'à n = 5 puis +3 (max 80) ;
+            // armure 0 jusqu'à n = 5 puis 0,085 × (n-6)(n-5)/2 (max 20)
+            case MELEE  -> new MinionStats(Math.min(1550, 430 + 35.0 * n),
+                    Math.min(80, 11 + 3.0 * Math.max(0, n - 5)), 1.25,
+                    n <= 5 ? 0 : Math.min(20, 0.085 * (n - 6) * (n - 5) / 2.0), 0, 20, 62, 0.02);
+            // PV 275 + 9n (max 600) ; AD 19,5 + 1,5n jusqu'à n = 5 puis +4 (max 125)
+            case CASTER -> new MinionStats(Math.min(600, 275 + 9.0 * n),
+                    Math.min(125, 19.5 + 1.5 * Math.min(n, 5) + 4.0 * Math.max(0, n - 5)), 0.667, 0, 0, 14, 31, 0.035);
+            // PV 750 + 85n (max 5850) ; AD 36 + 1,5n, +4 à partir de la 15e (max 126)
+            case CANNON -> new MinionStats(Math.min(5850, 750 + 85.0 * n),
+                    Math.min(126, 36 + 1.5 * Math.min(n, 14) + 4.0 * Math.max(0, n - 14)), 1.0, 0, 0, bigGold, 75, 0.05);
+            // PV 1500 + 100n (max 7500) ; AD 180 au départ puis +5 (max 480)
+            case SUPER  -> new MinionStats(Math.min(7500, 1500 + 100.0 * n),
+                    Math.min(480, 175 + 5.0 * n), 0.85, 100, -30, bigGold, 75, 0);
+        };
+    }
+
+    /** Applique les stats LoL : PV virtuels (au-delà du plafond Minecraft), AD, résistances, or, XP. */
+    private void applyStats(LivingEntity minion, MinionType type, String label) {
+        MinionStats st = statsFor(type);
+        fr.lolmc.util.VirtualHP.init(minion, st.hp());
+        fr.lolmc.util.MobCombat.setStats(minion, st.ad(), st.attackSpeed(), st.armor(), st.mr(), st.gold(), st.xp());
+        minion.getPersistentDataContainer().set(KEY_TYPE, PersistentDataType.STRING, type.name().toLowerCase());
+        minion.getPersistentDataContainer().set(KEY_ONHIT, PersistentDataType.DOUBLE, st.onHitPct());
+        fr.lolmc.util.HealthBar.apply(minion, st.hp(), st.hp(), label);
+        minion.setCustomNameVisible(true);
+    }
     private static final double MINION_SPEED = 0.25;
 
     private boolean spawning = false;
@@ -108,6 +159,8 @@ public class MinionManager {
         KEY_MINION = new NamespacedKey(LolPlugin.getInstance(), "minion");
         KEY_TEAM = new NamespacedKey(LolPlugin.getInstance(), "minion_team");
         KEY_LANE = new NamespacedKey(LolPlugin.getInstance(), "minion_lane");
+        KEY_TYPE = new NamespacedKey(LolPlugin.getInstance(), "minion_type");
+        KEY_ONHIT = new NamespacedKey(LolPlugin.getInstance(), "minion_onhit");
     }
 
     // ── Démarrage / arrêt des vagues ──────────────────────────────
@@ -117,14 +170,7 @@ public class MinionManager {
         purgeWorld(myWorld());
         spawning = true;
 
-        waveTask = new BukkitRunnable() {
-            @Override public void run() {
-                if (!spawning) { cancel(); return; }
-                waveCount++; // 1 incrément par cycle de vague global
-                spawnWave(Team.BLUE, waveCount);
-                spawnWave(Team.RED, waveCount);
-            }
-        }.runTaskTimer(LolPlugin.getInstance(), FIRST_WAVE_DELAY, WAVE_PERIOD);
+        scheduleNextWave(FIRST_WAVE_DELAY);
 
         // Tâche de déplacement des sbires (toutes les 10 ticks)
         moveTask = new BukkitRunnable() {
@@ -133,6 +179,20 @@ public class MinionManager {
                 moveMinions();
             }
         }.runTaskTimer(LolPlugin.getInstance(), 0L, 10L);
+    }
+
+    /** Programme la prochaine vague ; l'intervalle raccourcit avec le temps de jeu (LoL). */
+    private void scheduleNextWave(long delayTicks) {
+        waveTask = new BukkitRunnable() {
+            @Override public void run() {
+                if (!spawning) return;
+                waveCount++; // 1 incrément par cycle de vague global
+                spawnWave(Team.BLUE, waveCount);
+                spawnWave(Team.RED, waveCount);
+                long s = siblingGameManager() != null ? siblingGameManager().getElapsedSeconds() : 0;
+                scheduleNextWave(s >= 30 * 60 ? 400L : s >= 14 * 60 ? 500L : 600L);
+            }
+        }.runTaskLater(LolPlugin.getInstance(), delayTicks);
     }
 
     public void stopWaves() {
@@ -172,11 +232,14 @@ public class MinionManager {
             Location spawnPoint = getMinionSpawn(team, lane);
             if (spawnPoint == null) continue;
 
-            for (int i = 0; i < MINIONS_PER_WAVE; i++) {
+            // LoL : 3 mêlées, (canon), 3 casters ; le canon S'AJOUTE à la vague (avant : il
+            // remplaçait un caster) et n'apparaît pas dans une vague qui a un super-sbire
+            boolean cannon = isCannonWave(wave) && !hasSuperMinions(team, lane);
+            int count = MINIONS_PER_WAVE + (cannon ? 1 : 0);
+            for (int i = 0; i < count; i++) {
                 final int delay = i * 8; // décaler chaque sbire de 0.4s
-                // LoL : 3 sbires de mêlée puis 3 sbires à distance (mages)
-                // 3e vague = un sbire canon à la place du 1er caster
-                final MinionType type = determineMinionType(wave, i);
+                final MinionType type = i < 3 ? MinionType.MELEE
+                        : (cannon && i == 3) ? MinionType.CANNON : MinionType.CASTER;
                 new BukkitRunnable() {
                     @Override public void run() {
                         if (spawning) spawnMinion(team, lane, spawnPoint, type);
@@ -190,21 +253,18 @@ public class MinionManager {
                     @Override public void run() {
                         if (spawning) spawnSuperMinion(team, lane, sp);
                     }
-                }.runTaskLater(LolPlugin.getInstance(), MINIONS_PER_WAVE * 8 + 4);
+                }.runTaskLater(LolPlugin.getInstance(), count * 8 + 4);
             }
         }
     }
 
-    // Cadence canon LoL : toutes les 3 vagues avant 15min,
-    // toutes les 2 entre 15 et 25min, chaque vague après 25min
-    private MinionType determineMinionType(int wave, int i) {
+    // Cadence canon LoL (wiki) : 3e vague (1:30), puis toutes les 3 vagues avant 14:00,
+    // toutes les 2 entre 14:00 et 25:00, chaque vague ensuite
+    private boolean isCannonWave(int wave) {
         long elapsedS = siblingGameManager() != null
             ? siblingGameManager().getElapsedSeconds() : 0;
-        int cannonEvery = elapsedS >= 25 * 60 ? 1 : (elapsedS >= 15 * 60 ? 2 : 3);
-        if (wave % cannonEvery == 0 && i == MINIONS_PER_WAVE / 2) {
-            return MinionType.CANNON;
-        }
-        return (i < MINIONS_PER_WAVE / 2) ? MinionType.MELEE : MinionType.CASTER;
+        int cannonEvery = elapsedS >= 25 * 60 ? 1 : (elapsedS >= 14 * 60 ? 2 : 3);
+        return wave % cannonEvery == 0;
     }
 
     private void spawnMinion(Team team, String lane, Location loc, MinionType type) {
@@ -213,11 +273,6 @@ public class MinionManager {
             z.setShouldBurnInDay(false);
             // Empêcher le zombie de cibler les joueurs tout seul (IA vanilla)
             z.setTarget(null);
-            // toujours < 1024 (plafond Paper 26.1.2), pas besoin de clamp
-            double baseHp = (type == MinionType.CASTER) ? CASTER_HP : MINION_HP;
-            var maxHpAttr = z.getAttribute(Compat.maxHealth());
-            if (maxHpAttr != null) maxHpAttr.setBaseValue(baseHp);
-            z.setHealth(baseHp);
             var msAttr = z.getAttribute(Compat.movementSpeed());
             if (msAttr != null) msAttr.setBaseValue(MINION_SPEED);
             // Tag PDC
@@ -234,22 +289,9 @@ public class MinionManager {
             eq.setBoots(null);
         });
         applyMinionModel(minion, type, team, type == MinionType.CASTER ? 0.7f : (type == MinionType.CANNON ? 1.0f : 0.8f));
-        // Barre de vie APRÈS makeInvisible (forcer visible=true car Paper cache le name sur les entités invisibles)
-        double initHp = switch (type) {
-            case CANNON -> 100.0 + waveCount * 3;
-            case SUPER  -> 1500.0;
-            default     -> type == MinionType.MELEE ? 60.0 + waveCount * 2 : 40.0 + waveCount;
-        };
-        String label = team == Team.BLUE ? "🔵 Sbire" : "🔴 Sbire";
-        fr.lolmc.util.HealthBar.apply(minion, initHp, initHp, label);
-        minion.setCustomNameVisible(true); // forcer après makeInvisible
-            // HP du cannon plus élevé
-            if (type == MinionType.CANNON) {
-                var hpAttr = minion.getAttribute(fr.lolmc.util.Compat.maxHealth());
-                double safeCannonHp = 1024.0; // CANNON_HP (1257) depasse le plafond Paper 26.1.2, plafonne directement
-                if (hpAttr != null) { hpAttr.setBaseValue(safeCannonHp); minion.setHealth(safeCannonHp); }
-                fr.lolmc.util.VirtualHP.init(minion, CANNON_HP);
-            }
+        // Stats + barre de vie APRÈS makeInvisible (forcer visible=true car Paper cache le name
+        // sur les entités invisibles). Avant, la barre affichait 60 PV pour un sbire qui en avait 477.
+        applyStats(minion, type, team == Team.BLUE ? "🔵 Sbire" : "🔴 Sbire");
     }
 
     /** Rend le sbire invisible et lui pose un modèle custom anime (façon jungle). */
@@ -270,10 +312,6 @@ public class MinionManager {
             h.setAdult(); // SÉCURITÉ : On s'assure également qu'il s'agit d'un adulte via l'API moderne
             h.setShouldBurnInDay(false);
             h.setCustomNameVisible(true);
-            double superHp = 1000.0; // cap Paper 26.1.2 = 1024 ; MINION_HP*3 (1431) le depasserait donc plafonne directement
-            var maxHpAttr = h.getAttribute(Compat.maxHealth());
-            if (maxHpAttr != null) maxHpAttr.setBaseValue(superHp);
-            h.setHealth(superHp);
             var msAttr = h.getAttribute(Compat.movementSpeed());
             if (msAttr != null) msAttr.setBaseValue(MINION_SPEED);
             h.getPersistentDataContainer().set(KEY_MINION, PersistentDataType.BYTE, (byte) 1);
@@ -285,9 +323,7 @@ public class MinionManager {
                             : net.kyori.adventure.text.format.NamedTextColor.RED));
         });
         applyMinionModel(superMinion, MinionType.SUPER, team, 1.0f);
-        fr.lolmc.util.HealthBar.apply(superMinion, 1000.0,
-            1000.0, team == Team.BLUE ? "🔵 Super-Sbire" : "🔴 Super-Sbire");
-        superMinion.setCustomNameVisible(true);
+        applyStats(superMinion, MinionType.SUPER, team == Team.BLUE ? "🔵 Super-Sbire" : "🔴 Super-Sbire");
     }
 
     // ── Déplacement ───────────────────────────────────────────────
@@ -383,8 +419,8 @@ public class MinionManager {
 
     // Portée d'attaque d'un sbire sur une tourelle (blocs)
     private static final double MINION_TURRET_RANGE = 6.0;
-    // Dégâts d'un sbire à une tourelle par coup (LoL: mêlée ~12, caster ~23 environ)
-    private static final double MINION_DAMAGE_TO_TURRET = 14.0;
+    // Contre les champions et les structures, les sbires infligent 60 % de leurs dégâts (LoL)
+    public static final double MINION_DAMAGE_VS_CHAMPIONS_STRUCTURES = 0.60;
     // Cadence d'attaque sur les tourelles (cooldown en ms par sbire)
     private final Map<java.util.UUID, Long> lastTurretHit = new HashMap<>();
     private static final long TURRET_HIT_COOLDOWN = 1000L; // 1 coup/seconde
@@ -422,7 +458,9 @@ public class MinionManager {
             fr.lolmc.util.VisualEffectUtil.impact(target.getWorld(),
                     target.clone().add(0.5, 1, 0.5), Material.WHITE_STAINED_GLASS, 0.26f, 3L);
             boolean wasDestroyed = structure.isDestroyed();
-            boolean phaseChanged = structure.takeDamage(MINION_DAMAGE_TO_TURRET);
+            // Une frappe par seconde : AD × vitesse d'attaque × 60 %
+            boolean phaseChanged = structure.takeDamage(fr.lolmc.util.MobCombat.getAD(minion)
+                    * fr.lolmc.util.MobCombat.getAttackSpeed(minion) * MINION_DAMAGE_VS_CHAMPIONS_STRUCTURES);
             if (phaseChanged) {
                 siblingMapManager().updateStructurePhase(structure);
             }
@@ -633,11 +671,15 @@ public class MinionManager {
 
 
     /** Retourne le type de sbire ("melee", "caster", "cannon", "super") ou null si inconnu. */
+    /**
+     * Type du sbire : "melee", "caster", "cannon" ou "super". Avant, renvoyait la LANE
+     * (top/mid/bot) : tous les sbires étaient traités comme des mêlées (or, XP, dégâts).
+     */
     public static String getMinionTypeTag(org.bukkit.entity.LivingEntity e) {
         if (!isMinion(e)) return null;
-        var pdc = e.getPersistentDataContainer();
-        return pdc.has(KEY_LANE, org.bukkit.persistence.PersistentDataType.STRING)
-            ? pdc.get(KEY_LANE, org.bukkit.persistence.PersistentDataType.STRING) : "melee";
+        String t = KEY_TYPE != null
+                ? e.getPersistentDataContainer().get(KEY_TYPE, org.bukkit.persistence.PersistentDataType.STRING) : null;
+        return t != null ? t : "melee";
     }
 
 
@@ -658,8 +700,9 @@ public class MinionManager {
         var pdc = e.getPersistentDataContainer();
         pdc.set(KEY_MINION, org.bukkit.persistence.PersistentDataType.BYTE, (byte)1);
         pdc.set(KEY_TEAM,   org.bukkit.persistence.PersistentDataType.STRING, team.name());
-        pdc.set(KEY_LANE,   org.bukkit.persistence.PersistentDataType.STRING, typeStr.toLowerCase());
+        pdc.set(KEY_LANE,   org.bukkit.persistence.PersistentDataType.STRING, "mid");
         applyMinionModel(e, type, team, type == MinionType.CASTER ? 0.7f : 1.0f);
+        applyStats(e, type, team == Team.BLUE ? "🔵 Sbire" : "🔴 Sbire");
     }
 
     /** Force le spawn immédiat d'une vague (admin /lol wave). */

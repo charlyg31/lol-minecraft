@@ -222,24 +222,14 @@ public final class TargetingUtil {
                 case TRUE -> DamageUtil.Type.TRUE;
             };
             DamageUtil.damage(caster, victim, amount, true, dt);
-        } else if (VirtualHP.has(target)) {
-            // Entité à HP virtuels (Baron, Elder, canon...) : dégâts virtuels
-            VirtualHP.damage(target, amount, caster);
-            VisualEffectUtil.impact(target.getWorld(),
-                    target.getLocation().add(0, 1, 0), Material.WHITE_STAINED_GLASS, 0.28f, 4L);
         } else {
-            // Sbire ou monstre : dégât direct (pas de système de résistance LoL)
-            if (MinionManager.isMinion(target)) {
-                var cm2 = LolPlugin.getInstance().getChampionManager();
-                if (cm2.hasChampion(caster)) {
-                    amount *= 1.0 + cm2.getChampion(caster).getStats().getMinionDamageBonus();
-                }
-            }
-            double newHealth = Math.max(0, target.getHealth() - amount);
-            if (newHealth <= 0) { VirtualHP.kill(target, caster); return; }
-            target.setHealth(newHealth);
-            double maxHp = Compat.maxHealthOf(target);
-            HealthBar.update(target, newHealth, maxHp);
+            // Sbire ou monstre : armure/RM, bonus anti-sbires et PV virtuels
+            DamageUtil.Type dt = switch (type) {
+                case PHYSICAL -> DamageUtil.Type.PHYSICAL;
+                case MAGICAL -> DamageUtil.Type.MAGICAL;
+                case TRUE -> DamageUtil.Type.TRUE;
+            };
+            if (MobCombat.damage(caster, target, amount, dt)) return;
             VisualEffectUtil.impact(target.getWorld(),
                     target.getLocation().add(0, 1, 0), Material.WHITE_STAINED_GLASS, 0.28f, 4L);
         }

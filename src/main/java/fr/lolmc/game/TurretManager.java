@@ -234,8 +234,16 @@ public class TurretManager {
 
     private void fireAtMinion(GameStructure turret, Location beamFrom, LivingEntity minion) {
         shootBeam(beamFrom, minion.getLocation().add(0, 0.5, 0));
-        // Les sbires meurent en ~1-2 coups de tourelle
-        minion.damage(baseDamage);
+        // Un tir retire un % des PV max selon le type (wiki LoL) : mêlée 3 tirs, caster 2,
+        // canon 8, super-sbire 20
+        double pct = switch (String.valueOf(fr.lolmc.game.MinionManager.getMinionTypeTag(minion))) {
+            case "caster" -> 0.70;
+            case "cannon" -> 0.14;
+            case "super"  -> 0.05;
+            default       -> 0.45;
+        };
+        fr.lolmc.util.MobCombat.damage(null, minion,
+                fr.lolmc.util.VirtualHP.getMax(minion) * pct, fr.lolmc.util.DamageUtil.Type.TRUE);
     }
 
     private void shootBeam(Location from, Location to) {

@@ -21,7 +21,7 @@ import java.util.Map;
  *
  * Quand une équipe complète les 3 feats, elle obtient un avantage global :
  *   • +150 or à chaque membre
- *   • +300 PV max temporaires (2 minutes) → Atakhan buff (simplifié)
+ *   • +300 PV max temporaires (2 minutes)
  *   • Annonce globale
  *
  * Si les deux équipes ont chacune ≥1 feat, aucune ne peut déclencher
@@ -78,7 +78,7 @@ public class FeatManager {
         return fr.lolmc.util.WorldContext.getGamePlayers();
     }
 
-    /** Vérifie si une équipe a remporté les 3 feats → bonus Atakhan. */
+    /** Vérifie si une équipe a remporté les 3 feats → bonus d'équipe. */
     private void checkAllFeats(Team team, org.bukkit.World world) {
         if (bonusGranted) return;
         long teamFeats = claimed.values().stream().filter(t -> t == team).count();

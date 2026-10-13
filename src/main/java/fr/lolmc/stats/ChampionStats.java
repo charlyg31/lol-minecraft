@@ -208,6 +208,16 @@ public final class ChampionStats {
         return 2.0 - 100.0 / (100.0 - resist); // formule LoL pour résistance négative
     }
 
+    /** Dégâts physiques contre une armure donnée (sbire/monstre), pénétration comprise. */
+    public double calcPhysicalDamageVs(double rawDamage, double armor) {
+        return rawDamage * resistMultiplier(effectiveArmor(armor));
+    }
+
+    /** Dégâts magiques contre une résistance magique donnée (sbire/monstre), pénétration comprise. */
+    public double calcMagicalDamageVs(double rawDamage, double mr) {
+        return rawDamage * resistMultiplier(effectiveMR(mr));
+    }
+
     public double calcPhysicalDamage(double rawDamage, ChampionStats target) {
         if (target == null) return rawDamage;
         double armor = effectiveArmor(target.getFinalArmor());

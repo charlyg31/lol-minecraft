@@ -31,13 +31,11 @@ public class DamageUtil {
         if (victim instanceof Player p) {
             damage(attacker, p, rawAmount, isAbility, type);
         } else {
-            // Sbire ou monstre : dégât direct sur les PV (PAS de victim.damage() -> évite StackOverflow)
-            double newHealth = Math.max(0, victim.getHealth() - rawAmount);
+            // Sbire ou monstre : résistances + PV virtuels (PAS de victim.damage() -> évite StackOverflow)
             fr.lolmc.util.VisualEffectUtil.impact(victim.getWorld(),
                     victim.getLocation().add(0, 1, 0), Material.WHITE_STAINED_GLASS, 0.26f, 4L);
             // Mort attribuée à l'attaquant (or/XP gérés par EntityDeathListener)
-            if (newHealth <= 0) fr.lolmc.util.VirtualHP.kill(victim, attacker);
-            else victim.setHealth(newHealth);
+            MobCombat.damage(attacker, victim, rawAmount, type);
         }
     }
 
@@ -145,8 +143,12 @@ public class DamageUtil {
 
         // 1. Résistance (armure/MR avec pénétration de l'attaquant)
         double afterResist;
-        if (type == Type.TRUE || as == null) {
+        if (type == Type.TRUE) {
             afterResist = rawAmount;
+        } else if (as == null) {
+            // Sbire, monstre, tourelle… : la résistance de la victime s'applique aussi (LoL)
+            afterResist = rawAmount * MobCombat.resistMultiplier(
+                    type == Type.MAGICAL ? vs.getFinalMagicResist() : vs.getFinalArmor());
         } else if (type == Type.MAGICAL) {
             afterResist = as.calcMagicalDamage(rawAmount, vs);
         } else {
@@ -204,12 +206,8 @@ public class DamageUtil {
         // Dragon Elder : exécution si la cible tombe sous 20% HP
         if (attacker != null) {
             // Buff du Dragon Ancestral (avant : potion Force, donnée aussi par Ashe Q, Yi E, Janna E)
-            if (fr.lolmc.game.JungleManager.hasElderBuff(attacker)
-                    && vc.getHPSystem().getHPRatio() < 0.20) {
-                // +vrai dégâts supplémentaires proportionnels aux HP manquants
-                double elderDmg = vc.getHPSystem().getMaxHP() * 0.10;
-                vc.getHPSystem().takeDamage(elderDmg);
-            }
+            if (fr.lolmc.game.JungleManager.hasElderBuff(attacker) && type != Type.TRUE)
+                elderEffects(attacker, victim);
         }
         // Révéler la victime si elle est dans un bush (combat = visible)
         var bushMgr = LolPlugin.getInstance().getBushManager();
@@ -257,6 +255,45 @@ public class DamageUtil {
         // 7. Vérifier la mort
         if (vc.getHPSystem().isDead() && hud != null) {
             hud.triggerDeath(victim, attacker);
+        }
+    }
+
+    // ── Aspect du Dragon (Dragon Ancien, wiki LoL) ──
+    private static final java.util.Map<java.util.UUID, Long> elderBurnUntil = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final java.util.Set<java.util.UUID> elderExecutePending = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    /**
+     * Brûlure : 75 vrais dégâts sur 3 s jusqu'à 25:00, +15 toutes les 2 min (225 à 45:00).
+     * Exécution : une cible sous 20 % des PV max meurt 0,5 s plus tard (avant : immédiat et
+     * seulement +10 % des PV max).
+     */
+    private static void elderEffects(Player attacker, Player victim) {
+        var cm = LolPlugin.getInstance().getChampionManager();
+        var plugin = LolPlugin.getInstance();
+        java.util.UUID vid = victim.getUniqueId();
+        long now = System.currentTimeMillis();
+        Long until = elderBurnUntil.get(vid);
+        if (until == null || now >= until) {
+            elderBurnUntil.put(vid, now + 3000L);
+            long mins = fr.lolmc.instance.InstanceHelper.gameManager(attacker).getElapsedSeconds() / 60;
+            double total = Math.min(225, 75 + 15 * Math.max(0, (mins - 25) / 2));
+            for (int i = 0; i < 3; i++) {
+                org.bukkit.Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                    if (victim.isOnline() && cm.hasChampion(victim)
+                            && victim.getGameMode() != org.bukkit.GameMode.SPECTATOR)
+                        damage(attacker.isOnline() ? attacker : null, victim, total / 3, true, Type.TRUE);
+                }, 5L + i * 20L);
+            }
+        }
+        if (cm.getChampion(victim).getHPSystem().getHPRatio() < 0.20 && elderExecutePending.add(vid)) {
+            org.bukkit.Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                elderExecutePending.remove(vid);
+                if (!victim.isOnline() || !cm.hasChampion(victim)
+                        || victim.getGameMode() == org.bukkit.GameMode.SPECTATOR) return;
+                var hp = cm.getChampion(victim).getHPSystem();
+                if (hp.getHPRatio() < 0.20)
+                    damage(attacker.isOnline() ? attacker : null, victim, hp.getMaxHP(), true, Type.TRUE);
+            }, 10L);
         }
     }
 

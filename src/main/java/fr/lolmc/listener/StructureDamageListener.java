@@ -100,8 +100,8 @@ public class StructureDamageListener implements Listener {
         // Plaques
         var tm = fr.lolmc.instance.InstanceHelper.turretManager(player);
         String structKey = structure.getType().name() + "_" + structure.getTeam() + "_" + structure.getLane();
-        boolean plated = structure.getType() == Type.TURRET && structure.getIndex() == 1
-                && tm.hasPlating(structKey);
+        boolean plated = structure.getType() == Type.TURRET
+                && structure.getTier() == GameStructure.TurretTier.OUTER && tm.hasPlating(structKey);
         if (plated) damage *= 0.60;
 
         boolean phaseChanged = structure.takeDamage(damage);
@@ -178,8 +178,8 @@ public class StructureDamageListener implements Listener {
         // Turret Plating : -40% degats si plaques actives + or de plaque au frappeur
         var tm = fr.lolmc.instance.InstanceHelper.turretManager(player);
         String structKey = structure.getType().name() + "_" + structure.getTeam() + "_" + structure.getLane();
-        boolean plated = structure.getType() == Type.TURRET && structure.getIndex() == 1
-                && tm.hasPlating(structKey);
+        boolean plated = structure.getType() == Type.TURRET
+                && structure.getTier() == GameStructure.TurretTier.OUTER && tm.hasPlating(structKey);
         if (plated) damage *= 0.60;
 
         boolean phaseChanged = structure.takeDamage(damage);
@@ -217,7 +217,7 @@ public class StructureDamageListener implements Listener {
         }
         if (ref == null) return;
         if (structure.getType() == Type.TURRET) {
-            fr.lolmc.instance.InstanceHelper.rewardManager(ref).onTurretDestroyed(null, attacking, structure.getIndex());
+            fr.lolmc.instance.InstanceHelper.rewardManager(ref).onTurretDestroyed(null, attacking, structure);
             fr.lolmc.instance.InstanceHelper.featManager(ref).claim(
                 fr.lolmc.game.FeatManager.Feat.FIRST_TOWER, attacking, ref);
         } else if (structure.getType() == Type.INHIBITOR) {
@@ -246,7 +246,7 @@ public class StructureDamageListener implements Listener {
         var rewards = fr.lolmc.instance.InstanceHelper.rewardManager(player);
         while (tm.hasPlating(structKey) && tm.getPlatingLeft(structKey) > shouldRemain) {
             tm.tickPlating(structKey);
-            rewards.onPlateDestroyed(player, tm.getPlatingLeft(structKey));
+            rewards.onPlateDestroyed(player, structure, tm.getPlatingLeft(structKey));
         }
     }
 
@@ -257,8 +257,7 @@ public class StructureDamageListener implements Listener {
 
         // Inhibiteur détruit → super-sbires sur cette lane pour l'équipe adverse
         if (structure.getType() == Type.TURRET) {
-            int turretIndex = structure.getIndex(); // 1=T1, 2=T2, 3=T3
-            fr.lolmc.instance.InstanceHelper.rewardManager(destroyer).onTurretDestroyed(destroyer, playerTeam, turretIndex);
+            fr.lolmc.instance.InstanceHelper.rewardManager(destroyer).onTurretDestroyed(destroyer, playerTeam, structure);
             fr.lolmc.instance.InstanceHelper.featManager(destroyer).claim(
                 fr.lolmc.game.FeatManager.Feat.FIRST_TOWER, playerTeam, destroyer);
         } else if (structure.getType() == Type.INHIBITOR) {

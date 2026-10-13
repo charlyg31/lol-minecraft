@@ -121,27 +121,27 @@ public class JungleManager {
     public enum MonsterType {
         // ── Camps neutres (certains en groupes) ──
         // Format: entity, maxHP, gold, xp, respawnSec, buff, groupCount, displayName
-        GROMP        (EntityType.SLIME,        2050,  80,  60, 135, "none", 1, "🐸 Gromp"),
-        MURKWOLF     (EntityType.WOLF,         1300,  85,  55, 135, "none", 3, "🐺 Loups"),       // 1 gros + 2 petits
-        RAPTOR       (EntityType.VEX,          1000,  75,  50, 135, "none", 6, "🦅 Raptors"),     // 1 gros + 5 petits
-        KRUG         (EntityType.SILVERFISH,   1400,  70,  45, 135, "none", 2, "🪨 Krugs"),       // 1 gros + 1 petit (se divise)
+        // (PV/or/XP réels : statsFor(), selon le niveau moyen des champions ; ici le niveau 1)
+        GROMP        (EntityType.SLIME,        2050,  80, 120, 135, "none", 1, "🐸 Gromp"),
+        MURKWOLF     (EntityType.WOLF,         1600,  55,  50, 135, "none", 3, "🐺 Loups"),       // 1 grand + 2 petits
+        RAPTOR       (EntityType.VEX,          1200,  35,  20, 135, "none", 6, "🦅 Raptors"),     // 1 grand + 5 petits
+        KRUG         (EntityType.SILVERFISH,   1350,  15,  15, 135, "none", 2, "🪨 Krugs"),       // Ancien + Krug (se divisent)
         // ── Buffs ──
-        RED_BUFF     (EntityType.MAGMA_CUBE,   2100,  90, 90, 300, "red",  1, "🔴 Sanglepince"),
-        BLUE_BUFF    (EntityType.IRON_GOLEM,   2100,  90, 90, 300, "blue", 1, "🔵 Sentinelle bleue"),
+        RED_BUFF     (EntityType.MAGMA_CUBE,   2300,  90, 95, 300, "red",  1, "🔴 Sanglepince"),
+        BLUE_BUFF    (EntityType.IRON_GOLEM,   2300,  90, 95, 300, "blue", 1, "🔵 Sentinelle bleue"),
         // ── Crabe (rivière) ──
-        SCUTTLE_CRAB (EntityType.TURTLE,       1216,  55,  75,  150,"none", 1, "🦀 Crabe Pillargot"),
+        SCUTTLE_CRAB (EntityType.TURTLE,       1550,  55, 100,  150,"none", 1, "🦀 Crabe Pillargot"),
         // ── Dragons élémentaires (un seul à la fois sur la carte dans LoL) ──
-        DRAGON_INFERNAL (EntityType.RAVAGER,   3500,  25, 150, 300, "drake_infernal", 1, "🔥 Dragon Infernal"),
-        DRAGON_OCEAN    (EntityType.RAVAGER,   3500,  25, 150, 300, "drake_ocean",    1, "🌊 Dragon Océan"),
-        DRAGON_MOUNTAIN (EntityType.RAVAGER,   3500,  25, 150, 300, "drake_mountain", 1, "⛰ Dragon Montagne"),
-        DRAGON_CLOUD    (EntityType.RAVAGER,   3500,  25, 150, 300, "drake_cloud",    1, "☁ Dragon Foudre"),
-        DRAGON_CHEMTECH (EntityType.RAVAGER,   3500,  25, 150, 300, "drake_chemtech", 1, "☣ Dragon Chimtech"),
-        DRAGON_ELDER    (EntityType.RAVAGER,   6400,  25, 250, 360, "drake_elder",    1, "🐲 Dragon Ancien"),
+        DRAGON_INFERNAL (EntityType.RAVAGER,   5106,  75, 160, 300, "drake_infernal", 1, "🔥 Dragon Infernal"),
+        DRAGON_OCEAN    (EntityType.RAVAGER,   5106,  75, 160, 300, "drake_ocean",    1, "🌊 Dragon Océan"),
+        DRAGON_MOUNTAIN (EntityType.RAVAGER,   5106,  75, 160, 300, "drake_mountain", 1, "⛰ Dragon Montagne"),
+        DRAGON_CLOUD    (EntityType.RAVAGER,   5106,  75, 160, 300, "drake_cloud",    1, "☁ Dragon Foudre"),
+        DRAGON_CHEMTECH (EntityType.RAVAGER,   5106,  75, 160, 300, "drake_chemtech", 1, "☣ Dragon Chimtech"),
+        DRAGON_ELDER    (EntityType.RAVAGER,  17796, 150, 650, 360, "drake_elder",    1, "🐲 Dragon Ancien"),
         // ── Épiques de la fosse ──
-        VOIDGRUB     (EntityType.SILVERFISH,    550,  50, 20,  0, "voidgrub", 3, "🐛 Nuée du Néant"),
-        ATAKHAN      (EntityType.WARDEN,       12000, 250, 35,  0, "atakhan",  1, "🌺 Atakhan"),
-        HERALD       (EntityType.RAVAGER,      7125, 200, 25,  0,  "none", 1, "👁 Héraut de la Faille"),
-        BARON        (EntityType.WARDEN,       9000, 300, 30, 360, "baron",1, "🪱 Baron Nashor");
+        VOIDGRUB     (EntityType.SILVERFISH,   2269,  30, 65,  0, "voidgrub", 3, "🐛 Nuée du Néant"),
+        HERALD       (EntityType.RAVAGER,     11718, 100, 240,  0,  "none", 1, "👁 Héraut de la Faille"),
+        BARON        (EntityType.WARDEN,      17792, 150, 650, 360, "baron",1, "🪱 Baron Nashor");
 
         public final EntityType entity;
         public final double maxHP;
@@ -164,8 +164,100 @@ public class JungleManager {
         }
 
         public boolean isEpic() {
-            return isDragon() || this == HERALD || this == BARON || this == ATAKHAN;
+            return isDragon() || this == HERALD || this == BARON;
         }
+    }
+
+    /** Taille d'un monstre dans son camp (grand, Krug moyen, petit). */
+    public enum Size { LARGE, MEDIUM, SMALL }
+
+    /**
+     * Statistiques LoL d'un monstre (wiki, patch 26.01) : chaque paire va du niveau de départ au
+     * niveau 18 (niveau = moyenne des champions de la partie, interpolation linéaire, le wiki ne
+     * donnant que les bornes).
+     */
+    private record MStats(double hp0, double hp1, double ad0, double ad1, double ar0, double ar1,
+                          double mr0, double mr1, double gold0, double gold1, double xp0, double xp1,
+                          int startLevel) {}
+
+    private static MStats flat(double hp0, double hp1, double ad0, double ad1, double res,
+                               double gold, double xp0, double xp1) {
+        return new MStats(hp0, hp1, ad0, ad1, res, res, res, res, gold, gold, xp0, xp1, 1);
+    }
+
+    private static MStats statsFor(MonsterType t, Size size) {
+        return switch (t) {
+            case GROMP -> flat(2050, 4817.5, 70, 210, 42, 80, 120, 180);
+            case MURKWOLF -> size == Size.LARGE ? flat(1600, 3760, 30, 90, 42, 55, 50, 75)
+                                                : flat(630, 1480.5, 10, 30, 20, 15, 15, 22.5);
+            case RAPTOR -> size == Size.LARGE ? flat(1200, 2820, 17, 51, 42, 35, 20, 30)
+                                              : flat(500, 1175, 7, 21, 20, 8, 10, 15);
+            case KRUG -> switch (size) {
+                case LARGE  -> flat(1350, 3172.5, 57, 171, 42, 15, 15, 22.5); // Ancien Krug
+                case MEDIUM -> flat(650, 1527.5, 20, 60, 20, 10, 10, 15);     // Krug
+                case SMALL  -> flat(60, 141, 13, 39, 20, 14, 16, 24);         // Mini Krug
+            };
+            case RED_BUFF, BLUE_BUFF -> flat(2300, 6210, 66, 198, 42, 90, 95, 142.5);
+            case SCUTTLE_CRAB -> new MStats(1550, 5270, 0, 0, 42, 42, 42, 42, 55, 121, 100, 150, 1);
+            case DRAGON_INFERNAL, DRAGON_OCEAN, DRAGON_MOUNTAIN, DRAGON_CLOUD, DRAGON_CHEMTECH ->
+                    new MStats(5106.25, 10000, 70, 70, 65.6, 170, 47.8, 100, 75, 75, 160, 400, 1);
+            case DRAGON_ELDER -> new MStats(17796.25, 21275, 105, 105, 121.6, 170, 75.8, 100, 150, 150, 650, 650, 13);
+            case VOIDGRUB -> new MStats(2269, 4700, 21.69, 46, 72.76, 170, 51.38, 100, 30, 30, 65, 65, 7);
+            case HERALD -> new MStats(11718, 18900, 99.5, 250, 87.92, 170, 58.96, 100, 100, 100, 240, 240, 1);
+            case BARON -> new MStats(17791.75, 19190, 350.5, 515, 104.2, 170, 67.1, 100, 150, 150, 650, 650, 1);
+        };
+    }
+
+    /** Vitesse d'attaque LoL du monstre (wiki). */
+    private static double attackSpeedFor(MonsterType t, Size size) {
+        return switch (t) {
+            case GROMP -> 0.425;
+            case MURKWOLF -> 0.625;
+            case RAPTOR -> size == Size.LARGE ? 0.667 : 1.0;
+            case KRUG -> 0.613;
+            case RED_BUFF, BLUE_BUFF -> 0.493;
+            case DRAGON_INFERNAL, DRAGON_OCEAN, DRAGON_MOUNTAIN, DRAGON_CLOUD, DRAGON_CHEMTECH, DRAGON_ELDER -> 0.5;
+            case VOIDGRUB -> 0.5;
+            case HERALD -> 0.4;
+            case BARON -> 0.625;
+            case SCUTTLE_CRAB -> 1.0;
+        };
+    }
+
+    /** Fin du buff du Dragon Ancien (il est perdu à la mort, LoL). */
+    public static void clearElderBuff(UUID player) { elderUntil.remove(player); }
+
+    /** Niveau moyen des champions de la partie (niveau des monstres, LoL). */
+    private double averageChampionLevel() {
+        var cm = LolPlugin.getInstance().getChampionManager();
+        double sum = 0; int n = 0;
+        for (Player p : gameInstance != null ? gameInstance.getOnlinePlayers()
+                                             : fr.lolmc.util.WorldContext.getGamePlayers()) {
+            if (!cm.hasChampion(p)) continue;
+            sum += cm.getChampion(p).getLevelSystem().getLevel();
+            n++;
+        }
+        return n > 0 ? sum / n : 1;
+    }
+
+    /**
+     * Applique les stats LoL à un monstre : PV virtuels, AD, armure, RM, or et XP (lus à sa mort).
+     * {@code levelOffset} : -1 pour les mini-krugs (un niveau sous le monstre qui se divise).
+     */
+    private void applyMonsterStats(LivingEntity mob, MonsterType type, Size size, int levelOffset, boolean firstScuttle) {
+        MStats st = statsFor(type, size);
+        double lvl = Math.max(1, averageChampionLevel() + levelOffset);
+        double f = Math.max(0, Math.min(1, (lvl - st.startLevel()) / (18.0 - st.startLevel())));
+        double hp   = st.hp0()   + (st.hp1()   - st.hp0())   * f;
+        double ad   = st.ad0()   + (st.ad1()   - st.ad0())   * f;
+        double ar   = st.ar0()   + (st.ar1()   - st.ar0())   * f;
+        double mr   = st.mr0()   + (st.mr1()   - st.mr0())   * f;
+        double gold = st.gold0() + (st.gold1() - st.gold0()) * f;
+        double xp   = st.xp0()   + (st.xp1()   - st.xp0())   * f;
+        if (firstScuttle) { hp *= 0.65; xp *= 0.20; } // premier crabe : -35 % PV, -80 % XP (wiki)
+        fr.lolmc.util.VirtualHP.init(mob, hp);
+        fr.lolmc.util.MobCombat.setStats(mob, ad, attackSpeedFor(type, size), ar, mr, (int) Math.round(gold), xp);
+        mob.getPersistentDataContainer().set(KEY_GOLD, PersistentDataType.INTEGER, (int) Math.round(gold));
     }
 
     /** Un emplacement de camp configuré. */
@@ -176,6 +268,7 @@ public class JungleManager {
         public final Set<UUID> liveEntities = new HashSet<>();  // toutes les entités du camp
         public long respawnAt = 0;        // timestamp de réapparition
         public UUID respawnHologramId = null; // TextDisplay du compte à rebours
+        public int spawnCount = 0;            // nombre d'apparitions (premier crabe affaibli)
 
         public CampSpawn(String id, MonsterType type, Location location) {
             this.id = id; this.type = type; this.location = location;
@@ -265,17 +358,17 @@ public class JungleManager {
     private final List<org.bukkit.scheduler.BukkitTask> initialSpawnTasks
         = new ArrayList<>();
 
-    /** Délai de PREMIER spawn en secondes, fidèle LoL S15. */
+    /** Délai de PREMIER spawn en secondes (wiki LoL, patch 26.01). */
     private static int initialSpawnDelay(MonsterType type) {
         return switch (type) {
-            case SCUTTLE_CRAB -> 210;   // 3:30
+            case SCUTTLE_CRAB -> 175;   // 2:55
             case DRAGON_INFERNAL, DRAGON_OCEAN, DRAGON_MOUNTAIN,
                  DRAGON_CLOUD, DRAGON_CHEMTECH, DRAGON_ELDER -> 300; // 5:00
-            case VOIDGRUB     -> 360;   // 6:00
-            case HERALD       -> 960;   // 16:00
-            case ATAKHAN      -> 1200;  // 20:00
-            case BARON        -> 1500;  // 25:00
-            default           -> 90;    // camps + buffs : 1:30
+            case VOIDGRUB     -> 480;   // 8:00
+            case HERALD       -> 900;   // 15:00
+            case BARON        -> 1200;  // 20:00
+            case GROMP, KRUG  -> 67;    // 1:07
+            default           -> 55;    // loups, raptors, buffs : 0:55
         };
     }
 
@@ -320,6 +413,8 @@ public class JungleManager {
         if (loc.getWorld() == null) return;
 
         camp.liveEntities.clear();
+        boolean firstScuttle = type == MonsterType.SCUTTLE_CRAB && camp.spawnCount == 0;
+        camp.spawnCount++;
 
         // Spawn de tous les mobs du groupe (groupCount)
         for (int i = 0; i < type.groupCount; i++) {
@@ -331,24 +426,20 @@ public class JungleManager {
             Entity entity = spawnLoc.getWorld().spawnEntity(spawnLoc, type.entity);
             if (!(entity instanceof LivingEntity mob)) { entity.remove(); continue; }
 
-            // Le premier mob du groupe est le "gros" (plus de HP), les autres sont des petits
+            // Le premier mob du groupe est le grand ; les autres sont petits (le 2e Krug est moyen)
             boolean isLarge = (i == 0);
-            double hp = isLarge ? type.maxHP : type.maxHP * 0.35;
-            int gold = isLarge ? type.gold : Math.max(5, type.gold / 4);
-
-            var hpAttr = mob.getAttribute(Compat.maxHealth());
-            if (hpAttr != null) { hpAttr.setBaseValue(Math.min(hp, 1024.0)); mob.setHealth(Math.min(hp, 1024.0)); }
-            // HP virtuels au-delà de la limite Minecraft (Baron 8500, Atakhan 9000...)
-            if (hp > 1024.0) fr.lolmc.util.VirtualHP.init(mob, hp);
+            Size size = isLarge ? Size.LARGE : (type == MonsterType.KRUG ? Size.MEDIUM : Size.SMALL);
+            // Stats LoL (avant : petits = 35 % des PV du grand, et l'or/XP du grand à leur mort)
+            applyMonsterStats(mob, type, size, 0, firstScuttle);
 
             String name = type.groupCount > 1
                     ? type.displayName + (isLarge ? " (Grand)" : " (Petit)")
                     : type.displayName;
             mob.customName(Component.text(name));
             mob.setCustomNameVisible(true);
-            if (type == MonsterType.KRUG && isLarge)
+            if (type == MonsterType.KRUG)
                 mob.getPersistentDataContainer().set(
-                    new NamespacedKey(LolPlugin.getInstance(), "krug_large"),
+                    new NamespacedKey(LolPlugin.getInstance(), isLarge ? "krug_large" : "krug_medium"),
                     PersistentDataType.BYTE, (byte) 1);
             mob.setRemoveWhenFarAway(false);
             // Monstre passif : ne poursuit pas, reste à son camp (réveillé quand attaqué)
@@ -372,8 +463,6 @@ public class JungleManager {
 
             mob.getPersistentDataContainer().set(KEY_MONSTER, PersistentDataType.STRING, type.name());
             mob.getPersistentDataContainer().set(KEY_BUFF, PersistentDataType.STRING, type.buff);
-            // Stocker l'or individuel du mob
-            mob.getPersistentDataContainer().set(KEY_GOLD, PersistentDataType.INTEGER, gold);
 
             // ── APPARENCE CUSTOM : modèle composite + mob de base invisible ──
             // Le mob vanilla devient invisible : on ne voit que le modèle (technique datapack).
@@ -395,22 +484,19 @@ public class JungleManager {
         }
     }
 
-    /** Petit Krug issu de la division du grand (35% HP, or/4). */
+    /** Mini-krug issu de la division d'un Krug (un niveau sous lui, wiki). */
     private void spawnKrugMini(CampSpawn camp, Location loc) {
         MonsterType type = MonsterType.KRUG;
         Entity entity = loc.getWorld().spawnEntity(loc, type.entity);
         if (!(entity instanceof LivingEntity mob)) { entity.remove(); return; }
-        double hp = type.maxHP * 0.35;
-        var hpAttr = mob.getAttribute(Compat.maxHealth());
-        if (hpAttr != null) { hpAttr.setBaseValue(hp); mob.setHealth(hp); }
-        mob.customName(Component.text(type.displayName + " (Petit)"));
+        mob.customName(Component.text(type.displayName + " (Mini)"));
         mob.setCustomNameVisible(true);
         mob.setRemoveWhenFarAway(false);
         if (mob instanceof Mob mo) { mo.setAware(false); mo.setTarget(null); }
         var pdc = mob.getPersistentDataContainer();
         pdc.set(KEY_MONSTER, PersistentDataType.STRING, type.name());
         pdc.set(KEY_BUFF, PersistentDataType.STRING, type.buff);
-        pdc.set(KEY_GOLD, PersistentDataType.INTEGER, Math.max(5, type.gold / 4));
+        applyMonsterStats(mob, type, Size.SMALL, -1, false);
         var speedAttr = mob.getAttribute(Compat.movementSpeed());
         if (speedAttr != null) speedAttr.setBaseValue(0.15);
         MobAppearance.makeInvisible(mob);
@@ -474,17 +560,9 @@ public class JungleManager {
         }.runTaskTimer(LolPlugin.getInstance(), 0L, 4L);
     }
 
-    /** Id du buff d'équipe d'un épique. Atakhan change de forme selon l'agressivité de la partie (kills totaux). */
+    /** Id du buff d'équipe d'un épique. */
     private String epicBuffId(MonsterType type) {
-        String buffId = type.buff;
-        if (type == MonsterType.ATAKHAN) {
-            int totalKills = 0;
-            var msb2 = LolPlugin.getInstance().getMatchScoreboard();
-            if (msb2 != null)
-                for (var st : msb2.getStats().values()) totalKills += st.kills;
-            buffId = totalKills >= 15 ? "atakhan_voracious" : "atakhan";
-        }
-        return buffId;
+        return type.buff;
     }
 
     /** Appelé quand un monstre meurt (depuis le listener). */
@@ -512,13 +590,15 @@ public class JungleManager {
         Location deathLoc = deadEnt != null ? deadEnt.getLocation()
                 : (camp != null ? camp.location : null);
 
-        // ── Krugs : le grand se divise en 2 petits (LoL) ──
-        if (type == MonsterType.KRUG && camp != null && deathLoc != null
-                && deadEnt != null && deadEnt.getPersistentDataContainer().has(
-                    new NamespacedKey(LolPlugin.getInstance(), "krug_large"),
-                    PersistentDataType.BYTE)) {
-            for (int i = 0; i < 2; i++)
-                spawnKrugMini(camp, deathLoc.clone().add(i == 0 ? 0.8 : -0.8, 0, 0.4));
+        // ── Krugs : l'Ancien se divise en 4 mini-krugs, le Krug en 2 (wiki) ──
+        if (type == MonsterType.KRUG && camp != null && deathLoc != null && deadEnt != null) {
+            var kpdc = deadEnt.getPersistentDataContainer();
+            int minis = kpdc.has(new NamespacedKey(LolPlugin.getInstance(), "krug_large"), PersistentDataType.BYTE) ? 4
+                      : kpdc.has(new NamespacedKey(LolPlugin.getInstance(), "krug_medium"), PersistentDataType.BYTE) ? 2 : 0;
+            for (int i = 0; i < minis; i++) {
+                double a = 2 * Math.PI * i / minis;
+                spawnKrugMini(camp, deathLoc.clone().add(Math.cos(a) * 0.8, 0, Math.sin(a) * 0.8));
+            }
         }
 
         // ── Scuttle : shrine de vision + vitesse 60s pour l'équipe du tueur ──
@@ -533,10 +613,23 @@ public class JungleManager {
 
         // Récompenses (or individuel du mob, lu depuis le PDC si dispo)
         if (killer != null) {
-            int gold = type.gold;
-            // (l'entité est déjà morte, on utilise l'or du type par défaut)
-            siblingRewardManager()
-                    .onJungleMonsterKill(killer, gold, type.xp);
+            // Or/XP propres à ce monstre (taille, niveau) ; avant : ceux du grand pour chaque petit
+            LivingEntity deadMob = deadEnt instanceof LivingEntity dl ? dl : null;
+            int gold = deadMob != null ? fr.lolmc.util.MobCombat.getGold(deadMob, type.gold) : type.gold;
+            double xp = deadMob != null ? fr.lolmc.util.MobCombat.getXP(deadMob, type.xp) : type.xp;
+            var rewards = siblingRewardManager();
+            switch (type) {
+                // Dragons : or au tueur, XP partagée entre les alliés proches
+                case DRAGON_INFERNAL, DRAGON_OCEAN, DRAGON_MOUNTAIN, DRAGON_CLOUD, DRAGON_CHEMTECH ->
+                        rewards.onEpicKill(killer, deathLoc, gold, 0, xp, 0);
+                // Ancien : or et XP à toute l'équipe
+                case DRAGON_ELDER -> rewards.onEpicKill(killer, deathLoc, 0, gold, 0, xp);
+                // Baron : 150 or et 650 XP à toute l'équipe, +100 or au tueur
+                case BARON -> rewards.onEpicKill(killer, deathLoc, 100, gold, 0, xp);
+                // Héraut : or au tueur, XP partagée entre les proches
+                case HERALD -> rewards.onEpicKill(killer, deathLoc, gold, 0, xp, 0);
+                default -> rewards.onJungleMonsterKill(killer, gold, xp);
+            }
             // Passifs items de jungle (Gustwalker, Mosstomper, Scorchclaw)
             var pm = gameInstance != null ? gameInstance.getPassiveManager() : LolPlugin.getInstance().getPassiveManager();
             if (pm != null) pm.onJungleKill(killer);
@@ -777,27 +870,6 @@ public class JungleManager {
                 }, 180);
             }
             // ── Âmes du Dragon (permanentes, distinctes par élément) ──
-            // ── Atakhan Ruineux (partie calme) : buff équipe permanent ──
-            case "atakhan" -> {
-                champ.getStats().addBonusAD(15);
-                champ.getStats().addBonusAP(25);
-                champ.getStats().multiplyHP(1.05);
-                player.sendActionBar(Component.text(
-                    "🌺 ATAKHAN RUINEUX! +15 AD +25 AP +5% PV permanents", NamedTextColor.LIGHT_PURPLE));
-            }
-            // ── Atakhan Vorace (partie sanglante ≥15 kills) : résurrection + or ──
-            case "atakhan_voracious" -> {
-                boolean isKiller = player.equals(currentObjectiveKiller);
-                // Le tueur reçoit une résurrection unique (Pétales Sanglants)
-                var pmv = LolPlugin.getInstance().getPassiveManager();
-                if (pmv != null && isKiller) pmv.grantAtakhanRevive(player);
-                // Toute l'équipe : +150 or (pétales)
-                LolPlugin.getInstance().getGoldManager().addGold(player.getUniqueId(), 150);
-                player.sendActionBar(Component.text(
-                    isKiller ? "🌺 ATAKHAN VORACE! Résurrection + 150 or"
-                             : "🌺 ATAKHAN VORACE! +150 or (Pétales Sanglants)",
-                    NamedTextColor.DARK_RED));
-            }
             case "dragon_soul_infernal" -> {
                 // Infernal : burst AoE — +AD/AP forts
                 champ.getStats().addBonusAD(30);
@@ -974,7 +1046,8 @@ public class JungleManager {
 
     public static MonsterType getMonsterType(Entity e) {
         String t = e.getPersistentDataContainer().get(KEY_MONSTER, PersistentDataType.STRING);
-        return t != null ? MonsterType.valueOf(t) : null;
+        if (t == null) return null;
+        try { return MonsterType.valueOf(t); } catch (IllegalArgumentException ex) { return null; }
     }
 
     /**
@@ -1049,10 +1122,6 @@ public class JungleManager {
                     .cube(Material.PURPLE_CONCRETE,  0f, 0.0f, 0f, 0.4f)
                     .cube(Material.BLACK_CONCRETE,   0f, 0.4f, 0f, 0.2f);
 
-            case ATAKHAN -> new MobModel()
-                    .box(Material.RED_CONCRETE,    0f, 0.0f, 0f, 2.0f, 2.5f, 1.8f)
-                    .cube(Material.ORANGE_CONCRETE, 0f, 2.4f, 0f, 0.7f)
-                    .cube(Material.YELLOW_CONCRETE, 0f, 2.6f, 0.5f, 0.3f);
 
             case HERALD -> new MobModel()
                     .box(Material.PURPLE_CONCRETE,  0f, 0.1f, 0.0f, 0.9f, 1.1f, 0.9f)   // corps
@@ -1107,7 +1176,7 @@ public class JungleManager {
     private float hitboxScaleFor(MonsterType type) {
         return switch (type) {
             case GROMP        -> 2.0f;   // slime petit -> grossir
-            case MURKWOLF, RAPTOR, SCUTTLE_CRAB, ATAKHAN -> 1.0f;
+            case MURKWOLF, RAPTOR, SCUTTLE_CRAB -> 1.0f;
             case KRUG         -> 2.5f;   // silverfish minuscule -> grossir
             case RED_BUFF     -> 2.0f;   // magma cube petit
             case BLUE_BUFF    -> 0.8f;   // iron golem deja grand -> reduire un peu
@@ -1146,7 +1215,9 @@ public class JungleManager {
             var world = scopedWorld != null ? scopedWorld
                     : (worldName == null ? null : LolPlugin.getInstance().getServer().getWorld(worldName));
             if (world == null) continue;
-            MonsterType type = MonsterType.valueOf(config.getString(path + "type"));
+            MonsterType type;
+            try { type = MonsterType.valueOf(String.valueOf(config.getString(path + "type"))); }
+            catch (IllegalArgumentException ex) { continue; } // type retiré de LoL ou inconnu
             Location loc = new Location(world,
                     config.getDouble(path + "x"),
                     config.getDouble(path + "y"),
@@ -1170,9 +1241,7 @@ public class JungleManager {
             var entity = loc.getWorld().spawn(loc, Zombie.class);
             var pdc = entity.getPersistentDataContainer();
             pdc.set(KEY_MONSTER, PersistentDataType.STRING, type.name());
-            var hpAttr = entity.getAttribute(Compat.maxHealth());
-            if (hpAttr != null) { hpAttr.setBaseValue(Math.min(type.maxHP, 1024.0)); entity.setHealth(Math.min(type.maxHP, 1024.0)); }
-            if (type.maxHP > 1024.0) fr.lolmc.util.VirtualHP.init(entity, type.maxHP);
+            applyMonsterStats(entity, type, Size.LARGE, 0, false);
             liveMonsters.put(entity.getUniqueId(), type);
             // Apparence appliquée par applyMonsterAppearance si configurée
         } catch (IllegalArgumentException e) {

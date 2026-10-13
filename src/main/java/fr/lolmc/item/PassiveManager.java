@@ -842,30 +842,6 @@ public class PassiveManager {
         // avant même le calcul des dégâts — c'est le bon endroit puisque onDamageTaken ne
         // s'exécute qu'après application des dégâts aux HP.
 
-        // ── Atakhan Vorace : résurrection unique (avant GA) ──
-        if (state.atakhanRevive && hp.isDead() && !state.gaActive) {
-            state.atakhanRevive = false;
-            state.gaActive = true;
-            hp.setCurrentHP(1);
-            victim.showTitle(net.kyori.adventure.title.Title.title(
-                    Component.text("🌺"),
-                    Component.text("Pétales Sanglants — Résurrection 4s..."),
-                    net.kyori.adventure.title.Title.Times.times(
-                            java.time.Duration.ofMillis(250),
-                            java.time.Duration.ofMillis(3000),
-                            java.time.Duration.ofMillis(500))));
-            new BukkitRunnable() {
-                @Override public void run() {
-                    if (!victim.isOnline()) { state.gaActive = false; return; }
-                    hp.setCurrentHP(hp.getMaxHP() * 0.60);
-                    state.gaActive = false;
-                    fr.lolmc.util.VisualEffectUtil.impactBurst(victim.getWorld(),
-                        victim.getLocation().add(0,1,0), Material.GOLD_BLOCK, 0.3f, 0.6, 10, 15L);
-                }
-            }.runTaskLater(LolPlugin.getInstance(), 80L);
-            return;
-        }
-
         // ── Guardian Angel: résurrection (300s CD) ──
         if (hasAnyItem(victim,"guardian_angel")
                 && hp.isDead()
@@ -1850,10 +1826,6 @@ public class PassiveManager {
             && st.antihealTargets.get(target.getUniqueId()) > System.currentTimeMillis();
     }
 
-    /** Accorde une résurrection unique (Atakhan Vorace — Pétales Sanglants). */
-    public void grantAtakhanRevive(Player player) {
-        getState(player).atakhanRevive = true;
-    }
 
 
     /**

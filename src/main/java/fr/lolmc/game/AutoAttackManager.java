@@ -343,25 +343,11 @@ public class AutoAttackManager {
         playAnimation(attacker, target, type, crit);
 
         target.playHurtAnimation(attacker.getLocation().getYaw());
-        if (fr.lolmc.util.VirtualHP.has(target)) {
-            // Entité à HP virtuels (Baron, Elder, canon...) : dégâts virtuels
-            fr.lolmc.util.VirtualHP.damage(target, rawDamage, attacker);
-        } else {
-            if (fr.lolmc.game.MinionManager.isMinion(target)) {
-                rawDamage *= 1.0 + champ.getStats().getMinionDamageBonus();
-            }
-            double newHealth = Math.max(0, target.getHealth() - rawDamage);
-            if (newHealth <= 0) {
-                // Coup fatal attribué à l'attaquant (last-hit : or, CS)
-                fr.lolmc.util.VirtualHP.kill(target, attacker);
-                var pmKill = LolPlugin.getInstance().getPassiveManager();
-                if (pmKill != null) pmKill.onAutoAttackEntity(attacker, target);
-                return true;
-            }
-            target.setHealth(newHealth);
-            var maxHpAttr = target.getAttribute(fr.lolmc.util.Compat.maxHealth());
-            double maxHp = maxHpAttr != null ? maxHpAttr.getValue() : 20.0;
-            fr.lolmc.util.HealthBar.update(target, newHealth, maxHp);
+        // Sbire/monstre : armure, bonus anti-sbires, PV virtuels ; coup fatal attribué (last-hit)
+        if (fr.lolmc.util.MobCombat.damage(attacker, target, rawDamage, fr.lolmc.util.DamageUtil.Type.PHYSICAL)) {
+            var pmKill = LolPlugin.getInstance().getPassiveManager();
+            if (pmKill != null) pmKill.onAutoAttackEntity(attacker, target);
+            return true;
         }
 
         var pm = LolPlugin.getInstance().getPassiveManager();

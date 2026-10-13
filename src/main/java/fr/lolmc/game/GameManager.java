@@ -384,6 +384,7 @@ public class GameManager {
             player.removePotionEffect(effect.getType());
         var cc = LolPlugin.getInstance().getCCManager();
         if (cc != null) cc.clear(player.getUniqueId());
+        JungleManager.clearElderBuff(player.getUniqueId()); // Aspect du Dragon perdu à la mort
         var ssm = LolPlugin.getInstance().getSummonerSpellManager();
         if (ssm != null && ssm.isChanneling(player)) ssm.interruptTeleport(player);
 
