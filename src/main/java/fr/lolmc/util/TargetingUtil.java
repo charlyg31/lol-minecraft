@@ -43,6 +43,7 @@ public final class TargetingUtil {
         if (entity instanceof Player other) {
             var cm = LolPlugin.getInstance().getChampionManager();
             if (!cm.hasChampion(other)) return false;
+            if (other.getGameMode() == org.bukkit.GameMode.SPECTATOR) return false; // mort
             Team otherTeam = tm.getTeam(other);
             return otherTeam == null || otherTeam != myTeam;
         }

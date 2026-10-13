@@ -67,6 +67,9 @@ public class DamageUtil {
             return;
         }
 
+        // Mort (spectateur en attente de respawn) : aucun dégât
+        if (victim.getGameMode() == org.bukkit.GameMode.SPECTATOR) return;
+
         // Zhonya : stase, aucun dégât (setInvulnerable ne protège que des dégâts vanilla)
         var pmZhonya = LolPlugin.getInstance().getPassiveManager();
         if (pmZhonya != null && pmZhonya.getState(victim).zhonyasActive) return;

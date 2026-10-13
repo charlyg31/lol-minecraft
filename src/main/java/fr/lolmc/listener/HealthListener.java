@@ -93,17 +93,44 @@ public class HealthListener implements Listener {
         }
     }
 
-    // ── À la connexion → désactiver regen vanilla ─────────────────
-    @EventHandler
+    /** Fenêtre « en combat » pour la déconnexion : dégâts reçus il y a moins de 10 s. */
+    private static final long COMBAT_LOG_WINDOW_MS = 10_000L;
+
+    // ── Déconnexion : sauvegarde de l'état, et anti-déconnexion en combat ─────
+    // LOWEST : la mort doit être traitée avant les nettoyages des autres listeners
+    @EventHandler(priority = EventPriority.LOWEST)
     public void onQuit(org.bukkit.event.player.PlayerQuitEvent e) {
         Player p = e.getPlayer();
         var gm = fr.lolmc.instance.InstanceHelper.gameManager(p);
         if (gm != null && gm.isGameRunning()
                 && LolPlugin.getInstance().getChampionManager().hasChampion(p)) {
+            punishCombatLog(p);
+            gm.pauseRespawn(p.getUniqueId()); // le décompte ne court que si le joueur est en ligne
             gm.saveSnapshot(p);
         }
         var bridge = LolPlugin.getInstance().getBridgeManager();
         if (bridge != null) bridge.cleanupPlayer(p.getUniqueId());
+    }
+
+    /**
+     * Se déconnecter en combat pour échapper à la mort compte comme une mort : le dernier
+     * champion ennemi à l'avoir touché (10 s) reçoit le kill, l'or et les assistances ; le
+     * décompte de réapparition est en pause tant qu'il est hors ligne.
+     * Hors combat, la déconnexion ne coûte rien (le joueur se reconnecte au même endroit).
+     */
+    private void punishCombatLog(Player p) {
+        if (p.getGameMode() == org.bukkit.GameMode.SPECTATOR) return; // déjà mort
+        var champ = LolPlugin.getInstance().getChampionManager().getChampion(p);
+        if (champ == null) return;
+        var rm = fr.lolmc.instance.InstanceHelper.rewardManager(p);
+        boolean hitByChampion = rm != null && rm.getLastAttacker(p.getUniqueId()) != null;
+        boolean recentlyHit = champ.getHPSystem().msSinceLastDamage() < COMBAT_LOG_WINDOW_MS;
+        if (!hitByChampion && !recentlyHit) return;
+
+        fr.lolmc.util.WorldContext.broadcast(p.getWorld(), net.kyori.adventure.text.Component.text(
+                "⚠ " + p.getName() + " s'est déconnecté en combat : compté comme mort.",
+                net.kyori.adventure.text.format.NamedTextColor.RED));
+        hud.triggerDeath(p, null);
     }
 
     @EventHandler
@@ -132,6 +159,12 @@ public class HealthListener implements Listener {
                     
                     // Récupération et restauration complète du Snapshot
                     var snap = gm.getPlayerSnapshot(id);
+                    // Mort pendant la déconnexion : décompte repris ou réapparition (après la
+                    // restauration ci-dessous, qui recrée le champion)
+                    final var gmRejoin = gm;
+                    org.bukkit.Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                        if (p.isOnline()) gmRejoin.onRejoin(p);
+                    }, 2L);
                     if (snap != null) {
                         snap.restore(p);
                         p.sendMessage(net.kyori.adventure.text.Component.text(

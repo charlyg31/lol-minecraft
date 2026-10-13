@@ -46,6 +46,7 @@ public class HUDManager {
                 for (Player p : WorldContext.getGamePlayers()) {
                     if (!WorldContext.isInGameWorld(p)) continue;
                     if (!championManager.hasChampion(p)) continue;
+                    if (p.getGameMode() == org.bukkit.GameMode.SPECTATOR) continue; // mort : pas de regen
                     BaseChampion champ = championManager.getChampion(p);
                     HPSystem hp = champ.getHPSystem();
                     ResourceSystem res = champ.getResourceSystem();

@@ -71,6 +71,8 @@ public class GameManager {
 
     // Joueurs morts en attente de respawn : UUID → timestamp de respawn
     private final Map<UUID, Long> respawnAt = new HashMap<>();
+    // Morts déconnectés : décompte en pause (ms restantes), il ne court que si le joueur est en ligne
+    private final Map<UUID, Long> pausedRespawnMs = new HashMap<>();
     // BossBar individuelle de respawn
     private final Map<UUID, BossBar> respawnBars = new HashMap<>();
     // Participants de la partie en cours (pour la reconnexion)
@@ -202,6 +204,7 @@ public class GameManager {
             for (Player p : players()) p.hideBossBar(timerBar);
         }
         respawnAt.clear();
+        pausedRespawnMs.clear();
         for (BossBar bar : respawnBars.values()) {
             for (Player p : players()) p.hideBossBar(bar);
         }
@@ -375,6 +378,15 @@ public class GameManager {
         respawnBars.put(player.getUniqueId(), bar);
         player.showBossBar(bar);
 
+        // Nettoyer ce qui ne doit pas survivre à la mort : potions (ralentissements, buffs de
+        // sorts…), contrôles, Téléportation en cours
+        for (var effect : new java.util.ArrayList<>(player.getActivePotionEffects()))
+            player.removePotionEffect(effect.getType());
+        var cc = LolPlugin.getInstance().getCCManager();
+        if (cc != null) cc.clear(player.getUniqueId());
+        var ssm = LolPlugin.getInstance().getSummonerSpellManager();
+        if (ssm != null && ssm.isChanneling(player)) ssm.interruptTeleport(player);
+
         // Mettre le joueur en mode spectateur pendant la mort
         player.setGameMode(org.bukkit.GameMode.SPECTATOR);
 
@@ -384,6 +396,40 @@ public class GameManager {
             Location spawn = siblingMapManager().getBaseSpawn(team);
             if (spawn != null) player.teleport(spawn);
         }
+    }
+
+    /**
+     * Reconnexion d'un participant : s'il était mort, reprendre le décompte (BossBar) ou le
+     * faire réapparaître si le délai est écoulé ; s'il est resté spectateur sans décompte,
+     * le faire réapparaître.
+     */
+    public void onRejoin(Player player) {
+        if (!gameRunning) return;
+        UUID id = player.getUniqueId();
+        // Reprise du décompte mis en pause à la déconnexion
+        Long paused = pausedRespawnMs.remove(id);
+        if (paused != null) respawnAt.put(id, System.currentTimeMillis() + paused);
+        Long until = respawnAt.get(id);
+        if (until != null && System.currentTimeMillis() < until) {
+            BossBar bar = respawnBars.computeIfAbsent(id, _ -> BossBar.bossBar(
+                    Component.text("☠ Réapparition…", NamedTextColor.RED), 1.0f,
+                    BossBar.Color.RED, BossBar.Overlay.PROGRESS));
+            player.showBossBar(bar);
+            player.setGameMode(org.bukkit.GameMode.SPECTATOR);
+        } else if (until != null || player.getGameMode() == org.bukkit.GameMode.SPECTATOR) {
+            respawnAt.remove(id);
+            respawn(player);
+        }
+        if (timerBar != null) player.showBossBar(timerBar);
+    }
+
+    /**
+     * Déconnexion d'un mort : le décompte de réapparition est mis en pause (sinon il suffirait
+     * de se déconnecter pour attendre son respawn hors ligne, puis revenir).
+     */
+    public void pauseRespawn(UUID id) {
+        Long until = respawnAt.remove(id);
+        if (until != null) pausedRespawnMs.put(id, Math.max(0L, until - System.currentTimeMillis()));
     }
 
     public boolean isDead(Player player) {
@@ -400,7 +446,9 @@ public class GameManager {
                 while (it.hasNext()) {
                     var entry = it.next();
                     Player p = Bukkit.getPlayer(entry.getKey());
-                    if (p == null) { it.remove(); continue; }
+                    // Hors ligne : garder l'entrée (avant : supprimée, et le joueur restait
+                    // spectateur pour toujours en se reconnectant)
+                    if (p == null) continue;
 
                     long remaining = (entry.getValue() - now) / 1000;
                     if (remaining <= 0) {
@@ -453,6 +501,7 @@ public class GameManager {
 
     public void cleanup(UUID uuid) {
         respawnAt.remove(uuid);
+        pausedRespawnMs.remove(uuid);
         BossBar bar = respawnBars.remove(uuid);
         Player p = Bukkit.getPlayer(uuid);
         if (p != null) {
