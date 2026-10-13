@@ -83,9 +83,10 @@ public class BungeeQueueManager {
             if (!queue.contains(uid)) queue.add(uid);
             rankedOf.put(uid, ranked);
         }
-        player.sendMessage(new TextComponent(ranked
+        player.sendMessage(new TextComponent((ranked
                 ? "§6Vous êtes dans la file classée."
-                : "§aVous êtes dans la file d'attente."));
+                : "§aVous êtes dans la file d'attente.")
+                + " §7(" + available(ranked).size() + "/" + playersNeeded + ")"));
         checkAndStartGame(ranked);
     }
 
@@ -129,6 +130,11 @@ public class BungeeQueueManager {
         }
         prop.cancel(); // annuler le timeout
         // Le groupe a pu se défaire pendant la proposition (déconnexion, sortie de file)
+        if (!queue.contains(player.getUniqueId())) {
+            releaseProposal(prop);
+            player.sendMessage(new TextComponent("§7Tu n'es plus en file."));
+            return;
+        }
         for (UUID uid : prop.gamePlayers) {
             if (!queue.contains(uid) || ProxyServer.getInstance().getPlayer(uid) == null) {
                 releaseProposal(prop);
@@ -138,7 +144,8 @@ public class BungeeQueueManager {
             }
         }
         player.sendMessage(new TextComponent("§a✔ Tu rejoins la partie !"));
-        launchGame(prop.gamePlayers, player.getUniqueId(), prop.filledRole, prop.ranked);
+        if (launchGame(prop.gamePlayers, player.getUniqueId(), prop.filledRole, prop.ranked))
+            checkAndStartGame(prop.ranked); // il reste peut-être assez de monde pour une autre partie
     }
 
     public synchronized void refuseFill(ProxiedPlayer player) {
@@ -148,6 +155,7 @@ public class BungeeQueueManager {
             return;
         }
         prop.cancel();
+        reserved.remove(player.getUniqueId());
         player.sendMessage(new TextComponent("§7Proposition refusée. Tu restes en file."));
         // Proposer au prochain solo éligible
         tryProposeFill(prop.gamePlayers, prop.filledRole, prop.excludedSolos, prop.ranked);
@@ -176,12 +184,33 @@ public class BungeeQueueManager {
      *           libre, proposer ce poste aux solos éligibles dans la file.
      */
     private void checkAndStartGame(boolean ranked) {
+        // ── Étape 0 : une proposition attend son fill, et un nouveau joueur a justement ce rôle ──
+        for (FillProposal prop : new ArrayList<>(new LinkedHashSet<>(pendingProposals.values()))) {
+            if (prop.ranked != ranked) continue;
+            for (UUID uid : available(ranked)) {
+                if (partyManager.inParty(uid) || ProxyServer.getInstance().getPlayer(uid) == null) continue;
+                Set<String> r = new HashSet<>(roleManager.getRoles(uid));
+                if (!r.contains(prop.filledRole) && !r.containsAll(ROLES)) continue;
+                // Annuler la proposition en cours et lancer avec ce joueur
+                pendingProposals.remove(prop.solo);
+                prop.cancel();
+                releaseProposal(prop);
+                ProxiedPlayer solo = ProxyServer.getInstance().getPlayer(prop.solo);
+                if (solo != null) solo.sendMessage(new TextComponent("§7Le poste a été pourvu — tu restes en file."));
+                ProxyServer.getInstance().getPlayer(uid).sendMessage(new TextComponent(
+                        "§a✔ Tu rejoins une partie en tant que §l" + formatRole(prop.filledRole) + "§a !"));
+                if (launchGame(prop.gamePlayers, uid, prop.filledRole, ranked)) checkAndStartGame(ranked);
+                return;
+            }
+        }
+
         List<UUID> allInQueue = available(ranked);
 
         // ── Étape 1 : N joueurs complets ──────────────────────────────────
         List<UUID> full = findValidGroup(allInQueue, playersNeeded);
         if (full != null) {
-            launchGame(full, null, null, ranked);
+            // Relancer : il reste peut-être assez de joueurs pour une autre partie
+            if (launchGame(full, null, null, ranked)) checkAndStartGame(ranked);
             return;
         }
 
@@ -220,7 +249,7 @@ public class BungeeQueueManager {
                 ProxyServer.getInstance().getPlayer(uid).sendMessage(new TextComponent(
                     "§a✔ Tu rejoins une partie en tant que §l" + formatRole(missingRole) + "§a !"));
                 reserved.removeAll(gamePlayers);
-                launchGame(gamePlayers, uid, missingRole, ranked);
+                if (launchGame(gamePlayers, uid, missingRole, ranked)) checkAndStartGame(ranked);
                 return;
             }
         }
@@ -244,13 +273,15 @@ public class BungeeQueueManager {
         newExcluded.add(uid);
 
         reserved.addAll(gamePlayers);
-        FillProposal proposal = new FillProposal(gamePlayers, missingRole, newExcluded, ranked);
+        reserved.add(uid); // le solo aussi : sinon une autre partie pouvait le prendre pendant qu'il réfléchit
+        FillProposal proposal = new FillProposal(gamePlayers, missingRole, newExcluded, ranked, uid);
         pendingProposals.put(uid, proposal);
 
         proposal.timeoutTask = ProxyServer.getInstance().getScheduler().schedule(plugin, () -> {
             synchronized (BungeeQueueManager.this) {
                 FillProposal p = pendingProposals.remove(uid);
                 if (p != null) {
+                    reserved.remove(uid);
                     solo.sendMessage(new TextComponent("§7Proposition expirée — tu restes en file."));
                     tryProposeFill(gamePlayers, missingRole, newExcluded, ranked);
                 }
@@ -261,6 +292,7 @@ public class BungeeQueueManager {
     /** Libère les joueurs réservés par une proposition abandonnée. */
     private void releaseProposal(FillProposal prop) {
         reserved.removeAll(prop.gamePlayers);
+        reserved.remove(prop.solo);
     }
 
     // ══════════════════════════════════════════════════════════════════════
@@ -275,23 +307,25 @@ public class BungeeQueueManager {
      * @param fillRole     Le rôle assigné au fill
      * @param isRanked     Partie classée
      */
-    private void launchGame(List<UUID> gamePlayers, UUID fillUUID, String fillRole, boolean isRanked) {
+    /** @return true si la partie est lancée (sinon les joueurs restent en file) */
+    private boolean launchGame(List<UUID> gamePlayers, UUID fillUUID, String fillRole, boolean isRanked) {
         List<UUID> allPlayers = new ArrayList<>(gamePlayers);
         if (fillUUID != null) allPlayers.add(fillUUID);
+
+        // Vérifier AVANT de retirer de la file (avant : joueurs perdus si le serveur manquait)
+        ProxiedPlayer carrier = findCarrier(allPlayers);
+        if (carrier == null) return false;
+        ServerInfo gameServerInfo = ProxyServer.getInstance().getServerInfo(gameServer);
+        if (gameServerInfo == null) {
+            plugin.getLogger().severe("Serveur de jeu '" + gameServer + "' introuvable ! Les joueurs restent en file.");
+            return false;
+        }
+
         // Tous les joueurs lancés sortent de la file
         for (UUID uid : allPlayers) {
             queue.remove(uid);
             rankedOf.remove(uid);
             reserved.remove(uid);
-        }
-
-        ProxiedPlayer carrier = findCarrier(allPlayers);
-        if (carrier == null) return;
-
-        ServerInfo gameServerInfo = ProxyServer.getInstance().getServerInfo(gameServer);
-        if (gameServerInfo == null) {
-            plugin.getLogger().severe("Serveur de jeu '" + gameServer + "' introuvable !");
-            return;
         }
 
         // Envoyer les données de chaque joueur
@@ -353,6 +387,7 @@ public class BungeeQueueManager {
             sendPluginMessage(gameServer, json);
             plugin.getLogger().info("[Queue] GAME_READY envoyé pour " + allPlayers.size() + " joueurs (ranked=" + isRanked + ")");
         }, 6, TimeUnit.SECONDS);
+        return true;
     }
 
     // ══════════════════════════════════════════════════════════════════════
@@ -360,63 +395,45 @@ public class BungeeQueueManager {
     // ══════════════════════════════════════════════════════════════════════
 
     /**
-     * Cherche un groupe de `size` joueurs dans la file avec une assignation
-     * de postes valide (matching bipartite joueurs ↔ postes).
-     * Retourne la liste des UUIDs sélectionnés, ou null si impossible.
+     * Cherche `size` joueurs lançables (rôles répartissables, 2 équipes valides, groupes
+     * entiers), en privilégiant l'ordre d'arrivée. Exploration complète des combinaisons de
+     * groupes/solos, bornée par un budget (avant : seuls 2 ordres étaient essayés, parmi les
+     * 2N premiers ; la file pouvait rester bloquée alors qu'une composition existait).
      */
     private List<UUID> findValidGroup(List<UUID> candidates, int size) {
         if (candidates.size() < size) return null;
-        // Essayer parmi les 2N premiers (ordre d'arrivée)
-        List<UUID> subset = candidates.subList(0, Math.min(size * 2, candidates.size()));
-        return findMatchingSubset(subset, size);
+        List<List<UUID>> units = buildUnits(candidates);
+        int[] budget = {20_000};
+        return searchGroup(units, 0, new ArrayList<>(), size, suffixSizes(units), budget, this::isLaunchable);
     }
 
     /**
-     * Cherche un groupe de N-1 joueurs avec assignation valide,
-     * et retourne le groupe + le rôle du poste resté libre.
+     * Cherche N-1 joueurs qui, avec un fill sur le poste manquant, formeraient 2 équipes
+     * valides ; retourne le groupe et le poste à pourvoir.
      */
     private GroupAndMissingRole findGroupWithOneMissing(List<UUID> candidates) {
         int target = playersNeeded - 1;
         if (candidates.size() < target) return null;
-
-        List<UUID> subset = candidates.subList(0, Math.min(target * 2, candidates.size()));
-        List<UUID> group = findMatchingSubset(subset, target);
-        if (group == null) return null;
-
-        int[] match = computeMatching(group);
-        // Premier poste non assigné (parmi les N postes de la partie) = rôle manquant
-        for (int si = 0; si < playersNeeded && si < slots.size(); si++) {
-            if (match[si] == -1) return new GroupAndMissingRole(group, slots.get(si));
-        }
-        return null;
+        List<List<UUID>> units = buildUnits(candidates);
+        int[] budget = {20_000};
+        String[] role = new String[1];
+        List<UUID> group = searchGroup(units, 0, new ArrayList<>(), target, suffixSizes(units), budget, g -> {
+            if (!hasValidMatching(g)) return false;
+            // Essayer chaque poste pour le fill (un joueur fictif qui ne joue que ce poste)
+            UUID dummy = new UUID(0L, 0L);
+            for (String r : ROLES) {
+                List<UUID> withFill = new ArrayList<>(g);
+                withFill.add(dummy);
+                if (splitTeams(withFill, Map.of(dummy, List.of(r)), true) != null) { role[0] = r; return true; }
+            }
+            return false;
+        });
+        return group != null ? new GroupAndMissingRole(group, role[0]) : null;
     }
 
-    /** Cherche un sous-ensemble de `size` dans candidates avec matching valide. */
-    private List<UUID> findMatchingSubset(List<UUID> candidates, int size) {
-        if (candidates.size() < size) return null;
-        // Essai simple : les `size` premiers — sans couper un groupe en deux
-        List<UUID> attempt = takeWholeParties(candidates, size);
-        if (attempt != null && isLaunchable(attempt)) return attempt;
-
-        // Heuristique (pas exhaustive) : groupes d'abord, puis solos
-        List<UUID> groups = new ArrayList<>();
-        List<UUID> solos  = new ArrayList<>();
-        for (UUID uid : candidates) {
-            if (partyManager.inParty(uid)) groups.add(uid);
-            else solos.add(uid);
-        }
-        List<UUID> mixed = new ArrayList<>(groups);
-        mixed.addAll(solos);
-        List<UUID> attempt2 = takeWholeParties(mixed, size);
-        return attempt2 != null && isLaunchable(attempt2) ? attempt2 : null;
-    }
-
-    /**
-     * Prend `size` joueurs dans l'ordre en gardant les groupes entiers
-     * (un groupe qui ne rentre plus est sauté). Null si impossible.
-     */
-    private List<UUID> takeWholeParties(List<UUID> ordered, int size) {
-        List<UUID> result = new ArrayList<>();
+    /** Unités indivisibles dans l'ordre d'arrivée : un groupe (restreint aux candidats) ou un solo. */
+    private List<List<UUID>> buildUnits(List<UUID> ordered) {
+        List<List<UUID>> units = new ArrayList<>();
         Set<UUID> seen = new HashSet<>();
         Set<UUID> pool = new HashSet<>(ordered);
         for (UUID uid : ordered) {
@@ -425,11 +442,34 @@ public class BungeeQueueManager {
             for (UUID m : partyManager.getPartyMembers(uid)) if (pool.contains(m)) unit.add(m);
             if (unit.isEmpty()) unit.add(uid);
             seen.addAll(unit);
-            if (result.size() + unit.size() > size) continue;
-            result.addAll(unit);
-            if (result.size() == size) return result;
+            units.add(unit);
         }
-        return null;
+        return units;
+    }
+
+    private static int[] suffixSizes(List<List<UUID>> units) {
+        int[] suf = new int[units.size() + 1];
+        for (int i = units.size() - 1; i >= 0; i--) suf[i] = suf[i + 1] + units.get(i).size();
+        return suf;
+    }
+
+    /** DFS « inclure d'abord » (ordre d'arrivée prioritaire) avec élagage et budget. */
+    private List<UUID> searchGroup(List<List<UUID>> units, int i, List<UUID> cur, int size, int[] suffix,
+                                   int[] budget, java.util.function.Predicate<List<UUID>> accept) {
+        if (cur.size() == size) {
+            budget[0] -= 50; // tester une composition (répartition en équipes) coûte plus cher
+            return accept.test(cur) ? new ArrayList<>(cur) : null;
+        }
+        if (i >= units.size() || budget[0]-- <= 0) return null;
+        if (cur.size() + suffix[i] < size) return null; // plus assez de joueurs
+        List<UUID> unit = units.get(i);
+        if (cur.size() + unit.size() <= size) {
+            cur.addAll(unit);
+            var r = searchGroup(units, i + 1, cur, size, suffix, budget, accept);
+            cur.subList(cur.size() - unit.size(), cur.size()).clear();
+            if (r != null) return r;
+        }
+        return searchGroup(units, i + 1, cur, size, suffix, budget, accept);
     }
 
     /**
@@ -643,13 +683,15 @@ public class BungeeQueueManager {
         final String                           filledRole;
         final Set<UUID>                        excludedSolos;
         final boolean                          ranked;
+        final UUID                             solo;
         net.md_5.bungee.api.scheduler.ScheduledTask timeoutTask;
 
-        FillProposal(List<UUID> gamePlayers, String filledRole, Set<UUID> excludedSolos, boolean ranked) {
+        FillProposal(List<UUID> gamePlayers, String filledRole, Set<UUID> excludedSolos, boolean ranked, UUID solo) {
             this.gamePlayers   = gamePlayers;
             this.filledRole    = filledRole;
             this.excludedSolos = excludedSolos;
             this.ranked        = ranked;
+            this.solo          = solo;
         }
 
         void cancel() { if (timeoutTask != null) timeoutTask.cancel(); }

@@ -167,6 +167,20 @@ public final class BridgeManager implements PluginMessageListener {
                     // Lancer la sélection sur le thread principal
                     Bukkit.getScheduler().runTask(plugin, () -> {
                         var csm = plugin.getChampSelectManager();
+                        // Sans instances, une seule partie à la fois : refuser plutôt que lancer
+                        // une sélection par-dessus la partie (ou la sélection) en cours
+                        if (!plugin.getConfig().getBoolean("world.use-instances", false)
+                                && (plugin.getGameManager().isGameRunning() || csm.isSelecting())) {
+                            log.warning("[Bridge] GAME_READY refusé : une partie est déjà en cours (world.use-instances=false)");
+                            for (UUID id : connected) {
+                                Player pl = Bukkit.getPlayer(id);
+                                if (pl == null) continue;
+                                pl.sendMessage(Component.text("❌ Une partie est déjà en cours sur ce serveur — relance la recherche dans un instant.",
+                                        NamedTextColor.RED));
+                                sendPlayerToLobby(pl);
+                            }
+                            return;
+                        }
                         csm.freeze(connected);
                         // Équipes : celles du proxy, sinon par groupes (avant : un joueur sur deux,
                         // ce qui séparait les membres d'un même groupe)
