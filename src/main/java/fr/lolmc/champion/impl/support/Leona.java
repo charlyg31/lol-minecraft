@@ -60,11 +60,11 @@ public final class Leona extends BaseChampion implements fr.lolmc.champion.base.
             resourceCost = 45;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : prochaine attaque renforcée = stun 1s + dégâts magiques 20/45/70/95/120 + 30% AP
-            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,2.5); if(tgt==null){c.sendActionBar(Component.text("☀ Bouclier de l'Aube prêt (frappe un ennemi)",NamedTextColor.YELLOW));return;}
+            org.bukkit.entity.LivingEntity tgt = (t!=null && TargetingUtil.isEnemy(c,t))?t:TargetingUtil.getTargetedEnemy(c,2.5); if(tgt==null){c.sendActionBar(Component.text("☀ Bouclier de l'Aube prêt (frappe un ennemi)",NamedTextColor.YELLOW));return;}
             double[] base=fr.lolmc.util.Balance.base("q_leona",new double[]{20,45,70,95,120});double dmg=base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("q_leona","ap",0.3);
             TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.MAGICAL);
             if(tgt instanceof Player __p){
-                __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,20,10,false,true)); // stun 1s
+                fr.lolmc.LolPlugin.getInstance().getCCManager().stun(__p, 20); // stun 1s
                 __p.sendActionBar(Component.text("☀ STUN 1s — Bouclier de l'Aube!",NamedTextColor.YELLOW));
             }
             applyMark(tgt); // marque Lumière du Soleil
@@ -84,8 +84,6 @@ public final class Leona extends BaseChampion implements fr.lolmc.champion.base.
             resourceCost = 60;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : +20 armure, +20 RM pendant 3s puis explosion
-            c.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE,60,2,false,true));
-            c.addPotionEffect(new PotionEffect(PotionEffectType.ABSORPTION,60,0,false,true));
             var __cm = LolPlugin.getInstance().getChampionManager();
             if (__cm.hasChampion(c)) {
                 __cm.getChampion(c).getStats().addBonusArmor(20);
@@ -105,8 +103,7 @@ public final class Leona extends BaseChampion implements fr.lolmc.champion.base.
                             c.getLocation().add(0,1,0), Material.YELLOW_STAINED_GLASS, 0.35f, 2.5, 12, 8L);
                     // Si touché un ennemi, garde les bonus 3s de plus
                     if(hit){
-                        c.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE,60,2,false,true));
-                        c.addPotionEffect(new PotionEffect(PotionEffectType.ABSORPTION,60,0,false,true));
+                        // bonus conservés 3 s de plus (retirés par la tâche ci-dessous)
                     } else {
                         // Retirer les bonus si pas d'ennemi touché
                         if (__cm.hasChampion(c)) {
@@ -114,8 +111,9 @@ public final class Leona extends BaseChampion implements fr.lolmc.champion.base.
                             __cm.getChampion(c).getStats().addBonusMR(-20);
                         }
                     }
-                    // Toujours retirer après 6s (3s init + 3s bonus)
-                    new BukkitRunnable() {
+                    // Si touché : retirer après les 3 s supplémentaires (sinon déjà retirés juste au-dessus ;
+                    // les retirer une seconde fois faisait perdre 20 armure/RM pour toute la partie)
+                    if (hit) new BukkitRunnable() {
                         @Override public void run() {
                             if (__cm.hasChampion(c)) {
                                 __cm.getChampion(c).getStats().addBonusArmor(-20);
@@ -149,7 +147,7 @@ public final class Leona extends BaseChampion implements fr.lolmc.champion.base.
             dest.setY(c.getLocation().getY());
             c.teleport(dest);
             if(last instanceof Player __p){
-                __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,10,10,false,true)); // root 0.5s
+                fr.lolmc.LolPlugin.getInstance().getCCManager().root(__p, 10); // root 0.5s
                 __p.sendActionBar(Component.text("⚔ Enraciné — Lame du Zénith!",NamedTextColor.YELLOW));
             }
             fr.lolmc.util.VisualEffectUtil.impact(c.getWorld(),

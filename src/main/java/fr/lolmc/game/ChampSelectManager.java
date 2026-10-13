@@ -60,12 +60,18 @@ public class ChampSelectManager {
         return s != null && s.isParticipant(uuid);
     }
 
-    public void chooseChampion(Player p, String id)           { var s = of(p.getUniqueId()); if (s != null) s.chooseChampion(p, id); }
+    public boolean chooseChampion(Player p, String id)        { var s = of(p.getUniqueId()); return s != null && s.chooseChampion(p, id); }
+    /** Champion banni dans la sélection de ce joueur. */
+    public boolean isBanned(UUID viewer, String champ)        { var s = of(viewer); return s != null && s.isBanned(champ); }
+    /** Champion déjà pris (coéquipier en normal, n'importe qui en classé) pour ce joueur. */
+    public boolean isTaken(UUID viewer, String champ)         { var s = of(viewer); return s != null && s.isTaken(viewer, champ); }
     public void chooseRunes(Player p, RunePage page)          { var s = of(p.getUniqueId()); if (s != null) s.chooseRunes(p, page); }
     public void chooseSpells(Player p, String s1, String s2)  { var s = of(p.getUniqueId()); if (s != null) s.chooseSpells(p, s1, s2); }
+    /** Sorts choisis pendant la sélection (FLASH + IGNITE par défaut). */
+    public String[] getChosenSpells(UUID id) { var s = of(id); return s != null ? s.getChosenSpells(id) : new String[]{"FLASH", "IGNITE"}; }
     public void lock(Player p)                                { var s = of(p.getUniqueId()); if (s != null) s.lock(p); }
     public void onSkinChosen(Player p, String champ, String skin) { var s = of(p.getUniqueId()); if (s != null) s.onSkinChosen(p, champ, skin); }
-    public void onBanClick(Player p, String champ)            { var s = of(p.getUniqueId()); if (s != null) s.onBanClick(p, champ); }
+    public boolean onBanClick(Player p, String champ)         { var s = of(p.getUniqueId()); return s != null && s.onBanClick(p, champ); }
 
     public java.util.Set<String> getBannedChampions() {
         java.util.Set<String> all = new java.util.LinkedHashSet<>();

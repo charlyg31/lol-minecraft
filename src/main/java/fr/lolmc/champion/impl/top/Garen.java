@@ -46,7 +46,7 @@ public final class Garen extends BaseChampion {
             new double[]{8,7.5,7,6.5,6},5,0,DamageType.PHYSICAL);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,2.5); if(tgt==null){c.sendActionBar(Component.text("⚔ Aucune cible à portée",NamedTextColor.GRAY));return;}
+            org.bukkit.entity.LivingEntity tgt = (t!=null && TargetingUtil.isEnemy(c,t))?t:TargetingUtil.getTargetedEnemy(c,2.5); if(tgt==null){c.sendActionBar(Component.text("⚔ Aucune cible à portée",NamedTextColor.GRAY));return;}
             // LoL : 30/55/80/105/130 + 50% AD bonus, silence 1.5s, boost vitesse
             double[] base=fr.lolmc.util.Balance.base("q_garen",new double[]{30,65,100,135,170});
             double dmg=base[getLevel()-1]+s.getFinalAD()*fr.lolmc.util.Balance.ratio("q_garen","ad",0.5);
@@ -75,8 +75,12 @@ public final class Garen extends BaseChampion {
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : réduction de dégâts 30% (4s), bouclier + ténacité (0.75s initial)
             c.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE,80,1,false,true)); // ~30% réduction 4s
-            // Bouclier (absorption) : approximé via PV temporaires d'absorption
-            c.addPotionEffect(new PotionEffect(PotionEffectType.ABSORPTION,40,1,false,true));
+            // Bouclier 2 s : 70-170 + 20 % des PV bonus
+            double[] shieldBase={70,95,120,145,170};
+            double shield=shieldBase[getLevel()-1]+s.getBonusHP()*0.20;
+            s.addShield(shield);
+            new org.bukkit.scheduler.BukkitRunnable(){@Override public void run(){ s.addShield(-shield); }}
+                    .runTaskLater(LolPlugin.getInstance(), 40L);
             // Ténacité (immunité aux ralentissements 0.75s) via nettoyage
             c.removePotionEffect(PotionEffectType.SLOWNESS);
             fr.lolmc.util.VisualEffectUtil.impactBurst(c.getWorld(),
@@ -133,7 +137,7 @@ public final class Garen extends BaseChampion {
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // Justice Démacienne : porté plus loin (sort à distance moyenne), cible visée
-            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,8.0); if(tgt==null){c.sendActionBar(Component.text("☠ Aucune cible visée",NamedTextColor.GRAY));return;}
+            org.bukkit.entity.LivingEntity tgt = (t!=null && TargetingUtil.isEnemy(c,t))?t:TargetingUtil.getTargetedEnemy(c,8.0); if(tgt==null){c.sendActionBar(Component.text("☠ Aucune cible visée",NamedTextColor.GRAY));return;}
             double[] base=fr.lolmc.util.Balance.base("r_garen",new double[]{150,250,350});
             int r=Math.min(getLevel()-1,2);
             // Reveal de la cible pendant 1s (20 ticks) au début du cast

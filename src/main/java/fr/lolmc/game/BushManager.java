@@ -148,8 +148,9 @@ public class BushManager implements Listener {
             return;
         }
 
-        // target a-t-il été révélé par des dégâts récents ?
-        if (isRevealed(target)) {
+        // target a-t-il été révélé par des dégâts récents, ou détecté par une ward ennemie ?
+        var wardMgr = LolPlugin.getInstance().getWardManager();
+        if (isRevealed(target) || (wardMgr != null && wardMgr.isRevealed(target))) {
             showTo(viewer, target);
             return;
         }

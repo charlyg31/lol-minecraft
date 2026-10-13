@@ -71,7 +71,7 @@ public final class Janna extends BaseChampion {
             resourceCost = 40;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : envoie un élémentaire qui inflige des dégâts + ralentit. 60/105/150/195/240 + 60% AP
-            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,7.0); if(tgt==null){c.sendActionBar(Component.text("💨 Aucune cible",NamedTextColor.GRAY));return;}
+            org.bukkit.entity.LivingEntity tgt = (t!=null && TargetingUtil.isEnemy(c,t))?t:TargetingUtil.getTargetedEnemy(c,7.0); if(tgt==null){c.sendActionBar(Component.text("💨 Aucune cible",NamedTextColor.GRAY));return;}
             double[] base=fr.lolmc.util.Balance.base("w_janna",new double[]{55,105,155,205,255});double dmg=base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("w_janna","ap",0.6);
             TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.MAGICAL);
             if(tgt instanceof Player __p)
@@ -94,12 +94,16 @@ public final class Janna extends BaseChampion {
             resourceCost = 70;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : bouclier sur allié (ou soi) 75-175 + 50% AP + AD bonus 5s
-            Player dest = (t!=null) ? t : c;
+            Player dest = (t!=null && LolPlugin.getInstance().getTeamManager().areAllies(c,t)) ? t : c; // allié visé, sinon soi
             double[] shieldBase={80,120,160,200,240};
             double shield=shieldBase[getLevel()-1]+s.getFinalAP()*0.55;
             var cm=LolPlugin.getInstance().getChampionManager();
-            if(cm.hasChampion(dest)) cm.getChampion(dest).getStats().addShield(shield);
-            dest.addPotionEffect(new PotionEffect(PotionEffectType.ABSORPTION,100,1,false,true));
+            if(cm.hasChampion(dest)) {
+                var destStats = cm.getChampion(dest).getStats();
+                destStats.addShield(shield);
+                new org.bukkit.scheduler.BukkitRunnable(){@Override public void run(){ destStats.addShield(-shield); }}
+                        .runTaskLater(LolPlugin.getInstance(), 100L); // 5 s
+            }
             dest.addPotionEffect(new PotionEffect(PotionEffectType.STRENGTH,100,0,false,true)); // AD bonus
             fr.lolmc.util.VisualEffectUtil.impactBurst(dest.getWorld(),
                     dest.getLocation().add(0,1,0), Material.LIGHT_BLUE_STAINED_GLASS, 0.3f, 0.5, 8, 6L);
@@ -135,7 +139,8 @@ public final class Janna extends BaseChampion {
                     // Soigne Janna et les alliés proches
                     if(cm.hasChampion(c)) cm.getChampion(c).getHPSystem().heal(healPerTick);
                     for(var ent : c.getWorld().getNearbyLivingEntities(c.getLocation(),5)){
-                        if(ent instanceof Player ally && !ally.equals(c) && cm.hasChampion(ally))
+                        if(ent instanceof Player ally && !ally.equals(c) && cm.hasChampion(ally)
+                                && LolPlugin.getInstance().getTeamManager().areAllies(c, ally)) // pas les ennemis
                             cm.getChampion(ally).getHPSystem().heal(healPerTick);
                     }
                     fr.lolmc.util.VisualEffectUtil.impactBurst(c.getWorld(),

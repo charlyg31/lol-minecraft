@@ -123,7 +123,7 @@ public class EntityDeathListener implements Listener {
                     String.format("🤝 ASSIST! +%d or +%.0f XP", RewardManager.GOLD_ASSIST, RewardManager.XP_ASSIST),
                     net.kyori.adventure.text.format.NamedTextColor.YELLOW));
                 plugin.getMatchScoreboard().addAssist(assistant);
-                plugin.getRuneManager().onTakedown(assistant);
+                plugin.getRuneManager().onTakedown(assistant, victim);
             }
         }
 
@@ -139,7 +139,10 @@ public class EntityDeathListener implements Listener {
         if ("annie".equals(championManager.getChampion(victim).getId()))
             fr.lolmc.champion.impl.mid.Annie.onAnnieDeath(victim);
 
-        if (killer == null) return;
+        if (killer == null) {
+            rewards.resetStreak(victim.getUniqueId()); // la série (bounty) s'arrête à toute mort
+            return;
+        }
 
         // ── Kill de champion ──
         rewards.onChampionKill(killer, victim);
@@ -163,6 +166,6 @@ public class EntityDeathListener implements Listener {
             fr.lolmc.instance.InstanceHelper.featManager(killer).claim(
                 fr.lolmc.game.FeatManager.Feat.FIRST_BLOOD, killerTeam, killer);
         // Runes : Triomphe, Absorption (soin/or sur takedown)
-        plugin.getRuneManager().onTakedown(killer);
+        plugin.getRuneManager().onTakedown(killer, victim);
     }
 }

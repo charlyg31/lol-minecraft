@@ -203,6 +203,40 @@ public class StructureDamageListener implements Listener {
         }
     }
 
+    /**
+     * Structure abattue par des sbires (aucun champion n'a porté le coup final) : or d'équipe,
+     * super-sbires après un inhibiteur, et fin de partie si c'est le Nexus principal.
+     * Avant, rien ne se passait — un Nexus détruit par les sbires ne terminait jamais la partie.
+     */
+    public void onStructureDestroyedByMinions(GameStructure structure, org.bukkit.World world) {
+        Team enemyTeam = structure.getTeam();
+        Team attacking = enemyTeam.opposite();
+        // Joueur de référence (équipe attaquante de cette partie) pour retrouver instance et managers
+        Player ref = null;
+        for (Player p : world.getPlayers()) {
+            if (!championManager.hasChampion(p)) continue;
+            if (teamManager.getTeam(p) == attacking) { ref = p; break; }
+            if (ref == null) ref = p;
+        }
+        if (ref == null) return;
+        if (structure.getType() == Type.TURRET) {
+            fr.lolmc.instance.InstanceHelper.rewardManager(ref).onTurretDestroyed(null, attacking, structure.getIndex());
+            fr.lolmc.instance.InstanceHelper.featManager(ref).claim(
+                fr.lolmc.game.FeatManager.Feat.FIRST_TOWER, attacking, ref);
+        } else if (structure.getType() == Type.INHIBITOR) {
+            fr.lolmc.instance.InstanceHelper.minionManager(ref).enableSuperMinions(enemyTeam, structure.getLane());
+            String inhKey = structure.getType().name() + "_" + enemyTeam.name() + "_" + structure.getLane();
+            fr.lolmc.instance.InstanceHelper.gameManager(ref).onInhibitorDestroyed(inhKey);
+            fr.lolmc.instance.InstanceHelper.announcementManager(ref).announceInhibitorDestroyed(
+                    structure.getLane(), enemyTeam.name());
+            fr.lolmc.instance.InstanceHelper.rewardManager(ref).onInhibitorDestroyed(null, attacking);
+        }
+        fr.lolmc.util.WorldContext.broadcast(world, Component.text(
+                "💥 " + structureName(structure) + " (" + enemyTeam.name() + ") détruit par les sbires !",
+                NamedTextColor.GOLD));
+        if (structure.getType() == Type.NEXUS_BASE) endMatch(attacking, ref);
+    }
+
     private void onStructureDestroyed(GameStructure structure, Player destroyer) {
         String name = structureName(structure);
         Team enemyTeam = structure.getTeam();

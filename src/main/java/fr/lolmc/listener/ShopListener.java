@@ -307,8 +307,7 @@ public class ShopListener implements Listener {
             goldManager.addGold(player.getUniqueId(), effectiveCost);
             for (java.util.Map.Entry<Integer, LolItem> entry : removedComponents.entrySet()) {
                 LolItem comp = entry.getValue();
-                comp.applyStats(champ.getStats(), champ.getHPSystem(), champ.getResourceSystem());
-                inv.equipItem(player, champ, comp);
+                inv.equipItem(player, champ, comp); // réapplique ses stats (pas de second applyStats)
                 hb.addItem(player, comp.getId());
             }
             player.sendMessage(Component.text("❌ Impossible d'équiper l'item.", NamedTextColor.RED));
@@ -343,6 +342,11 @@ public class ShopListener implements Listener {
 
         PlayerInventoryManager inv = getOrCreate(player);
         if (inv.getItem(lolSlot) == null) return;
+        // La vente suit la même règle que l'achat : à la base uniquement en partie
+        if (!canShopHere(player)) {
+            player.sendActionBar(Component.text("🏪 Vente possible uniquement à la base !", NamedTextColor.RED));
+            return;
+        }
 
         BaseChampion champ = championManager.getChampion(player);
         var soldItem = inv.getItem(lolSlot);

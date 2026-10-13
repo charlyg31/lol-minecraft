@@ -55,7 +55,7 @@ public final class MasterYi extends BaseChampion implements fr.lolmc.champion.ba
             new double[]{18,16,14,12,10},15,0,DamageType.TRUE);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
+            org.bukkit.entity.LivingEntity tgt = (t!=null && TargetingUtil.isEnemy(c,t))?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
             Location dest=safeTeleport(c.getLocation(),tgt.getLocation());
             c.teleport(dest);
             double[] base=fr.lolmc.util.Balance.base("q_masteryi",new double[]{20,45,70,95,120});double dmg=base[getLevel()-1]+s.getFinalAD()*0.40;
@@ -74,8 +74,16 @@ public final class MasterYi extends BaseChampion implements fr.lolmc.champion.ba
             new double[]{35,30,25,20,15},0,0,DamageType.TRUE);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            c.addPotionEffect(new PotionEffect(PotionEffectType.REGENERATION,80,4,false,true));
-            c.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE,80,2,false,true));
+            c.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE,80,2,false,true)); // -60 % de dégâts
+            // Soin sur 4 s (la potion Régénération était écrasée par la synchro des PV LoL)
+            double[] heals={120,200,280,360,440};
+            double perTick=(heals[getLevel()-1]+s.getFinalAP()*0.60)/8.0;
+            new org.bukkit.scheduler.BukkitRunnable(){ int n=0;
+                @Override public void run(){
+                    var cm=LolPlugin.getInstance().getChampionManager();
+                    if(n++>=8 || !c.isOnline() || !cm.hasChampion(c)){ cancel(); return; }
+                    cm.getChampion(c).getHPSystem().heal(perTick);
+                }}.runTaskTimer(LolPlugin.getInstance(), 10L, 10L);
             c.sendActionBar(Component.text("🧘 Méditation 4s...",NamedTextColor.AQUA));
         }
         @Override public String getDynamicDescription(ChampionStats s){return "Régénère HP pendant 4s. Réduit dégâts de 60%%.";}

@@ -28,15 +28,14 @@ public final class Yasuo extends BaseChampion implements fr.lolmc.champion.base.
         setAbility(0,new AA()); setAbility(1,new Q());
         setAbility(2,new W()); setAbility(3,new E()); setAbility(4,new R());
         initSystems(523, 0.0, ResourceSystem.ResourceType.FLOW, 100, 0.0);
-        // Passif Voie du Vagabond : double la crit chance des items (plafonné à 1.0)
-        // Simulé via un multiplicateur appliqué quand des items de crit sont achetés
-        // Note: l'application se fait dans PassiveManager.equipItem via addBonusCritChance x2
+        // Passif Voie du Vagabond : double la chance de critique des objets (plafonnée à 100 %)
+        getStats().setCritChanceMultiplier(2.0);
     }
 
     public static final Map<UUID,Integer> qCasts=new java.util.concurrent.ConcurrentHashMap<>();
     /** Reinitialise l'etat de ce joueur (fin de partie / deconnexion). */
-    @Override public void resetState(UUID id){ qCasts.remove(id); eStacks.remove(id); }
-    @Override public void resetAllState(){ qCasts.clear(); eStacks.clear(); }
+    @Override public void resetState(UUID id){ qCasts.remove(id); eStacks.remove(id); eLastCast.remove(id); }
+    @Override public void resetAllState(){ qCasts.clear(); eStacks.clear(); eLastCast.clear(); }
 
     // Passif Voie du Vagabond : au double crit chance passif (déjà configuré via ChampionStats)
     // Passif Esprit du Vent : bouclier égal 100+50%AP quand Flow est plein
@@ -102,6 +101,7 @@ public final class Yasuo extends BaseChampion implements fr.lolmc.champion.base.
 
     // Stacks de dégâts E (Lame Déferlante) par joueur
     public static final Map<UUID,Integer> eStacks=new java.util.concurrent.ConcurrentHashMap<>();
+    private static final Map<UUID,Long> eLastCast=new java.util.concurrent.ConcurrentHashMap<>();
 
     static class E extends BaseAbility {
         E(){super("e_yasuo","Lame Déferlante",Material.FEATHER,AbilitySlot.E,
@@ -109,7 +109,7 @@ public final class Yasuo extends BaseChampion implements fr.lolmc.champion.base.
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : dash à travers la cible, dégâts magiques + 25% par stack (max 4 = +100%)
-            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,5.0); if(tgt==null){c.sendActionBar(Component.text("🍃 Aucune cible",NamedTextColor.GRAY));return;}
+            org.bukkit.entity.LivingEntity tgt = (t!=null && TargetingUtil.isEnemy(c,t))?t:TargetingUtil.getTargetedEnemy(c,5.0); if(tgt==null){c.sendActionBar(Component.text("🍃 Aucune cible",NamedTextColor.GRAY));return;}
             int stacks=Math.min(eStacks.getOrDefault(c.getUniqueId(),0),4);
             double[] base=fr.lolmc.util.Balance.base("e_yasuo",new double[]{70,85,100,115,130});
             double dmg=(base[getLevel()-1]+s.getFinalAD()*0.20+s.getFinalAP()*0.60)*(1.0+0.25*stacks);
@@ -119,8 +119,12 @@ public final class Yasuo extends BaseChampion implements fr.lolmc.champion.base.
             c.teleport(dest);
             TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.MAGICAL);
             eStacks.merge(c.getUniqueId(),1,Integer::sum);
-            // Reset stacks après 6s
-            new BukkitRunnable(){@Override public void run(){eStacks.put(c.getUniqueId(),0);}}.runTaskLater(LolPlugin.getInstance(),120L);
+            // Reset des stacks 6s après le DERNIER E (avant : le reset du 1er E effaçait les suivants)
+            final long castAt=System.currentTimeMillis();
+            eLastCast.put(c.getUniqueId(), castAt);
+            new BukkitRunnable(){@Override public void run(){
+                if(eLastCast.getOrDefault(c.getUniqueId(),0L)==castAt) eStacks.put(c.getUniqueId(),0);
+            }}.runTaskLater(LolPlugin.getInstance(),120L);
             fr.lolmc.util.VisualEffectUtil.impact(c.getWorld(),
                     dest.add(0,1,0), Material.WHITE_STAINED_GLASS, 0.3f, 4L);
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 1.4f);
@@ -137,7 +141,7 @@ public final class Yasuo extends BaseChampion implements fr.lolmc.champion.base.
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : se TP sur un ennemi (idéalement aérien), dégâts + maintient en l'air
-            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,8.0); if(tgt==null){c.sendActionBar(Component.text("⚔ Aucune cible visée",NamedTextColor.GRAY));return;}
+            org.bukkit.entity.LivingEntity tgt = (t!=null && TargetingUtil.isEnemy(c,t))?t:TargetingUtil.getTargetedEnemy(c,8.0); if(tgt==null){c.sendActionBar(Component.text("⚔ Aucune cible visée",NamedTextColor.GRAY));return;}
             // Dash sur la cible
             var dest=tgt.getLocation().clone().subtract(tgt.getLocation().getDirection().multiply(1.0));
             dest.setY(c.getLocation().getY());

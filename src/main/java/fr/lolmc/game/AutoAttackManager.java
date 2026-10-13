@@ -578,8 +578,11 @@ public class AutoAttackManager {
 
     /** Vérifie la cadence d'attaque. Renvoie false si trop tôt. */
     private boolean checkRangeAndCooldown(Player attacker, BaseChampion champ) {
+        var ccAa = LolPlugin.getInstance().getCCManager();
+        if (ccAa != null && !ccAa.canAutoAttack(attacker.getUniqueId())) return false; // étourdi
         long now = System.currentTimeMillis();
-        double attackSpeed = champ.getStats().getFinalAttackSpeed();
+        double attackSpeed = Math.min(2.5, champ.getStats().getFinalAttackSpeed()
+                * fr.lolmc.util.PotionCombat.attackSpeedMultiplier(attacker));
         long cooldownMs = (long)(1000.0 / Math.max(0.1, attackSpeed));
         Long last = lastAttack.get(attacker.getUniqueId());
         if (last != null && (now - last) < cooldownMs) return false;
@@ -591,8 +594,11 @@ public class AutoAttackManager {
     public boolean canAutoAttack(Player attacker) {
         if (!LolPlugin.getInstance().getChampionManager().hasChampion(attacker)) return false;
         var champ = LolPlugin.getInstance().getChampionManager().getChampion(attacker);
+        var ccAa = LolPlugin.getInstance().getCCManager();
+        if (ccAa != null && !ccAa.canAutoAttack(attacker.getUniqueId())) return false; // étourdi
         long now = System.currentTimeMillis();
-        double attackSpeed = champ.getStats().getFinalAttackSpeed();
+        double attackSpeed = Math.min(2.5, champ.getStats().getFinalAttackSpeed()
+                * fr.lolmc.util.PotionCombat.attackSpeedMultiplier(attacker));
         long cooldownMs = (long)(1000.0 / Math.max(0.1, attackSpeed));
         Long last = lastAttack.get(attacker.getUniqueId());
         return last == null || (now - last) >= cooldownMs;

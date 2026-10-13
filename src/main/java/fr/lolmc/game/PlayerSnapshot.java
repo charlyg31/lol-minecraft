@@ -49,7 +49,7 @@ public class PlayerSnapshot {
         var ssm = LolPlugin.getInstance().getSummonerSpellManager();
         var spells = ssm.getSpells(player);
         this.spell1 = spells != null && spells.length > 0 ? spells[0].name() : "FLASH";
-        this.spell2 = spells != null && spells.length > 1 ? spells[1].name() : "IGNITE";
+        this.spell2 = spells != null && spells.length > 1 ? spells[1].name() : "FLASH"; // FLASH = aucun sort supplémentaire
     }
 
     /** Restaure l'état du joueur après reconnexion. */

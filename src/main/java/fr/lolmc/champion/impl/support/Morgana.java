@@ -47,10 +47,10 @@ public final class Morgana extends BaseChampion {
                 new double[]{11,10.5,10,9.5,9},20,0,DamageType.MAGICAL);
             resourceCost = 50;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
+            org.bukkit.entity.LivingEntity tgt = (t!=null && TargetingUtil.isEnemy(c,t))?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
             double[] base=fr.lolmc.util.Balance.base("q_morgana",new double[]{80,135,190,245,300});double dmg=base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("q_morgana","ap",0.9);
             DamageUtil.abilityDamageMagicEntity(c, tgt, dmg);
-            tgt.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,40,10,false,true));
+            fr.lolmc.LolPlugin.getInstance().getCCManager().root(tgt, 40); // root 2s
             if(tgt instanceof Player _tp)_tp.sendActionBar(Component.text("🕸 Root 2s — Morgana Q!",NamedTextColor.DARK_PURPLE));
             fr.lolmc.util.VisualEffectUtil.impactBurst(c.getWorld(),
                     tgt.getLocation(), Material.PURPLE_STAINED_GLASS, 0.28f, 0.5, 8, 6L);
@@ -65,7 +65,7 @@ public final class Morgana extends BaseChampion {
                 new double[]{12,12,12,12,12},20,4,DamageType.MAGICAL);
             resourceCost = 25;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
+            org.bukkit.entity.LivingEntity tgt = (t!=null && TargetingUtil.isEnemy(c,t))?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
             Location loc=tgt.getLocation();
             new BukkitRunnable(){
                 int tick=0;
@@ -99,13 +99,17 @@ public final class Morgana extends BaseChampion {
             resourceCost = 80;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // Bouclier Noir : protège un allié (ou soi), absorbe les dégâts magiques + immunité CC tant qu'il tient
-            Player dest = (t != null) ? t : c;
+            Player dest = (t!=null && LolPlugin.getInstance().getTeamManager().areAllies(c,t)) ? t : c; // allié visé, sinon soi
             double[] shieldBase = {60,120,180,240,300};
             double shield = shieldBase[getLevel()-1] + s.getFinalAP()*0.50;
             var cm = LolPlugin.getInstance().getChampionManager();
-            if (cm.hasChampion(dest)) cm.getChampion(dest).getStats().addShield(shield);
-            dest.addPotionEffect(new PotionEffect(PotionEffectType.ABSORPTION,100,1,false,true));
-            dest.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE,100,1,false,true));
+            // Bouclier anti-dégâts magiques (absorbe d'abord la magie), 5 s
+            if (cm.hasChampion(dest)) {
+                var destStats = cm.getChampion(dest).getStats();
+                destStats.addMagicShield(shield);
+                new org.bukkit.scheduler.BukkitRunnable(){@Override public void run(){ destStats.addMagicShield(-shield); }}
+                        .runTaskLater(LolPlugin.getInstance(), 100L);
+            }
             dest.sendActionBar(Component.text("🛡 Bouclier Noir! ("+(int)shield+")",NamedTextColor.DARK_GRAY));
             c.getWorld().playSound(c.getLocation(), Sound.BLOCK_BEACON_ACTIVATE, 0.8f, 0.6f);
         }
@@ -124,7 +128,7 @@ public final class Morgana extends BaseChampion {
             for(var __t : TargetingUtil.enemiesAround(c, 5.0)){
                 TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);
                 if(__t instanceof Player __p){
-                    __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,30,10,false,true));
+                    fr.lolmc.LolPlugin.getInstance().getCCManager().stun(__p, 30); // stun 1.5s
                     __p.sendActionBar(Component.text("⛓ STUN Morgana R!",NamedTextColor.DARK_PURPLE));
                 }
             }

@@ -162,16 +162,12 @@ public final class Veigar extends BaseChampion implements fr.lolmc.champion.base
                 new double[]{120,90,60},20,0,DamageType.MAGICAL);
             resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,8.0); if(tgt==null){c.sendActionBar(Component.text("☠ Aucune cible visée",NamedTextColor.GRAY));return;}
+            org.bukkit.entity.LivingEntity tgt = (t!=null && TargetingUtil.isEnemy(c,t))?t:TargetingUtil.getTargetedEnemy(c,8.0); if(tgt==null){c.sendActionBar(Component.text("☠ Aucune cible visée",NamedTextColor.GRAY));return;}
             double[] base=fr.lolmc.util.Balance.base("r_veigar",new double[]{175,350,525});int rr=Math.min(getLevel()-1,2);
             double baseDmg=base[rr]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("r_veigar","ap",1.2);
 
-            // CORRECTION : Utilisation de l'attribut GENERIC_MAX_HEALTH au lieu de getMaxHealth() déprécié
-            var maxHealthAttr = tgt.getAttribute(fr.lolmc.util.Compat.maxHealth());
-            double maxHealth = maxHealthAttr != null ? maxHealthAttr.getValue() : 20.0;
-
-            // Augmenté jusqu'à +100% selon PV manquants de la cible
-            double missingPct=1.0-(tgt.getHealth()/maxHealth);
+            // Augmenté jusqu'à +100% selon PV manquants de la cible (PV LoL)
+            double missingPct=1.0-(TargetingUtil.getRealHealth(tgt)/Math.max(1, TargetingUtil.getRealMaxHealth(tgt)));
             double dmg=baseDmg*(1.0+missingPct);
             tgt.getWorld().strikeLightningEffect(tgt.getLocation());
             fr.lolmc.util.VisualEffectUtil.impactBurst(tgt.getWorld(),

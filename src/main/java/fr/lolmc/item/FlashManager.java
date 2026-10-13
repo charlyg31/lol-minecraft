@@ -29,6 +29,8 @@ public class FlashManager {
      * Tente d'utiliser Flash.
      */
     public boolean useFlash(Player player) {
+        var ssmFlash = LolPlugin.getInstance().getSummonerSpellManager();
+        if (ssmFlash != null && !ssmFlash.hasFlash(player)) return false; // Flash non choisi en sélection
         if (isOnCooldown(player)) {
             player.sendActionBar(Component.text(
                     String.format("✦ Flash en recharge — %.0fs", getRemaining(player)),
@@ -61,6 +63,11 @@ public class FlashManager {
 
         cooldowns.put(player.getUniqueId(), System.currentTimeMillis());
         player.sendActionBar(Component.text("✦ Flash!", NamedTextColor.AQUA));
+        // Icône grisée pendant la recharge, puis remise en couleur à la fin
+        setFlashReady(player);
+        org.bukkit.Bukkit.getScheduler().runTaskLater(LolPlugin.getInstance(), () -> {
+            if (!isOnCooldown(player)) setFlashReady(player);
+        }, FLASH_COOLDOWN_MS / 50L + 1L);
         var rm = LolPlugin.getInstance().getRuneManager();
         if (rm != null) rm.applyNimbusCloak(player);
         return true;
@@ -100,8 +107,9 @@ public class FlashManager {
     }
 
     public void setFlashReady(org.bukkit.entity.Player player) {
-        LolPlugin.getInstance().getHotbarManager()
-                .refreshAbilitySlot(player,
-                        LolPlugin.getInstance().getChampionManager().getChampion(player), 0);
+        // Redessine la barre (l'icône Flash est en slot 5 ; refreshAbilitySlot(…, 0) visait l'AA)
+        var champ = LolPlugin.getInstance().getChampionManager().getChampion(player);
+        if (champ != null && player.isOnline())
+            LolPlugin.getInstance().getHotbarManager().renderPage(player, champ);
     }
 }

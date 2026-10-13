@@ -109,7 +109,7 @@ public final class Annie extends BaseChampion implements fr.lolmc.champion.base.
         for (Entity e : dest.getWorld().getNearbyEntities(dest, 5, 5, 5)) {
             if (!(e instanceof org.bukkit.entity.LivingEntity le)) continue;
             if (e.equals(annie) || e.equals(tibbers)) continue;
-            if (e instanceof Player ep && !LolPlugin.getInstance().getTeamManager().areEnemies(annie, ep)) continue;
+            if (!TargetingUtil.isEnemy(annie, le)) continue; // ni alliés ni sbires alliés
             double d = e.getLocation().distance(dest);
             if (d < best) { best = d; nearEnemy = le; }
         }
@@ -147,8 +147,11 @@ public final class Annie extends BaseChampion implements fr.lolmc.champion.base.
             }
             TargetingUtil.dealDamage(c, target, dmg, TargetingUtil.DmgType.MAGICAL);
             if(kills){
-                triggerCooldown(c,s);
+                // Remboursement de 50 % : appliqué au CD que BaseChampion déclenche juste après ce cast,
+                // puis retour au CD normal (sinon la réduction restait et se cumulait à chaque kill)
                 setDynamicCooldown(getCurrentCooldown(s)*0.5);
+                new org.bukkit.scheduler.BukkitRunnable(){@Override public void run(){ setDynamicCooldown(-1); }}
+                        .runTaskLater(LolPlugin.getInstance(), 1L);
                 var cm=LolPlugin.getInstance().getChampionManager();
                 if(cm.hasChampion(c)&&cm.getChampion(c).getResourceSystem()!=null)cm.getChampion(c).getResourceSystem().addCurrent(60);
             }
@@ -192,7 +195,7 @@ public final class Annie extends BaseChampion implements fr.lolmc.champion.base.
                 new double[]{10,9,8,7,6},0,0,DamageType.MAGICAL);
             resourceCost = 40;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            Player dest=t!=null?t:c;
+            Player dest = (t!=null && LolPlugin.getInstance().getTeamManager().areAllies(c,t)) ? t : c; // allié visé, sinon soi
             double[] shieldBase={60,95,130,165,200};
             double shield=shieldBase[getLevel()-1]+s.getFinalAP()*0.40;
             var cm=LolPlugin.getInstance().getChampionManager();

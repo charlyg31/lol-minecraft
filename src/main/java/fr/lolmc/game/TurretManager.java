@@ -135,6 +135,7 @@ public class TurretManager {
         if (aggro != null) {
             for (Player p : center.getWorld().getPlayers()) {
                 if (teamManager.getTeam(p) == turretTeam) continue;
+                if (p.getGameMode() == org.bukkit.GameMode.SPECTATOR) continue; // mort
                 if (!aggro.hasTurretAggro(p)) continue;
                 if (!inCylinder(center, p.getLocation())) continue;
                 return p; // retarget immédiat sur l'attaquant
@@ -143,6 +144,7 @@ public class TurretManager {
         for (var entity : center.getWorld().getNearbyEntities(center, boxRange(), boxRange(), boxRange())) {
             if (!(entity instanceof Player p)) continue;
             if (!championManager.hasChampion(p)) continue;
+            if (p.getGameMode() == org.bukkit.GameMode.SPECTATOR) continue; // mort
             if (!inCylinder(center, p.getLocation())) continue;
             Team pTeam = teamManager.getTeam(p);
             if (pTeam == null || pTeam == turretTeam) continue; // pas un ennemi
@@ -157,7 +159,8 @@ public class TurretManager {
 
     private boolean hasAlliedChampionNearby(Location center, Team turretTeam) {
         for (var entity : center.getWorld().getNearbyEntities(center, boxRange(), boxRange(), boxRange())) {
-            if (entity instanceof Player p && championManager.hasChampion(p)) {
+            if (entity instanceof Player p && championManager.hasChampion(p)
+                    && p.getGameMode() != org.bukkit.GameMode.SPECTATOR) { // pas les morts
                 if (!inCylinder(center, p.getLocation())) continue;
                 if (teamManager.getTeam(p) == turretTeam) return true;
             }
@@ -185,7 +188,8 @@ public class TurretManager {
         Player closest = null;
         double closestDist = Double.MAX_VALUE;
         for (var entity : center.getWorld().getNearbyEntities(center, boxRange(), boxRange(), boxRange())) {
-            if (entity instanceof Player p && championManager.hasChampion(p)) {
+            if (entity instanceof Player p && championManager.hasChampion(p)
+                    && p.getGameMode() != org.bukkit.GameMode.SPECTATOR) { // pas les morts
                 if (!inCylinder(center, p.getLocation())) continue;
                 Team pTeam = teamManager.getTeam(p);
                 if (pTeam != null && pTeam != turretTeam) {

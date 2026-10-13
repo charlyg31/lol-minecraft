@@ -145,7 +145,11 @@ public final class ChampionStats {
     public void addHealShieldPower(double v) { healShieldPower = Math.max(0, healShieldPower + v); }
 
     public double getFinalAttackSpeed()  { return Math.min((baseAttackSpeed + growthBonus(growthAttackSpeed) + bonusAttackSpeed) * multAttackSpeed, 2.5); }
-    public double getFinalCritChance()   { return Math.min(baseCritChance + bonusCritChance, 1.0); }
+    public double getFinalCritChance()   { return Math.min(baseCritChance + bonusCritChance * critChanceMultiplier, 1.0); }
+
+    /** Multiplicateur des chances de critique des objets (Yasuo : x2, Voie du Vagabond). */
+    private double critChanceMultiplier = 1.0;
+    public void setCritChanceMultiplier(double m) { critChanceMultiplier = m; }
     public double getFinalCritDamage()   { return baseCritDamage + bonusCritDamage; }
     public double getFinalMovementSpeed(){ return (baseMovementSpeed + bonusMovementSpeed) * multMovementSpeed; }
     public double getFinalRange()        { return baseRange + bonusRange; }
@@ -260,7 +264,17 @@ public final class ChampionStats {
         // consommé par des dégâts laisserait un solde négatif qui annulerait le suivant.
         shieldAmount = Math.max(0, shieldAmount + amount);
     }
-    public void addMagicShield(double amount)   { magicShieldAmount += amount; }
+    public void addMagicShield(double amount)   { magicShieldAmount = Math.max(0, magicShieldAmount + amount); }
+
+    // Bouclier anti-sort temporaire (Sivir E) : bloque le prochain sort subi
+    private long spellShieldUntil = 0;
+    public void grantSpellShield(long durationMs) { spellShieldUntil = System.currentTimeMillis() + durationMs; }
+    /** Consomme le bouclier anti-sort s'il est actif. */
+    public boolean consumeSpellShield() {
+        if (System.currentTimeMillis() >= spellShieldUntil) return false;
+        spellShieldUntil = 0;
+        return true;
+    }
     public double getShield()                   { return shieldAmount + magicShieldAmount; }
 
     /**

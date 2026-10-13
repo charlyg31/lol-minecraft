@@ -32,6 +32,13 @@ public class ChampSelectGUI implements Listener {
     private static final Component RUNE_TITLE = Component.text("Choisis tes Runes", NamedTextColor.DARK_PURPLE)
             .decoration(TextDecoration.ITALIC, false);
 
+    private static final Component SPELL_TITLE = Component.text("Sorts d'invocateur", NamedTextColor.DARK_PURPLE)
+            .decoration(TextDecoration.ITALIC, false);
+    /** Sorts proposés (Flash compris), dans l'ordre d'affichage. */
+    private static final String[] SPELLS = {
+            "FLASH", "IGNITE", "HEAL", "BARRIER", "EXHAUST", "TELEPORT", "SMITE", "CLEANSE", "GHOST"
+    };
+
     private static final Component BAN_TITLE = Component.text("Bannissez un Champion", NamedTextColor.RED).decoration(TextDecoration.ITALIC, false);
     private static final String SKIN_TITLE = "🎨 Choisir un skin";
 
@@ -53,15 +60,40 @@ public class ChampSelectGUI implements Listener {
 
     public void openChampionMenu(Player player) {
         Inventory inv = Bukkit.createInventory(null, 27, CHAMP_TITLE);
+        var csmMenu = LolPlugin.getInstance().getChampSelectManager();
         for (int i = 0; i < CHAMPIONS.length; i++) {
-            inv.setItem(i, championIcon(CHAMPIONS[i]));
+            String id = CHAMPIONS[i];
+            if (csmMenu.isBanned(player.getUniqueId(), id)) inv.setItem(i, unavailableIcon(id, "⛔ Banni"));
+            else if (csmMenu.isTaken(player.getUniqueId(), id)) inv.setItem(i, unavailableIcon(id, "✖ Déjà pris"));
+            else inv.setItem(i, championIcon(id));
         }
-        // Bouton runes + bouton lock
+        // Bouton sorts + bouton runes + bouton lock
+        String[] spells = LolPlugin.getInstance().getChampSelectManager().getChosenSpells(player.getUniqueId());
+        inv.setItem(24, button(Material.BLAZE_POWDER, Component.text("Sorts d'invocateur", NamedTextColor.GOLD),
+                "Actuels : " + spellName(spells[0]) + " + " + spellName(spells[1]) + " — clique pour changer"));
         inv.setItem(25, button(Material.ENCHANTED_BOOK, Component.text("Runes", NamedTextColor.LIGHT_PURPLE),
                 "Clique pour configurer tes runes"));
         inv.setItem(26, button(Material.LIME_DYE, Component.text("🔒 Verrouiller", NamedTextColor.GREEN),
                 "Confirme tes choix"));
         player.openInventory(inv);
+    }
+
+    /** Vrai si le joueur a l'écran de sélection des champions ouvert. */
+    public boolean isChampionMenuOpen(Player player) {
+        return CHAMP_TITLE.equals(player.getOpenInventory().title());
+    }
+
+    private ItemStack unavailableIcon(String champId, String reason) {
+        ItemStack item = new ItemStack(Material.GRAY_STAINED_GLASS_PANE);
+        var meta = item.getItemMeta();
+        if (meta != null) {
+            meta.displayName(Component.text(capitalize(champId) + " — " + reason, NamedTextColor.DARK_GRAY)
+                    .decoration(TextDecoration.ITALIC, false));
+            meta.lore(List.of(Component.text("Indisponible", NamedTextColor.GRAY)
+                    .decoration(TextDecoration.ITALIC, false)));
+            item.setItemMeta(meta);
+        }
+        return item;
     }
 
     private ItemStack championIcon(String champId) {
@@ -101,6 +133,57 @@ public class ChampSelectGUI implements Listener {
             case "missfortune" -> Material.TIPPED_ARROW;
             default -> Material.PLAYER_HEAD;
         };
+    }
+
+    // ── Menu Sorts d'invocateur ──────────────────────────────────
+
+    /** Ligne du haut = 1er sort, ligne du bas = 2e sort ; le sort actuel brille. */
+    public void openSpellMenu(Player player) {
+        String[] chosen = LolPlugin.getInstance().getChampSelectManager().getChosenSpells(player.getUniqueId());
+        Inventory inv = Bukkit.createInventory(null, 27, SPELL_TITLE);
+        for (int i = 0; i < SPELLS.length; i++) {
+            inv.setItem(i, spellIcon(SPELLS[i], 1, SPELLS[i].equals(chosen[0])));
+            inv.setItem(9 + i, spellIcon(SPELLS[i], 2, SPELLS[i].equals(chosen[1])));
+        }
+        inv.setItem(22, button(Material.ARROW, Component.text("◀ Retour aux champions", NamedTextColor.YELLOW), ""));
+        player.openInventory(inv);
+    }
+
+    private ItemStack spellIcon(String spell, int position, boolean selected) {
+        Material mat = switch (spell) {
+            case "FLASH"    -> Material.ENDER_PEARL;
+            case "IGNITE"   -> Material.BLAZE_POWDER;
+            case "HEAL"     -> Material.GLISTERING_MELON_SLICE;
+            case "BARRIER"  -> Material.SHIELD;
+            case "EXHAUST"  -> Material.FERMENTED_SPIDER_EYE;
+            case "TELEPORT" -> Material.ENDER_EYE;
+            case "SMITE"    -> Material.GOLDEN_SWORD;
+            case "CLEANSE"  -> Material.MILK_BUCKET;
+            default         -> Material.FEATHER;
+        };
+        ItemStack item = new ItemStack(mat);
+        var meta = item.getItemMeta();
+        if (meta != null) {
+            meta.displayName(Component.text((selected ? "✔ " : "") + spellName(spell),
+                    selected ? NamedTextColor.GREEN : NamedTextColor.YELLOW).decoration(TextDecoration.ITALIC, false));
+            meta.lore(List.of(Component.text("Sort " + position + (selected ? " (actuel)" : " — clique pour choisir"),
+                    NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false)));
+            if (selected) {
+                meta.addEnchant(org.bukkit.enchantments.Enchantment.UNBREAKING, 1, true);
+                meta.addItemFlags(org.bukkit.inventory.ItemFlag.HIDE_ENCHANTS);
+            }
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
+    private static String spellName(String spell) {
+        if ("FLASH".equals(spell)) return "Flash";
+        try {
+            return fr.lolmc.game.SummonerSpellManager.Spell.valueOf(spell).displayName;
+        } catch (IllegalArgumentException e) {
+            return spell;
+        }
     }
 
     // ── Menu Skins ───────────────────────────────────────────────
@@ -206,12 +289,11 @@ public class ChampSelectGUI implements Listener {
                 banner.sendMessage(Component.text("❌ " + capitalize(banId) + " est déjà banni.", NamedTextColor.RED));
                 return;
             }
-            LolPlugin.getInstance().getChampSelectManager().onBanClick(banner, banId);
-            banner.closeInventory();
+            LolPlugin.getInstance().getChampSelectManager().onBanClick(banner, banId); // ferme le menu si accepté
             return;
         }
 
-        if (!title.equals(CHAMP_TITLE) && !title.equals(RUNE_TITLE)
+        if (!title.equals(CHAMP_TITLE) && !title.equals(RUNE_TITLE) && !title.equals(SPELL_TITLE)
                 && !titleStr.startsWith("🎨 Choisir un skin")) return;
         e.setCancelled(true);
 
@@ -224,8 +306,10 @@ public class ChampSelectGUI implements Listener {
         if (title.equals(CHAMP_TITLE)) {
             int slot = e.getSlot();
             if (slot < CHAMPIONS.length) {
-                csm.chooseChampion(player, CHAMPIONS[slot]);
-                openSkinMenu(player, CHAMPIONS[slot]);
+                // Skin seulement si le choix est accepté (pas banni, pas pris, bon tour)
+                if (csm.chooseChampion(player, CHAMPIONS[slot])) openSkinMenu(player, CHAMPIONS[slot]);
+            } else if (slot == 24) {
+                openSpellMenu(player);
             } else if (slot == 25) {
                 player.closeInventory();
                 LolPlugin.getInstance().getRuneGUI().open(player);
@@ -233,6 +317,19 @@ public class ChampSelectGUI implements Listener {
                 csm.lock(player);
                 player.closeInventory();
             }
+        } else if (title.equals(SPELL_TITLE)) {
+            if (e.getClickedInventory() == null || !e.getClickedInventory().equals(e.getView().getTopInventory())) return;
+            int slot = e.getSlot();
+            if (slot == 22) { openChampionMenu(player); return; }
+            int pos = slot / 9, idx = slot % 9;
+            if (pos > 1 || idx >= SPELLS.length) return;
+            String[] cur = csm.getChosenSpells(player.getUniqueId());
+            String s1 = cur[0], s2 = cur[1];
+            String picked = SPELLS[idx];
+            if (pos == 0) { if (picked.equals(s2)) s2 = s1; s1 = picked; }   // même sort des 2 côtés → échange
+            else          { if (picked.equals(s1)) s1 = s2; s2 = picked; }
+            csm.chooseSpells(player, s1, s2);
+            openSpellMenu(player); // rafraîchir la sélection
         } else if (titleStr.startsWith("🎨 Choisir un skin")) {
             // Extraire le champId du titre "🎨 Choisir un skin — garen"
             String champId = titleStr.contains(" — ")

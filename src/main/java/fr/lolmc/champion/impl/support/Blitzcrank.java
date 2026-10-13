@@ -80,7 +80,7 @@ public final class Blitzcrank extends BaseChampion implements fr.lolmc.champion.
                     Vector pull=c.getLocation().toVector().subtract(finalTgt.getLocation().toVector()).normalize().multiply(2.0);
                     pull.setY(0.3); finalTgt.setVelocity(pull);
                     if(finalTgt instanceof Player __p){
-                        __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,15,10,false,true));
+                        fr.lolmc.LolPlugin.getInstance().getCCManager().stun(__p, 15); // attrapé : étourdi
                         __p.sendActionBar(Component.text("🪝 ATTRAPÉ! Grappin Fusée",NamedTextColor.YELLOW));
                     }
                     fr.lolmc.util.VisualEffectUtil.impactBurst(finalTgt.getWorld(),
@@ -115,7 +115,7 @@ public final class Blitzcrank extends BaseChampion implements fr.lolmc.champion.
             resourceCost = 25;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : prochaine attaque renforcée = knockup 1s + 200% AD
-            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,2.5); if(tgt==null){c.sendActionBar(Component.text("⚡ Poing de Force prêt (frappe un ennemi)",NamedTextColor.YELLOW));return;}
+            org.bukkit.entity.LivingEntity tgt = (t!=null && TargetingUtil.isEnemy(c,t))?t:TargetingUtil.getTargetedEnemy(c,2.5); if(tgt==null){c.sendActionBar(Component.text("⚡ Poing de Force prêt (frappe un ennemi)",NamedTextColor.YELLOW));return;}
             // Double l'attaque de base : AA (100% AD) + 100% AD bonus = 200% AD total
             double dmg=s.getFinalAD()*2.0;
             TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.PHYSICAL);

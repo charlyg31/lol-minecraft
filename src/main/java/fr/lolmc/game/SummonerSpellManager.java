@@ -71,6 +71,12 @@ public class SummonerSpellManager {
     private void triggerCooldown(Player player, Spell spell) {
         cooldowns.put(player.getUniqueId() + ":" + spell.name(),
                 System.currentTimeMillis() + spell.cooldownSeconds * 1000L);
+        // Icône de la barre d'action remise en couleur à la fin de la recharge
+        org.bukkit.Bukkit.getScheduler().runTaskLater(LolPlugin.getInstance(), () -> {
+            var champ = LolPlugin.getInstance().getChampionManager().getChampion(player);
+            if (player.isOnline() && champ != null && !isOnCooldown(player, spell))
+                LolPlugin.getInstance().getHotbarManager().renderPage(player, champ);
+        }, spell.cooldownSeconds * 20L + 1L);
     }
 
     /**
@@ -174,9 +180,9 @@ public class SummonerSpellManager {
         fr.lolmc.util.VisualEffectUtil.impactBurst(caster.getWorld(),
                 caster.getLocation().add(0,1,0), Material.YELLOW_STAINED_GLASS, 0.3f, 0.6, 8, 8L);
         caster.sendActionBar(Component.text("🛡 Bouclier! +" + (int) shield, NamedTextColor.YELLOW));
-        // Le bouclier disparaît après 2s (comme LoL)
+        // Le bouclier disparaît après 2s (comme LoL) — seulement celui-ci, pas les autres boucliers
         new org.bukkit.scheduler.BukkitRunnable() {
-            @Override public void run() { champ.getStats().clearShields(); }
+            @Override public void run() { champ.getStats().addShield(-shield); }
         }.runTaskLater(LolPlugin.getInstance(), 40L);
         return true;
     }
@@ -192,10 +198,7 @@ public class SummonerSpellManager {
         if (caster.getLocation().distance(target.getLocation()) > LolUnits.toBlocks(650)) return false;
         target.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 50, 2, false, true)); // ~2.5s
         target.addPotionEffect(new PotionEffect(PotionEffectType.WEAKNESS, 50, 1, false, true));
-        var cm = LolPlugin.getInstance().getChampionManager();
-        if (cm.hasChampion(target)) {
-            cm.getChampion(target).getStats().addFlatDamageReduction(0); // marqueur
-        }
+        exhaustedUntil.put(target.getUniqueId(), System.currentTimeMillis() + 2500L);
         target.sendActionBar(Component.text("😵 Épuisé par " + caster.getName() + "!", NamedTextColor.GRAY));
         caster.sendActionBar(Component.text("Épuisement lancé!", NamedTextColor.AQUA));
         return true;
@@ -473,6 +476,8 @@ public class SummonerSpellManager {
 
     public void cleanup(UUID uuid) {
         cooldowns.entrySet().removeIf(e -> e.getKey().startsWith(uuid.toString()));
+        exhaustedUntil.remove(uuid);
+        flashChosen.remove(uuid);
     }
 
 
@@ -480,12 +485,36 @@ public class SummonerSpellManager {
      * Définit les sorts d'invocateur d'un joueur (appelé par BridgeManager).
      */
     public void setSpells(org.bukkit.entity.Player player, String spell1, String spell2) {
-        // FLASH est géré par FlashManager (hors de cet enum) : on le saute sans erreur.
-        Spell s1 = parseSpell(spell1);
-        Spell s2 = parseSpell(spell2);
-        if (s1 == null) s1 = (s2 == Spell.IGNITE) ? Spell.HEAL : Spell.IGNITE;
-        if (s2 == null) s2 = (s1 == Spell.IGNITE) ? Spell.HEAL : Spell.IGNITE;
-        playerSpells.put(player.getUniqueId(), new Spell[]{s1, s2});
+        // FLASH est géré par FlashManager (toujours disponible, hors de cet enum) : seuls les
+        // autres sorts choisis sont retenus. Avant, Flash était remplacé par un sort arbitraire.
+        java.util.List<Spell> chosen = new java.util.ArrayList<>(2);
+        flashChosen.put(player.getUniqueId(),
+                "FLASH".equalsIgnoreCase(spell1) || "FLASH".equalsIgnoreCase(spell2));
+        for (String name : new String[]{spell1, spell2}) {
+            Spell sp = parseSpell(name);
+            if (sp != null && !chosen.contains(sp)) chosen.add(sp);
+        }
+        playerSpells.put(player.getUniqueId(), chosen.toArray(new Spell[0]));
+    }
+
+    /** Le joueur a-t-il pris Flash ? (vrai par défaut si aucun choix n'a été fait) */
+    private final Map<UUID, Boolean> flashChosen = new java.util.concurrent.ConcurrentHashMap<>();
+    public boolean hasFlash(Player player) { return flashChosen.getOrDefault(player.getUniqueId(), true); }
+
+    // ── Épuisement : -35 % de dégâts infligés pendant 2,5 s ──
+    private final Map<UUID, Long> exhaustedUntil = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** Épuise {@code target} : -35 % de dégâts infligés pendant {@code durationMs}. */
+    public void exhaust(Player target, long durationMs) {
+        exhaustedUntil.merge(target.getUniqueId(), System.currentTimeMillis() + durationMs, Math::max);
+    }
+
+    /** Multiplicateur des dégâts infligés par {@code attacker} (0,65 s'il est épuisé, sinon 1). */
+    public double outgoingDamageMultiplier(Player attacker) {
+        Long until = exhaustedUntil.get(attacker.getUniqueId());
+        if (until == null) return 1.0;
+        if (System.currentTimeMillis() >= until) { exhaustedUntil.remove(attacker.getUniqueId()); return 1.0; }
+        return 0.65;
     }
 
     private static Spell parseSpell(String name) {

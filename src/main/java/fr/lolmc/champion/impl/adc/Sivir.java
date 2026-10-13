@@ -55,7 +55,7 @@ public final class Sivir extends BaseChampion implements fr.lolmc.champion.base.
             new double[]{14,13,12,11,10},25,0,DamageType.PHYSICAL);
             resourceCost = 70;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
+            org.bukkit.entity.LivingEntity tgt = (t!=null && TargetingUtil.isEnemy(c,t))?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
             double[] base=fr.lolmc.util.Balance.base("q_sivir",new double[]{60,105,150,195,240});double dmg=base[getLevel()-1]+s.getFinalAD();
             DamageUtil.abilityDamageEntity(c, tgt, dmg);
             // Retour: dégâts pleins (plus de falloff en LoL actuel)
@@ -93,7 +93,8 @@ public final class Sivir extends BaseChampion implements fr.lolmc.champion.base.
             new double[]{22,20,18,16,14},0,0,DamageType.TRUE);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            c.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE,40,3,false,true));
+            // Bouclier anti-sort : bloque le prochain sort ennemi pendant 1,5 s
+            s.grantSpellShield(1500L);
             c.sendActionBar(Component.text("🛡 Bouclier Maléfique!",NamedTextColor.GREEN));
         }
         @Override public String getDynamicDescription(ChampionStats s){return "Bloque un sort ennemi. Annule le CC.";}

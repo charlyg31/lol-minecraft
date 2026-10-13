@@ -20,7 +20,7 @@ import java.util.*;
  * Gère la barre d'action (hotbar) avec un système de 2 pages.
  *
  * HOTBAR (slots 0-8) — visible en jeu :
- *   Page 1 : 0=AA  1=Q  2=W  3=E  4=R  5=Flash  6,7=items ACTIFS  8=→page2
+ *   Page 1 : 0=AA  1=Q  2=W  3=E  4=R  5=Flash  6,7=sorts d'invocateur puis items ACTIFS  8=→page2
  *   Page 2 : 0..6=items actifs + consommables  7=Recall  8=←page1
  *
  * INVENTAIRE (slots 9-35) — items achetés affichés (passifs ET actifs) :
@@ -142,15 +142,20 @@ public class HotbarManager {
             }
         }
 
-        // Slot 5 : Flash
-        inv.setItem(FLASH_SLOT, buildFlash(player));
+        // Slot 5 : Flash s'il a été choisi, sinon le 1er sort d'invocateur choisi à sa place
+        var summoners = new ArrayList<>(summonerSpells(player));
+        if (hasFlash(player) || summoners.isEmpty()) inv.setItem(FLASH_SLOT, buildFlash(player));
+        else inv.setItem(FLASH_SLOT, buildSummoner(player, summoners.removeFirst()));
 
-        // Slots 6,7 : 2 premiers items actifs
+        // Slots 6,7 : autres sorts d'invocateur, puis les premiers items actifs
         List<String> activeItems = getActiveItems(player);
+        int activeIdx = 0;
         for (int i = 0; i < PAGE1_ACTIVE_SLOTS.length; i++) {
             int slot = PAGE1_ACTIVE_SLOTS[i];
-            if (i < activeItems.size()) {
-                inv.setItem(slot, buildActiveItem(activeItems.get(i)));
+            if (i < summoners.size()) {
+                inv.setItem(slot, buildSummoner(player, summoners.get(i)));
+            } else if (activeIdx < activeItems.size()) {
+                inv.setItem(slot, buildActiveItem(activeItems.get(activeIdx++)));
             } else {
                 inv.setItem(slot, emptySlot());
             }
@@ -166,12 +171,13 @@ public class HotbarManager {
         // Effacer toute la hotbar avant de redessiner (evite les residus de page 1)
         for (int i = 0; i <= 8; i++) inv.setItem(i, emptySlot());
 
-        // Items actifs au-delà des 2 premiers + consommables
+        // Items actifs qui n'ont pas trouvé de place en page 1 + consommables
         List<String> activeItems = getActiveItems(player);
         List<ItemStack> page2Content = new ArrayList<>();
+        int summonersOnSlots67 = summonerSpells(player).size() - (hasFlash(player) ? 0 : 1);
+        int onPage1 = Math.max(0, PAGE1_ACTIVE_SLOTS.length - Math.max(0, summonersOnSlots67));
 
-        // Items actifs 3+ (les 2 premiers sont en page 1)
-        for (int i = 2; i < activeItems.size(); i++) {
+        for (int i = onPage1; i < activeItems.size(); i++) {
             page2Content.add(buildActiveItem(activeItems.get(i)));
         }
         // Consommables possédés
@@ -277,6 +283,47 @@ public class HotbarManager {
         }
         tag(flash, "flash", "flash", -1);
         return flash;
+    }
+
+    private static boolean hasFlash(Player player) {
+        var ssm = LolPlugin.getInstance().getSummonerSpellManager();
+        return ssm == null || ssm.hasFlash(player);
+    }
+
+    /** Sorts d'invocateur du joueur à afficher (Flash a son propre emplacement). */
+    private static List<fr.lolmc.game.SummonerSpellManager.Spell> summonerSpells(Player player) {
+        var ssm = LolPlugin.getInstance().getSummonerSpellManager();
+        var spells = ssm != null ? ssm.getSpells(player) : null;
+        return spells != null ? List.of(spells) : List.of();
+    }
+
+    private ItemStack buildSummoner(Player player, fr.lolmc.game.SummonerSpellManager.Spell spell) {
+        var ssm = LolPlugin.getInstance().getSummonerSpellManager();
+        boolean ready = !ssm.isOnCooldown(player, spell);
+        Material icon = switch (spell) {
+            case IGNITE   -> Material.BLAZE_POWDER;
+            case HEAL     -> Material.GLISTERING_MELON_SLICE;
+            case BARRIER  -> Material.SHIELD;
+            case EXHAUST  -> Material.FERMENTED_SPIDER_EYE;
+            case TELEPORT -> Material.ENDER_EYE;
+            case SMITE    -> Material.GOLDEN_SWORD;
+            case CLEANSE  -> Material.MILK_BUCKET;
+            case GHOST    -> Material.FEATHER;
+        };
+        ItemStack stack = new ItemStack(ready ? icon : Material.GRAY_DYE);
+        ItemMeta meta = stack.getItemMeta();
+        if (meta != null) {
+            meta.displayName(Component.text(spell.displayName, ready ? NamedTextColor.GOLD : NamedTextColor.GRAY)
+                    .decoration(TextDecoration.ITALIC, false));
+            List<Component> lore = new ArrayList<>();
+            lore.add(Component.text(ready ? "Clic droit pour utiliser."
+                            : String.format("En recharge: %.0fs", ssm.getRemainingCooldown(player, spell)),
+                    ready ? NamedTextColor.DARK_GRAY : NamedTextColor.RED).decoration(TextDecoration.ITALIC, false));
+            meta.lore(lore);
+            stack.setItemMeta(meta);
+        }
+        tag(stack, "summoner", spell.name(), -1);
+        return stack;
     }
 
     private ItemStack buildActiveItem(String itemId) {

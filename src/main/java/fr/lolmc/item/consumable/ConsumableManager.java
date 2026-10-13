@@ -42,6 +42,8 @@ public class ConsumableManager {
     private final Map<UUID, Long> elixirExpire = new HashMap<>();
     // Effets élixirs actifs sur les stats
     private final Map<UUID, double[]> elixirStatBoosts = new HashMap<>(); // [ad, ap, hp, ms]
+    // Vol de vie et ténacité de l'élixir, retirés à l'expiration (le vol de vie restait permanent)
+    private final Map<UUID, double[]> elixirExtraBoosts = new HashMap<>(); // [lifesteal, tenacity]
 
     public ConsumableManager(ChampionManager cm, HUDManager hud) {
         this.championManager = cm;
@@ -189,7 +191,7 @@ public class ConsumableManager {
 
     /** Élixir de Fer (Tank) — +300 HP + tenacité */
     public boolean useElixirIron(Player player) {
-        return activateElixir(player, "iron", new double[]{0, 0, 300, 0}, 0);
+        return activateElixir(player, "iron", new double[]{0, 0, 300, 0}, 0, 0.25);
     }
 
     /** Élixir de Sorcellerie (AP) — +50 AP */
@@ -198,6 +200,10 @@ public class ConsumableManager {
     }
 
     private boolean activateElixir(Player player, String type, double[] boosts, double lifesteal) {
+        return activateElixir(player, type, boosts, lifesteal, 0);
+    }
+
+    private boolean activateElixir(Player player, String type, double[] boosts, double lifesteal, double tenacity) {
         if (!championManager.hasChampion(player)) return false;
 
         // Retirer l'élixir précédent si actif
@@ -210,6 +216,8 @@ public class ConsumableManager {
         if (boosts[2] > 0) champ.getHPSystem().addBonusHP(boosts[2]);
         if (boosts[3] > 0) champ.getStats().addBonusMoveSpeed(boosts[3]);
         if (lifesteal > 0) champ.getStats().addBonusLifeSteal(lifesteal);
+        if (tenacity > 0) champ.getStats().addTenacity(tenacity);
+        elixirExtraBoosts.put(player.getUniqueId(), new double[]{lifesteal, tenacity});
 
         activeElixir.put(player.getUniqueId(), type);
         elixirExpire.put(player.getUniqueId(), System.currentTimeMillis() + 180_000L);
@@ -234,6 +242,11 @@ public class ConsumableManager {
         if (boosts[1] > 0) champ.getStats().addBonusAP(-boosts[1]);
         if (boosts[2] > 0) champ.getHPSystem().addBonusHP(-boosts[2]);
         if (boosts[3] > 0) champ.getStats().addBonusMoveSpeed(-boosts[3]);
+        double[] extra = elixirExtraBoosts.remove(player.getUniqueId());
+        if (extra != null) {
+            if (extra[0] > 0) champ.getStats().addBonusLifeSteal(-extra[0]);
+            if (extra[1] > 0) champ.getStats().addTenacity(-extra[1]);
+        }
         activeElixir.remove(player.getUniqueId());
         elixirExpire.remove(player.getUniqueId());
     }
@@ -459,6 +472,22 @@ public class ConsumableManager {
             for (BukkitRunnable t : tasks) { try { t.cancel(); } catch (Exception ignored) {} }
         }
         activePotions.clear();
+        // Élixirs : sinon leur expiration retirait les stats du champion de la partie suivante
+        activeElixir.clear();
+        elixirExpire.clear();
+        elixirStatBoosts.clear();
+        elixirExtraBoosts.clear();
+    }
+
+    /** Fin de partie d'un joueur (instance terminée) : potions, charges et élixirs oubliés. */
+    public void cleanup(UUID uuid) {
+        refillableCharges.remove(uuid);
+        List<BukkitRunnable> tasks = activePotions.remove(uuid);
+        if (tasks != null) for (BukkitRunnable t : tasks) { try { t.cancel(); } catch (Exception ignored) {} }
+        activeElixir.remove(uuid);
+        elixirExpire.remove(uuid);
+        elixirStatBoosts.remove(uuid);
+        elixirExtraBoosts.remove(uuid);
     }
 
     // Getters

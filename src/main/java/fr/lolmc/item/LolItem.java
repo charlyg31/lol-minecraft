@@ -71,6 +71,10 @@ public class LolItem {
     private String passiveName;
     private String passiveDescription;
     private boolean hasActive = false; // true si l'item a un actif cliquable
+    // Actif séparé du passif : avant, active() écrivait dans passiveName (affiché « Passif — … »)
+    // et un .passive() chaîné après l'écrasait.
+    private String activeName;
+    private String activeDescription;
 
     public LolItem(String id, String displayName, int goldCost,
                    Material icon, ItemCategory category) {
@@ -245,6 +249,19 @@ public class LolItem {
             }
         }
 
+        // Actif (clic droit sur l'objet dans la barre d'action pendant la partie)
+        if (hasActive && activeName != null) {
+            lore.add(sep());
+            lore.add(Component.text("⚡ Actif — " + activeName + ":", NamedTextColor.AQUA)
+                    .decoration(TextDecoration.ITALIC, false));
+            for (String line : fr.lolmc.util.TextWrapUtil.wrap(activeDescription, LORE_WRAP_WIDTH)) {
+                lore.add(Component.text("  " + line, NamedTextColor.GRAY)
+                        .decoration(TextDecoration.ITALIC, false));
+            }
+            lore.add(Component.text("  ➤ Clic droit dans la barre d'action pour l'utiliser", NamedTextColor.DARK_AQUA)
+                    .decoration(TextDecoration.ITALIC, false));
+        }
+
         lore.add(sep());
         lore.add(Component.text("💰 Coût: " + goldCost + " or", NamedTextColor.GOLD)
                 .decoration(TextDecoration.ITALIC, false));
@@ -298,7 +315,7 @@ public class LolItem {
     }
     /** Marque l'item comme ayant un actif cliquable (apparaît dans la hotbar). */
     public LolItem active(String name, String desc) {
-        this.passiveName = name; this.passiveDescription = desc; this.hasActive = true; return this;
+        this.activeName = name; this.activeDescription = desc; this.hasActive = true; return this;
     }
 
     /** Définit la recette : les IDs des composants qui construisent cet item. */

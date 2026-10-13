@@ -58,7 +58,7 @@ public final class MissFortune extends BaseChampion implements fr.lolmc.champion
             resourceCost = 43;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : tir sur 1 cible qui ricoche sur celle derrière. 1ère: 20-100+100%AD. 2ème: 20-80+85%AD +crit
-            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.0); if(tgt==null){c.sendActionBar(Component.text("🔫 Aucune cible",NamedTextColor.GRAY));return;}
+            org.bukkit.entity.LivingEntity tgt = (t!=null && TargetingUtil.isEnemy(c,t))?t:TargetingUtil.getTargetedEnemy(c,6.0); if(tgt==null){c.sendActionBar(Component.text("🔫 Aucune cible",NamedTextColor.GRAY));return;}
             double[] base=fr.lolmc.util.Balance.base("q_missfortune",new double[]{20,40,60,80,100});double d1=base[getLevel()-1]+s.getFinalAD();
             TargetingUtil.dealDamage(c, tgt, d1, TargetingUtil.DmgType.PHYSICAL);
             // Ricochet : 2e cible la plus proche derrière la 1ère

@@ -37,6 +37,14 @@ public class ItemState {
 
     // ── Cooldowns d'actifs (timestamp dernière utilisation) ──
     public long lastZhonyas = 0;                // 120s
+    public long lastMaw = 0;                    // Maw of Malmortius : Lifeline, 45s
+    public long lastHydraActive = 0;            // Tiamat / Hydres : Crescent, 10s
+    public long lastChemtank = 0;               // Turbo Chemtank : Supercharged, 90s
+    public long lastYoumuu = 0;                 // Youmuu : Wraith Step, 45s
+    public long lastGunblade = 0;               // Hextech Gunblade : Lightning Bolt, 60s
+    public long lastHeartsteelProc = 0;         // Heartsteel : coup colossal, 3s
+    public int heartsteelHPApplied = 0;         // PV Heartsteel réellement ajoutés (retirés à la revente)
+    public int ravenousStacks = 0;              // Rune Ravenous Hunter : takedowns comptés (max 10)
     public long lastGaleforce = 0;              // 90s
     public long lastShurelyas = 0;              // 120s
     public long lastRedemption = 0;             // 120s

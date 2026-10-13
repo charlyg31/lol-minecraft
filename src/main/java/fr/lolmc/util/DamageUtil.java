@@ -67,6 +67,10 @@ public class DamageUtil {
             return;
         }
 
+        // Zhonya : stase, aucun dégât (setInvulnerable ne protège que des dégâts vanilla)
+        var pmZhonya = LolPlugin.getInstance().getPassiveManager();
+        if (pmZhonya != null && pmZhonya.getState(victim).zhonyasActive) return;
+
         BaseChampion vc = cm.getChampion(victim);
         ChampionStats vs = vc.getStats();
         ChampionStats as = (attacker != null && cm.hasChampion(attacker))
@@ -97,6 +101,13 @@ public class DamageUtil {
             }
         }
         if (isAbility && attacker != null) {
+            if (vs.consumeSpellShield()) {
+                victim.sendActionBar(net.kyori.adventure.text.Component.text(
+                    "Bouclier anti-sort - sort bloque!", net.kyori.adventure.text.format.NamedTextColor.AQUA));
+                attacker.sendActionBar(net.kyori.adventure.text.Component.text(
+                    "Sort bloque par un bouclier!", net.kyori.adventure.text.format.NamedTextColor.GRAY));
+                return;
+            }
             if (vs.consumeEonShield()) {
                 victim.sendActionBar(net.kyori.adventure.text.Component.text(
                     "Annul - sort bloque!", net.kyori.adventure.text.format.NamedTextColor.AQUA));
@@ -139,6 +150,10 @@ public class DamageUtil {
             afterResist = as.calcPhysicalDamage(rawAmount, vs);
         }
 
+        // Effets de potion des sorts : Force (attaquant) et Résistance (victime)
+        if (attacker != null) afterResist *= PotionCombat.damageDealtMultiplier(attacker);
+        afterResist *= PotionCombat.damageTakenMultiplier(victim);
+
         // 2. Réductions défensives plates/% de la cible
         double finalDmg = afterResist;
         if (type != Type.TRUE) {
@@ -153,6 +168,11 @@ public class DamageUtil {
         }
 
         // 2. Boucliers (les vrais dégâts passent à travers ? Non, les boucliers absorbent tout en LoL)
+        // Épuisement : l'attaquant épuisé inflige 35 % de dégâts en moins
+        if (attacker != null) {
+            var ssmEx = LolPlugin.getInstance().getSummonerSpellManager();
+            if (ssmEx != null) finalDmg *= ssmEx.outgoingDamageMultiplier(attacker);
+        }
         double afterShield = vs.absorbWithShield(finalDmg, type == Type.MAGICAL);
 
         // 3. HP
@@ -180,8 +200,8 @@ public class DamageUtil {
         // dans Amumu.java — plus de renvoi de dégâts ici.
         // Dragon Elder : exécution si la cible tombe sous 20% HP
         if (attacker != null) {
-            // Vérifier si l'attaquant a le buff dragon_elder
-            if (attacker.hasPotionEffect(org.bukkit.potion.PotionEffectType.STRENGTH)
+            // Buff du Dragon Ancestral (avant : potion Force, donnée aussi par Ashe Q, Yi E, Janna E)
+            if (fr.lolmc.game.JungleManager.hasElderBuff(attacker)
                     && vc.getHPSystem().getHPRatio() < 0.20) {
                 // +vrai dégâts supplémentaires proportionnels aux HP manquants
                 double elderDmg = vc.getHPSystem().getMaxHP() * 0.10;

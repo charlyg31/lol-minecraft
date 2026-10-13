@@ -118,7 +118,7 @@ public final class Jinx extends BaseChampion implements fr.lolmc.champion.base.S
             for(var __t : TargetingUtil.entitiesInRadius(c, loc, 4.0)){
                 TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);
                 if(__t instanceof Player __p){
-                    __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,35,10,false,true));
+                    fr.lolmc.LolPlugin.getInstance().getCCManager().root(__p, 35); // vrai root (ténacité)
                     __p.sendActionBar(Component.text("🦷 ENRACINÉ par les Croque-Flammes!",NamedTextColor.RED));
                 }
             }
@@ -151,7 +151,9 @@ public final class Jinx extends BaseChampion implements fr.lolmc.champion.base.S
             for(var __t : TargetingUtil.entitiesInRadius(c, main.getLocation(), 5.0)){
                 // PV manquants à l'échelle LoL (joueur=HPSystem, Baron=virtuel, sbire=vanilla)
                 double missingHP = TargetingUtil.getRealMaxHealth(__t) - TargetingUtil.getRealHealth(__t);
-                double dmg=baseDmg+missingHP*missPct[rr];
+                double missingBonus=missingHP*missPct[rr];
+                if(!(__t instanceof Player)) missingBonus=Math.min(800, missingBonus); // plafond LoL contre les monstres
+                double dmg=baseDmg+missingBonus;
                 TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.PHYSICAL);
             }
             fr.lolmc.util.VisualEffectUtil.impactBurst(main.getWorld(),

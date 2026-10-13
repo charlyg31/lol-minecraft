@@ -33,6 +33,42 @@ public class RuneManager {
     // Stacks de keystones par joueur (Conqueror, Electrocute, etc.)
     private final Map<UUID, Integer> keystoneStacks = new HashMap<>();
     private final Map<UUID, Long> keystoneLastProc = new HashMap<>();
+    /** Recharges des runes (clé "uuid:rune") : évite que chaque coup déclenche l'effet. */
+    private final Map<String, Long> runeCooldowns = new HashMap<>();
+    /** Bonus temporaires réellement appliqués, retirés à l'expiration des charges. */
+    private final Map<UUID, Double> conquerorAD = new HashMap<>();
+    private final Map<UUID, Double> tempoAS = new HashMap<>();
+
+    /**
+     * Vrai (et démarre la recharge) si la rune {@code rune} est disponible pour {@code id}.
+     * Public : aussi utilisé par PassiveManager (Goût du Sang).
+     */
+    public boolean tryRuneCooldown(UUID id, String rune, long cooldownMs) {
+        String key = id + ":" + rune;
+        long now = System.currentTimeMillis();
+        Long last = runeCooldowns.get(key);
+        if (last != null && now - last < cooldownMs) return false;
+        runeCooldowns.put(key, now);
+        return true;
+    }
+
+    /** Planifie l'expiration des charges de Conquérant / Tempo Mortel après {@code ms} sans coup. */
+    private void scheduleStackDecay(Player attacker, long ms) {
+        final UUID id = attacker.getUniqueId();
+        org.bukkit.Bukkit.getScheduler().runTaskLater(LolPlugin.getInstance(), () -> {
+            Long last = keystoneLastProc.get(id);
+            if (last == null || System.currentTimeMillis() - last < ms - 50) return; // rafraîchi entre-temps
+            keystoneStacks.put(id, 0);
+            var cm = LolPlugin.getInstance().getChampionManager();
+            Double ad = conquerorAD.remove(id);
+            Double as = tempoAS.remove(id);
+            if (attacker.isOnline() && cm.hasChampion(attacker)) {
+                var st = cm.getChampion(attacker).getStats();
+                if (ad != null) st.addBonusAD(-ad);
+                if (as != null) st.addBonusAttackSpeed(-as);
+            }
+        }, ms / 50L + 1L);
+    }
     // Gathering Storm : bonus adaptatif croissant avec le temps de partie
     private final Map<UUID, Double> gatheringStormBonus = new HashMap<>();
     // Relentless Hunter : stacks de kills uniques (un stack par champion différent tué)
@@ -57,25 +93,39 @@ public class RuneManager {
         startGatheringStormTask();
     }
 
-    /** Tâche Tempête Montante : toutes les 10 minutes, +8 force adaptative (+8 AD ou +14 AP). */
+    /** Champion qui a reçu le bonus Tempête Montante (nouveau champion = bonus repart de 0). */
+    private final Map<UUID, BaseChampion> gatheringStormChamp = new HashMap<>();
+
+    /**
+     * Tâche Tempête Montante : toutes les 10 minutes DE PARTIE, +force adaptative.
+     * (Avant : comptait les minutes depuis le démarrage du serveur, et le bonus n'était
+     * jamais remis à zéro d'une partie à l'autre.)
+     */
     private void startGatheringStormTask() {
         new org.bukkit.scheduler.BukkitRunnable() {
-            int minutes = 0;
             @Override public void run() {
-                minutes += 10;
-                double bonus = switch (minutes) {
-                    case 10 -> 8;
-                    case 20 -> 24;
-                    case 30 -> 48;
-                    case 40 -> 80;
-                    case 50 -> 120;
-                    default -> minutes > 50 ? 120 + (minutes - 50) * 8 : 0;
-                };
                 var cm = LolPlugin.getInstance().getChampionManager();
                 for (var entry : playerPages.entrySet()) {
                     if (!entry.getValue().has("gathering_storm")) continue;
                     var p = org.bukkit.Bukkit.getPlayer(entry.getKey());
                     if (p == null || !cm.hasChampion(p)) continue;
+                    var gm = fr.lolmc.instance.InstanceHelper.gameManager(p);
+                    if (!gm.isGameRunning()) continue;
+                    int minutes = (int) (gm.getElapsedSeconds() / 600) * 10;
+                    double bonus = switch (minutes) {
+                        case 0 -> 0;
+                        case 10 -> 8;
+                        case 20 -> 24;
+                        case 30 -> 48;
+                        case 40 -> 80;
+                        case 50 -> 120;
+                        default -> 120 + (minutes - 50) * 8;
+                    };
+                    var champ = cm.getChampion(p);
+                    if (gatheringStormChamp.get(entry.getKey()) != champ) {
+                        gatheringStormChamp.put(entry.getKey(), champ);
+                        gatheringStormBonus.put(entry.getKey(), 0.0);
+                    }
                     double prev = gatheringStormBonus.getOrDefault(entry.getKey(), 0.0);
                     double delta = bonus - prev;
                     if (delta > 0) {
@@ -87,7 +137,7 @@ public class RuneManager {
                     }
                 }
             }
-        }.runTaskTimer(LolPlugin.getInstance(), 12000L, 12000L); // toutes les 10 minutes
+        }.runTaskTimer(LolPlugin.getInstance(), 600L, 600L); // vérifié toutes les 30 s
     }
 
     // ── Gestion des pages ─────────────────────────────────────────
@@ -216,18 +266,17 @@ public class RuneManager {
     public void onDamageTaken(Player victim, double amount, boolean isMagical) {
         RunePage page = getPage(victim.getUniqueId());
         // Bone Plating : réduit les dégâts des 3 prochaines attaques ennemies de 30-60
-        if (page.has("bone_plating")) {
+        if (page.has("bone_plating") && tryRuneCooldown(victim.getUniqueId(), "bone_plating", 55_000L)) {
             var cm3 = LolPlugin.getInstance().getChampionManager();
             if (cm3.hasChampion(victim)) {
                 int lvl3 = cm3.getChampion(victim).getLevelSystem().getLevel();
-                // Simulé par une réduction de 30 + 2*lvl dégâts absorbés via bouclier temporaire
-                double bpShield = Math.min(amount, 30 + lvl3 * 2.0);
-                cm3.getChampion(victim).getStats().addShield(bpShield);
+                // 3 prochaines attaques réduites de 30-60 : simulé par un bouclier de 3 × (30 + 1,76/niv) sur 1,5 s
+                double bpShield = 3 * (30 + lvl3 * 1.76);
+                var bpStats = cm3.getChampion(victim).getStats();
+                bpStats.addShield(bpShield);
                 new org.bukkit.scheduler.BukkitRunnable() {
-                    @Override public void run() {
-                        if (cm3.hasChampion(victim)) cm3.getChampion(victim).getStats().clearShields();
-                    }
-                }.runTaskLater(LolPlugin.getInstance(), 20L);
+                    @Override public void run() { bpStats.addShield(-bpShield); } // seulement ce bouclier
+                }.runTaskLater(LolPlugin.getInstance(), 30L);
             }
         }
 
@@ -255,10 +304,6 @@ public class RuneManager {
                 }
             }.runTaskTimer(LolPlugin.getInstance(), 20L, 20L);
             secondWindTasks.put(victim.getUniqueId(), task);
-        }
-        if (page.has("bone_plating")) {
-            // Les 3 prochaines sources de dégâts sont réduites (marqueur simplifié: petit bouclier)
-            champ.getStats().addFlatDamageReduction(8);
         }
 
         // Nullifying Orb : bouclier anti-magie sous 30% HP max (60s CD)
@@ -304,34 +349,25 @@ public class RuneManager {
         if (!cm.hasChampion(attacker)) return;
         var champ = cm.getChampion(attacker);
 
-        if (page.has("legend_bloodline")) {
-            champ.getHPSystem().heal(damage * 0.04); // ~4% vol de vie
-        }
+        // (Lignée Légendaire : déjà +6 % d'omnivamp dans applyPassiveRune, pas de second vol de vie ici)
         if (page.has("ravenous_hunter")) {
             champ.getHPSystem().heal(damage * 0.03); // omnivampirisme
         }
-        if (page.has("manaflow_band") && isAbility) {
-            champ.getResourceSystem().fill(); // restaure un peu de ressource (simplifié)
+        if (page.has("manaflow_band") && isAbility
+                && tryRuneCooldown(attacker.getUniqueId(), "manaflow_band", 15_000L)) {
+            // Restaure 5 % de la ressource max (avant : remplissait TOUTE la ressource à chaque sort)
+            var res = champ.getResourceSystem();
+            if (res != null) res.addCurrent(res.getMax() * 0.05);
         }
         if (page.has("scorch") && isAbility) {
-            // Premier sort touchant inflige des dégâts bonus (CD 10s géré via stacks)
-            long now = System.currentTimeMillis();
-            Long last = keystoneLastProc.get(attacker.getUniqueId());
-            if (last == null || (now - last) > 10000) {
-                keystoneLastProc.put(attacker.getUniqueId(), now);
+            // Premier sort touchant inflige des dégâts bonus (CD 10s, propre à la rune :
+            // partager keystoneLastProc perturbait Conquérant / Tempo Mortel)
+            if (tryRuneCooldown(attacker.getUniqueId(), "scorch", 10_000L)) {
                 int level = champ.getLevelSystem().getLevel();
                 DamageUtil.damage(attacker, victim, 15 + level * 1.5, true, DamageUtil.Type.MAGICAL);
             }
         }
-        if (page.has("cheap_shot")) {
-            // Dégâts vrais bonus si la cible est sous contrôle (ralentie/immobilisée)
-            if (victim.hasPotionEffect(PotionEffectType.SLOWNESS)) {
-                DamageUtil.damage(attacker, victim, 10, false, DamageUtil.Type.TRUE);
-            }
-        }
-        if (page.has("taste_blood")) {
-            champ.getHPSystem().heal(8); // petit soin en touchant un champion
-        }
+        // Coup Bas et Goût du Sang : gérés dans PassiveManager.onAbilityDamage (ils étaient appliqués deux fois)
     }
 
     // ── Effets de combat (keystones) ──────────────────────────────
@@ -348,19 +384,28 @@ public class RuneManager {
         switch (page.keystone) {
             case "conqueror" -> {
                 // Stacks de force adaptative, max 12
-                int stacks = Math.min(12, keystoneStacks.getOrDefault(attacker.getUniqueId(), 0) + 1);
+                int prev = keystoneStacks.getOrDefault(attacker.getUniqueId(), 0);
+                int stacks = Math.min(12, prev + 1);
                 keystoneStacks.put(attacker.getUniqueId(), stacks);
                 keystoneLastProc.put(attacker.getUniqueId(), now);
                 var cm = LolPlugin.getInstance().getChampionManager();
-                if (cm.hasChampion(attacker)) {
-                    cm.getChampion(attacker).getStats().addBonusAD(0.8); // +AD par stack
+                if (stacks > prev && cm.hasChampion(attacker)) {
+                    // +0,8 AD par charge gagnée (avant : à chaque coup, même à 12 charges, jamais retiré)
+                    cm.getChampion(attacker).getStats().addBonusAD(0.8);
+                    conquerorAD.merge(attacker.getUniqueId(), 0.8, Double::sum);
                 }
+                scheduleStackDecay(attacker, 5000L);
             }
             case "electrocute" -> {
-                // 3 procs distincts en 3s → dégâts
+                // 3 coups en 3 s → dégâts (recharge 25 s)
+                Long first = keystoneLastProc.get(attacker.getUniqueId());
+                if (first == null || now - first > 3000L) {
+                    keystoneStacks.put(attacker.getUniqueId(), 0);
+                    keystoneLastProc.put(attacker.getUniqueId(), now);
+                }
                 int stacks = keystoneStacks.getOrDefault(attacker.getUniqueId(), 0) + 1;
                 keystoneStacks.put(attacker.getUniqueId(), stacks);
-                if (stacks >= 3) {
+                if (stacks >= 3 && tryRuneCooldown(attacker.getUniqueId(), "electrocute", 25_000L)) {
                     keystoneStacks.put(attacker.getUniqueId(), 0);
                     int level = LolPlugin.getInstance().getChampionManager()
                             .getChampion(attacker).getLevelSystem().getLevel();
@@ -385,14 +430,15 @@ public class RuneManager {
                 var cm = LolPlugin.getInstance().getChampionManager();
                 if (cm.hasChampion(victim)) {
                     var hp = cm.getChampion(victim).getHPSystem();
-                    if (hp.getCurrentHP() / hp.getMaxHP() < 0.5) {
+                    if (hp.getCurrentHP() / hp.getMaxHP() < 0.5
+                            && tryRuneCooldown(attacker.getUniqueId(), "dark_harvest", 20_000L)) {
                         DamageUtil.damage(attacker, victim, 40, true, DamageUtil.Type.MAGICAL);
                         attacker.sendActionBar(Component.text("🌑 Moisson Noire!", NamedTextColor.DARK_PURPLE));
                     }
                 }
             }
             case "arcane_comet" -> {
-                if (isAbility) {
+                if (isAbility && tryRuneCooldown(attacker.getUniqueId(), "arcane_comet", 15_000L)) {
                     int level = LolPlugin.getInstance().getChampionManager()
                             .getChampion(attacker).getLevelSystem().getLevel();
                     DamageUtil.damage(attacker, victim, 30 + level * 5, true, DamageUtil.Type.MAGICAL);
@@ -442,20 +488,18 @@ public class RuneManager {
             }
             case "lethal_tempo" -> {
                 // Stacks de vitesse d'attaque sur champion (max 6), dure 6s
-                int stacks = Math.min(6, keystoneStacks.getOrDefault(attacker.getUniqueId(), 0) + 1);
+                int prev = keystoneStacks.getOrDefault(attacker.getUniqueId(), 0);
+                int stacks = Math.min(6, prev + 1);
                 keystoneStacks.put(attacker.getUniqueId(), stacks);
                 keystoneLastProc.put(attacker.getUniqueId(), System.currentTimeMillis());
-                // +13% AS par stack (total +78% AS à 6 stacks)
+                // +0,08 de vitesse d'attaque par charge gagnée (≈ +13 % d'une AS de base de 0,65).
+                // Avant : +13 en valeur absolue à chaque coup → plafond de 2,5 dès le 1er coup.
                 var cm = LolPlugin.getInstance().getChampionManager();
-                if (cm.hasChampion(attacker)) {
-                    cm.getChampion(attacker).getStats().addBonusAttackSpeed(13);
-                    new org.bukkit.scheduler.BukkitRunnable() {
-                        @Override public void run() {
-                            if (cm.hasChampion(attacker))
-                                cm.getChampion(attacker).getStats().addBonusAttackSpeed(-13);
-                        }
-                    }.runTaskLater(LolPlugin.getInstance(), 120L); // 6s
+                if (stacks > prev && cm.hasChampion(attacker)) {
+                    cm.getChampion(attacker).getStats().addBonusAttackSpeed(0.08);
+                    tempoAS.merge(attacker.getUniqueId(), 0.08, Double::sum);
                 }
+                scheduleStackDecay(attacker, 6000L);
             }
             case "hail_blades" -> {
                 // 3 attaques rapides sur champion (ignore AS normale pendant 2s)
@@ -467,8 +511,8 @@ public class RuneManager {
                 }
             }
             case "summon_aery" -> {
-                // Dégâts à un ennemi ou bouclier sur un allié
-                if (isAbility) {
+                // Dégâts à un ennemi ou bouclier sur un allié (Aery doit revenir : ~3 s)
+                if (isAbility && tryRuneCooldown(attacker.getUniqueId(), "summon_aery", 3_000L)) {
                     var cm = LolPlugin.getInstance().getChampionManager();
                     if (cm.hasChampion(attacker)) {
                         int lvl = cm.getChampion(attacker).getLevelSystem().getLevel();
@@ -513,7 +557,7 @@ public class RuneManager {
             case "glacial_augment" -> {
                 // AA ralentit 30% + crée des zones gelées
                 if (!isAbility) {
-                    LolPlugin.getInstance().getCCManager().slow(victim, 30, 40);
+                    LolPlugin.getInstance().getCCManager().slow(victim, 30, 1); // ~30 % (l'amplificateur 40 immobilisait)
                     LolPlugin.getInstance().getCCManager().markCoordinatedFire(attacker, victim);
                     LolPlugin.getInstance().getCCManager().applyZekeConduit(attacker, victim);
                     // Aftershock ne se déclenche que sur une vraie immobilisation, pas un simple ralentissement
@@ -555,7 +599,10 @@ public class RuneManager {
     }
 
     /** Triumph : soin + or sur takedown. */
-    public void onTakedown(Player player) {
+    public void onTakedown(Player player) { onTakedown(player, null); }
+
+    /** Takedown (kill ou assist) sur {@code victim} (null si inconnue). */
+    public void onTakedown(Player player, Player victim) {
         RunePage page = getPage(player.getUniqueId());
         if (page.has("triumph")) {
             var cm = LolPlugin.getInstance().getChampionManager();
@@ -574,20 +621,13 @@ public class RuneManager {
         // Relentless Hunter : +5 MS hors combat par champion unique tué (max +45 à 8 stacks)
         if (page.has("relentless_hunter")) {
             var kills = relentlessKills.computeIfAbsent(player.getUniqueId(), _ -> new java.util.HashSet<>());
-            // Ajouter la victime si on peut l'identifier
             var cm2 = LolPlugin.getInstance().getChampionManager();
-            // On cherche la cible dans les entités proches (approximation)
-            for (var e : player.getNearbyEntities(20,20,20)) {
-                if (e instanceof Player vp && !vp.equals(player) && cm2.hasChampion(vp)) {
-                    kills.add(vp.getUniqueId());
-                }
-            }
+            // Stacks AVANT d'ajouter la victime (avant, prev était lu après l'ajout : jamais de gain)
+            int prev = Math.min(8, kills.size());
+            if (victim != null && !victim.equals(player)) kills.add(victim.getUniqueId());
             int stacks = Math.min(8, kills.size());
-            if (cm2.hasChampion(player)) {
-                // Recalculer depuis 0 (reset puis re-apply pour éviter accumulation)
-                var stats = cm2.getChampion(player).getStats();
-                int prev = relentlessKills.getOrDefault(player.getUniqueId(), new java.util.HashSet<>()).size();
-                if (stacks > prev) stats.addBonusMoveSpeed(5); // +5 par stack gagné
+            if (stacks > prev && cm2.hasChampion(player)) {
+                cm2.getChampion(player).getStats().addBonusMoveSpeed(5); // +5 par champion unique
             }
         }
     }
@@ -595,7 +635,11 @@ public class RuneManager {
     public void cleanup(UUID uuid) {
         keystoneStacks.remove(uuid);
         keystoneLastProc.remove(uuid);
+        conquerorAD.remove(uuid);
+        tempoAS.remove(uuid);
+        runeCooldowns.keySet().removeIf(k -> k.startsWith(uuid.toString()));
         gatheringStormBonus.remove(uuid);
+        gatheringStormChamp.remove(uuid);
         relentlessKills.remove(uuid);
     }
 

@@ -324,7 +324,7 @@ public class MinionManager {
                 // Aggro forcée en cours (champion attaqué) → ne pas retarget
                 if (fr.lolmc.game.AggroManager.hasMinionAggro(z)
                         && z.getTarget() instanceof Player) {
-                    return; // garder la cible aggro pendant 3s
+                    continue; // garder la cible aggro pendant 3s (return figeait TOUS les autres sbires)
                 }
                 // Chercher un ennemi proche (sbire ou champion)
                 LivingEntity enemy = findNearbyEnemy(z, team);
@@ -401,6 +401,10 @@ public class MinionManager {
 
     /** Le sbire s'approche et inflige des dégâts à la structure (tourelle). */
     private void attackStructure(Zombie minion, GameStructure structure) {
+        // Même règle que pour les champions : Nexus principal protégé tant que
+        // l'inhibiteur/nexus de lane et les tourelles de base tiennent
+        if (structure.getType() == GameStructure.Type.NEXUS_BASE
+                && !siblingMapManager().canAttackBaseNexus(structure.getTeam())) return;
         // Se déplacer vers la structure si pas assez proche
         Location target = structure.getCenter();
         double dist = minion.getLocation().distance(target);
@@ -417,13 +421,16 @@ public class MinionManager {
             minion.swingMainHand();
             fr.lolmc.util.VisualEffectUtil.impact(target.getWorld(),
                     target.clone().add(0.5, 1, 0.5), Material.WHITE_STAINED_GLASS, 0.26f, 3L);
+            boolean wasDestroyed = structure.isDestroyed();
             boolean phaseChanged = structure.takeDamage(MINION_DAMAGE_TO_TURRET);
             if (phaseChanged) {
                 siblingMapManager().updateStructurePhase(structure);
             }
-            // Si détruite, déclencher la logique de destruction
-            if (structure.isDestroyed()) {
+            // Si détruite par ce coup : récompenses, super-sbires, victoire (comme pour un champion)
+            if (!wasDestroyed && structure.isDestroyed()) {
                 siblingMapManager().updateStructurePhase(structure);
+                var sdl = LolPlugin.getInstance().getStructureDamageListener();
+                if (sdl != null) sdl.onStructureDestroyedByMinions(structure, minion.getWorld());
             }
         }
     }
@@ -436,7 +443,9 @@ public class MinionManager {
             if (e instanceof Player p) {
                 var cm = LolPlugin.getInstance().getChampionManager();
                 var tm = LolPlugin.getInstance().getTeamManager();
-                if (cm.hasChampion(p) && tm.getTeam(p) != null && tm.getTeam(p) != team) {
+                // Pas les champions morts (spectateurs en attente de respawn)
+                if (cm.hasChampion(p) && p.getGameMode() != org.bukkit.GameMode.SPECTATOR
+                        && tm.getTeam(p) != null && tm.getTeam(p) != team) {
                     return p;
                 }
             }

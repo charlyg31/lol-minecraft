@@ -77,11 +77,7 @@ public final class LeeSin extends BaseChampion implements fr.lolmc.champion.base
                     c.teleport(dest);
                     double[] base=fr.lolmc.util.Balance.base("q_leesin",new double[]{60,90,120,150,180});
 
-                    // CORRECTION : Utilisation de l'attribut GENERIC_MAX_HEALTH au lieu de getMaxHealth() déprécié
-                    var maxHealthAttr = tgt.getAttribute(fr.lolmc.util.Compat.maxHealth());
-                    double maxHealth = maxHealthAttr != null ? maxHealthAttr.getValue() : 20.0;
-
-                    double missingPct=1.0-(tgt.getHealth()/maxHealth);
+                    double missingPct=1.0-(TargetingUtil.getRealHealth(tgt)/Math.max(1, TargetingUtil.getRealMaxHealth(tgt)));
                     double dmg=(base[getLevel()-1]+s.getFinalAD()*fr.lolmc.util.Balance.ratio("q_leesin","ad",0.9))*(1.0+missingPct);
                     TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.PHYSICAL);
                     c.getWorld().playSound(c.getLocation(), Sound.ENTITY_PLAYER_ATTACK_CRIT, 1f, 0.9f);
@@ -113,9 +109,9 @@ public final class LeeSin extends BaseChampion implements fr.lolmc.champion.base
             resourceCost = 50;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             fr.lolmc.champion.impl.jungle.LeeSin.onSpellCast(c.getUniqueId()); // Flurry
-            Player dest = (t!=null) ? t : c;
-            if(t!=null && !t.equals(c)){
-                Location safe=safeTeleport(c.getLocation(),t.getLocation());
+            Player dest = (t!=null && LolPlugin.getInstance().getTeamManager().areAllies(c,t)) ? t : c; // allié visé, sinon soi
+            if(!dest.equals(c)){ // bond vers l'allié uniquement
+                Location safe=safeTeleport(c.getLocation(),dest.getLocation());
                 c.teleport(safe);
             }
             // Bouclier 60/105/150/195/240 +80%AP pendant 2s (40 ticks) sur Lee Sin (et la cible si champion)
@@ -123,7 +119,7 @@ public final class LeeSin extends BaseChampion implements fr.lolmc.champion.base
             double shield=shieldBase[getLevel()-1]+s.getFinalAP()*0.80;
             var cm=LolPlugin.getInstance().getChampionManager();
             if(cm.hasChampion(c)) cm.getChampion(c).getStats().addShield(shield);
-            if(t!=null && !t.equals(c) && cm.hasChampion(t)) cm.getChampion(t).getStats().addShield(shield);
+            if(!dest.equals(c) && cm.hasChampion(dest)) cm.getChampion(dest).getStats().addShield(shield);
             final Player fdest=dest; final double fsh=shield; final Player fc=c;
             new BukkitRunnable(){@Override public void run(){
                 if(cm.hasChampion(fc)) cm.getChampion(fc).getStats().addShield(-fsh);
@@ -175,7 +171,7 @@ public final class LeeSin extends BaseChampion implements fr.lolmc.champion.base
                 new double[]{110,85,60},5,0,DamageType.PHYSICAL);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,4.0); if(tgt==null){c.sendActionBar(Component.text("🐉 Aucune cible visée",NamedTextColor.GRAY));return;}
+            org.bukkit.entity.LivingEntity tgt = (t!=null && TargetingUtil.isEnemy(c,t))?t:TargetingUtil.getTargetedEnemy(c,4.0); if(tgt==null){c.sendActionBar(Component.text("🐉 Aucune cible visée",NamedTextColor.GRAY));return;}
             double[] base=fr.lolmc.util.Balance.base("r_leesin",new double[]{150,300,450});
             int r=Math.min(getLevel()-1,2);
             double dmg=base[r]+s.getFinalAD()*fr.lolmc.util.Balance.ratio("r_leesin","ad",2.0);

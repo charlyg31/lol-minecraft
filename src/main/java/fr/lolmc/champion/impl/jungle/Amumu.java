@@ -88,9 +88,8 @@ public final class Amumu extends BaseChampion implements fr.lolmc.champion.base.
                 @Override public void run(){
                     if(ticks>=10){cancel();return;}
                     for(var __t : TargetingUtil.entitiesInRadius(c, c.getLocation(), 3.5)){
-                        // CORRECTION : Utilisation de l'attribut GENERIC_MAX_HEALTH au lieu de getMaxHealth() déprécié
-                        var maxHealthAttr = __t.getAttribute(fr.lolmc.util.Compat.maxHealth());
-                        double maxHealth = maxHealthAttr != null ? maxHealthAttr.getValue() : 20.0;
+                        // PV max LoL (l'attribut Minecraft vaut 40 pour un champion)
+                        double maxHealth = TargetingUtil.getRealMaxHealth(__t);
 
                         double dmg=maxHealth*pct+s.getFinalAP()*fr.lolmc.util.Balance.ratio("w_amumu","ap",0.01);
                         TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);

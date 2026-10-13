@@ -185,6 +185,8 @@ public class MonsterAbilities {
                 p.setVelocity(push);
                 // Debuff : faiblesse (réduction de dégâts infligés)
                 p.addPotionEffect(new PotionEffect(PotionEffectType.WEAKNESS, 60, 0, false, true));
+                // Effet réel (la Faiblesse vanilla n'agit pas sur les dégâts LoL) : -35 % de dégâts 3 s
+                fr.lolmc.LolPlugin.getInstance().getSummonerSpellManager().exhaust(p, 3000L);
             }
         }
         return true;

@@ -128,6 +128,24 @@ public class RuneGUI implements Listener {
     // GESTION DES CLICS
     // ══════════════════════════════════════════════════════════════
 
+    /**
+     * Éditeur fermé (Échap) pendant la sélection de champion : revenir à l'écran de sélection.
+     * Vérifié au tick suivant, car l'éditeur se rouvre lui-même pour se rafraîchir.
+     */
+    @EventHandler
+    public void onClose(org.bukkit.event.inventory.InventoryCloseEvent e) {
+        if (!TITLE.equals(e.getView().title())) return;
+        if (!(e.getPlayer() instanceof Player player)) return;
+        var csm = LolPlugin.getInstance().getChampSelectManager();
+        if (!csm.isParticipant(player.getUniqueId())) return;
+        Bukkit.getScheduler().runTask(LolPlugin.getInstance(), () -> {
+            if (!player.isOnline() || !csm.isParticipant(player.getUniqueId())) return;
+            // Un autre menu est déjà ouvert (rafraîchissement de l'éditeur, retour déjà fait…)
+            if (player.getOpenInventory().getType() != org.bukkit.event.inventory.InventoryType.CRAFTING) return;
+            LolPlugin.getInstance().getChampSelectGUI().openChampionMenu(player);
+        });
+    }
+
     @EventHandler
     public void onClick(InventoryClickEvent e) {
         // CORRECTION : Utilisation de e.getView().title() au lieu de getTitle() déprécié
@@ -254,6 +272,7 @@ public class RuneGUI implements Listener {
         player.closeInventory();
         player.sendMessage(Component.text("✔ Page de runes sauvegardée!", NamedTextColor.GREEN));
         editing.remove(player.getUniqueId());
+        // (retour à l'écran de sélection : géré par onClose, déclenché par closeInventory())
     }
 
     // ══════════════════════════════════════════════════════════════

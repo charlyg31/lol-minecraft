@@ -160,12 +160,9 @@ public class RewardManager {
         // Reset streak de la victime, incrémenter celle du tueur
         killStreak.put(victim.getUniqueId(), 0);
         killStreak.merge(killer.getUniqueId(), 1, Integer::sum);
-        // Killing spree announcement
-        int streak = killStreak.get(killer.getUniqueId());
-        String spreeMsg = streak == 3 ? "⚔ KILLING SPREE!" : streak == 4 ? "⚔⚔ RAMPAGE!" : streak == 5 ? "⚔⚔⚔ UNSTOPPABLE!" : streak >= 6 ? "⚔⚔⚔⚔ GODLIKE!" : null;
+        // (les séries « KILLING SPREE »… sont annoncées par AnnouncementManager)
         String goldMsg = bounty > 0 ? String.format("⚔ KILL! +%d or (+%d bounty) +%.0f XP", totalGold, bounty, XP_CHAMPION_KILL) : String.format("⚔ KILL! +%d or +%.0f XP", totalGold, XP_CHAMPION_KILL);
         killer.sendActionBar(net.kyori.adventure.text.Component.text(goldMsg, NamedTextColor.GOLD));
-        if (spreeMsg != null) killer.sendMessage(net.kyori.adventure.text.Component.text(spreeMsg, NamedTextColor.RED));
 
         // Déclencher les passifs on-kill (Hubris, Axiom Arc...)
         var pm = LolPlugin.getInstance().getPassiveManager();
@@ -256,6 +253,9 @@ public class RewardManager {
             if (hud != null) hud.updateHUD(player, champ);
         }
     }
+    /** Fin de la série de kills (bounty) d'un joueur mort sans tueur champion. */
+    public void resetStreak(java.util.UUID player) { killStreak.put(player, 0); }
+
     public void resetKillStreaks() { killStreak.clear(); gameStartMs = 0; }
 
     /**

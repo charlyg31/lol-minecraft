@@ -245,7 +245,9 @@ public final class Zed extends BaseChampion implements fr.lolmc.champion.base.St
                 Location shadowLoc = shadows.get(c.getUniqueId());
                 if (shadowLoc != null) {
                     for (Entity entity : shadowLoc.getWorld().getNearbyEntities(shadowLoc, 4.0, 4.0, 4.0)) {
-                        if (entity instanceof org.bukkit.entity.LivingEntity tgtEnnemi && !entity.equals(c)) {
+                        // Ennemis uniquement (avant : alliés, sbires alliés et Tibbers étaient touchés)
+                        if (entity instanceof org.bukkit.entity.LivingEntity tgtEnnemi
+                                && TargetingUtil.isEnemy(c, tgtEnnemi)) {
                             TargetingUtil.dealDamage(c, tgtEnnemi, dmg, TargetingUtil.DmgType.PHYSICAL);
                             if (tgtEnnemi instanceof Player __p)
                                 __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 30, rank, false, true));
@@ -268,7 +270,7 @@ public final class Zed extends BaseChampion implements fr.lolmc.champion.base.St
                 new double[]{120,90,60},20,0,DamageType.TRUE);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,8.0); if(tgt==null){c.sendActionBar(Component.text("💀 Aucune cible visée",NamedTextColor.GRAY));return;}
+            org.bukkit.entity.LivingEntity tgt = (t!=null && TargetingUtil.isEnemy(c,t))?t:TargetingUtil.getTargetedEnemy(c,8.0); if(tgt==null){c.sendActionBar(Component.text("💀 Aucune cible visée",NamedTextColor.GRAY));return;}
             var dest=tgt.getLocation().clone().add(tgt.getLocation().getDirection().multiply(1.5));
             dest.setY(c.getLocation().getY());
             c.teleport(dest);

@@ -81,16 +81,15 @@ public final class Warwick extends BaseChampion {
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : bond + morsure, 100% AD + 6-10% PV max de la cible, soigne 100% des dégâts post-mitigation
-            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,3.0); if(tgt==null){c.sendActionBar(Component.text("🐺 Aucune cible",NamedTextColor.GRAY));return;}
+            org.bukkit.entity.LivingEntity tgt = (t!=null && TargetingUtil.isEnemy(c,t))?t:TargetingUtil.getTargetedEnemy(c,3.0); if(tgt==null){c.sendActionBar(Component.text("🐺 Aucune cible",NamedTextColor.GRAY));return;}
             // Bond vers la cible
             var dest=tgt.getLocation().clone().subtract(tgt.getLocation().getDirection().multiply(1.0));
             dest.setY(c.getLocation().getY());
             c.teleport(dest);
             double[] pct={0.06,0.07,0.08,0.09,0.10};
 
-            // CORRECTION : Utilisation de l'attribut GENERIC_MAX_HEALTH pour les PV max de la cible
-            var tgtMaxHealthAttr = tgt.getAttribute(fr.lolmc.util.Compat.maxHealth());
-            double tgtMaxHealth = tgtMaxHealthAttr != null ? tgtMaxHealthAttr.getValue() : 20.0;
+            // PV max LoL de la cible (l'attribut Minecraft vaut 40 pour un champion)
+            double tgtMaxHealth = TargetingUtil.getRealMaxHealth(tgt);
 
             double dmg=s.getFinalAD()*fr.lolmc.util.Balance.ratio("q_warwick","ad",1.0)+tgtMaxHealth*pct[getLevel()-1];
             TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.MAGICAL);
@@ -123,7 +122,7 @@ public final class Warwick extends BaseChampion {
                 new double[]{20,18,16,14,12},5,3,DamageType.PHYSICAL);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            double[] redux={1,2,2,3,3}; // amplifier RESISTANCE approx 35-55%
+            double[] redux={1,1,1,2,2}; // amplificateur Résistance : 40/40/40/60/60 % (LoL 35-55 %)
             c.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE,50,(int)redux[getLevel()-1],false,true));
             c.sendActionBar(Component.text("🛡 Hurlement Primal! Réduction de dégâts",NamedTextColor.GOLD));
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_WOLF_GROWL, 1f, 1f);
@@ -131,7 +130,7 @@ public final class Warwick extends BaseChampion {
                 @Override public void run(){
                     for(var __t : TargetingUtil.enemiesAround(c, 4.0)){
                         if(__t instanceof Player __p){
-                            __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,20,5,false,true));
+                            fr.lolmc.LolPlugin.getInstance().getCCManager().stun(__p, 20); // peur : ni déplacement ni action
                             __p.sendActionBar(Component.text("😱 Peur! (Hurlement Primal)",NamedTextColor.DARK_RED));
                         }
                     }
@@ -149,7 +148,7 @@ public final class Warwick extends BaseChampion {
                 new double[]{110,90,70},25,0,DamageType.MAGICAL);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,8.0); if(tgt==null){c.sendActionBar(Component.text("🐺 Aucune cible visée",NamedTextColor.GRAY));return;}
+            org.bukkit.entity.LivingEntity tgt = (t!=null && TargetingUtil.isEnemy(c,t))?t:TargetingUtil.getTargetedEnemy(c,8.0); if(tgt==null){c.sendActionBar(Component.text("🐺 Aucune cible visée",NamedTextColor.GRAY));return;}
             var dest=tgt.getLocation().clone().subtract(tgt.getLocation().getDirection().multiply(0.5));
             dest.setY(c.getLocation().getY());
             c.teleport(dest);

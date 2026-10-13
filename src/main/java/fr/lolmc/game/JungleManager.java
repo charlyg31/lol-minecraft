@@ -671,6 +671,17 @@ public class JungleManager {
         currentObjectiveKiller = null;
     }
 
+    /** Fin du buff du Dragon Ancestral par joueur (exécution sous 20 % PV). */
+    private static final Map<UUID, Long> elderUntil = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** Vrai si {@code player} a le buff du Dragon Ancestral actif. */
+    public static boolean hasElderBuff(Player player) {
+        Long until = elderUntil.get(player.getUniqueId());
+        if (until == null) return false;
+        if (System.currentTimeMillis() >= until) { elderUntil.remove(player.getUniqueId()); return false; }
+        return true;
+    }
+
     private void applyBuff(Player player, String buff) {
         if (buff == null || buff.equals("none")) return;
         if (!LolPlugin.getInstance().getChampionManager().hasChampion(player)) return;
@@ -708,7 +719,8 @@ public class JungleManager {
                 player.sendActionBar(Component.text("⛰ Dragon Montagne: +résistances!", NamedTextColor.GOLD));
             }
             case "drake_cloud" -> {
-                champ.getStats().addBonusMoveSpeed(0.02);
+                // +2 % de vitesse (avant : +0,02 en valeur absolue, sans effet)
+                champ.getStats().addBonusMoveSpeed(champ.getStats().getFinalMovementSpeed() * 0.02);
                 player.sendActionBar(Component.text("☁ Dragon Foudre: +vitesse!", NamedTextColor.WHITE));
             }
             case "drake_chemtech" -> {
@@ -718,6 +730,7 @@ public class JungleManager {
             case "drake_elder" -> {
                 champ.getStats().addBonusAD(20);
                 champ.getStats().addBonusAP(30);
+                elderUntil.put(player.getUniqueId(), System.currentTimeMillis() + 150_000L);
                 player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 150*20, 0, false, true));
                 player.sendActionBar(Component.text("🐲 Dragon Ancien: bénédiction puissante!", NamedTextColor.LIGHT_PURPLE));
                 scheduleBuffRemoval(player, () -> {
@@ -796,8 +809,9 @@ public class JungleManager {
                 // Océan : régénération puissante
                 champ.getStats().addBonusAD(10);
                 champ.getStats().multiplyHP(1.05);
-                player.addPotionEffect(new PotionEffect(
-                    PotionEffectType.REGENERATION, Integer.MAX_VALUE, 1, false, false));
+                // Régénération LoL (la potion vanilla était écrasée par la synchro des PV)
+                champ.getHPSystem().setHpRegen(champ.getHPSystem().getHpRegenPer5s()
+                        + champ.getHPSystem().getMaxHP() * 0.05);
                 player.sendActionBar(Component.text(
                     "🌊 ÂME OCÉANIQUE! Régénération permanente +5% PV", NamedTextColor.AQUA));
             }
@@ -915,18 +929,21 @@ public class JungleManager {
                     herald.getPathfinder().moveTo(ft.getCenter(), 1.6);
                 } else {
                     // CHARGE ! 400 dégâts à la structure puis mort du Héraut
+                    boolean ftWasDestroyed = ft.isDestroyed();
                     boolean phaseChanged = ft.takeDamage(1500);
                     fr.lolmc.util.VisualEffectUtil.impactBurst(ft.getCenter().getWorld(),
                         ft.getCenter().clone().add(0,1,0), Material.GRAY_STAINED_GLASS, 0.4f, 1.0, 10, 8L);
                     ft.getCenter().getWorld().playSound(ft.getCenter(),
                         org.bukkit.Sound.ENTITY_GENERIC_EXPLODE, 1.5f, 0.7f);
                     if (phaseChanged) mm.updateStructurePhase(ft);
-                    if (ft.isDestroyed()) {
-                        // Détruire proprement via le flux normal
+                    if (!ftWasDestroyed && ft.isDestroyed()) {
+                        // Détruire proprement via le flux normal (or d'équipe, super-sbires…)
                         announce(
                             Component.text(
                                 "👁 Le Héraut a détruit une tourelle!",
                                 NamedTextColor.LIGHT_PURPLE));
+                        var sdl = LolPlugin.getInstance().getStructureDamageListener();
+                        if (sdl != null) sdl.onStructureDestroyedByMinions(ft, ft.getCenter().getWorld());
                     }
                     herald.setHealth(0.01);
                     herald.damage(1000); // mort du Héraut après la charge

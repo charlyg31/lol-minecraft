@@ -338,6 +338,15 @@ public class WardManager {
         return until != null && until > System.currentTimeMillis();
     }
 
+    /** Retire toutes les wards d'un monde (fermeture d'une instance, avant son déchargement). */
+    public void clearWorld(org.bukkit.World world) {
+        wards.removeIf(w -> {
+            if (!world.getName().equals(w.location.getWorld() != null ? w.location.getWorld().getName() : null)) return false;
+            removeWardEntity(w);
+            return true;
+        });
+    }
+
     public void cleanup(UUID uuid) {
         revealedUntil.remove(uuid);
         revealedToTeam.remove(uuid);

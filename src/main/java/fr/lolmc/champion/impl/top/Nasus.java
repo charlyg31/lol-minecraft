@@ -54,7 +54,7 @@ public final class Nasus extends BaseChampion implements fr.lolmc.champion.base.
             new double[]{8,7,6,5,4},5,0,DamageType.PHYSICAL);
             resourceCost = 20;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,2.5); if(tgt==null){c.sendActionBar(Component.text("💀 Aucune cible",NamedTextColor.GRAY));return;}
+            org.bukkit.entity.LivingEntity tgt = (t!=null && TargetingUtil.isEnemy(c,t))?t:TargetingUtil.getTargetedEnemy(c,2.5); if(tgt==null){c.sendActionBar(Component.text("💀 Aucune cible",NamedTextColor.GRAY));return;}
             // LoL : AD + bonus par rang (30/50/70/90/110) + stacks permanents
             double[] bonus={40,60,80,100,120};
             int stacks=qStacks.getOrDefault(c.getUniqueId(),0);
@@ -83,7 +83,7 @@ public final class Nasus extends BaseChampion implements fr.lolmc.champion.base.
             new double[]{15,14,13,12,11},6.0,0,DamageType.MAGICAL);
             resourceCost = 80;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            org.bukkit.entity.LivingEntity tgt = (t!=null)?t:TargetingUtil.getTargetedEnemy(c,6.0); if(tgt==null){c.sendActionBar(Component.text("💀 Aucune cible",NamedTextColor.GRAY));return;}
+            org.bukkit.entity.LivingEntity tgt = (t!=null && TargetingUtil.isEnemy(c,t))?t:TargetingUtil.getTargetedEnemy(c,6.0); if(tgt==null){c.sendActionBar(Component.text("💀 Aucune cible",NamedTextColor.GRAY));return;}
             // LoL : ralentit 35% montant jusqu'à 95% sur 5s (+ ralentit vitesse d'attaque)
             // Approximation : lenteur progressive (amplifier croît) sur 5s
             new BukkitRunnable(){
@@ -121,15 +121,31 @@ public final class Nasus extends BaseChampion implements fr.lolmc.champion.base.
                 for(var __t : TargetingUtil.entitiesInRadius(c, loc, 3.5))
                     TargetingUtil.dealDamage(c, __t, burst, TargetingUtil.DmgType.MAGICAL);
             }}.runTaskLater(LolPlugin.getInstance(), 5L);
-            // Zone persistante 5s : dot/s + réduction d'armure
+            // Zone persistante 5s : dot/s + réduction d'armure 25-45 %
+            // (la potion Faiblesse n'avait aucun effet sur les dégâts LoL)
+            double[] shredPct={0.25,0.30,0.35,0.40,0.45};
+            double shred=shredPct[rank];
+            var shredded=new java.util.HashMap<java.util.UUID, Double>(); // champion -> armure retirée
+            var cmE=LolPlugin.getInstance().getChampionManager();
             new BukkitRunnable(){
                 int sec=0;
                 @Override public void run(){
-                    if(sec>=5){cancel();return;}
+                    if(sec>=5){
+                        // Fin de la zone : rendre exactement l'armure retirée
+                        for(var e : shredded.entrySet()){
+                            Player p=org.bukkit.Bukkit.getPlayer(e.getKey());
+                            if(p!=null && cmE.hasChampion(p)) cmE.getChampion(p).getStats().addBonusArmor(e.getValue());
+                        }
+                        cancel();return;
+                    }
                     for(var __t : TargetingUtil.entitiesInRadius(c, loc, 3.5)){
                         TargetingUtil.dealDamage(c, __t, perSec, TargetingUtil.DmgType.MAGICAL);
-                        if(__t instanceof Player __p)
-                            __p.addPotionEffect(new PotionEffect(PotionEffectType.WEAKNESS,40,1,false,true)); // -armure
+                        if(__t instanceof Player __p && cmE.hasChampion(__p) && !shredded.containsKey(__p.getUniqueId())){
+                            var st=cmE.getChampion(__p).getStats();
+                            double amount=Math.max(0, st.getFinalArmor())*shred;
+                            st.addBonusArmor(-amount);
+                            shredded.put(__p.getUniqueId(), amount);
+                        }
                     }
                     fr.lolmc.util.VisualEffectUtil.impactBurst(loc.getWorld(),
                             loc, Material.YELLOW_STAINED_GLASS, 0.3f, 3.0, 8, 15L);
@@ -153,12 +169,16 @@ public final class Nasus extends BaseChampion implements fr.lolmc.champion.base.
             double[] hpBonus={300,450,600};
             double[] pctArr={0.03,0.04,0.05};
             double pctHP=pctArr[rank]; // 3/4/5% HP max/s
-            c.addPotionEffect(new PotionEffect(PotionEffectType.HEALTH_BOOST,300,2,false,true));
-            c.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE,300,1,false,true));
+            double[] resists={15,35,55};
+            double resist=resists[Math.min(rank,2)];
             c.sendActionBar(Component.text("☀ Furie des Sables! (15s, Q -50%% CD)",NamedTextColor.GOLD));
             // Bonus HP réel (300/450/600 selon rang), jamais appliqué auparavant
             var cm=LolPlugin.getInstance().getChampionManager();
-            if (cm.hasChampion(c)) cm.getChampion(c).getStats().addBonusHP(hpBonus[rank]);
+            if (cm.hasChampion(c)) {
+                cm.getChampion(c).getStats().addBonusHP(hpBonus[rank]);
+                cm.getChampion(c).getStats().addBonusArmor(resist);
+                cm.getChampion(c).getStats().addBonusMR(resist);
+            }
             // Réduction CD du Q de 50%% pendant la durée
             final BaseAbility qAbil = cm.hasChampion(c) ? cm.getChampion(c).getAbility(1) : null;
             if(qAbil!=null) qAbil.setDynamicCooldown(Math.max(0.5, qAbil.getCurrentCooldown(s)*0.5));
@@ -167,7 +187,11 @@ public final class Nasus extends BaseChampion implements fr.lolmc.champion.base.
                 @Override public void run(){
                     if(tick>=300){
                         if(qAbil!=null) qAbil.setDynamicCooldown(-1); // restaurer CD normal
-                        if(cm.hasChampion(c)) cm.getChampion(c).getStats().addBonusHP(-hpBonus[rank]);
+                        if(cm.hasChampion(c)) {
+                            cm.getChampion(c).getStats().addBonusHP(-hpBonus[rank]);
+                            cm.getChampion(c).getStats().addBonusArmor(-resist);
+                            cm.getChampion(c).getStats().addBonusMR(-resist);
+                        }
                         cancel();return;
                     }
                     for(var __t : TargetingUtil.entitiesInRadius(c, c.getLocation(), 3)){

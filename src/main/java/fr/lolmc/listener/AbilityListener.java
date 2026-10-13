@@ -518,6 +518,21 @@ public class AbilityListener implements Listener {
                 }
             }
             case "flash" -> LolPlugin.getInstance().getFlashManager().useFlash(caster);
+            case "summoner" -> {
+                var ssm = LolPlugin.getInstance().getSummonerSpellManager();
+                String spellId = HotbarManager.getId(held);
+                if (ssm != null && spellId != null) {
+                    var spell = fr.lolmc.game.SummonerSpellManager.Spell.valueOf(spellId);
+                    // Embrasement / Épuisement : champion ennemi sous le viseur
+                    Player spellTarget = target;
+                    if (spellTarget == null && fr.lolmc.util.TargetingUtil.getTargetedEnemy(caster, 8.0)
+                            instanceof Player aimed) spellTarget = aimed;
+                    if (spellTarget != null && !LolPlugin.getInstance().getTeamManager().areEnemies(caster, spellTarget))
+                        spellTarget = null;
+                    ssm.cast(caster, spell, spellTarget);
+                    hotbar().renderPage(caster, champ);
+                }
+            }
             case "item" -> {
                 String itemId = HotbarManager.getId(held);
                 PassiveManager pm = LolPlugin.getInstance().getPassiveManager();
@@ -851,6 +866,8 @@ public class AbilityListener implements Listener {
         LolPlugin.getInstance().getBushManager().cleanup(p.getUniqueId());
         LolPlugin.getInstance().getRoleQueueManager().cleanup(p.getUniqueId());
         LolPlugin.getInstance().getRuneManager().cleanup(p.getUniqueId());
+        var consumables = LolPlugin.getInstance().getConsumableManager();
+        if (consumables != null) consumables.cleanup(p.getUniqueId());
     }
 
     // ══════════════════════════════════════════════════════════════

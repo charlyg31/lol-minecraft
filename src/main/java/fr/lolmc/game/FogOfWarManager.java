@@ -128,6 +128,11 @@ public class FogOfWarManager {
         var bushMgr = LolPlugin.getInstance().getBushManager();
 
         java.util.List<Player> players = new java.util.ArrayList<>(playerList);
+        // Brouillard global : les joueurs d'une instance sont gérés par le brouillard de leur instance
+        if (scopedWorld == null) {
+            var im = LolPlugin.getInstance().getInstanceManager();
+            if (im != null) players.removeIf(p -> im.getInstanceOf(p) != null);
+        }
 
         for (Player viewer : players) {
             if (!cm.hasChampion(viewer)) continue;
@@ -137,17 +142,22 @@ public class FogOfWarManager {
                 if (!viewer.getWorld().equals(target.getWorld())) continue; // autre partie
 
                 // Alliés toujours visibles
-                // Un allié est toujours visible; un ennemi révélé par sbire allié aussi
-                boolean revealedByMinion  = revealedByAllyMinion(viewer, target);
-                boolean revealedByTurret  = revealedByAllyTurret(viewer, target);
-                if (!teamManager.areEnemies(viewer, target) || revealedByMinion || revealedByTurret) {
+                if (!teamManager.areEnemies(viewer, target)) {
                     viewer.showPlayer(LolPlugin.getInstance(), target);
                     continue;
                 }
 
-                // Le BushManager gère déjà l'invisibilité dans les bushes :
-                // on ne touche pas un ennemi caché dans un bush.
-                if (bushMgr != null && bushMgr.isInBush(target) && !bushMgr.isRevealed(target)) {
+                // Le BushManager gère l'invisibilité dans les bushes : on ne touche pas un ennemi
+                // caché dans un bush. Ce test passe AVANT la vision des sbires/tourelles, sinon les
+                // deux tâches se contredisaient (l'ennemi clignotait dans le bush).
+                if (bushMgr != null && bushMgr.isInBush(target) && !bushMgr.isRevealed(target)
+                        && (wardMgr == null || !wardMgr.isRevealed(target))) {
+                    continue;
+                }
+
+                // Ennemi vu par un sbire ou une tourelle alliée
+                if (revealedByAllyMinion(viewer, target) || revealedByAllyTurret(viewer, target)) {
+                    viewer.showPlayer(LolPlugin.getInstance(), target);
                     continue;
                 }
 

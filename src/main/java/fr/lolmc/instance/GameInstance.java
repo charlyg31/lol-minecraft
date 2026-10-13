@@ -83,6 +83,8 @@ public final class GameInstance {
     public void addPlayer(Player player, TeamManager.Team team) {
         participants.add(player.getUniqueId());
         teams.put(player.getUniqueId(), team);
+        // Le reste du jeu (sélection, HUD, ciblage…) lit l'équipe dans le TeamManager global
+        LolPlugin.getInstance().getTeamManager().setTeam(player, team);
     }
 
     public boolean hasPlayer(UUID uuid) { return participants.contains(uuid); }
@@ -122,6 +124,7 @@ public final class GameInstance {
         jungleManager.dispose();
         fogManager.stopTask();
         turretManager.stopTasks();
+        LolPlugin.getInstance().getWardManager().clearWorld(world);
         baseManager.stopHealRingTask();
         // Le PassiveManager est partagé : ne nettoyer que l'état des joueurs de cette partie
         // (GameManager.stopGame arrête ses tâches quand la dernière partie se termine).
@@ -132,6 +135,7 @@ public final class GameInstance {
             fr.lolmc.util.ChampionStateReset.resetPlayer(uid);
             lp.getCCManager().clear(uid);
             lp.getDeathRecapManager().cleanup(uid);
+            if (lp.getConsumableManager() != null) lp.getConsumableManager().cleanup(uid);
         }
         participants.clear();
         teams.clear();
