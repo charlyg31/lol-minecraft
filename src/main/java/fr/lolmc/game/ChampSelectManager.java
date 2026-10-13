@@ -36,7 +36,6 @@ public class ChampSelectManager {
     }
 
     public void startSelection(Collection<UUID> players, boolean ranked) {
-        if (sessions.isEmpty()) ChampSelectGUI.resetBans();
         ChampSelectSession session = new ChampSelectSession();
         for (UUID id : players) sessions.put(id, session);
         session.startSelection(players, ranked);
@@ -75,6 +74,12 @@ public class ChampSelectManager {
     }
 
     /** IDLE si aucune sélection n'est en cours, sinon la phase la plus avancée parmi les sessions. */
+    /** Champions bannis dans la session de ce joueur (vide s'il n'est pas en sélection). */
+    public Set<String> bansFor(UUID id) {
+        ChampSelectSession s = sessions.get(id);
+        return s != null ? s.getBannedChampions() : Collections.emptySet();
+    }
+
     public Phase getPhase() {
         Phase best = Phase.IDLE;
         for (ChampSelectSession s : sessions.values()) {
@@ -101,4 +106,7 @@ public class ChampSelectManager {
     }
 
     public void unfreezeAll() { frozen.clear(); }
+
+    /** Libère uniquement ces joueurs (n'affecte pas les autres parties). */
+    public void unfreeze(Collection<UUID> ids) { frozen.removeAll(ids); }
 }

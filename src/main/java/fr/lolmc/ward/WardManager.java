@@ -212,7 +212,7 @@ public class WardManager {
                                     && now < revealedUntil.get(p.getUniqueId());
                             revealedUntil.put(p.getUniqueId(), now + REVEAL_DURATION_MS);
                             revealedToTeam.put(p.getUniqueId(), ward.team);
-                            if (!wasRevealed) playDetectionSound(ward.team);
+                            if (!wasRevealed) playDetectionSound(ward.team, ward.location.getWorld());
                         }
                     }
                 }
@@ -221,8 +221,8 @@ public class WardManager {
         }.runTaskTimer(LolPlugin.getInstance(), 0L, 10L);
     }
 
-    private void playDetectionSound(Team team) {
-        for (UUID memberId : teamManager.getTeamMembers(team)) {
+    private void playDetectionSound(Team team, org.bukkit.World world) {
+        for (UUID memberId : teamManager.getTeamMembers(team, world)) {
             Player member = Bukkit.getPlayer(memberId);
             if (member == null || !member.isOnline()) continue;
             member.playSound(member.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 1f, 1.5f);
@@ -296,7 +296,7 @@ public class WardManager {
         displays.get(10).teleport(base.clone().add(Math.cos(spin) * 0.8, 2.4, Math.sin(spin) * 0.8));
 
         // Visibilité par-viewer : uniquement les joueurs de viewerTeam
-        for (UUID viewerId : teamManager.getTeamMembers(viewerTeam)) {
+        for (UUID viewerId : teamManager.getTeamMembers(viewerTeam, revealed.getWorld())) {
             Player viewer = Bukkit.getPlayer(viewerId);
             if (viewer == null || !viewer.isOnline() || !viewer.getWorld().equals(revealed.getWorld())) continue;
             for (var d : displays) viewer.showEntity(LolPlugin.getInstance(), d);

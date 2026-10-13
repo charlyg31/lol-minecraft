@@ -23,6 +23,15 @@ import java.util.UUID;
  */
 public class AnnouncementManager {
 
+    private fr.lolmc.instance.GameInstance gameInstance = null;
+    public void setGameInstance(fr.lolmc.instance.GameInstance inst) { this.gameInstance = inst; }
+
+    /** Joueurs de CETTE partie (instance) ou tous les joueurs en jeu hors instances. */
+    private java.util.Collection<Player> audience() {
+        return gameInstance != null ? gameInstance.getOnlinePlayers() : WorldContext.getGamePlayers();
+    }
+
+
     public AnnouncementManager() {}
     // Killing spree par joueur (Doublé/Triplé/Quadra/Penta meurtre)
     private final Map<UUID, Integer> spreeStreak = new HashMap<>();
@@ -105,7 +114,7 @@ public class AnnouncementManager {
         Component subComp = LegacyText.parse(subtitle);
         Title t = Title.title(titleComp, subComp,
                 Title.Times.times(Duration.ofMillis(300), Duration.ofMillis(2000), Duration.ofMillis(500)));
-        for (Player p : WorldContext.getGamePlayers()) {
+        for (Player p : audience()) {
             p.showTitle(t);
             p.playSound(sound);
         }
@@ -167,7 +176,7 @@ public class AnnouncementManager {
                 .append(Component.text(" a fait un ping " + phrase, NamedTextColor.AQUA))
                 .append(Component.text("  (" + (int) loc.getX() + ", " + (int) loc.getZ() + ")", NamedTextColor.GRAY));
 
-        for (UUID memberId : tm.getTeamMembers(team)) {
+        for (UUID memberId : tm.getTeamMembers(team, loc.getWorld())) {
             Player member = Bukkit.getPlayer(memberId);
             if (member == null || !member.isOnline()) continue;
             member.sendMessage(msg);
@@ -210,7 +219,7 @@ public class AnnouncementManager {
             d.setVisibleByDefault(false);
             displays.add(d);
         }
-        for (UUID memberId : tm.getTeamMembers(team)) {
+        for (UUID memberId : tm.getTeamMembers(team, world)) {
             Player member = Bukkit.getPlayer(memberId);
             if (member != null && member.isOnline())
                 for (var d : displays) member.showEntity(LolPlugin.getInstance(), d);

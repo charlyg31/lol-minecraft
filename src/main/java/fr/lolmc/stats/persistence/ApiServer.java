@@ -222,20 +222,40 @@ public class ApiServer {
     /** GET /api/status → état du serveur */
     private void handleStatus(HttpExchange ex) throws java.io.IOException {
         if (!isAuthorized(ex)) { respond(ex, 401, err("unauthorized")); return; }
-        // Reste global : cette API donne une vue d'ensemble du serveur, pas l'état
-        // d'une partie précise. En mode multi-instances, elle ne reflète que le
-        // GameManager global (généralement inactif si toutes les parties tournent
-        // en instances isolées) — limite connue, cohérente avec son rôle de statut serveur.
-        var gm = LolPlugin.getInstance().getGameManager();
-        long elapsed = gm.isGameRunning() ? gm.getElapsedSeconds() : 0;
+        var plugin = LolPlugin.getInstance();
+        var gm = plugin.getGameManager();
+        boolean anyRunning = gm.isGameRunning();
+        long elapsed = anyRunning ? gm.getElapsedSeconds() : 0;
+        // Parties en instances : une entrée par instance
+        StringBuilder inst = new StringBuilder("[");
+        var im = plugin.getInstanceManager();
+        if (im != null) {
+            boolean first = true;
+            for (var gi : im.getAllInstances()) {
+                var igm = gi.getGameManager();
+                boolean running = igm.isGameRunning();
+                long el = running ? igm.getElapsedSeconds() : 0;
+                if (running) { anyRunning = true; elapsed = Math.max(elapsed, el); }
+                if (!first) inst.append(",");
+                first = false;
+                inst.append(String.format(
+                    "{\"id\":%d,\"world\":\"%s\",\"state\":\"%s\",\"game_running\":%b,"
+                    + "\"game_elapsed_seconds\":%d,\"players\":%d}",
+                    gi.getId(), gi.getWorldName(), gi.getState(), running, el,
+                    gi.getWorld().getPlayers().size()));
+            }
+        }
+        inst.append("]");
         int online = org.bukkit.Bukkit.getOnlinePlayers().size();
-        var db = LolPlugin.getInstance().getDatabaseManager();
+        var db = plugin.getDatabaseManager();
         int totalPlayers = db.getAllFromDb().size();
+        // game_running / game_elapsed_seconds : vrai si AU MOINS une partie tourne (globale ou instance),
+        // durée de la plus longue — champs conservés pour compatibilité ; le détail est dans "instances".
         String json = String.format(
             "{\"online_players\":%d,\"game_running\":%b,\"game_elapsed_seconds\":%d,"
-            + "\"total_registered_players\":%d,\"server_version\":\"%s\"}",
-            online, gm.isGameRunning(), elapsed, totalPlayers,
-            org.bukkit.Bukkit.getVersion());
+            + "\"total_registered_players\":%d,\"server_version\":\"%s\",\"instances\":%s}",
+            online, anyRunning, elapsed, totalPlayers,
+            org.bukkit.Bukkit.getVersion(), inst);
         respond(ex, 200, json);
     }
 
@@ -250,10 +270,12 @@ public class ApiServer {
             var cm = LolPlugin.getInstance().getChampionManager();
             String champ = cm.hasChampion(p) ? cm.getChampion(p).getId() : null;
             json.append(String.format(
-                "{\"name\":\"%s\",\"uuid\":\"%s\",\"champion\":%s,\"inGame\":%b}",
+                "{\"name\":\"%s\",\"uuid\":\"%s\",\"champion\":%s,\"inGame\":%b,\"instance\":%d}",
                 p.getName(), p.getUniqueId(),
                 champ != null ? "\"" + champ + "\"" : "null",
-                fr.lolmc.instance.InstanceHelper.gameManager(p).isGameRunning()));
+                fr.lolmc.instance.InstanceHelper.gameManager(p).isGameRunning(),
+                fr.lolmc.instance.InstanceHelper.instanceOf(p) != null
+                        ? fr.lolmc.instance.InstanceHelper.instanceOf(p).getId() : 0));
         }
         json.append("]}");
         respond(ex, 200, json.toString());

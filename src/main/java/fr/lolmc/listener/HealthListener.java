@@ -119,7 +119,8 @@ public class HealthListener implements Listener {
             public void run() {
                 if (!p.isOnline()) return;
                 var plugin = LolPlugin.getInstance();
-                var gm = plugin.getGameManager();
+                var rejoinInst = plugin.getInstanceManager() != null ? plugin.getInstanceManager().getInstanceOf(p) : null;
+                var gm = rejoinInst != null ? rejoinInst.getGameManager() : plugin.getGameManager();
                 var cm = plugin.getChampionManager();
                 var tm = plugin.getTeamManager();
                 java.util.UUID id = p.getUniqueId();
@@ -137,9 +138,10 @@ public class HealthListener implements Listener {
                                 "✔ Reconnexion — Ton état de partie a été restauré !", net.kyori.adventure.text.format.NamedTextColor.GREEN));
                     } else if (cm.hasChampion(p)) {
                         var champ = cm.getChampion(p);
-                        try { plugin.getHotbarManager().renderPage(p, champ); } catch (Exception ignored) {}
+                        try { plugin.getHotbarManager().renderPage(p, champ); } catch (Exception ex) { fr.lolmc.LolPlugin.getInstance().getLogger().log(java.util.logging.Level.WARNING, "[HealthListener] erreur ignorée (ligne 140)", ex); }
                         plugin.getMinimapManager().giveMinimap(p);
-                        var spawn = (team != null) ? plugin.getMapManager().getSpawn(team, 1) : null;
+                        var rejoinMap = rejoinInst != null ? rejoinInst.getMapManager() : plugin.getMapManager();
+                        var spawn = (team != null) ? rejoinMap.getSpawn(team, 1) : null;
                         if (spawn != null) p.teleport(spawn);
                         p.sendMessage(net.kyori.adventure.text.Component.text(
                                 "🔄 Reconnecté à ta partie en cours.", net.kyori.adventure.text.format.NamedTextColor.GREEN));

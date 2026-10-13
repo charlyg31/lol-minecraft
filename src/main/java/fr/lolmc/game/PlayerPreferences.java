@@ -139,7 +139,7 @@ public class PlayerPreferences {
                 page.secondaryRunes.addAll(config.getStringList(path + "rune.secondaryRunes"));
                 if (page.keystone != null) p.runePage = page;
                 prefs.put(uuid, p);
-            } catch (Exception ignored) {}
+            } catch (Exception ex) { fr.lolmc.LolPlugin.getInstance().getLogger().log(java.util.logging.Level.WARNING, "[PlayerPreferences] erreur ignorée (ligne 142)", ex); }
         }
     }
 }

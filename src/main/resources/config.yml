@@ -35,8 +35,8 @@ world:
   # Mode instances (EXPERIMENTAL) : chaque match du matchmaking local joue dans une copie du monde template.
   # false (défaut) = une seule partie à la fois dans le monde "name" ci-dessous, mode stable.
   use-instances: false
-  # Nombre maximum de parties simultanées (mode instances)
-  max-instances: 1
+  # Nombre maximum de parties simultanées (mode instances) ; 0 = illimité
+  max-instances: 4
   # Nom exact du monde de jeu (dossier dans le répertoire serveur)
   name: "lolmc_template"
   # Monde lobby/hub (optionnel). Si renseigné, c'est ici que

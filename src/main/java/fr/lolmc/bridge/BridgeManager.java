@@ -142,6 +142,7 @@ public class BridgeManager implements PluginMessageListener {
                     // Lancer la sélection sur le thread principal
                     Bukkit.getScheduler().runTask(plugin, () -> {
                         var csm = plugin.getChampSelectManager();
+                        csm.freeze(connected);
                         if (!plugin.getConfig().getBoolean("world.use-instances", false)) {
                             csm.startSelection(connected, ranked);
                             return;
@@ -157,6 +158,7 @@ public class BridgeManager implements PluginMessageListener {
                         }
                         plugin.getInstanceManager().createInstance(blue, red, instance -> {
                             if (instance == null) {
+                                csm.unfreeze(connected);
                                 for (UUID id : connected) {
                                     Player pl = Bukkit.getPlayer(id);
                                     if (pl != null) pl.sendMessage(net.kyori.adventure.text.Component.text(
@@ -392,7 +394,7 @@ public class BridgeManager implements PluginMessageListener {
         if (!enabled) return;
         try {
             plugin.getServer().getMessenger().unregisterIncomingPluginChannel(plugin, CHANNEL_IN);
-        } catch (Exception ignored) {}
+        } catch (Exception ex) { fr.lolmc.LolPlugin.getInstance().getLogger().log(java.util.logging.Level.WARNING, "[BridgeManager] erreur ignorée (ligne 397)", ex); }
     }
 
 

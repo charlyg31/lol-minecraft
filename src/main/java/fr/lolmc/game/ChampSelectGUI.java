@@ -35,10 +35,10 @@ public class ChampSelectGUI implements Listener {
     private static final Component BAN_TITLE = Component.text("Bannissez un Champion", NamedTextColor.RED).decoration(TextDecoration.ITALIC, false);
     private static final String SKIN_TITLE = "🎨 Choisir un skin";
 
-    // Bans actifs (empêchés d'être sélectionnés)
-    private static final java.util.Set<String> bannedChampions
-            = java.util.Collections.synchronizedSet(new java.util.HashSet<>());
-    private static int banRound = 0; // 0 = pas en ban, 1-10 = tour de ban
+    // Les bans sont propres à chaque session de sélection (voir ChampSelectSession#getBannedChampions).
+    private static java.util.Set<String> bansOf(Player p) {
+        return LolPlugin.getInstance().getChampSelectManager().bansFor(p.getUniqueId());
+    }
 
     // Les 20 champions disponibles (id → matériau d'icône)
     private static final String[] CHAMPIONS = {
@@ -206,7 +206,7 @@ public class ChampSelectGUI implements Listener {
             int banSlot = e.getSlot();
             if (banSlot < 0 || banSlot >= CHAMPIONS.length) return;
             String banId = CHAMPIONS[banSlot];
-            if (isBanned(banId)) {
+            if (bansOf(banner).contains(banId)) {
                 banner.sendMessage(Component.text("❌ " + capitalize(banId) + " est déjà banni.", NamedTextColor.RED));
                 return;
             }
@@ -300,32 +300,18 @@ public class ChampSelectGUI implements Listener {
     public void openBanMenu(Player player) {
         Inventory inv = Bukkit.createInventory(null, 27, BAN_TITLE);
         for (int i = 0; i < CHAMPIONS.length; i++) {
-            if (!bannedChampions.contains(CHAMPIONS[i]))
-                inv.setItem(i, buildChampionIcon(CHAMPIONS[i]));
+            if (!bansOf(player).contains(CHAMPIONS[i]))
+                inv.setItem(i, buildChampionIcon(CHAMPIONS[i], bansOf(player)));
         }
         player.openInventory(inv);
     }
 
-    /** Bannit un champion (appelé depuis ChampSelectManager). */
-    public static void banChampion(String championId) {
-        bannedChampions.add(championId);
-        banRound++;
-        Bukkit.broadcast(Component.text(
-                "🚫 " + championId + " est banni! (ban " + banRound + "/6)",
-                NamedTextColor.RED));
-    }
-
-    public static boolean isBanned(String championId) { return bannedChampions.contains(championId); }
-
-    public static void resetBans() { bannedChampions.clear(); banRound = 0; }
-
-
-    private org.bukkit.inventory.ItemStack buildChampionIcon(String championId) {
+    private org.bukkit.inventory.ItemStack buildChampionIcon(String championId, java.util.Set<String> bans) {
         org.bukkit.Material mat = org.bukkit.Material.PLAYER_HEAD;
         org.bukkit.inventory.ItemStack is = new org.bukkit.inventory.ItemStack(mat);
         org.bukkit.inventory.meta.ItemMeta meta = is.getItemMeta();
         if (meta != null) {
-            boolean banned = isBanned(championId);
+            boolean banned = bans.contains(championId);
             meta.displayName(net.kyori.adventure.text.Component.text(
                             (banned ? "§c✗ " : "§f") + championId,
                             net.kyori.adventure.text.format.NamedTextColor.WHITE)

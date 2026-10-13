@@ -156,8 +156,21 @@ public class InstanceManager {
      * @param red       Liste des UUIDs équipe rouge
      * @param callback  Appelé sur le thread principal quand l'instance est prête
      */
+    private final AtomicInteger creating = new AtomicInteger(0);
+
     public void createInstance(List<UUID> blue, List<UUID> red,
-                               java.util.function.Consumer<GameInstance> callback) {
+                               java.util.function.Consumer<GameInstance> callbackIn) {
+        int max = plugin.getConfig().getInt("world.max-instances", 0);
+        if (max > 0 && instances.size() + creating.get() >= max) {
+            log.warning("[InstanceManager] Limite atteinte (world.max-instances=" + max + ") — création refusée.");
+            callbackIn.accept(null);
+            return;
+        }
+        creating.incrementAndGet();
+        final java.util.function.Consumer<GameInstance> callback = inst -> {
+            creating.decrementAndGet();
+            callbackIn.accept(inst);
+        };
         int instanceId = idCounter.incrementAndGet();
         String worldName = INSTANCE_PREFIX + instanceId;
 
@@ -350,7 +363,7 @@ public class InstanceManager {
             try {
                 var mv = (com.onarandombox.MultiverseCore.MultiverseCore) mvPlugin;
                 if (mv.getMVWorldManager().unloadWorld(name)) return true;
-            } catch (Exception ignored) {}
+            } catch (Exception ex) { fr.lolmc.LolPlugin.getInstance().getLogger().log(java.util.logging.Level.WARNING, "[InstanceManager] erreur ignorée (ligne 366)", ex); }
         }
 
         // Fallback
@@ -451,7 +464,7 @@ public class InstanceManager {
     /** Arrête toutes les instances actives (onDisable). */
     public void shutdownAll() {
         for (GameInstance instance : new ArrayList<>(instances.values())) {
-            try { instance.stop(); } catch (Exception ignored) {}
+            try { instance.stop(); } catch (Exception ex) { fr.lolmc.LolPlugin.getInstance().getLogger().log(java.util.logging.Level.WARNING, "[InstanceManager] erreur ignorée (ligne 467)", ex); }
         }
         instances.clear();
         playerMap.clear();

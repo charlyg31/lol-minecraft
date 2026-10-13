@@ -128,13 +128,14 @@ public class FogOfWarManager {
         var wardMgr = LolPlugin.getInstance().getWardManager();
         var bushMgr = LolPlugin.getInstance().getBushManager();
 
-        java.util.List<Player> players = new java.util.ArrayList<>(WorldContext.getGamePlayers());
+        java.util.List<Player> players = new java.util.ArrayList<>(playerList);
 
         for (Player viewer : players) {
             if (!cm.hasChampion(viewer)) continue;
             for (Player target : players) {
                 if (viewer.equals(target)) continue;
                 if (!cm.hasChampion(target)) continue;
+                if (!viewer.getWorld().equals(target.getWorld())) continue; // autre partie
 
                 // Alliés toujours visibles
                 // Un allié est toujours visible; un ennemi révélé par sbire allié aussi

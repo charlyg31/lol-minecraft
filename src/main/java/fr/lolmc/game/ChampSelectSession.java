@@ -170,7 +170,6 @@ public class ChampSelectSession {
             return;
         }
         bannedChampions.add(championId);
-        ChampSelectGUI.banChampion(championId);
         for (UUID id : participants) {
             Player p = Bukkit.getPlayer(id);
             if (p != null) p.sendMessage(Component.text(
@@ -269,6 +268,10 @@ public class ChampSelectSession {
             player.sendActionBar(Component.text("❌ Tu n'as pas accès à ce champion.", NamedTextColor.RED));
             return;
         }
+        if (bannedChampions.contains(championId.toLowerCase())) {
+            player.sendActionBar(Component.text("⛔ Ce champion est banni.", NamedTextColor.RED));
+            return;
+        }
         chosenChampion.put(player.getUniqueId(), championId);
         player.sendActionBar(Component.text("✔ Champion: " + championId, NamedTextColor.GREEN));
     }
@@ -349,6 +352,7 @@ public class ChampSelectSession {
         var instance = instMgr != null && !participants.isEmpty()
                 ? instMgr.getInstanceOf(participants.iterator().next()) : null;
         if (instance != null) {
+            plugin_startMatch(participants);
             instance.start();
         } else {
             var plugin = LolPlugin.getInstance();
@@ -379,4 +383,9 @@ public class ChampSelectSession {
 
     public Phase getPhase() { return phase; }
     public void onSkinChosen(Player p, String champId, String skinId) { chosenSkin.put(p.getUniqueId(), skinId); }
+
+    /** Remet à zéro les stats de ces joueurs uniquement (les autres parties ne sont pas touchées). */
+    private void plugin_startMatch(Collection<UUID> group) {
+        LolPlugin.getInstance().getMatchScoreboard().startMatch(ranked, new HashSet<>(group));
+    }
 }

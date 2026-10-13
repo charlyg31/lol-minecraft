@@ -199,7 +199,7 @@ public class RewardManager {
         // ── XP catch-up (LoL) : un joueur en retard sur le niveau moyen ──
         // ── de la partie gagne un bonus d'XP progressif (jusqu'à +40%) ──
         double avgLevel = 0; int counted = 0;
-        for (var op : fr.lolmc.util.WorldContext.getGamePlayers()) {
+        for (var op : (gameInstance != null ? gameInstance.getOnlinePlayers() : fr.lolmc.util.WorldContext.getGamePlayers())) {
             if (!championManager.hasChampion(op)) continue;
             avgLevel += championManager.getChampion(op).getLevelSystem().getLevel();
             counted++;

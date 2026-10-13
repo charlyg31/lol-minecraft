@@ -256,8 +256,8 @@ public class HUDManager {
     private void onDeath(Player player) {
         var plugin = LolPlugin.getInstance();
         var tm = plugin.getTeamManager();
-        var mm = plugin.getMapManager();
-        var gm = plugin.getGameManager();
+        var mm = fr.lolmc.instance.InstanceHelper.mapManager(player);
+        var gm = fr.lolmc.instance.InstanceHelper.gameManager(player);
         var cm = plugin.getChampionManager();
 
         // Timer de respawn (LoL : ~8s niveau 1 → 50s niveau 18)
@@ -293,7 +293,7 @@ public class HUDManager {
     private void respawnPlayer(Player player) {
         var plugin = LolPlugin.getInstance();
         var tm = plugin.getTeamManager();
-        var mm = plugin.getMapManager();
+        var mm = fr.lolmc.instance.InstanceHelper.mapManager(player);
         var cm = plugin.getChampionManager();
 
         // Revenir en survie

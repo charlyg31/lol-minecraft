@@ -72,6 +72,7 @@ public class GameInstance {
         this.fogManager.setGameInstance(this); // lier à cette instance
         this.passiveManager      = new PassiveManager(lp.getChampionManager(), lp.getHUDManager(), lp.getShopListener());
         this.announcementManager = new AnnouncementManager();
+        this.announcementManager.setGameInstance(this);
         this.featManager         = new FeatManager();
     }
 

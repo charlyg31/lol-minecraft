@@ -82,6 +82,21 @@ public class TeamManager {
         return ta != null && tb != null && ta != tb;
     }
 
+    /**
+     * Joueurs en ligne d'une équipe qui se trouvent dans ce monde — permet à deux parties
+     * simultanées (deux mondes d'instance) d'avoir chacune une équipe BLEUE et ROUGE distinctes.
+     */
+    public Set<UUID> getTeamMembers(Team team, org.bukkit.World world) {
+        Set<UUID> members = new HashSet<>();
+        if (world == null) return getTeamMembers(team);
+        for (var e : playerTeams.entrySet()) {
+            if (e.getValue() != team) continue;
+            Player p = org.bukkit.Bukkit.getPlayer(e.getKey());
+            if (p != null && p.isOnline() && p.getWorld().equals(world)) members.add(e.getKey());
+        }
+        return members;
+    }
+
     /** Tous les joueurs en ligne d'une équipe donnée. */
     public Set<UUID> getTeamMembers(Team team) {
         Set<UUID> members = new HashSet<>();

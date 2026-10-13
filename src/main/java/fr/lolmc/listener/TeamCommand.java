@@ -85,11 +85,11 @@ public class TeamCommand implements CommandExecutor, TabCompleter {
         Component msg = Component.text(
             "[" + team.name() + "] " + sender.getName() + ": " + message,
             team.chatColor);
-        for (java.util.UUID id : tm.getTeamMembers(team)) {
+        for (java.util.UUID id : tm.getTeamMembers(team, sender.getWorld())) {
             var p = LolPlugin.getInstance().getServer().getPlayer(id);
             if (p != null && p.isOnline()) p.sendMessage(msg);
         }
         // Log pour le joueur lui-même (confirmé)
-        if (tm.getTeamMembers(team).isEmpty()) sender.sendMessage(msg);
+        if (tm.getTeamMembers(team, sender.getWorld()).isEmpty()) sender.sendMessage(msg);
     }
 }

@@ -161,6 +161,7 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
             case "resetcd" -> handleResetCd(player, args);
             case "hp"      -> handleHp(player, args);
             case "wave"    -> handleWave(player);
+            case "instance", "instances" -> handleInstance(player, args);
             case "help"    -> handleAdminHelp(player);
             case "reload" -> {
                 LolPlugin.getInstance().reloadConfig();
@@ -226,6 +227,14 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
                 fr.lolmc.instance.InstanceHelper.jungleManager(player).stopJungle();
                 LolPlugin.getInstance().getPlantManager().clearAll();
                 fr.lolmc.instance.InstanceHelper.gameManager(player).stopGame();
+                // Instance de partie : fermeture immédiate (joueurs renvoyés au spawn, monde supprimé)
+                var stopInst = fr.lolmc.instance.InstanceHelper.instanceOf(player);
+                if (stopInst != null) {
+                    LolPlugin.getInstance().getInstanceManager().closeInstance(stopInst, 20L);
+                    player.sendMessage(Component.text("⏹ Partie arrêtée — instance #" + stopInst.getId()
+                            + " fermée et supprimée.", NamedTextColor.YELLOW));
+                    return true;
+                }
                 player.sendMessage(Component.text("⏹ Partie arrêtée.", NamedTextColor.YELLOW));
             }
             default -> sendHelp(player);
@@ -471,7 +480,9 @@ private void handleSolo(Player player, String[] args) {
     plugin.getJungleManager().stopJungle();
     if (plugin.getGameManager().isRunning()) plugin.getGameManager().stopGame();
     plugin.getGameManager().stopSystems();
-    fr.lolmc.game.MinionManager.purgeAllWorlds();
+    // Uniquement le monde de test (template) : les instances en cours ne sont pas touchées
+    var soloWorld = fr.lolmc.util.WorldContext.getGameWorld();
+    if (soloWorld != null) fr.lolmc.game.MinionManager.purgeWorld(soloWorld);
 
     plugin.getTeamManager().setTeam(player, fr.lolmc.team.TeamManager.Team.BLUE);
     plugin.getChampionManager().assignChampion(player, champId);
@@ -489,7 +500,7 @@ private void handleSolo(Player player, String[] args) {
     plugin.getJungleManager().startJungle();
     plugin.getPlantManager().spawnAll();
     plugin.getGameManager().startGame();
-    plugin.getMatchScoreboard().startMatch(false);
+    plugin.getMatchScoreboard().startMatch(false, java.util.Set.of(player.getUniqueId()));
     var spawn = plugin.getMapManager().getSpawn(fr.lolmc.team.TeamManager.Team.BLUE, 1);
     if (spawn != null) player.teleport(spawn);
 
@@ -747,9 +758,15 @@ private void handleSolo(Player player, String[] args) {
 
     @Override
     public List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command cmd, @NotNull String alias, @NotNull String @NotNull [] args) {
-        if (args.length == 1) return List.of("set", "position", "lane", "schem", "road", "jungle", "shopnpc", "mode", "select", "solo", "give", "level", "gold", "team", "testgame", "debug", "reload", "start", "stop", "center"); // MODIFICATION : Injecté "schem"
+        if (args.length == 1) return List.of("set", "position", "lane", "schem", "road", "jungle", "shopnpc", "mode", "select", "solo", "give", "level", "gold", "team", "testgame", "debug", "reload", "start", "stop", "center", "instance"); // MODIFICATION : Injecté "schem"
         if (args.length == 2) {
             return switch (args[0].toLowerCase()) {
+                case "instance", "instances" -> {
+                    List<String> ids = new java.util.ArrayList<>();
+                    for (var gi : LolPlugin.getInstance().getInstanceManager().getAllInstances()) ids.add(String.valueOf(gi.getId()));
+                    ids.add("template");
+                    yield ids;
+                }
                 case "set" -> List.of("turret", "inhibitor", "nexus", "basenexus");
                 case "schem" -> List.of("pos1", "pos2", "save"); // AJOUT : Auto-complétion de l'action de schématique
                 case "shopnpc", "position", "lane" -> List.of("blue", "red");
@@ -889,10 +906,60 @@ private void handleSolo(Player player, String[] args) {
         player.sendMessage(Component.text("✔ Vague forcée!", NamedTextColor.GREEN));
     }
 
+    // ── /lola instance [numéro|template] ──────────────────────────────────
+    // Sans argument : liste les instances. Avec un numéro : téléporte l'admin
+    // dans cette instance (spawn bleu, sinon spawn du monde). "template" = monde template.
+    private void handleInstance(Player player, String[] args) {
+        var im = LolPlugin.getInstance().getInstanceManager();
+        var all = new java.util.ArrayList<>(im.getAllInstances());
+        all.sort(java.util.Comparator.comparingInt(fr.lolmc.instance.GameInstance::getId));
+        if (args.length < 2) {
+            if (all.isEmpty()) {
+                player.sendMessage(Component.text("Aucune instance active. (/lola instance template pour le monde template)", NamedTextColor.GRAY));
+                return;
+            }
+            player.sendMessage(Component.text("═══ Instances actives ═══", NamedTextColor.GOLD));
+            for (var gi : all) {
+                player.sendMessage(Component.text(String.format("  #%d  %s  — %d joueur(s), état %s",
+                        gi.getId(), gi.getWorldName(), gi.getWorld().getPlayers().size(), gi.getState()),
+                        NamedTextColor.YELLOW));
+            }
+            player.sendMessage(Component.text("§7/lola instance <numéro> pour s'y téléporter", NamedTextColor.GRAY));
+            return;
+        }
+        org.bukkit.Location dest;
+        String label;
+        if (args[1].equalsIgnoreCase("template")) {
+            var w = fr.lolmc.util.WorldContext.getGameWorld();
+            if (w == null) { player.sendMessage(Component.text("❌ Monde template introuvable.", NamedTextColor.RED)); return; }
+            dest = w.getSpawnLocation();
+            label = "monde template (" + w.getName() + ")";
+        } else {
+            int id;
+            try { id = Integer.parseInt(args[1].replace("#", "")); }
+            catch (NumberFormatException ex) {
+                player.sendMessage(Component.text("❌ Numéro invalide : " + args[1], NamedTextColor.RED));
+                return;
+            }
+            fr.lolmc.instance.GameInstance target = null;
+            for (var gi : all) if (gi.getId() == id) { target = gi; break; }
+            if (target == null) {
+                player.sendMessage(Component.text("❌ Instance #" + id + " introuvable. /lola instance pour la liste.", NamedTextColor.RED));
+                return;
+            }
+            dest = target.getMapManager().getSpawn(fr.lolmc.team.TeamManager.Team.BLUE, 0);
+            if (dest == null) dest = target.getWorld().getSpawnLocation();
+            label = "instance #" + id;
+        }
+        player.teleport(dest);
+        player.sendMessage(Component.text("✔ Téléporté dans " + label + ".", NamedTextColor.GREEN));
+    }
+
     // ── /lola help ────────────────────────────────────────────────────────
     private void handleAdminHelp(Player player) {
         player.sendMessage(Component.text("═══ /lola — Commandes admin ═══", NamedTextColor.GOLD));
         String[][] cmds = {
+                {"/lola instance [n|template]", "Lister / rejoindre une instance de partie"},
                 {"/lola solo [champion]",        "Mode test solo (niveau 18, 20k or)"},
                 {"/lola give <champion>",         "Assigner un champion"},
                 {"/lola level <1-18>",            "Changer de niveau"},

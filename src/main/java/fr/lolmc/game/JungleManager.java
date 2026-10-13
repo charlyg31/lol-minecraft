@@ -583,7 +583,7 @@ public class JungleManager {
                 if (kteam != null) {
                     int grubs = voidgrubKills.merge(kteam, 1, Integer::sum);
                     if (grubs == 3 || grubs == 6) {
-                        for (UUID mid : LolPlugin.getInstance().getTeamManager().getTeamMembers(kteam)) {
+                        for (UUID mid : LolPlugin.getInstance().getTeamManager().getTeamMembers(kteam, killer.getWorld())) {
                             Player mp = Bukkit.getPlayer(mid);
                             if (mp != null) mp.sendMessage(Component.text(
                                 "🐛 " + grubs + " Nuées du Néant — +" + (grubs == 3 ? "6" : "14")
@@ -643,7 +643,7 @@ public class JungleManager {
         var team = tm.getTeam(killer);
         currentObjectiveKiller = killer;
         if (team == null) { applyBuff(killer, buff); currentObjectiveKiller = null; return; }
-        for (UUID id : tm.getTeamMembers(team)) {
+        for (UUID id : tm.getTeamMembers(team, killer.getWorld())) {
             Player m = LolPlugin.getInstance().getServer().getPlayer(id);
             if (m != null && m.isOnline()) applyBuff(m, buff);
         }

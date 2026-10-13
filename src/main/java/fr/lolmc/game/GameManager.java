@@ -217,7 +217,7 @@ public class GameManager {
         // Marqueurs de cible (rouge visee / vert verrouillee)
         LolPlugin.getInstance().getAutoAttackManager().startVisuals();
         // FF + death recap reset
-        if (!otherGameRunning()) LolPlugin.getInstance().getForfeitManager().reset();
+        LolPlugin.getInstance().getForfeitManager().reset(gameInstance != null ? gameInstance.getId() : 0);
     }
 
     public void stopGame() {
@@ -236,7 +236,7 @@ public class GameManager {
         // Réinitialiser les skins
         if (last) LolPlugin.getInstance().getSkinManager().resetAll();
         // FF reset
-        if (last) LolPlugin.getInstance().getForfeitManager().reset();
+        LolPlugin.getInstance().getForfeitManager().reset(gameInstance != null ? gameInstance.getId() : 0);
         // Passifs d'objets : arrêt des tâches et remise à zéro de l'état par joueur
         var passives = LolPlugin.getInstance().getPassiveManager();
         if (passives != null && last) { passives.stopTasks(); passives.cleanupAll(); }

@@ -132,7 +132,7 @@ public class RuneManager {
                 page.statShard2 = runeConfig.getString(base + "shard2", "adaptive");
                 page.statShard3 = runeConfig.getString(base + "shard3", "health");
                 playerPages.put(uuid, page);
-            } catch (Exception ignored) {}
+            } catch (Exception ex) { fr.lolmc.LolPlugin.getInstance().getLogger().log(java.util.logging.Level.WARNING, "[RuneManager] erreur ignorée (ligne 135)", ex); }
         }
     }
 

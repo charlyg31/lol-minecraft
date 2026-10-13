@@ -37,12 +37,28 @@ public class MatchScoreboard {
     private final Map<UUID, MatchStats> stats = new HashMap<>();
     private boolean ranked = false;
 
+    /** Joueurs dont la partie en cours est classée (par joueur, pour des parties simultanées). */
+    private final Set<UUID> rankedPlayers = new HashSet<>();
+
+    /** Démarre une partie pour TOUS les joueurs (mode partie unique / tests). */
     public void startMatch(boolean ranked) {
         this.ranked = ranked;
         stats.clear();
+        rankedPlayers.clear();
+    }
+
+    /** Démarre une partie pour ce groupe uniquement : les stats des autres parties restent intactes. */
+    public void startMatch(boolean ranked, Collection<UUID> group) {
+        this.ranked = ranked;
+        if (group == null) { startMatch(ranked); return; }
+        for (UUID id : group) {
+            stats.remove(id);
+            if (ranked) rankedPlayers.add(id); else rankedPlayers.remove(id);
+        }
     }
 
     public boolean isRanked() { return ranked; }
+    public boolean isRanked(UUID id) { return rankedPlayers.contains(id) || (rankedPlayers.isEmpty() && ranked); }
 
     private MatchStats get(Player p) {
         return stats.computeIfAbsent(p.getUniqueId(), u -> new MatchStats(u, p.getName()));
@@ -66,7 +82,7 @@ public class MatchScoreboard {
     // ══════════════════════════════════════════════════════════════
 
     /** Ajoute à {@code lines} l'entête et les statistiques de chaque joueur d'une équipe. */
-    private void appendTeamScores(List<Component> lines, Team team, fr.lolmc.team.TeamManager tm) {
+    private void appendTeamScores(List<Component> lines, Team team, fr.lolmc.team.TeamManager tm, Set<UUID> group) {
         // Entête équipe
         String teamName = team == Team.BLUE ? "§9═══ Équipe Bleue ═══" : "§c═══ Équipe Rouge ═══";
         lines.add(Component.text(teamName));
@@ -76,6 +92,7 @@ public class MatchScoreboard {
                 "Joueur", "K", "D", "A", "CS", "Or", "Dégâts"),
             NamedTextColor.GRAY));
         for (UUID id : tm.getTeamMembers(team)) {
+            if (group != null && !group.contains(id)) continue;
             var ms = stats.get(id);
             if (ms == null) continue;
             var cm = LolPlugin.getInstance().getChampionManager();
@@ -91,31 +108,11 @@ public class MatchScoreboard {
         }
     }
 
-    private void appendTeamScores_OLD(List<Component> lines, Team team, fr.lolmc.team.TeamManager tm) {
-        lines.add(Component.text("── Équipe " + (team == Team.BLUE ? "Bleue" : "Rouge") + " ──",
-                team.chatColor));
-        for (UUID id : tm.getTeamMembers(team)) {
-            MatchStats s = stats.get(id);
-            String name = Bukkit.getOfflinePlayer(id).getName();
-            if (s == null) {
-                lines.add(Component.text("  " + name + " : 0/0/0", NamedTextColor.GRAY));
-            } else {
-                lines.add(Component.text(String.format(
-                    "  %s : %d/%d/%d  CS %d  %dor",
-                    name, s.kills, s.deaths, s.assists, s.cs, s.gold),
-                    NamedTextColor.WHITE));
-                lines.add(Component.text(String.format(
-                    "    DMG: %,d infligés / %,d subis  Soins: %,d  Wards: %d posées %d détruites",
-                    s.damageDealt, s.damageTaken, s.healingDone, s.wardsPlaced, s.wardsKilled),
-                    NamedTextColor.GRAY));
-            }
-        }
-    }
-
     /** Recopie le total de soins de chaque champion dans les statistiques de la partie. */
-    private void syncHealingStats() {
+    private void syncHealingStats(Set<UUID> group) {
         var cm = LolPlugin.getInstance().getChampionManager();
         for (var entry : stats.entrySet()) {
+            if (group != null && !group.contains(entry.getKey())) continue;
             Player p = org.bukkit.Bukkit.getPlayer(entry.getKey());
             if (p != null && cm.hasChampion(p)) {
                 entry.getValue().healingDone = (long) cm.getChampion(p).getHPSystem().getTotalHealed();
@@ -125,9 +122,25 @@ public class MatchScoreboard {
 
     /** Affiche le tableau de score à tous les joueurs et persiste en base. */
     public void showEndScreen(Team winner) {
+        showEndScreen(winner, null, null);
+    }
+
+    /**
+     * Fin de partie pour un groupe : n'affiche et ne persiste que les joueurs de {@code players}
+     * (null = tous), avec le chrono et les feats de {@code gm} (null = partie globale).
+     */
+    public void showEndScreen(Team winner, Collection<? extends Player> players, GameManager gm) {
         var tm = LolPlugin.getInstance().getTeamManager();
-        syncHealingStats();
-        var feat = LolPlugin.getInstance().getFeatManager();
+        Set<UUID> group = null;
+        if (players != null) {
+            group = new HashSet<>();
+            for (Player gp : players) group.add(gp.getUniqueId());
+        }
+        syncHealingStats(group);
+        var feat = (gm != null && gm.getGameInstance() != null)
+                ? gm.getGameInstance().getFeatManager()
+                : LolPlugin.getInstance().getFeatManager();
+        GameManager timeSrc = gm != null ? gm : LolPlugin.getInstance().getGameManager();
 
         List<Component> lines = new ArrayList<>();
         lines.add(Component.text("═══════ FIN DE PARTIE ═══════", NamedTextColor.GOLD));
@@ -142,53 +155,58 @@ public class MatchScoreboard {
             lines.add(Component.empty());
         }
 
-        appendTeamScores(lines, Team.BLUE, tm);
+        appendTeamScores(lines, Team.BLUE, tm, group);
         lines.add(Component.empty());
-        appendTeamScores(lines, Team.RED, tm);
+        appendTeamScores(lines, Team.RED, tm, group);
 
-        for (Player p : Bukkit.getOnlinePlayers()) {
+        Collection<? extends Player> audience = players != null ? players : Bukkit.getOnlinePlayers();
+        for (Player p : audience) {
             for (Component line : lines) p.sendMessage(line);
         }
 
-        persistResults(winner, tm);
+        persistResults(winner, tm, group, timeSrc);
 
         // Notifier le lobby (BungeeCord) de la fin de partie
         var bridge = LolPlugin.getInstance().getBridgeManager();
         if (bridge != null && bridge.isEnabled()) {
-            long duration = LolPlugin.getInstance().getGameManager().getElapsedSeconds();
+            long duration = timeSrc.getElapsedSeconds();
             List<fr.lolmc.stats.persistence.PlayerStats> endStats = new ArrayList<>();
             for (UUID id : stats.keySet()) {
+                if (group != null && !group.contains(id)) continue;
                 endStats.add(new fr.lolmc.stats.persistence.PlayerStats(id, ""));
             }
             bridge.notifyGameEnd(winner.name(), duration, endStats);
         }
     }
 
-    private void persistResults(Team winner, fr.lolmc.team.TeamManager tm) {
+    private void persistResults(Team winner, fr.lolmc.team.TeamManager tm, Set<UUID> group, GameManager timeSrc) {
         var db = LolPlugin.getInstance().getDatabaseManager();
         var ranked = LolPlugin.getInstance().getRankedManager();
         if (db == null || ranked == null) return;
 
         List<UUID> winners = new ArrayList<>(tm.getTeamMembers(winner));
         List<UUID> losers = new ArrayList<>(tm.getTeamMembers(winner.opposite()));
+        if (group != null) { winners.retainAll(group); losers.retainAll(group); }
 
         // Reporter les KDA de la partie dans les stats persistantes
-        long duration = LolPlugin.getInstance().getGameManager().getElapsedSeconds();
+        long duration = timeSrc.getElapsedSeconds();
         String matchId = java.util.UUID.randomUUID().toString(); // ID unique pour cette partie
         long now = System.currentTimeMillis();
         var tm2 = LolPlugin.getInstance().getTeamManager();
         var cm2 = LolPlugin.getInstance().getChampionManager();
-        var mode = this.ranked ? fr.lolmc.stats.persistence.RankedManager.Mode.RANKED
-                : fr.lolmc.stats.persistence.RankedManager.Mode.NORMAL;
         for (var entry : stats.entrySet()) {
+            if (group != null && !group.contains(entry.getKey())) continue;
             MatchStats s = entry.getValue();
+            boolean isRk = isRanked(entry.getKey());
+            var mode = isRk ? fr.lolmc.stats.persistence.RankedManager.Mode.RANKED
+                    : fr.lolmc.stats.persistence.RankedManager.Mode.NORMAL;
             org.bukkit.entity.Player mp = org.bukkit.Bukkit.getPlayer(entry.getKey());
             // Construire MatchRecord enrichi
             var mr = new fr.lolmc.stats.persistence.MatchRecord();
             mr.uuid    = entry.getKey();
             mr.matchId = matchId;
             mr.playedAt = now;
-            mr.ranked  = this.ranked;
+            mr.ranked  = isRk;
             mr.won     = winners.contains(entry.getKey());
             mr.team    = (mp != null && tm2.getTeam(mp) != null)
                          ? tm2.getTeam(mp).name() : "UNKNOWN";
@@ -231,7 +249,12 @@ public class MatchScoreboard {
         }
 
         // Mettre à jour Elo (classé) ou stats (amical)
-        if (this.ranked) {
+        boolean groupRanked = this.ranked;
+        if (group != null) {
+            groupRanked = false;
+            for (UUID id : group) if (isRanked(id)) { groupRanked = true; break; }
+        }
+        if (groupRanked) {
             ranked.updateEloAfterRanked(winners, losers);
         } else {
             ranked.updateAfterNormal(winners, losers);

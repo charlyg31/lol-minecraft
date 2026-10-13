@@ -262,7 +262,15 @@ public class StructureDamageListener implements Listener {
             p.sendMessage(msg);
         }
         // Afficher le tableau de score de fin de partie
-        LolPlugin.getInstance().getMatchScoreboard().showEndScreen(winner);
+        final java.util.List<java.util.UUID> groupIds = new java.util.ArrayList<>();
+        for (Player gp : (inst != null ? inst.getOnlinePlayers()
+                : fr.lolmc.util.WorldContext.getGamePlayers())) groupIds.add(gp.getUniqueId());
+        {
+            java.util.List<Player> grp = new java.util.ArrayList<>();
+            for (java.util.UUID id : groupIds) { Player gp = org.bukkit.Bukkit.getPlayer(id); if (gp != null) grp.add(gp); }
+            LolPlugin.getInstance().getMatchScoreboard().showEndScreen(winner, grp,
+                    fr.lolmc.instance.InstanceHelper.gameManager(destroyer));
+        }
         // Arrêter la partie
         fr.lolmc.instance.InstanceHelper.minionManager(destroyer).stopWaves();
         fr.lolmc.instance.InstanceHelper.jungleManager(destroyer).stopJungle();
@@ -279,7 +287,9 @@ public class StructureDamageListener implements Listener {
                     var bridge = LolPlugin.getInstance().getBridgeManager();
                     // Pour chaque joueur : retour sur son serveur d'origine
                     // (ou téléportation locale si pas de BungeeCord)
-                    for (Player p : fr.lolmc.util.WorldContext.getGamePlayers()) {
+                    for (java.util.UUID gid : groupIds) {
+                        Player p = org.bukkit.Bukkit.getPlayer(gid);
+                        if (p == null || !p.isOnline()) continue;
                         if (bridge != null && bridge.isEnabled()) {
                             // BungeeCord : envoyer vers le serveur d'origine
                             bridge.sendPlayerToOrigin(p);
@@ -288,8 +298,9 @@ public class StructureDamageListener implements Listener {
                             if (mm != null) mm.returnPlayerToPreGameLocation(p);
                         }
                     }
-                    // Aussi nettoyer les joueurs des instances
-                    if (mm != null) mm.returnAllToPreGameLocations();
+                    // Mode partie unique : nettoyer toutes les positions mémorisées
+                    // (en instances, seuls les joueurs de CETTE partie sont renvoyés)
+                    if (mm != null && winnerInstance == null) mm.returnAllToPreGameLocations();
                     // Fermer l'instance
                     if (winnerInstance != null)
                         im.closeInstance(winnerInstance, 60L);
@@ -297,7 +308,9 @@ public class StructureDamageListener implements Listener {
                     return;
                 }
                 if (countdown <= 10 || countdown % 10 == 0) {
-                    for (Player p : fr.lolmc.util.WorldContext.getGamePlayers()) {
+                    for (java.util.UUID gid : groupIds) {
+                        Player p = org.bukkit.Bukkit.getPlayer(gid);
+                        if (p == null) continue;
                         p.sendActionBar(Component.text(
                             "🏠 Retour dans " + countdown + "s",
                             NamedTextColor.YELLOW));

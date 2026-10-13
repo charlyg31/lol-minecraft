@@ -398,6 +398,6 @@ public class DatabaseManager {
     public void close() {
         try {
             if (connection != null && !connection.isClosed()) connection.close();
-        } catch (SQLException ignored) {}
+        } catch (SQLException ex) { fr.lolmc.LolPlugin.getInstance().getLogger().log(java.util.logging.Level.WARNING, "[DatabaseManager] erreur ignorée (ligne 401)", ex); }
     }
 }

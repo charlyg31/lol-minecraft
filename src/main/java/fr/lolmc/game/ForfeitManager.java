@@ -25,12 +25,45 @@ public class ForfeitManager {
     private static final int VOTE_TIMEOUT_S  = 60;
     private static final double VOTE_RATIO   = 3.0 / 5.0;       // 3/5
 
-    private final Map<Team, Set<UUID>>   votes      = new EnumMap<>(Team.class);
-    private final Map<Team, org.bukkit.scheduler.BukkitTask> timers = new EnumMap<>(Team.class);
+    // Clé = "<id de partie>:<équipe>" : deux parties simultanées ont des votes distincts.
+    private final Map<String, Set<UUID>>   votes      = new HashMap<>();
+    private final Map<String, org.bukkit.scheduler.BukkitTask> timers = new HashMap<>();
 
+    private static int gameKey(Player p) {
+        var inst = fr.lolmc.instance.InstanceHelper.instanceOf(p);
+        return inst != null ? inst.getId() : 0;
+    }
+
+    private static String key(int game, Team team) { return game + ":" + team.name(); }
+
+    /** Joueurs de la même partie (instance, ou tous les joueurs en jeu hors instances). */
+    private static Collection<Player> groupOf(Player p) {
+        var inst = fr.lolmc.instance.InstanceHelper.instanceOf(p);
+        return inst != null ? inst.getOnlinePlayers() : fr.lolmc.util.WorldContext.getGamePlayers();
+    }
+
+    private static List<Player> teamMembers(Player ref, Team team) {
+        var tm = LolPlugin.getInstance().getTeamManager();
+        List<Player> out = new ArrayList<>();
+        for (Player q : groupOf(ref)) if (tm.getTeam(q) == team) out.add(q);
+        return out;
+    }
+
+    /** Réinitialise tous les votes. */
     public void reset() {
         timers.values().forEach(t -> { if (t != null) t.cancel(); });
         votes.clear(); timers.clear();
+    }
+
+    /** Réinitialise les votes d'une seule partie (0 = hors instance). */
+    public void reset(int game) {
+        String prefix = game + ":";
+        timers.entrySet().removeIf(e -> {
+            if (!e.getKey().startsWith(prefix)) return false;
+            if (e.getValue() != null) e.getValue().cancel();
+            return true;
+        });
+        votes.keySet().removeIf(k -> k.startsWith(prefix));
     }
 
     /**
@@ -58,26 +91,30 @@ public class ForfeitManager {
         Team team = tm.getTeam(player);
         if (team == null) { player.sendMessage(Component.text("❌ Equipe inconnue.", NamedTextColor.RED)); return false; }
 
+        final int game = gameKey(player);
+        final String k = key(game, team);
+        final Player ref = player;
+
         // Démarrer un nouveau vote si aucun en cours
-        if (!votes.containsKey(team)) {
-            votes.put(team, new HashSet<>());
-            broadcastTeam(team, Component.text(
+        if (!votes.containsKey(k)) {
+            votes.put(k, new HashSet<>());
+            broadcastTeam(ref, team, Component.text(
                 "🏳 Vote d'abandon lancé par " + player.getName() + " ! /l ff pour voter (60s)",
                 NamedTextColor.YELLOW));
             // Timeout
             var task = new BukkitRunnable() {
                 @Override public void run() {
-                    if (votes.containsKey(team)) {
-                        votes.remove(team); timers.remove(team);
-                        broadcastTeam(team, Component.text(
+                    if (votes.containsKey(k)) {
+                        votes.remove(k); timers.remove(k);
+                        broadcastTeam(ref, team, Component.text(
                             "🏳 Vote d'abandon expiré.", NamedTextColor.GRAY));
                     }
                 }
             };
-            timers.put(team, task.runTaskLater(LolPlugin.getInstance(), VOTE_TIMEOUT_S * 20L));
+            timers.put(k, task.runTaskLater(LolPlugin.getInstance(), VOTE_TIMEOUT_S * 20L));
         }
 
-        Set<UUID> teamVotes = votes.get(team);
+        Set<UUID> teamVotes = votes.get(k);
         if (teamVotes.contains(player.getUniqueId())) {
             player.sendMessage(Component.text("Tu as déjà voté.", NamedTextColor.GRAY));
             return false;
@@ -86,37 +123,30 @@ public class ForfeitManager {
         teamVotes.add(player.getUniqueId());
 
         // Compter les membres de l'équipe en ligne
-        int total = tm.getTeamMembers(team).stream()
-            .mapToInt(id -> {
-                var p = Bukkit.getPlayer(id);
-                return (p != null && p.isOnline()) ? 1 : 0;
-            })
-            .sum();
+        int total = teamMembers(ref, team).size();
         int needed = (int) Math.ceil(total * VOTE_RATIO);
 
-        broadcastTeam(team, Component.text(
+        broadcastTeam(ref, team, Component.text(
             String.format("🏳 %s a voté l'abandon (%d/%d)", player.getName(), teamVotes.size(), needed),
             NamedTextColor.YELLOW));
 
         if (teamVotes.size() >= needed) {
             // Abandon !
-            timers.get(team).cancel();
-            votes.remove(team); timers.remove(team);
-            Bukkit.broadcast(Component.text(
+            var tk = timers.get(k);
+            if (tk != null) tk.cancel();
+            votes.remove(k); timers.remove(k);
+            Component ffMsg = Component.text(
                 "🏳 L'équipe " + (team == Team.BLUE ? "Bleue" : "Rouge") + " abandonne !",
-                NamedTextColor.RED));
+                NamedTextColor.RED);
+            for (Player gp : groupOf(ref)) gp.sendMessage(ffMsg);
             Team winner = team == Team.BLUE ? Team.RED : Team.BLUE;
-            LolPlugin.getInstance().getMatchScoreboard().showEndScreen(winner);
+            LolPlugin.getInstance().getMatchScoreboard().showEndScreen(winner, groupOf(ref), gm);
             fr.lolmc.instance.InstanceHelper.gameManager(player).stopGame();
         }
         return true;
     }
 
-    private void broadcastTeam(Team team, Component msg) {
-        var tm = LolPlugin.getInstance().getTeamManager();
-        for (UUID id : tm.getTeamMembers(team)) {
-            Player p = Bukkit.getPlayer(id);
-            if (p != null && p.isOnline()) p.sendMessage(msg);
-        }
+    private void broadcastTeam(Player ref, Team team, Component msg) {
+        for (Player p : teamMembers(ref, team)) p.sendMessage(msg);
     }
 }
