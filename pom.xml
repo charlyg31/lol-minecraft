@@ -13,7 +13,6 @@
         <maven.compiler.source>25</maven.compiler.source>
         <maven.compiler.target>25</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <btlp.version>2.7.0</btlp.version>
     </properties>
 
     <!-- Pins transitifs de paper-api (CVE-2025-67030, CVE-2025-48924, CVE-2026-49844) -->
@@ -46,19 +45,9 @@
             <id>onarandombox</id>
             <url>https://repo.onarandombox.com/content/groups/public/</url>
         </repository>
-        <repository>
-            <id>codecrafter47-repo</id>
-            <url>https://nexus.codecrafter47.de/content/repositories/public/</url>
-        </repository>
     </repositories>
 
     <dependencies>
-        <dependency>
-            <groupId>codecrafter47.bungeetablistplus</groupId>
-            <artifactId>bungeetablistplus-api-bukkit</artifactId>
-            <version>${btlp.version}</version>
-            <scope>provided</scope>
-        </dependency>
         <dependency>
             <groupId>io.papermc.paper</groupId>
             <artifactId>paper-api</artifactId>
@@ -131,6 +120,14 @@
                         <configuration>
                             <createDependencyReducedPom>false</createDependencyReducedPom>
                             <filters>
+                                <!-- Stubs de l'API BungeeTabListPlus (compilation seulement) : au runtime les vraies
+                                     classes viennent du plugin BungeeTabListPlus (bridge Bukkit). -->
+                                <filter>
+                                    <artifact>fr.lolmc:lol-minecraft</artifact>
+                                    <excludes>
+                                        <exclude>codecrafter47/**</exclude>
+                                    </excludes>
+                                </filter>
                                 <filter>
                                     <artifact>*:*</artifact>
                                     <excludes>
