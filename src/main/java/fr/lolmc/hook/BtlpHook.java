@@ -5,7 +5,6 @@ import codecrafter47.bungeetablistplus.api.bukkit.Variable;
 import fr.lolmc.LolPlugin;
 import fr.lolmc.instance.GameInstance;
 import fr.lolmc.team.TeamManager.Team;
-import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
 import java.util.function.Function;

@@ -45,7 +45,6 @@ public class RewardManager {
     public static final int GOLD_INHIBITOR_GLOBAL = 400;
     public static final int GOLD_INHIBITOR_KILLER = 25;
     // Nexus
-    public static final int GOLD_NEXUS_GLOBAL     = 100;
     // XP structures
     public static final double XP_TURRET    = 100;
     public static final double XP_INHIBITOR = 150;

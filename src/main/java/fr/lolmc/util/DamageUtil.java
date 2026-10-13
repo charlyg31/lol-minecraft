@@ -121,7 +121,7 @@ public class DamageUtil {
         }
 
         // Rune Cut Down : +8% dégâts (hors vrais dégâts) contre une cible au-dessus de 60% de son HP max
-        if (as != null && type != Type.TRUE && attacker != null) {
+        if (as != null && type != Type.TRUE) {
             var rm = LolPlugin.getInstance().getRuneManager();
             if (rm != null) {
                 var atkPage = rm.getPage(attacker.getUniqueId());

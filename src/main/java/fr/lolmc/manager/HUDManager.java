@@ -119,7 +119,7 @@ public class HUDManager {
     private void applyMovementSpeed(Player player, fr.lolmc.stats.ChampionStats stats) {
         double lolMS = stats.getFinalMovementSpeed();
         // Formule: mc_speed = (lolMS / 330.0) * 0.2
-        float mcSpeed = (float) Math.min(1.0, Math.max(0.05, (lolMS / 330.0) * 0.2));
+        float mcSpeed = (float) Math.clamp((lolMS / 330.0) * 0.2, 0.05, 1.0);
         if (Math.abs(player.getWalkSpeed() - mcSpeed) > 0.001f) {
             player.setWalkSpeed(mcSpeed);
         }
@@ -134,7 +134,7 @@ public class HUDManager {
         // Calculer HP Minecraft proportionnel
         double mcHP = hp.toMinecraftHealth();
         if (Math.abs(player.getHealth() - mcHP) > 0.1) {
-            player.setHealth(Math.max(0.1, Math.min(40.0, mcHP)));
+            player.setHealth(Math.clamp(mcHP, 0.1, 40.0));
         }
     }
 
@@ -255,9 +255,6 @@ public class HUDManager {
 
     private void onDeath(Player player) {
         var plugin = LolPlugin.getInstance();
-        var tm = plugin.getTeamManager();
-        var mm = fr.lolmc.instance.InstanceHelper.mapManager(player);
-        var gm = fr.lolmc.instance.InstanceHelper.gameManager(player);
         var cm = plugin.getChampionManager();
 
         // Timer de respawn (LoL : ~8s niveau 1 → 50s niveau 18)

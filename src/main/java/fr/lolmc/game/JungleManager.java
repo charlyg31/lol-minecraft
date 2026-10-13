@@ -521,7 +521,6 @@ public class JungleManager {
         // Récompenses (or individuel du mob, lu depuis le PDC si dispo)
         if (killer != null) {
             int gold = type.gold;
-            Entity ent = LolPlugin.getInstance().getServer().getEntity(entityId);
             // (l'entité est déjà morte, on utilise l'or du type par défaut)
             siblingRewardManager()
                     .onJungleMonsterKill(killer, gold, type.xp);
@@ -901,7 +900,6 @@ public class JungleManager {
                         org.bukkit.Sound.ENTITY_GENERIC_EXPLODE, 1.5f, 0.7f);
                     if (phaseChanged) mm.updateStructurePhase(ft);
                     if (ft.isDestroyed()) {
-                        var sdl = LolPlugin.getInstance().getStructureDamageListener();
                         // Détruire proprement via le flux normal
                         LolPlugin.getInstance().getServer().broadcast(
                             Component.text(

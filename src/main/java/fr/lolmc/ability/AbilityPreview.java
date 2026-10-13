@@ -154,11 +154,9 @@ public class AbilityPreview {
         spawnLoc.setPitch(0f);
 
         switch (type) {
-            case SKILLSHOT -> {
-                // Une seule bande plate au sol, de la largeur du couloir.
-                // La bande de l'ombre de Zed est créée à la demande (voir updateSkillshot).
-                displays.add(makeLineDisplay(spawnLoc, LINE_BLOCK));
-            }
+            // Une seule bande plate au sol, de la largeur du couloir.
+            // La bande de l'ombre de Zed est créée à la demande (voir updateSkillshot).
+            case SKILLSHOT -> displays.add(makeLineDisplay(spawnLoc, LINE_BLOCK));
             case GROUND -> {
                 for (int i = 0; i < RING_SEGMENTS; i++) {
                     displays.add(makeRingSegment(spawnLoc));

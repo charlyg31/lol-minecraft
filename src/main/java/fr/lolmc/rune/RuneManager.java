@@ -278,9 +278,6 @@ public class RuneManager {
     }
 
     /**
-     * Effets on-hit additionnels (vol de vie, mana, dégâts de sort).
-     */
-    /**
      * Rune Nimbus Cloak : après un sort d'invocateur, +25% vitesse de mouvement pendant 2s.
      * (Le vrai taux varie selon le cooldown du sort dans le jeu original ; simplifié ici
      * à un taux médian unique.)

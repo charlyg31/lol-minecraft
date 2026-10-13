@@ -148,16 +148,17 @@ public class InstanceManager {
     // CRÉER UNE INSTANCE
     // ══════════════════════════════════════════════════════════════════════
 
+    /** Créations d'instances en cours (comptées dans la limite world.max-instances). */
+    private final AtomicInteger creating = new AtomicInteger(0);
+
     /**
      * Crée une nouvelle instance de partie de façon asynchrone.
      * La copie du monde se fait en async (I/O), le chargement en sync.
      *
-     * @param blue      Liste des UUIDs équipe bleue
-     * @param red       Liste des UUIDs équipe rouge
-     * @param callback  Appelé sur le thread principal quand l'instance est prête
+     * @param blue        Liste des UUIDs équipe bleue
+     * @param red         Liste des UUIDs équipe rouge
+     * @param callbackIn  Appelé sur le thread principal quand l'instance est prête (null si échec)
      */
-    private final AtomicInteger creating = new AtomicInteger(0);
-
     public void createInstance(List<UUID> blue, List<UUID> red,
                                java.util.function.Consumer<GameInstance> callbackIn) {
         int max = plugin.getConfig().getInt("world.max-instances", 0);

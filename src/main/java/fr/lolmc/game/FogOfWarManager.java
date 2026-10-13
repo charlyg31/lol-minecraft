@@ -1,7 +1,6 @@
 package fr.lolmc.game;
 
 import fr.lolmc.LolPlugin;
-import fr.lolmc.util.WorldContext;
 
 import fr.lolmc.team.TeamManager;
 import org.bukkit.entity.Player;

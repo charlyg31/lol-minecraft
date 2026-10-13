@@ -1,7 +1,5 @@
 package fr.lolmc.listener;
 import fr.lolmc.util.Compat;
-import org.bukkit.Location;
-import fr.lolmc.game.AutoAttackManager;
 import fr.lolmc.game.GameStructure;
 
 import fr.lolmc.LolPlugin;
@@ -416,7 +414,6 @@ public class AbilityListener implements Listener {
         return true;
     }
 
-    /** Trouve le joueur visé par le caster (raycast simple, portée 30 blocs). */
     /** Cible verrouillable : ennemi (champion, sbire adverse, monstre) et visible par le joueur. */
     private boolean isLockableEnemy(Player caster, org.bukkit.entity.LivingEntity le) {
         return fr.lolmc.util.TargetingUtil.isEnemy(caster, le) && caster.canSee(le);

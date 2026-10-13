@@ -186,10 +186,6 @@ public class ChampSelectGUI implements Listener {
         return f;
     }
 
-    public boolean isSkinMenu(Inventory inv) {
-        return false;
-    }
-
     // ── Gestion des clics ─────────────────────────────────────────
 
     @EventHandler

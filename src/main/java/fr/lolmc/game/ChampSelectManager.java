@@ -73,13 +73,13 @@ public class ChampSelectManager {
         return all;
     }
 
-    /** IDLE si aucune sélection n'est en cours, sinon la phase la plus avancée parmi les sessions. */
     /** Champions bannis dans la session de ce joueur (vide s'il n'est pas en sélection). */
     public Set<String> bansFor(UUID id) {
         ChampSelectSession s = sessions.get(id);
         return s != null ? s.getBannedChampions() : Collections.emptySet();
     }
 
+    /** IDLE si aucune sélection n'est en cours, sinon la phase la plus avancée parmi les sessions. */
     public Phase getPhase() {
         Phase best = Phase.IDLE;
         for (ChampSelectSession s : sessions.values()) {

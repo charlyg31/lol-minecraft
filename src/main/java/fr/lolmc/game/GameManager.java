@@ -58,7 +58,6 @@ public class GameManager {
     private org.bukkit.scheduler.BukkitTask timerTask;
     private org.bukkit.scheduler.BukkitTask passiveGoldTask;
     private org.bukkit.scheduler.BukkitTask respawnTask;
-    private org.bukkit.scheduler.BukkitTask respawnTotalSeconds_task;
     // Temps de respawn figé au moment de la mort (bug bossbar)
     private final java.util.Map<java.util.UUID, Integer> respawnTotalSecondsMap
         = new java.util.concurrent.ConcurrentHashMap<>();
@@ -385,7 +384,7 @@ public class GameManager {
 
     public int computeRespawnSeconds(int level) {
         // BRW de base selon le niveau (table officielle LoL)
-        int idx = Math.max(1, Math.min(18, level)) - 1;
+        int idx = Math.clamp(level, 1, 18) - 1;
         double brw = BRW_TABLE[idx];
 
         // Time Increase Factor (TIFx) : augmente le timer selon le temps de jeu
@@ -468,7 +467,7 @@ public class GameManager {
                             int level = LolPlugin.getInstance().getChampionManager().hasChampion(p)
                                     ? LolPlugin.getInstance().getChampionManager().getChampion(p).getLevelSystem().getLevel() : 1;
                             int total = respawnTotalSecondsMap.getOrDefault(entry.getKey(), computeRespawnSeconds(level));
-                            bar.progress(Math.max(0f, Math.min(1f, (float) remaining / total)));
+                            bar.progress(Math.clamp((float) remaining / total, 0f, 1f));
                         }
                     }
                 }

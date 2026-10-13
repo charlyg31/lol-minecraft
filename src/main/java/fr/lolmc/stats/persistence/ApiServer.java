@@ -179,9 +179,9 @@ public class ApiServer {
         if (players.isEmpty()) { respond(ex, 404, err("match not found")); return; }
         StringBuilder json = new StringBuilder("{");
         json.append("\"match_id\":\"").append(matchId).append("\",");
-        json.append("\"played_at\":").append(players.get(0).playedAt).append(",");
-        json.append("\"ranked\":").append(players.get(0).ranked).append(",");
-        json.append("\"duration_seconds\":").append(players.get(0).durationSeconds).append(",");
+        json.append("\"played_at\":").append(players.getFirst().playedAt).append(",");
+        json.append("\"ranked\":").append(players.getFirst().ranked).append(",");
+        json.append("\"duration_seconds\":").append(players.getFirst().durationSeconds).append(",");
         // Séparer les équipes
         json.append("\"blue\":[");
         boolean firstB = true;
