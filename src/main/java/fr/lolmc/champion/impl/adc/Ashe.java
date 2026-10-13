@@ -17,14 +17,21 @@ import org.bukkit.potion.PotionEffectType;
 public final class Ashe extends BaseChampion {
     public Ashe() {
         super("ashe", "Ashe", ChampionRole.ADC,
-            new ChampionStats(610,59,0,26,30,0.658,0,325,6.0,3.5));
-        getStats().setGrowthStats(101.0,3.5,4.6,1.30,0.03000,0.55);
+            new ChampionStats(610,59,0,26,33,0.658,0,325,6,3.5));
+        getStats().setGrowthStats(101,3,4.6,1.1,0.03,0.55);
+        setLolAttackRange(600); // stats LoL (wiki)
     }
     @Override protected void registerAbilities() {
         setAbility(0,new AA()); setAbility(1,new Q());
         setAbility(2,new W()); setAbility(3,new E()); setAbility(4,new R());
-        initSystems(528, 3.0, ResourceSystem.ResourceType.MANA, 480, 11.0);
-        setAutoAttackRange(9.2);
+        initSystems(3.5, ResourceSystem.ResourceType.MANA, 280, 35, 7, 0.65);
+    }
+
+    /** Ralentissement de Tir de Givre selon le niveau (20 % → 30 %, wiki). */
+    static double frostShot(int lvl) { return 0.20 + 0.10 * (lvl - 1) / 17.0; }
+    static double frostShot(Player ashe) {
+        var cm = LolPlugin.getInstance().getChampionManager();
+        return frostShot(cm.hasChampion(ashe) ? cm.getChampion(ashe).getLevelSystem().getLevel() : 1);
     }
 
     static class AA extends BasicAttackAbility {
@@ -34,8 +41,8 @@ public final class Ashe extends BaseChampion {
             if(tgt instanceof Player __p){
                 var cm=LolPlugin.getInstance().getChampionManager();
                 int lvl=cm.hasChampion(c)?cm.getChampion(c).getLevelSystem().getLevel():1;
-                int amp=lvl>=10?1:0; // ~15% puis ~30%
-                __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,40,amp,false,true));
+                // Tir de Givre (wiki) : 20 % → 30 % selon le niveau, 2 s
+                fr.lolmc.LolPlugin.getInstance().getCCManager().slowPct(__p, frostShot(lvl), 40);
             }
         }
     }
@@ -45,11 +52,18 @@ public final class Ashe extends BaseChampion {
             new double[]{15,12.5,10,7.5,5},25,0,DamageType.PHYSICAL);
             resourceCost = 25;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            c.addPotionEffect(new PotionEffect(PotionEffectType.STRENGTH,120,0,false,true));
-            c.addPotionEffect(new PotionEffect(PotionEffectType.SPEED,120,0,false,true));
+            // Wiki : 6 s, +20-60 % de vitesse d'attaque ; la rafale inflige 110-130 % AD par attaque
+            int r=getLevel()-1;
+            double asBonus=new double[]{0.20,0.30,0.40,0.50,0.60}[r];
+            double adBonus=s.getFinalAD()*new double[]{0.10,0.15,0.20,0.25,0.30}[r];
+            s.addBonusAttackSpeed(asBonus);
+            s.addBonusAD(adBonus);
+            new org.bukkit.scheduler.BukkitRunnable(){@Override public void run(){
+                s.addBonusAttackSpeed(-asBonus); s.addBonusAD(-adBonus);
+            }}.runTaskLater(LolPlugin.getInstance(), 120L);
             c.sendActionBar(Component.text("🏹 Tir Concentré 6s!",NamedTextColor.AQUA));
         }
-        @Override public String getDynamicDescription(ChampionStats s){return "6s: +15%% AD, les AA ralentissent davantage.";}
+        @Override public String getDynamicDescription(ChampionStats s){return "6s: +20-60% vitesse d'attaque, attaques en rafale (110-130% AD).";}
     }
 
     static class W extends BaseAbility {
@@ -58,12 +72,11 @@ public final class Ashe extends BaseChampion {
             resourceCost = 50;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : tire des flèches en cône. 60/95/130/165/200 + 100% AD, applique Tir de Givre (ralentit)
-            double[] base=fr.lolmc.util.Balance.base("w_ashe",new double[]{60,95,130,165,200});double dmg=base[getLevel()-1]+s.getFinalAD()*fr.lolmc.util.Balance.ratio("w_ashe","ad",1.0);
-            var targets=TargetingUtil.enemiesInCone(c, 8.0, 45);
+            double[] base=fr.lolmc.util.Balance.base("w_ashe",new double[]{60,95,130,165,200});double dmg=base[getLevel()-1]+s.getBonusAD()*fr.lolmc.util.Balance.ratio("w_ashe","ad",1.0); // AD bonus (wiki)
+            var targets=TargetingUtil.enemiesInCone(c, 12.0, 45); // 1200 unités
             for(var __t : targets){
                 TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.PHYSICAL);
-                if(__t instanceof Player __p)
-                    __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,40,1,false,true));
+                if(__t instanceof Player __p) fr.lolmc.LolPlugin.getInstance().getCCManager().slowPct(__p, frostShot(c), 40);
             }
             // Animation : flèches en éventail devant
             var dir=c.getEyeLocation().getDirection().normalize();
@@ -75,14 +88,14 @@ public final class Ashe extends BaseChampion {
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] base=fr.lolmc.util.Balance.base("w_ashe",new double[]{60,95,130,165,200});
-            return String.format("Cône de flèches: %.0f dégâts (+100%%AD) + ralentit.",base[getLevel()-1]+s.getFinalAD());
+            return String.format("Cône de flèches: %.0f dégâts (+100%%AD bonus) + ralentit.",base[getLevel()-1]+s.getBonusAD());
         }
     }
 
     static class E extends BaseAbility {
         E(){super("e_ashe","Faucon Explorateur",Material.FEATHER,AbilitySlot.E,
             new double[]{90,80,70,60,50},60,0,DamageType.TRUE);
-            resourceCost = 0;}
+            resourceCost = 0; maxCharges = 2;} // 2 charges (wiki)
         @Override public void cast(Player c,ChampionStats s,Player t){
             // Faucon qui voyage 40 blocs dans la direction du regard
             // Révèle les ennemis dans un rayon de 8 blocs autour de son trajet
@@ -171,11 +184,11 @@ public final class Ashe extends BaseChampion {
             if(main instanceof Player __p){
                 __p.sendActionBar(Component.text("❄ ÉTOURDI par la Flèche de Cristal!",NamedTextColor.AQUA));
             }
-            // Zone autour de la cible principale : 50% dégâts + ralentissement
-            for(var __t : TargetingUtil.entitiesInRadius(c, main.getLocation(), 3.0)){
+            // Zone autour de la cible principale (rayon 400) : mêmes dégâts + ralentissement (wiki)
+            for(var __t : TargetingUtil.entitiesInRadius(c, main.getLocation(), 4.0)){
                 if(__t.equals(main)) continue;
-                TargetingUtil.dealDamage(c, __t, dmg*0.5, TargetingUtil.DmgType.MAGICAL);
-                if(__t instanceof Player __p2)__p2.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,60,2,false,true));
+                TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);
+                if(__t instanceof Player __p2) fr.lolmc.LolPlugin.getInstance().getCCManager().slowPct(__p2, frostShot(c), 40);
             }
             fr.lolmc.util.VisualEffectUtil.groundRing(main.getWorld(),
                     main.getLocation().add(0,1,0), 1.5, Material.LIGHT_BLUE_STAINED_GLASS, 14, 0.3f, 0.1f, 8L);

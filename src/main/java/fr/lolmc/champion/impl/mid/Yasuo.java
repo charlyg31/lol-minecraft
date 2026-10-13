@@ -20,22 +20,57 @@ import java.util.*;
 public final class Yasuo extends BaseChampion implements fr.lolmc.champion.base.StatefulChampion {
     public Yasuo() {
         super("yasuo", "Yasuo", ChampionRole.MID,
-            new ChampionStats(590,60,0,30,32,0.697,0,345,1.75,6.5));
-        getStats().setGrowthStats(110.0,3.5,4.3,2.05,0.03500,0.90);
-        setAutoAttackRange(2.7);
+            new ChampionStats(590,60,0,32,32,0.697,0,345,1.75,6.5));
+        getStats().setGrowthStats(110,2.5,4.6,2.05,0.035,0.9);
+        setLolAttackRange(175); // stats LoL (wiki)
     }
     @Override protected void registerAbilities() {
         setAbility(0,new AA()); setAbility(1,new Q());
         setAbility(2,new W()); setAbility(3,new E()); setAbility(4,new R());
-        initSystems(523, 0.0, ResourceSystem.ResourceType.FLOW, 100, 0.0);
+        initSystems(6.5, ResourceSystem.ResourceType.FLOW, 100, 0, 0, 0);
         // Passif Voie du Vagabond : double la chance de critique des objets (plafonnée à 100 %)
         getStats().setCritChanceMultiplier(2.0);
     }
 
     public static final Map<UUID,Integer> qCasts=new java.util.concurrent.ConcurrentHashMap<>();
+
+    // ── Mur du Vent : segment au sol qui détruit les projectiles ennemis (skillshots, AA à distance) ──
+    private record WindWall(fr.lolmc.team.TeamManager.Team team, org.bukkit.World world,
+                            double cx, double cy, double cz, double ax, double az, double half, long until) {}
+    private static final List<WindWall> walls = new java.util.concurrent.CopyOnWriteArrayList<>();
+
+    /**
+     * Un projectile du lanceur allant de {@code from} à {@code to} traverse-t-il un Mur du Vent
+     * ennemi ? (intersection de segments sur le plan horizontal, hauteur du mur ~4 blocs)
+     */
+    public static boolean blocksProjectile(Player caster, Location from, Location to) {
+        if (walls.isEmpty()) return false;
+        long now = System.currentTimeMillis();
+        walls.removeIf(w -> w.until() < now);
+        var team = LolPlugin.getInstance().getTeamManager().getTeam(caster);
+        for (WindWall w : walls) {
+            if (w.team() == team || !w.world().equals(from.getWorld())) continue;
+            double px = from.getX(), pz = from.getZ(), rx = to.getX() - px, rz = to.getZ() - pz;
+            double qx = w.cx() - w.ax() * w.half(), qz = w.cz() - w.az() * w.half();
+            double sx = w.ax() * 2 * w.half(), sz = w.az() * 2 * w.half();
+            double denom = rx * sz - rz * sx;
+            if (Math.abs(denom) < 1e-9) continue;
+            double tt = ((qx - px) * sz - (qz - pz) * sx) / denom;
+            double uu = ((qx - px) * rz - (qz - pz) * rx) / denom;
+            if (tt < 0 || tt > 1 || uu < 0 || uu > 1) continue;
+            double y = from.getY() + tt * (to.getY() - from.getY());
+            if (y < w.cy() - 1 || y > w.cy() + 4) continue;
+            fr.lolmc.util.VisualEffectUtil.impact(from.getWorld(),
+                    new Location(from.getWorld(), px + rx * tt, y, pz + rz * tt), Material.WHITE_STAINED_GLASS, 0.3f, 4L);
+            return true;
+        }
+        return false;
+    }
+    // E : chaque cible ne peut être traversée qu'une fois par 10/9/8/7/6 s (LoL)
+    private static final Map<String,Long> eLockout=new java.util.concurrent.ConcurrentHashMap<>();
     /** Reinitialise l'etat de ce joueur (fin de partie / deconnexion). */
     @Override public void resetState(UUID id){ qCasts.remove(id); eStacks.remove(id); eLastCast.remove(id); }
-    @Override public void resetAllState(){ qCasts.clear(); eStacks.clear(); eLastCast.clear(); }
+    @Override public void resetAllState(){ qCasts.clear(); eStacks.clear(); eLastCast.clear(); walls.clear(); eLockout.clear(); }
 
     // Passif Voie du Vagabond : au double crit chance passif (déjà configuré via ChampionStats)
     // Passif Esprit du Vent : bouclier égal 100+50%AP quand Flow est plein
@@ -44,7 +79,8 @@ public final class Yasuo extends BaseChampion implements fr.lolmc.champion.base.
         if (res.getType() == fr.lolmc.stats.ResourceSystem.ResourceType.FLOW
                 && res.getCurrent() >= res.getMax()
                 && champ.getStats().getShield() <= 0) {
-            double shield = 100 + champ.getStats().getFinalAP() * 0.50;
+            int lvl = champ.getLevelSystem().getLevel();
+            double shield = 125 + (674.46 - 125) * (lvl - 1) / 17.0; // wiki
             champ.getStats().addShield(shield);
             res.setCurrent(0);
             p.sendActionBar(net.kyori.adventure.text.Component.text(
@@ -61,16 +97,18 @@ public final class Yasuo extends BaseChampion implements fr.lolmc.champion.base.
             new double[]{4,3.5,3,2.5,2},20,6,DamageType.PHYSICAL);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            int casts=qCasts.merge(c.getUniqueId(),1,Integer::sum);
+            // 2 coups touchés → le 3e Q est une tornade (avant : chaque lancer, même raté, comptait)
+            int qStacks=qCasts.getOrDefault(c.getUniqueId(),0);
             // LoL : coup d'estoc en ligne. 20/45/70/95/120 + 100% AD (peut critiquer)
             double[] base=fr.lolmc.util.Balance.base("q_yasuo",new double[]{20,45,70,95,120});double dmg=base[getLevel()-1]+s.getFinalAD()*fr.lolmc.util.Balance.ratio("q_yasuo","ad",1.05);
-            boolean tornado = casts>=3; // 2 stacks accumulés -> 3e cast = tornade
+            boolean tornado = qStacks>=2;
             if(tornado){
                 // Tornade : skillshot plus long qui projette en l'air
-                var hits=TargetingUtil.skillshot(c, 9.0, 1.5, true);
+                var hits=TargetingUtil.skillshot(c, 11.5, 1.5, true); // 1150 unités
+                var ccQ = LolPlugin.getInstance().getCCManager();
                 for(var __t : hits){
                     TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.PHYSICAL);
-                    __t.setVelocity(new Vector(0,1.0,0));
+                    if(ccQ!=null) ccQ.setAirborne(__t, 18); // projeté 0.9 s (wiki)
                     if(__t instanceof Player __p)__p.sendActionBar(Component.text("🌪 TORNADE Yasuo!",NamedTextColor.YELLOW));
                 }
                 qCasts.put(c.getUniqueId(),0);
@@ -79,6 +117,7 @@ public final class Yasuo extends BaseChampion implements fr.lolmc.champion.base.
                 // Estoc en ligne droite
                 var hits=TargetingUtil.skillshot(c, 5.0, 1.0, true);
                 for(var __t : hits) TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.PHYSICAL);
+                if(!hits.isEmpty()) qCasts.put(c.getUniqueId(), Math.min(2, qStacks+1));
                 c.getWorld().playSound(c.getLocation(), Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 1.1f);
             }
         }
@@ -93,10 +132,29 @@ public final class Yasuo extends BaseChampion implements fr.lolmc.champion.base.
             new double[]{25,23,21,19,17},0,6,DamageType.TRUE);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            c.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE,80,0,false,true));
+            // Mur perpendiculaire au regard, 2 blocs devant, largeur 3.2-5.2 blocs (320-520 unités),
+            // 4 s. Avant : simple potion de Résistance, aucun projectile bloqué.
+            Location base=c.getLocation();
+            org.bukkit.util.Vector fwd=base.getDirection().setY(0);
+            if(fwd.lengthSquared()<1e-6) fwd=new org.bukkit.util.Vector(1,0,0);
+            fwd.normalize();
+            Location center=base.clone().add(fwd.clone().multiply(2.0));
+            double[] widths={3.2,3.9,4.6,5.3,6.0}; // 320-600 unités (wiki)
+            double half=widths[getLevel()-1]/2.0;
+            double ax=-fwd.getZ(), az=fwd.getX();
+            walls.add(new WindWall(LolPlugin.getInstance().getTeamManager().getTeam(c), c.getWorld(),
+                    center.getX(), center.getY(), center.getZ(), ax, az, half, System.currentTimeMillis()+4000L));
+            new BukkitRunnable(){ int n=0;
+                @Override public void run(){
+                    if(n++>=16){cancel();return;}
+                    for(double d=-half; d<=half; d+=0.8)
+                        fr.lolmc.util.VisualEffectUtil.impact(center.getWorld(),
+                                center.clone().add(ax*d, 1.2, az*d), Material.WHITE_STAINED_GLASS, 0.25f, 5L);
+                }}.runTaskTimer(LolPlugin.getInstance(),0L,5L);
             c.sendActionBar(Component.text("💨 Mur du Vent 4s!",NamedTextColor.WHITE));
+            c.getWorld().playSound(c.getLocation(), Sound.ENTITY_PHANTOM_FLAP, 1f, 0.6f);
         }
-        @Override public String getDynamicDescription(ChampionStats s){return "Crée un mur bloquant les projectiles ennemis pendant 4s.";}
+        @Override public String getDynamicDescription(ChampionStats s){return "Mur devant toi : détruit les projectiles ennemis (sorts et attaques à distance) 4s.";}
     }
 
     // Stacks de dégâts E (Lame Déferlante) par joueur
@@ -109,14 +167,20 @@ public final class Yasuo extends BaseChampion implements fr.lolmc.champion.base.
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : dash à travers la cible, dégâts magiques + 25% par stack (max 4 = +100%)
-            org.bukkit.entity.LivingEntity tgt = (t!=null && TargetingUtil.isEnemy(c,t))?t:TargetingUtil.getTargetedEnemy(c,5.0); if(tgt==null){c.sendActionBar(Component.text("🍃 Aucune cible",NamedTextColor.GRAY));return;}
+            org.bukkit.entity.LivingEntity tgt = (t!=null && TargetingUtil.isEnemy(c,t))?t:TargetingUtil.getTargetedEnemy(c,5.4); if(tgt==null){cancelCast();c.sendActionBar(Component.text("🍃 Aucune cible",NamedTextColor.GRAY));return;}
+            // Une même cible ne peut être traversée qu'une fois par 10/9/8/7/6 s (avant : E à volonté)
+            String lockKey=c.getUniqueId()+":"+tgt.getUniqueId();
+            if(eLockout.getOrDefault(lockKey,0L)>System.currentTimeMillis()){
+                c.sendActionBar(Component.text("🍃 Cible déjà traversée récemment",NamedTextColor.GRAY));
+                cancelCast(); return;
+            }
+            double[] lockSec={10,9,8,7,6};
+            eLockout.put(lockKey, System.currentTimeMillis()+(long)(lockSec[getLevel()-1]*1000));
             int stacks=Math.min(eStacks.getOrDefault(c.getUniqueId(),0),4);
             double[] base=fr.lolmc.util.Balance.base("e_yasuo",new double[]{70,85,100,115,130});
-            double dmg=(base[getLevel()-1]+s.getFinalAD()*0.20+s.getFinalAP()*0.60)*(1.0+0.25*stacks);
-            // Dash à travers/derrière la cible
-            var dest=tgt.getLocation().clone().add(tgt.getLocation().getDirection().multiply(1.5));
-            dest.setY(c.getLocation().getY());
-            c.teleport(dest);
+            double dmg=(base[getLevel()-1]+s.getBonusAD()*0.20+s.getFinalAP()*0.60)*(1.0+0.25*stacks); // AD bonus (wiki)
+            // Dash à travers la cible (direction Yasuo → cible, sans traverser les murs)
+            dashTo(c, tgt, 1.5);
             TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.MAGICAL);
             eStacks.merge(c.getUniqueId(),1,Integer::sum);
             // Reset des stacks 6s après le DERNIER E (avant : le reset du 1er E effaçait les suivants)
@@ -126,12 +190,12 @@ public final class Yasuo extends BaseChampion implements fr.lolmc.champion.base.
                 if(eLastCast.getOrDefault(c.getUniqueId(),0L)==castAt) eStacks.put(c.getUniqueId(),0);
             }}.runTaskLater(LolPlugin.getInstance(),120L);
             fr.lolmc.util.VisualEffectUtil.impact(c.getWorld(),
-                    dest.add(0,1,0), Material.WHITE_STAINED_GLASS, 0.3f, 4L);
+                    c.getLocation().add(0,1,0), Material.WHITE_STAINED_GLASS, 0.3f, 4L);
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 1.4f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] base=fr.lolmc.util.Balance.base("e_yasuo",new double[]{70,85,100,115,130});
-            return String.format("Dash à travers la cible: %.0f dégâts (+20%%AD+60%%AP, +25%%/stack max +100%%).",base[getLevel()-1]+s.getFinalAD()*0.20+s.getFinalAP()*0.60);
+            return String.format("Dash à travers la cible: %.0f dégâts (+20%%AD bonus +60%%AP, +25%%/stack max +100%%).",base[getLevel()-1]+s.getBonusAD()*0.20+s.getFinalAP()*0.60);
         }
     }
 
@@ -141,19 +205,34 @@ public final class Yasuo extends BaseChampion implements fr.lolmc.champion.base.
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : se TP sur un ennemi (idéalement aérien), dégâts + maintient en l'air
-            org.bukkit.entity.LivingEntity tgt = (t!=null && TargetingUtil.isEnemy(c,t))?t:TargetingUtil.getTargetedEnemy(c,8.0); if(tgt==null){c.sendActionBar(Component.text("⚔ Aucune cible visée",NamedTextColor.GRAY));return;}
+            // Wiki : Dernier Souffle ne vise qu'un ennemi PROJETÉ EN L'AIR à moins de 1400 unités
+            // (avant : n'importe quelle cible)
+            var cc = LolPlugin.getInstance().getCCManager();
+            org.bukkit.entity.LivingEntity tgt = null;
+            if (t != null && TargetingUtil.isEnemy(c, t) && cc != null && cc.isAirborne(t.getUniqueId())) tgt = t;
+            if (tgt == null) {
+                var aimed = TargetingUtil.getTargetedEnemy(c, 14.0);
+                if (aimed != null && cc != null && cc.isAirborne(aimed.getUniqueId())) tgt = aimed;
+            }
+            if (tgt == null && cc != null) {
+                double best = 14.0 * 14.0;
+                for (var e : TargetingUtil.enemiesAround(c, 14.0)) {
+                    if (!cc.isAirborne(e.getUniqueId())) continue;
+                    double d = e.getLocation().distanceSquared(c.getLocation());
+                    if (d < best) { best = d; tgt = e; }
+                }
+            }
+            if(tgt==null){cancelCast();c.sendActionBar(Component.text("⚔ Aucun ennemi projeté en l'air",NamedTextColor.GRAY));return;}
             // Dash sur la cible
-            var dest=tgt.getLocation().clone().subtract(tgt.getLocation().getDirection().multiply(1.0));
-            dest.setY(c.getLocation().getY());
-            c.teleport(dest);
+            dashTo(c, tgt, -1.0);
             double[] base=fr.lolmc.util.Balance.base("r_yasuo",new double[]{200,350,500});
             int r=Math.min(getLevel()-1,2);
-            double dmg=base[r]+s.getFinalAD()*fr.lolmc.util.Balance.ratio("r_yasuo","ad",1.5);
-            // Yasuo R : propulse en l'air tous les ennemis dans la zone
-            var cc = LolPlugin.getInstance().getCCManager();
-            for(var __t : TargetingUtil.enemiesAround(c, 4.0)){
+            double dmg=base[r]+s.getBonusAD()*fr.lolmc.util.Balance.ratio("r_yasuo","ad",1.5); // AD bonus (wiki)
+            // Frappe tous les ennemis projetés en l'air autour de la cible (rayon 400) et les y maintient
+            for(var __t : TargetingUtil.entitiesInRadius(c, tgt.getLocation(), 4.0)){
+                if (cc != null && !cc.isAirborne(__t.getUniqueId()) && !__t.equals(tgt)) continue;
                 TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.PHYSICAL);
-                if (cc != null) cc.setAirborne(__t, 30); // 1.5s en l'air
+                if (cc != null) cc.setAirborne(__t, 20); // 1 s en l'air (wiki)
                 if(__t instanceof Player __p)
                     __p.sendActionBar(Component.text("⚔ DERNIER SOUFFLE! Propulsé!",NamedTextColor.DARK_GRAY));
             }
@@ -173,7 +252,7 @@ public final class Yasuo extends BaseChampion implements fr.lolmc.champion.base.
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] base=fr.lolmc.util.Balance.base("r_yasuo",new double[]{200,350,500});int r=Math.min(getLevel()-1,2);
-            return String.format("Dash sur la cible: %.0f dégâts (+150%%AD) + maintient en l'air.",base[r]+s.getFinalAD()*fr.lolmc.util.Balance.ratio("r_yasuo","ad",1.5));
+            return String.format("Sur un ennemi projeté en l'air: %.0f dégâts (+150%%AD bonus) + maintient en l'air 1s.",base[r]+s.getBonusAD()*fr.lolmc.util.Balance.ratio("r_yasuo","ad",1.5));
         }
     }
 }

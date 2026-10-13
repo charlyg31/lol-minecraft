@@ -39,6 +39,15 @@ public class BasicAttackAbility extends BaseAbility {
     /** Passif d'attaque de base (ralentissement, soin, dégâts bonus...). Vide par défaut. */
     protected void onHit(Player attacker, ChampionStats stats, LivingEntity target, double damageDealt) { }
 
+    /**
+     * Applique le passif d'AA du champion. Appelé par AutoAttackManager à chaque auto-attaque :
+     * avant, les AA passaient par AutoAttackManager sans jamais appeler onHit — aucun passif
+     * d'attaque (saignement de Darius, Toucher maudit d'Amumu, Love Tap…) ne se déclenchait.
+     */
+    public void applyOnHit(Player attacker, ChampionStats stats, LivingEntity target, double damageDealt) {
+        onHit(attacker, stats, target, damageDealt);
+    }
+
     @Override
     public String getDynamicDescription(ChampionStats stats) {
         return String.format("Attaque de base : %.0f dégâts.", stats.getFinalAD());

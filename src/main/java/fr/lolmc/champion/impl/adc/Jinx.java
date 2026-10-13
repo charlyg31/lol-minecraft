@@ -17,40 +17,79 @@ import org.bukkit.potion.PotionEffectType;
 public final class Jinx extends BaseChampion implements fr.lolmc.champion.base.StatefulChampion {
     public Jinx() {
         super("jinx", "Jinx", ChampionRole.ADC,
-                new ChampionStats(630,59,0,26,30,0.625,0,325,5.25,3.8));
-        getStats().setGrowthStats(100.0,3.4,4.7,1.30,0.01360,0.50);
+                new ChampionStats(630,59,0,26,33,0.625,0,325,5.25,3.75));
+        getStats().setGrowthStats(105,3.25,4.2,1.1,0.01,0.5);
+        setLolAttackRange(525); // stats LoL (wiki)
     }
     // Passif Get Excited : kill/assist → +175% vitesse 6s (décroît après 3s)
     public static void getExcited(Player jinx) {
-        jinx.addPotionEffect(new org.bukkit.potion.PotionEffect(
-            org.bukkit.potion.PotionEffectType.SPEED, 120, 4, false, true)); // 6s vitesse
+        fr.lolmc.LolPlugin.getInstance().getCCManager().speedDecaying(jinx, 1.75, 120); // +175 %, décroît sur 6 s (wiki)
         fr.lolmc.util.VisualEffectUtil.impactBurst(jinx.getWorld(),
             jinx.getLocation().add(0,1,0), Material.RED_STAINED_GLASS, 0.28f, 0.5, 8, 8L);
         jinx.sendActionBar(net.kyori.adventure.text.Component.text(
             "🎉 GET EXCITED! +175% vitesse 6s!", net.kyori.adventure.text.format.NamedTextColor.RED));
     }
 
-    @Override public void resetState(java.util.UUID id) { fishbonesMode.remove(id); }
-    @Override public void resetAllState()               { fishbonesMode.clear(); }
+    @Override public void resetState(java.util.UUID id) { fishbonesMode.remove(id); powStacks.remove(id); }
+    @Override public void resetAllState()               { fishbonesMode.clear(); powStacks.clear(); }
+
+    // Mini-canon (wiki) : chaque attaque donne un stack (max 3, 2.5 s) ; bonus de vitesse
+    // d'attaque 15-65 % au 1er stack, +7.5-32.5 % par stack suivant
+    private record Pow(int stacks, double applied, long until) {}
+    private static final java.util.Map<java.util.UUID, Pow> powStacks = new java.util.concurrent.ConcurrentHashMap<>();
+
+    static void powPowHit(Player c, ChampionStats s) {
+        var cm = LolPlugin.getInstance().getChampionManager();
+        int qr = cm.hasChampion(c) ? cm.getChampion(c).getLevelSystem().getAbilityRank(1) : 0;
+        if (qr <= 0) return;
+        Pow old = powStacks.get(c.getUniqueId());
+        long now = System.currentTimeMillis();
+        int stacks = (old != null && old.until() > now) ? Math.min(3, old.stacks() + 1) : 1;
+        double first = new double[]{0.15,0.275,0.40,0.525,0.65}[qr-1];
+        double extra = new double[]{0.075,0.1375,0.20,0.2625,0.325}[qr-1];
+        double bonus = first + extra * (stacks - 1);
+        s.addBonusAttackSpeed(bonus - (old != null ? old.applied() : 0));
+        long until = now + 2500L;
+        powStacks.put(c.getUniqueId(), new Pow(stacks, bonus, until));
+        new org.bukkit.scheduler.BukkitRunnable(){@Override public void run(){
+            Pow cur = powStacks.get(c.getUniqueId());
+            if (cur != null && cur.until() == until) { s.addBonusAttackSpeed(-cur.applied()); powStacks.remove(c.getUniqueId()); }
+        }}.runTaskLater(LolPlugin.getInstance(), 50L);
+    }
+
+    /** Retire le bonus de Mini-canon (passage à Fishbones). */
+    static void clearPow(Player c, ChampionStats s) {
+        Pow cur = powStacks.remove(c.getUniqueId());
+        if (cur != null) s.addBonusAttackSpeed(-cur.applied());
+    }
     private static final java.util.Map<java.util.UUID, Boolean> fishbonesMode
         = new java.util.concurrent.ConcurrentHashMap<>();
+    /** Portée de base de Jinx (525 unités) et bonus de Fishbones (100-200 unités, wiki). */
+    static final double BASE_RANGE = (525 + 130) / 100.0;
+    static final double[] FISHBONES_BONUS = {1.0, 1.25, 1.5, 1.75, 2.0};
 
     @Override protected void registerAbilities() {
         setAbility(0,new AA()); setAbility(1,new Q());
         setAbility(2,new W()); setAbility(3,new E()); setAbility(4,new R());
-        initSystems(516, 3.0, ResourceSystem.ResourceType.NONE, 0, 0.0);
-        setAutoAttackRange(8.1);
+        initSystems(3.75, ResourceSystem.ResourceType.MANA, 260, 50, 6.7, 1);
     }
 
     static class AA extends BasicAttackAbility {
         AA(){super("jinx",Material.CROSSBOW,6.0f,DamageType.PHYSICAL);}
         @Override protected void onHit(Player c, ChampionStats s, org.bukkit.entity.LivingEntity tgt, double dmg) {
-            // Mode Fishbones : AoE autour de la cible principale (107% AD total réparti)
+            if (!fishbonesMode.getOrDefault(c.getUniqueId(), false)) { powPowHit(c, s); return; }
+            // Mode Fishbones (wiki) : 20 mana par attaque, 110 % AD à la cible et autour d'elle
             if (fishbonesMode.getOrDefault(c.getUniqueId(), false)) {
-                for (var nearby : fr.lolmc.util.TargetingUtil.enemiesAround(c, 2.5)) {
+                var cmF = LolPlugin.getInstance().getChampionManager();
+                var res = cmF.hasChampion(c) ? cmF.getChampion(c).getResourceSystem() : null;
+                if (res != null && !res.consume(20)) {
+                    c.sendActionBar(Component.text("💥 Plus assez de mana pour Fishbones", NamedTextColor.GRAY));
+                    return;
+                }
+                fr.lolmc.util.DamageUtil.damageEntity(c, tgt, dmg * 0.10, false, fr.lolmc.util.DamageUtil.Type.PHYSICAL);
+                for (var nearby : fr.lolmc.util.TargetingUtil.entitiesInRadius(c, tgt.getLocation(), 2.5)) {
                     if (nearby.equals(tgt)) continue; // cible principale déjà touchée
-                    fr.lolmc.util.TargetingUtil.dealDamage(c, nearby,
-                        dmg * 0.87, fr.lolmc.util.TargetingUtil.DmgType.PHYSICAL);
+                    fr.lolmc.util.DamageUtil.damageEntity(c, nearby, dmg * 1.10, false, fr.lolmc.util.DamageUtil.Type.PHYSICAL);
                 }
                 fr.lolmc.util.VisualEffectUtil.impact(tgt.getWorld(),
                     tgt.getLocation().add(0,0.5,0), Material.ORANGE_STAINED_GLASS, 0.3f, 4L);
@@ -68,15 +107,15 @@ public final class Jinx extends BaseChampion implements fr.lolmc.champion.base.S
             if (fish) {
                 // Mode Fishbones (bazooka) : portée étendue +2 blocs, dégâts AoE
                 c.sendActionBar(Component.text("💥 Fishbones! Bazooka activé (+portée, AoE)", NamedTextColor.RED));
+                clearPow(c, s);
                 // Augmenter la portée AA
                 var cm = LolPlugin.getInstance().getChampionManager();
-                if (cm.hasChampion(c)) cm.getChampion(c).setAutoAttackRange(cm.getChampion(c).getAutoAttackRange() + 2);
+                if (cm.hasChampion(c)) cm.getChampion(c).setAutoAttackRange(BASE_RANGE + FISHBONES_BONUS[getLevel()-1]);
             } else {
                 // Mode Mini-canons : vitesse d'attaque
-                c.sendActionBar(Component.text("⚡ Mini-canons! Vitesse d'attaque", NamedTextColor.YELLOW));
-                c.addPotionEffect(new PotionEffect(PotionEffectType.HASTE, 40, 1, false, true));
+                c.sendActionBar(Component.text("⚡ Mini-canon! Chaque attaque augmente la vitesse d'attaque", NamedTextColor.YELLOW));
                 var cm = LolPlugin.getInstance().getChampionManager();
-                if (cm.hasChampion(c)) cm.getChampion(c).setAutoAttackRange(8.1);
+                if (cm.hasChampion(c)) cm.getChampion(c).setAutoAttackRange(BASE_RANGE);
             }
             c.getWorld().playSound(c.getLocation(), org.bukkit.Sound.ENTITY_FIREWORK_ROCKET_BLAST, 0.5f, fish ? 0.7f : 1.5f);
         }
@@ -89,14 +128,13 @@ public final class Jinx extends BaseChampion implements fr.lolmc.champion.base.S
             resourceCost = 20;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             double[] base=fr.lolmc.util.Balance.base("w_jinx",new double[]{10,60,110,160,210});double dmg=base[getLevel()-1]+s.getFinalAD()*fr.lolmc.util.Balance.ratio("w_jinx","ad",1.4);
-            var hits=TargetingUtil.skillshot(c, 14.0, 0.8, false);
+            var hits=TargetingUtil.skillshot(c, 15.0, 0.6, false); // 1500 unités
             if(hits.isEmpty()){c.sendActionBar(Component.text("⚡ Zap manqué!",NamedTextColor.GRAY));return;}
             var main=hits.getFirst();
             TargetingUtil.dealDamage(c, main, dmg, TargetingUtil.DmgType.PHYSICAL);
             // Slow 40/50/60/70/80% selon rang (2s = 40 ticks)
             if(main instanceof Player __p){
-                int slowAmp=Math.min(4, 1+getLevel()/2);
-                __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,40,slowAmp,false,true));
+                fr.lolmc.LolPlugin.getInstance().getCCManager().slowPct(__p, new double[]{0.40,0.50,0.60,0.70,0.80}[getLevel()-1], 40); // wiki
             }
             fr.lolmc.util.VisualEffectUtil.impactBurst(main.getWorld(),
                     main.getLocation().add(0,1,0), Material.YELLOW_STAINED_GLASS, 0.25f, 0.5, 6, 6L);
@@ -118,7 +156,7 @@ public final class Jinx extends BaseChampion implements fr.lolmc.champion.base.S
             for(var __t : TargetingUtil.entitiesInRadius(c, loc, 4.0)){
                 TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);
                 if(__t instanceof Player __p){
-                    fr.lolmc.LolPlugin.getInstance().getCCManager().root(__p, 35); // vrai root (ténacité)
+                    fr.lolmc.LolPlugin.getInstance().getCCManager().root(__p, 30); // root 1.5 s (wiki)
                     __p.sendActionBar(Component.text("🦷 ENRACINÉ par les Croque-Flammes!",NamedTextColor.RED));
                 }
             }
@@ -143,17 +181,20 @@ public final class Jinx extends BaseChampion implements fr.lolmc.champion.base.S
             if(hits.isEmpty()){c.sendActionBar(Component.text("🚀 Roquette tirée (aucune cible)",NamedTextColor.GRAY));return;}
             var main=hits.getFirst();
             double dist=c.getLocation().distance(main.getLocation());
-            double distMult=Math.min(1.0, 0.1+dist*0.06);
-            double[] baseMax={250,400,550};int rr=Math.min(getLevel()-1,2);
+            // Wiki : 10 % → 100 % des dégâts sur les 1500 premières unités ; max 200/350/500
+            // (+120 % AD bonus) + 25/30/35 % des PV manquants ; 80 % autour de la cible
+            double distMult=Math.min(1.0, 0.1+0.9*dist/15.0);
+            double[] baseMax=fr.lolmc.util.Balance.base("r_jinx",new double[]{200,350,500});int rr=Math.min(getLevel()-1,2);
             double[] missPct={0.25,0.30,0.35};
-            double baseDmg=baseMax[rr]*distMult+s.getFinalAD()*fr.lolmc.util.Balance.ratio("r_jinx","ad",1.3)*distMult;
+            double baseDmg=(baseMax[rr]+s.getBonusAD()*fr.lolmc.util.Balance.ratio("r_jinx","ad",1.2))*distMult;
 
             for(var __t : TargetingUtil.entitiesInRadius(c, main.getLocation(), 5.0)){
                 // PV manquants à l'échelle LoL (joueur=HPSystem, Baron=virtuel, sbire=vanilla)
                 double missingHP = TargetingUtil.getRealMaxHealth(__t) - TargetingUtil.getRealHealth(__t);
                 double missingBonus=missingHP*missPct[rr];
-                if(!(__t instanceof Player)) missingBonus=Math.min(800, missingBonus); // plafond LoL contre les monstres
+                if(!(__t instanceof Player)) missingBonus=Math.min(1200, missingBonus); // plafond contre les monstres (wiki)
                 double dmg=baseDmg+missingBonus;
+                if(!__t.equals(main)) dmg*=0.80; // explosion : 80 % autour de la cible
                 TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.PHYSICAL);
             }
             fr.lolmc.util.VisualEffectUtil.impactBurst(main.getWorld(),
@@ -162,8 +203,8 @@ public final class Jinx extends BaseChampion implements fr.lolmc.champion.base.S
             if(main instanceof Player _tp)_tp.sendMessage(Component.text("🚀 SUPER MÉGA ROQUETTE DE LA MORT!",NamedTextColor.RED));
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            double[] base=fr.lolmc.util.Balance.base("r_jinx",new double[]{250,400,550});int r=Math.min(getLevel()-1,2);
-            return String.format("Roquette globale: jusqu'à %.0f dégâts (+130%%AD) selon distance + %% PV manquants. Explose en zone.",base[r]+s.getFinalAD()*fr.lolmc.util.Balance.ratio("r_jinx","ad",1.3));
+            double[] base=fr.lolmc.util.Balance.base("r_jinx",new double[]{200,350,500});int r=Math.min(getLevel()-1,2);
+            return String.format("Roquette globale: jusqu'à %.0f dégâts (+120%%AD bonus) selon distance + %% PV manquants. Explose en zone.",base[r]+s.getBonusAD()*fr.lolmc.util.Balance.ratio("r_jinx","ad",1.2));
         }
     }
 }

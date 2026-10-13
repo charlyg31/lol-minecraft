@@ -66,11 +66,11 @@ public class PlayerSnapshot {
 
         // Niveaux + XP
         champ.getLevelSystem().setLevel(level);
-        champ.getLevelSystem().setAbilityRanks(abilityRanks);
+        champ.getLevelSystem().setAbilityRanks(abilityRanks); champ.onAbilityRanksChanged();
         champ.getLevelSystem().setCurrentXP(currentXP);
         // setLevel ajoute (niveau - 1) points : sans ça, chaque reconnexion offrait des points gratuits
         champ.getLevelSystem().setSkillPoints(skillPoints);
-        champ.getStats().setChampionLevel(level);
+        champ.onLevelChanged(level);
 
         // HP
         champ.getHPSystem().setCurrentHP(currentHP);

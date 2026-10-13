@@ -2,66 +2,66 @@
 # champions.yml — valeurs d'equilibrage rechargeables a chaud
 # Modifie une valeur puis fais /lol reload (pas besoin de recompiler).
 #
+# Valeurs du wiki League of Legends (patch 26.x).
 # Cle = identifiant du sort (q_<champion>, etc.).
 #   cooldown : liste par rang (5 pour Q/W/E, 3 pour R)
-#   cost     : cout mana/energie (0 = gratuit)
+#   cost     : cout mana/energie, nombre ou liste par rang
 #   base     : degats de base par rang (si le sort en a)
+#   ratio_ad / ratio_ap : ratios (ad = AD bonus ou total selon le sort, voir le code)
 # Cle absente => la valeur codee en dur s'applique (repli sur).
-# (Les ratios AD/AP seront ajoutes dans un prochain lot.)
 # ─────────────────────────────────────────────────────────────
 
 # ===== amumu =====
 q_amumu:        # Q — Lancer de Bandage
-  cooldown: [12, 11, 10, 9, 8]
+  cooldown: [16, 15, 14, 13, 12]
   cost: 50
-  base: [80, 130, 180, 230, 280]
+  base: [70, 95, 120, 145, 170]
   ratio_ap: 0.85
-w_amumu:        # W — Désespoir
-  cooldown: [0, 0, 0, 0, 0]
-  cost: 8
-  ratio_ap: 0.01
+w_amumu:        # W — Désespoir (8 mana/s)
+  cooldown: [1, 1, 1, 1, 1]
+  cost: 0
 e_amumu:        # E — Caprice
   cooldown: [9, 8, 7, 6, 5]
   cost: 35
-  base: [75, 100, 125, 150, 175]
+  base: [65, 95, 125, 155, 185]
   ratio_ap: 0.5
 r_amumu:        # R — Malédiction de la Momie
-  cooldown: [150, 130, 110]
-  cost: 100
+  cooldown: [150, 125, 100]
+  cost: [100, 150, 200]
   base: [200, 300, 400]
   ratio_ap: 0.8
 
 # ===== annie =====
 q_annie:        # Q — Brasier
-  cooldown: [4, 3.5, 3, 2.5, 2]
-  cost: 60
-  base: [80, 130, 180, 230, 280]
-  ratio_ap: 0.85
+  cooldown: [4, 4, 4, 4, 4]
+  cost: [60, 65, 70, 75, 80]
+  base: [80, 125, 170, 215, 260]
+  ratio_ap: 0.8
 w_annie:        # W — Incinération
-  cooldown: [8, 7, 6, 5, 4]
-  cost: 70
-  base: [70, 115, 160, 205, 250]
-  ratio_ap: 0.75
-e_annie:        # E — Molten Shield
-  cooldown: [10, 9, 8, 7, 6]
-  cost: 40
-r_annie:        # R — Invocation de Tibbers
-  cooldown: [100, 80, 60]
+  cooldown: [7, 7, 7, 7, 7]
+  cost: [70, 75, 80, 85, 90]
+  base: [70, 110, 150, 190, 230]
+  ratio_ap: 0.8
+e_annie:        # E — Bouclier en Fusion
+  cooldown: [10, 10, 10, 10, 10]
+  cost: [60, 65, 70, 75, 80]
+r_annie:        # R — Invocation de Tibbers (recharge gérée par le sort)
+  cooldown: [0, 0, 0]
   cost: 100
-  base: [175, 300, 425]
+  base: [150, 275, 400]
   ratio_ap: 0.75
 
 # ===== ashe =====
 q_ashe:        # Q — Tir Concentré
-  cooldown: [14, 12, 10, 8, 6]
-  cost: 25
+  cooldown: [6, 6, 6, 6, 6]
+  cost: 30
 w_ashe:        # W — Volée
   cooldown: [18, 14.5, 11, 7.5, 4]
-  cost: 50
+  cost: [75, 70, 65, 60, 55]
   base: [60, 95, 130, 165, 200]
-  ratio_ad: 1.0
+  ratio_ad: 1
 e_ashe:        # E — Faucon Explorateur
-  cooldown: [5, 4, 3, 2, 1]
+  cooldown: [90, 80, 70, 60, 50]
   cost: 0
 r_ashe:        # R — Flèche de Cristal Enchantée
   cooldown: [100, 80, 60]
@@ -75,306 +75,292 @@ q_blitzcrank:        # Q — Grappin Fusée
   cost: 100
   base: [110, 160, 210, 260, 310]
   ratio_ap: 1.2
-w_blitzcrank:        # W — Surrégime
-  cooldown: [15, 14.5, 14, 13.5, 13]
-  cost: 75
-e_blitzcrank:        # E — Poing de Force
+w_blitzcrank:        # W — Poing de Force
   cooldown: [7, 6.5, 6, 5.5, 5]
   cost: 25
-  ratio_ad: 2.0
-  ratio_ap: 0.25
+e_blitzcrank:        # E — Surrégime
+  cooldown: [15, 15, 15, 15, 15]
+  cost: 75
 r_blitzcrank:        # R — Champ Statique
-  cooldown: [40, 30, 20]
+  cooldown: [60, 40, 20]
   cost: 100
   base: [275, 400, 525]
-  ratio_ap: 1.0
+  ratio_ap: 1
 
 # ===== darius =====
 q_darius:        # Q — Décimation
   cooldown: [9, 8, 7, 6, 5]
-  cost: 0
-  base: [56, 98, 140, 182, 224]
+  cost: [25, 30, 35, 40, 45]
+  base: [50, 80, 110, 140, 170]
 w_darius:        # W — Frappe Estropiante
-  cooldown: [9, 8, 7, 6, 5]
-  cost: 0
+  cooldown: [5, 5, 5, 5, 5]
+  cost: 40
 e_darius:        # E — Appréhension
-  cooldown: [24, 21, 18, 15, 12]
-  cost: 0
+  cooldown: [26, 23.5, 21, 18.5, 16]
+  cost: [70, 60, 50, 40, 30]
 r_darius:        # R — Guillotine Noxienne
   cooldown: [120, 100, 80]
-  cost: 0
-  base: [100, 200, 300]
+  cost: [100, 100, 0]
+  base: [125, 250, 375]
   ratio_ad: 0.75
 
 # ===== garen =====
-q_garen:        # Q — Jugement Décisif
-  cooldown: [8, 7.5, 7, 6.5, 6]
+q_garen:        # Q — Coup Décisif
+  cooldown: [8, 8, 8, 8, 8]
   cost: 0
-  base: [30, 55, 80, 105, 130]
+  base: [30, 60, 90, 120, 150]
   ratio_ad: 0.5
 w_garen:        # W — Courage
-  cooldown: [23, 21, 19, 17, 15]
+  cooldown: [22, 19.5, 17, 14.5, 12]
   cost: 0
 e_garen:        # E — Jugement
-  cooldown: [9, 8, 7, 6, 5]
+  cooldown: [9, 8.25, 7.5, 6.75, 6]
   cost: 0
-r_garen:        # R — Exécution
+r_garen:        # R — Justice Démacienne
   cooldown: [120, 100, 80]
   cost: 0
-  base: [150, 300, 450]
+  base: [125, 200, 275]
 
 # ===== janna =====
 q_janna:        # Q — Bourrasque Hurlante
-  cooldown: [12, 11, 10, 9, 8]
-  cost: 60
-  base: [60, 90, 120, 150, 180]
+  cooldown: [14, 14, 14, 14, 14]
+  cost: [90, 95, 100, 105, 110]
+  base: [55, 90, 125, 160, 195]
   ratio_ap: 0.5
 w_janna:        # W — Zéphyr
-  cooldown: [8, 7, 6, 5, 4]
-  cost: 40
-  base: [60, 105, 150, 195, 240]
-  ratio_ap: 0.6
-e_janna:        # E — Oeil de la Tempête
-  cooldown: [10, 9, 8, 7, 6]
-  cost: 70
+  cooldown: [8, 7.5, 7, 6.5, 6]
+  cost: [50, 55, 60, 65, 70]
+  base: [55, 85, 115, 145, 175]
   ratio_ap: 0.5
+e_janna:        # E — Oeil de la Tempête
+  cooldown: [16, 15, 14, 13, 12]
+  cost: [70, 75, 80, 85, 90]
 r_janna:        # R — Mousson
-  cooldown: [150, 120, 90]
+  cooldown: [130, 115, 100]
   cost: 100
-  ratio_ap: 0.6
 
 # ===== jinx =====
-q_jinx:        # Q — Choix des Armes
-  cooldown: [0, 0, 0, 0, 0]
+q_jinx:        # Q — Changement d'arme !
+  cooldown: [0.9, 0.9, 0.9, 0.9, 0.9]
   cost: 0
-w_jinx:        # W — Zap!
+w_jinx:        # W — Zap !
   cooldown: [8, 7, 6, 5, 4]
-  cost: 20
-  base: [10, 80, 150, 220, 290]
-  ratio_ad: 1.6
-e_jinx:        # E — Croque-Flammes!
+  cost: [40, 45, 50, 55, 60]
+  base: [10, 60, 110, 160, 210]
+  ratio_ad: 1.4
+e_jinx:        # E — Croque-Flammes !
   cooldown: [24, 20.5, 17, 13.5, 10]
-  cost: 70
-  base: [70, 120, 170, 220, 270]
-  ratio_ap: 1.0
-r_jinx:        # R — Super Méga Roquette de la Mort!
-  cooldown: [75, 65, 55]
+  cost: 90
+  base: [90, 140, 190, 240, 290]
+  ratio_ap: 1
+r_jinx:        # R — Super Méga Roquette de la Mort !
+  cooldown: [85, 65, 45]
   cost: 100
-  base: [250, 400, 550]
-  ratio_ad: 1.5
+  base: [200, 350, 500]
+  ratio_ad: 1.2
 
 # ===== leesin =====
 q_leesin:        # Q — Onde Sonique
-  cooldown: [9, 8, 7, 6, 5]
+  cooldown: [10, 9, 8, 7, 6]
   cost: 50
   base: [60, 90, 120, 150, 180]
   ratio_ad: 0.9
-w_leesin:        # W — Protection
-  cooldown: [14, 13, 12, 11, 10]
+w_leesin:        # W — Rempart
+  cooldown: [7, 7, 7, 7, 7]
   cost: 50
-e_leesin:        # E — Tempête de Flammes
-  cooldown: [10, 9, 8, 7, 6]
+e_leesin:        # E — Tempête
+  cooldown: [8, 8, 8, 8, 8]
   cost: 50
   base: [35, 60, 85, 110, 135]
   ratio_ad: 0.9
-r_leesin:        # R — Dragon's Rage
-  cooldown: [90, 75, 60]
+r_leesin:        # R — Rage du Dragon
+  cooldown: [110, 85, 60]
   cost: 0
-  base: [150, 300, 450]
-  ratio_ad: 2.0
+  base: [175, 400, 625]
+  ratio_ad: 2
 
 # ===== leona =====
 q_leona:        # Q — Bouclier de l'Aube
-  cooldown: [6, 6, 6, 6, 6]
-  cost: 45
-  base: [20, 45, 70, 95, 120]
+  cooldown: [5, 5, 5, 5, 5]
+  cost: [30, 35, 40, 45, 50]
+  base: [10, 35, 60, 85, 110]
   ratio_ap: 0.3
 w_leona:        # W — Éclipse
-  cooldown: [14, 13.5, 13, 12.5, 12]
+  cooldown: [14, 13, 12, 11, 10]
   cost: 60
-  base: [80, 120, 160, 200, 240]
+  base: [55, 85, 115, 145, 175]
   ratio_ap: 0.4
 e_leona:        # E — Lame du Zénith
   cooldown: [12, 10.5, 9, 7.5, 6]
-  cost: 55
-  base: [60, 95, 130, 165, 200]
+  cost: [40, 45, 50, 55, 60]
+  base: [50, 90, 130, 170, 210]
   ratio_ap: 0.4
 r_leona:        # R — Éruption Solaire
   cooldown: [90, 75, 60]
   cost: 100
-  base: [150, 250, 350]
-  ratio_ap: 1.0
+  base: [150, 225, 300]
+  ratio_ap: 0.8
 
 # ===== malphite =====
-q_malphite:        # Q — Éclat de Pierre
-  cooldown: [8, 7.5, 7, 6.5, 6]
-  cost: 70
+q_malphite:        # Q — Éclat Sismique
+  cooldown: [8, 8, 8, 8, 8]
+  cost: [70, 75, 80, 85, 90]
   base: [70, 120, 170, 220, 270]
   ratio_ap: 0.6
-w_malphite:        # W — Frappe Sismique
-  cooldown: [12, 11, 10, 9, 8]
-  cost: 25
-e_malphite:        # E — Sol Fracturé
-  cooldown: [10, 9, 8, 7, 6]
-  cost: 50
-  ratio_ap: 0.3
-r_malphite:        # R — Assaut Implacable
-  cooldown: [130, 105, 80]
+w_malphite:        # W — Coup de Tonnerre
+  cooldown: [10, 9.5, 9, 8.5, 8]
+  cost: [30, 35, 40, 45, 50]
+e_malphite:        # E — Onde de Choc
+  cooldown: [7, 7, 7, 7, 7]
+  cost: [50, 55, 60, 65, 70]
+r_malphite:        # R — Force Inarrêtable
+  cooldown: [130, 115, 100]
   cost: 100
 
 # ===== masteryi =====
 q_masteryi:        # Q — Frappe Alpha
-  cooldown: [18, 16, 14, 12, 10]
-  cost: 0
-  base: [25, 60, 95, 130, 165]
+  cooldown: [20, 19.5, 19, 18.5, 18]
+  cost: [50, 55, 60, 65, 70]
+  base: [20, 40, 60, 80, 100]
 w_masteryi:        # W — Méditation
-  cooldown: [35, 30, 25, 20, 15]
-  cost: 0
+  cooldown: [10, 10, 10, 10, 10]
+  cost: 40
 e_masteryi:        # E — Style Wuju
-  cooldown: [18, 17, 16, 15, 14]
+  cooldown: [14, 14, 14, 14, 14]
   cost: 0
-  ratio_ad: 0.1
 r_masteryi:        # R — Highlander
-  cooldown: [85, 70, 55]
-  cost: 0
+  cooldown: [85, 85, 85]
+  cost: 100
 
 # ===== missfortune =====
 q_missfortune:        # Q — Doublé
   cooldown: [7, 6, 5, 4, 3]
-  cost: 43
-  base: [20, 40, 60, 80, 100]
-w_missfortune:        # W — Strut
-  cooldown: [19, 17, 15, 13, 11]
-  cost: 30
+  cost: 40
+  base: [20, 45, 70, 95, 120]
+w_missfortune:        # W — Fanfaronnade
+  cooldown: [12, 12, 12, 12, 12]
+  cost: 45
 e_missfortune:        # E — Pluie de Balles
-  cooldown: [14.5, 13, 11.5, 10, 8.5]
+  cooldown: [18, 17, 16, 15, 14]
   cost: 80
-  ratio_ap: 0.1
 r_missfortune:        # R — Déluge de Balles
-  cooldown: [120, 100, 80]
-  cost: 100
-  ratio_ad: 0.75
-  ratio_ap: 0.35
-
-# ===== morgana =====
-q_morgana:        # Q — Filet des Ombres
-  cooldown: [11, 10.5, 10, 9.5, 9]
-  cost: 50
-  base: [80, 135, 190, 245, 300]
-  ratio_ap: 0.9
-w_morgana:        # W — Emprisonnement Torturé
-  cooldown: [10, 9, 8, 7, 6]
-  cost: 25
-  ratio_ap: 0.11
-e_morgana:        # E — Bouclier Noir
-  cooldown: [23, 21, 19, 17, 15]
-  cost: 80
-  ratio_ap: 0.4
-r_morgana:        # R — Chaînes de la Corruption
   cooldown: [120, 110, 100]
   cost: 100
-  ratio_ap: 0.7
+  ratio_ad: 0.6
+  ratio_ap: 0.25
+
+# ===== morgana =====
+q_morgana:        # Q — Entrave Noire
+  cooldown: [10, 10, 10, 10, 10]
+  cost: [50, 55, 60, 65, 70]
+  base: [80, 135, 190, 245, 300]
+  ratio_ap: 0.9
+w_morgana:        # W — Ombre Tourmentée
+  cooldown: [12, 12, 12, 12, 12]
+  cost: [70, 80, 90, 100, 110]
+e_morgana:        # E — Bouclier Noir
+  cooldown: [26, 23.5, 21, 18.5, 16]
+  cost: 80
+r_morgana:        # R — Chaînes de l'Âme
+  cooldown: [120, 110, 100]
+  cost: 100
+  ratio_ap: 0.8
 
 # ===== nasus =====
 q_nasus:        # Q — Frappe Siphon
-  cooldown: [8, 7, 6, 5, 4]
+  cooldown: [7.5, 6.5, 5.5, 4.5, 3.5]
   cost: 20
-w_nasus:        # W — Flétrissure
+w_nasus:        # W — Flétrissement
   cooldown: [15, 14, 13, 12, 11]
   cost: 80
 e_nasus:        # E — Feu Spirituel
-  cooldown: [12, 11, 10, 9, 8]
-  cost: 70
-  ratio_ap: 0.12
+  cooldown: [12, 12, 12, 12, 12]
+  cost: [60, 70, 80, 90, 100]
 r_nasus:        # R — Furie des Sables
   cooldown: [120, 100, 80]
   cost: 100
 
 # ===== sivir =====
 q_sivir:        # Q — Lame Boomerang
-  cooldown: [9, 8, 7, 6, 5]
-  cost: 70
-  base: [25, 45, 65, 85, 105]
+  cooldown: [10, 9.5, 9, 8.5, 8]
+  cost: [55, 60, 65, 70, 75]
+  base: [60, 85, 110, 135, 160]
 w_sivir:        # W — Ricochets
-  cooldown: [10, 9, 8, 7, 6]
-  cost: 22
-e_sivir:        # E — Bouclier Maléfique
-  cooldown: [22, 20, 18, 16, 14]
+  cooldown: [12, 12, 12, 12, 12]
+  cost: 60
+e_sivir:        # E — Bouclier Magique
+  cooldown: [24, 22.5, 21, 19.5, 18]
   cost: 0
-r_sivir:        # R — Appel des Flèches
+r_sivir:        # R — À la Chasse
   cooldown: [120, 100, 80]
   cost: 100
 
 # ===== veigar =====
-q_veigar:        # Q — Frappe Baleful
-  cooldown: [7, 6.5, 6, 5.5, 5]
-  cost: 40
+q_veigar:        # Q — Frappe Maléfique
+  cooldown: [6, 5.5, 5, 4.5, 4]
+  cost: [30, 35, 40, 45, 50]
   base: [80, 120, 160, 200, 240]
-  ratio_ap: 0.65
 w_veigar:        # W — Matière Noire
-  cooldown: [10, 9, 8, 7, 6]
-  cost: 100
-  base: [80, 130, 180, 230, 280]
-  ratio_ap: 1.0
-e_veigar:        # E — Cage Événementielle
-  cooldown: [18, 16, 14, 12, 10]
-  cost: 80
+  cooldown: [8, 8, 8, 8, 8]
+  cost: [60, 65, 70, 75, 80]
+  base: [85, 140, 195, 250, 305]
+e_veigar:        # E — Horizon des Événements
+  cooldown: [20, 18.5, 17, 15.5, 14]
+  cost: [70, 75, 80, 85, 90]
 r_veigar:        # R — Explosion Primordiale
-  cooldown: [120, 100, 80]
+  cooldown: [120, 90, 60]
   cost: 100
-  base: [200, 350, 500]
-  ratio_ap: 0.8
+  base: [175, 250, 325]
 
 # ===== warwick =====
-q_warwick:        # Q — Crocs de la Bête
+q_warwick:        # Q — Mâchoires de la Bête
   cooldown: [8, 7.5, 7, 6.5, 6]
-  cost: 0
-  ratio_ad: 1.0
-w_warwick:        # W — Meute de Prédateurs
-  cooldown: [0, 0, 0, 0, 0]
-  cost: 0
+  cost: [80, 85, 90, 95, 100]
+  ratio_ad: 1.2
+w_warwick:        # W — Traque Sanglante
+  cooldown: [80, 70, 60, 50, 40]
+  cost: 55
 e_warwick:        # E — Hurlement Primal
-  cooldown: [20, 18, 16, 14, 12]
-  cost: 0
-r_warwick:        # R — Emprise Infinie
+  cooldown: [15, 14, 13, 12, 11]
+  cost: 40
+r_warwick:        # R — Contrainte Infinie
   cooldown: [110, 90, 70]
-  cost: 0
-  base: [175, 300, 425]
-  ratio_ad: 1.675
+  cost: 100
+  base: [175, 350, 525]
+  ratio_ad: 1.67
 
 # ===== yasuo =====
 q_yasuo:        # Q — Tempête d'Acier
-  cooldown: [4, 3.5, 3, 2.5, 2]
+  cooldown: [4, 4, 4, 4, 4]
   cost: 0
   base: [20, 45, 70, 95, 120]
-  ratio_ad: 1.0
+  ratio_ad: 1.05
 w_yasuo:        # W — Mur du Vent
-  cooldown: [26, 24, 22, 20, 18]
+  cooldown: [25, 23, 21, 19, 17]
   cost: 0
 e_yasuo:        # E — Lame Déferlante
-  cooldown: [0.5, 0.5, 0.5, 0.5, 0.5]
+  cooldown: [0.5, 0.4, 0.3, 0.2, 0.1]
   cost: 0
-  base: [60, 70, 80, 90, 100]
-  ratio_ap: 0.6
+  base: [70, 85, 100, 115, 130]
 r_yasuo:        # R — Dernier Souffle
-  cooldown: [200, 180, 160]
+  cooldown: [70, 50, 30]
   cost: 0
   base: [200, 350, 500]
   ratio_ad: 1.5
 
 # ===== zed =====
-q_zed:        # Q — Shuriken Tranchant
-  cooldown: [6, 5.5, 5, 4.5, 4]
+q_zed:        # Q — Shuriken Rasoir
+  cooldown: [6, 6, 6, 6, 6]
+  cost: [75, 70, 65, 60, 55]
+w_zed:        # W — Ombre Vivante (recharge et énergie gérées par le sort)
+  cooldown: [0, 0, 0, 0, 0]
+  cost: 0
+e_zed:        # E — Taillade de l'Ombre
+  cooldown: [5, 4.5, 4, 3.5, 3]
   cost: 40
-w_zed:        # W — Ombre Vivante
-  cooldown: [20, 18, 16, 14, 12]
-  cost: 40
-e_zed:        # E — Taillade des Ombres
-  cooldown: [4, 3, 2, 1, 0.5]
-  cost: 50
   base: [70, 92.5, 115, 137.5, 160]
   ratio_ad: 0.7
-r_zed:        # R — Marque de Mort
-  cooldown: [120, 100, 80]
+r_zed:        # R — Marque de la Mort
+  cooldown: [120, 110, 100]
   cost: 0
 

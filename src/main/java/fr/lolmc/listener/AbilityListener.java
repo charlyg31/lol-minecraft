@@ -574,6 +574,23 @@ public class AbilityListener implements Listener {
         }
     }
 
+    /**
+     * Attaque de Tibbers : dégâts magiques LoL (30/45/60 +10 % AP, 0.625 attaque/s) attribués à
+     * Annie, sur champions, sbires et monstres. Avant, ses coups sur les champions étaient annulés
+     * (dégâts vanilla) : Tibbers ne blessait aucun joueur.
+     */
+    @EventHandler(priority = org.bukkit.event.EventPriority.LOW)
+    public void onTibbersAttack(EntityDamageByEntityEvent e) {
+        if (!(e.getDamager() instanceof org.bukkit.entity.PolarBear bear)) return;
+        Player annie = fr.lolmc.champion.impl.mid.Annie.getTibbersOwner(bear);
+        if (annie == null) return;
+        e.setCancelled(true);
+        if (!(e.getEntity() instanceof org.bukkit.entity.LivingEntity victim)) return;
+        if (!fr.lolmc.util.TargetingUtil.isEnemy(annie, victim)) return;
+        double dmg = fr.lolmc.champion.impl.mid.Annie.getTibbersAttackDamage(bear) * 0.625;
+        fr.lolmc.util.DamageUtil.damageEntity(annie, victim, dmg, false, fr.lolmc.util.DamageUtil.Type.MAGICAL);
+    }
+
     /** Dégâts d'un monstre de jungle sur un joueur — remplace le vanilla par les valeurs LoL. */
     @EventHandler
     public void onJungleMonsterAttackPlayer(EntityDamageByEntityEvent e) {

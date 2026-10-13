@@ -21,14 +21,14 @@ import java.util.*;
 public final class Zed extends BaseChampion implements fr.lolmc.champion.base.StatefulChampion {
     public Zed() {
         super("zed", "Zed", ChampionRole.MID,
-                new ChampionStats(654,63,0,32,32,0.651,0,345,1.25,7.0));
-        getStats().setGrowthStats(99.0,3.4,4.7,2.05,0.03300,0.65);
-        setAutoAttackRange(2.7);
+                new ChampionStats(654,63,0,32,29,0.651,0,345,1.25,7));
+        getStats().setGrowthStats(99,3.4,4.7,2.05,0.033,0.65);
+        setLolAttackRange(125); // stats LoL (wiki)
     }
     @Override protected void registerAbilities() {
         setAbility(0,new AA()); setAbility(1,new Q());
         setAbility(2,new W()); setAbility(3,new E()); setAbility(4,new R());
-        initSystems(582, 7.0, ResourceSystem.ResourceType.ENERGY, 200, 50.0);
+        initSystems(7, ResourceSystem.ResourceType.ENERGY, 200, 0, 50, 0);
     }
 
     // Gestion de l'ombre et des cooldowns manuels
@@ -89,19 +89,31 @@ public final class Zed extends BaseChampion implements fr.lolmc.champion.base.St
             double[] baseFirst={80,120,160,200,240};
             double[] baseNext={48,72,96,120,144};
             int rank=getLevel()-1;
-            double dmgFirst=baseFirst[rank]+s.getFinalAD();
-            double dmgNext=baseNext[rank]+s.getFinalAD()*0.6;
-            var hits=TargetingUtil.skillshot(c, 12.0, 1.0, true);
+            // Wiki : 80-240 (+100 % AD bonus), 60 % aux suivants ; portée 925
+            double dmgFirst=baseFirst[rank]+s.getBonusAD();
+            double dmgNext=baseNext[rank]+s.getBonusAD()*0.6;
+            var hits=TargetingUtil.skillshot(c, 9.9, 0.6, true);
             boolean first=true;
+            var alreadyHit=new java.util.HashSet<UUID>();
             for(var __t : hits){
                 TargetingUtil.dealDamage(c, __t, first?dmgFirst:dmgNext, TargetingUtil.DmgType.PHYSICAL);
+                alreadyHit.add(__t.getUniqueId());
                 first=false;
+            }
+            // L'ombre lance aussi un Shuriken dans la même direction (LoL) ; une cible déjà
+            // touchée ne prend que les dégâts réduits
+            Location shadow=shadows.get(c.getUniqueId());
+            if(shadow!=null && shadow.getWorld().equals(c.getWorld())){
+                var dir=c.getEyeLocation().getDirection();
+                for(var __t : TargetingUtil.skillshotFrom(c, shadow.clone().add(0,1.6,0), dir, 9.9, 0.6, true)){
+                    TargetingUtil.dealDamage(c, __t, alreadyHit.add(__t.getUniqueId()) ? dmgFirst : dmgNext, TargetingUtil.DmgType.PHYSICAL);
+                }
             }
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_ARROW_SHOOT, 1f, 1.3f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] baseFirst={80,120,160,200,240};
-            return String.format("Skillshot: %.0f dégâts au 1er ennemi (+100%%AD), réduit aux suivants.",baseFirst[getLevel()-1]+s.getFinalAD());
+            return String.format("Skillshot: %.0f dégâts au 1er ennemi (+100%%AD bonus), 60%% aux suivants. L'ombre lance aussi.",baseFirst[getLevel()-1]+s.getBonusAD());
         }
     }
 
@@ -114,7 +126,8 @@ public final class Zed extends BaseChampion implements fr.lolmc.champion.base.St
         @Override public void cast(Player c,ChampionStats s,Player t){
             UUID uuid = c.getUniqueId();
             int rank = Math.min(getLevel() - 1, 4);
-            double[] realCooldowns = {20, 18, 16, 14, 12};
+            double[] realCooldowns = {20, 19, 18, 17, 16}; // wiki
+            double[] energyCost = {40, 35, 30, 25, 20};
             long now = System.currentTimeMillis();
 
             if (wCooldowns.containsKey(uuid) && wCooldowns.get(uuid) > now && !shadows.containsKey(uuid)) {
@@ -143,17 +156,18 @@ public final class Zed extends BaseChampion implements fr.lolmc.champion.base.St
                     c.teleport(dest);
                 }
             } else {
-                // Coût en énergie uniquement au placement de l'ombre (40)
+                // Coût en énergie uniquement au placement de l'ombre (40/35/30/25/20, wiki)
+                int cost = (int) energyCost[rank];
                 var cm0 = LolPlugin.getInstance().getChampionManager();
                 if (cm0.hasChampion(c)) {
                     var res = cm0.getChampion(c).getResourceSystem();
-                    if (res != null && !res.consume(40)) {
-                        c.sendActionBar(Component.text("❌ Pas assez d'énergie (40)", NamedTextColor.RED));
+                    if (res != null && !res.consume(cost)) {
+                        c.sendActionBar(Component.text("❌ Pas assez d'énergie (" + cost + ")", NamedTextColor.RED));
                         return;
                     }
                 }
                 Vector dir = c.getLocation().getDirection().setY(0).normalize();
-                Location shadowLoc = c.getLocation().clone().add(dir.multiply(8));
+                Location shadowLoc = c.getLocation().clone().add(dir.multiply(6.5)); // 650 unités
 
                 // CORRECTION : Conserve le Y du joueur pour éviter que l'ombre spawn sur les toits en intérieur
                 shadowLoc.setY(c.getLocation().getY());
@@ -198,7 +212,7 @@ public final class Zed extends BaseChampion implements fr.lolmc.champion.base.St
                             }
                         }
                     }
-                }.runTaskLater(LolPlugin.getInstance(), 80L);
+                }.runTaskLater(LolPlugin.getInstance(), 105L); // l'ombre dure 5.25 s (wiki)
             }
         }
         @Override public String getDynamicDescription(ChampionStats s){
@@ -212,13 +226,13 @@ public final class Zed extends BaseChampion implements fr.lolmc.champion.base.St
             resourceCost = 50;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             double[] base=fr.lolmc.util.Balance.base("e_zed",new double[]{70,92.5,115,137.5,160});
-            double dmg=base[getLevel()-1]+s.getFinalAD()*fr.lolmc.util.Balance.ratio("e_zed","ad",0.7);
+            double dmg=base[getLevel()-1]+s.getBonusAD()*fr.lolmc.util.Balance.ratio("e_zed","ad",0.7); // AD bonus (wiki)
             int rank=getLevel()-1;
             int champsHit=0;
-            for(var __t : TargetingUtil.enemiesAround(c, 4.0)){
+            for(var __t : TargetingUtil.enemiesAround(c, 3.8)){ // rayon 315
                 TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.PHYSICAL);
                 if(__t instanceof Player __p){
-                    __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,30,rank,false,true));
+                    fr.lolmc.LolPlugin.getInstance().getCCManager().slowPct(__p, new double[]{0.20,0.25,0.30,0.35,0.40}[rank], 30); // wiki
                     champsHit++;
                 }
             }
@@ -228,7 +242,7 @@ public final class Zed extends BaseChampion implements fr.lolmc.champion.base.St
                 UUID id = c.getUniqueId();
                 if (Zed.wCooldowns.containsKey(id)) {
                     long currentCd = Zed.wCooldowns.get(id);
-                    long newCd = currentCd - (champsHit * 2000L); // Enlève 2000ms par champion
+                    long newCd = currentCd - (champsHit * 3000L); // -3 s par champion touché (wiki)
                     // S'assure que le CD ne tombe pas dans le négatif
                     if (newCd < System.currentTimeMillis()) {
                         newCd = System.currentTimeMillis();
@@ -250,7 +264,7 @@ public final class Zed extends BaseChampion implements fr.lolmc.champion.base.St
                                 && TargetingUtil.isEnemy(c, tgtEnnemi)) {
                             TargetingUtil.dealDamage(c, tgtEnnemi, dmg, TargetingUtil.DmgType.PHYSICAL);
                             if (tgtEnnemi instanceof Player __p)
-                                __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 30, rank, false, true));
+                                fr.lolmc.LolPlugin.getInstance().getCCManager().slowPct(__p, new double[]{0.30,0.375,0.45,0.525,0.60}[rank], 30); // 2 taillades (wiki)
                         }
                     }
                     fr.lolmc.util.VisualEffectUtil.groundRing(shadowLoc.getWorld(),
@@ -261,7 +275,7 @@ public final class Zed extends BaseChampion implements fr.lolmc.champion.base.St
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] base=fr.lolmc.util.Balance.base("e_zed",new double[]{70,92.5,115,137.5,160});
-            return String.format("%.0f dégâts AoE (+70%%AD) + ralentit 20-40%% 1.5s.",base[getLevel()-1]+s.getFinalAD()*fr.lolmc.util.Balance.ratio("e_zed","ad",0.7));
+            return String.format("%.0f dégâts AoE (+70%%AD bonus) + ralentit 20-40%% 1.5s. -3s de recharge du W par champion.",base[getLevel()-1]+s.getBonusAD()*fr.lolmc.util.Balance.ratio("e_zed","ad",0.7));
         }
     }
 
@@ -270,10 +284,8 @@ public final class Zed extends BaseChampion implements fr.lolmc.champion.base.St
                 new double[]{120,90,60},20,0,DamageType.TRUE);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            org.bukkit.entity.LivingEntity tgt = (t!=null && TargetingUtil.isEnemy(c,t))?t:TargetingUtil.getTargetedEnemy(c,8.0); if(tgt==null){c.sendActionBar(Component.text("💀 Aucune cible visée",NamedTextColor.GRAY));return;}
-            var dest=tgt.getLocation().clone().add(tgt.getLocation().getDirection().multiply(1.5));
-            dest.setY(c.getLocation().getY());
-            c.teleport(dest);
+            org.bukkit.entity.LivingEntity tgt = (t!=null && TargetingUtil.isEnemy(c,t))?t:TargetingUtil.getTargetedEnemy(c,6.9); if(tgt==null){cancelCast();c.sendActionBar(Component.text("💀 Aucune cible visée",NamedTextColor.GRAY));return;} // 625 unités
+            dashTo(c, tgt, 1.5); // derrière la cible
             final double startHP=TargetingUtil.getRealHealth(tgt);
             if(tgt instanceof Player _tp)_tp.sendActionBar(Component.text("💀 MARQUE DE MORT — 3s...",NamedTextColor.DARK_RED));
             fr.lolmc.util.VisualEffectUtil.impactBurst(tgt.getWorld(),
@@ -295,7 +307,7 @@ public final class Zed extends BaseChampion implements fr.lolmc.champion.base.St
                 @Override public void run(){
                     if(tgt.isDead())return;
                     double subis=Math.max(0, startHP - TargetingUtil.getRealHealth(tgt));
-                    double dmg=ad*0.65 + subis*ampPct[rank];
+                    double dmg=ad + subis*ampPct[rank]; // 100 % AD + 25/40/55 % des dégâts stockés (wiki)
                     tgt.getWorld().strikeLightningEffect(tgt.getLocation());
                     fr.lolmc.util.VisualEffectUtil.impactBurst(tgt.getWorld(),
                             tgt.getLocation().add(0,1,0), Material.RED_STAINED_GLASS, 0.4f, 0.6, 10, 10L);
@@ -316,7 +328,7 @@ public final class Zed extends BaseChampion implements fr.lolmc.champion.base.St
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] ampPct={25,40,55};int r=Math.min(getLevel()-1,2);
-            return String.format("Dash + marque 3s. Détonation: 65%%AD + %.0f%% des dégâts infligés.",ampPct[r]);
+            return String.format("Dash + marque 3s. Détonation: 100%%AD + %.0f%% des dégâts infligés.",ampPct[r]);
         }
     }
 

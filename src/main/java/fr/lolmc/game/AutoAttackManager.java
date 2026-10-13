@@ -307,10 +307,19 @@ public class AutoAttackManager {
         AAType type = getAAType(champ);
         playAnimation(attacker, target, type, crit);
 
-        // Dégâts
+        // Projectile arrêté par un Mur du Vent ennemi (Yasuo)
+        if (type != AAType.MELEE && fr.lolmc.champion.impl.mid.Yasuo.blocksProjectile(attacker,
+                attacker.getEyeLocation(), target.getLocation().add(0, 1, 0))) return true;
+
+        // Dégâts (les attaques de base sont physiques dans LoL, même celles des mages)
         DamageUtil.damage(attacker, target, rawDamage, false, DamageUtil.Type.PHYSICAL);
 
-        // Passifs on-hit
+        // Passif d'attaque du champion (onHit), puis passifs d'objets
+        if (champ.getAbility(0) instanceof fr.lolmc.ability.base.BasicAttackAbility baa)
+            baa.applyOnHit(attacker, champ.getStats(), target, rawDamage);
+        // La cible réagit à l'attaque subie (Caprice d'Amumu, Bouclier en Fusion d'Annie)
+        cm.getChampion(target).onBasicAttacked(target, attacker);
+        fr.lolmc.champion.impl.mid.Annie.onShieldedAttacked(target, attacker);
         var pm = LolPlugin.getInstance().getPassiveManager();
         if (pm != null) pm.onAutoAttack(attacker, target);
 
@@ -343,8 +352,13 @@ public class AutoAttackManager {
         playAnimation(attacker, target, type, crit);
 
         target.playHurtAnimation(attacker.getLocation().getYaw());
+        if (type != AAType.MELEE && fr.lolmc.champion.impl.mid.Yasuo.blocksProjectile(attacker,
+                attacker.getEyeLocation(), target.getLocation().add(0, 1, 0))) return true;
         // Sbire/monstre : armure, bonus anti-sbires, PV virtuels ; coup fatal attribué (last-hit)
-        if (fr.lolmc.util.MobCombat.damage(attacker, target, rawDamage, fr.lolmc.util.DamageUtil.Type.PHYSICAL)) {
+        boolean killed = fr.lolmc.util.MobCombat.damage(attacker, target, rawDamage, fr.lolmc.util.DamageUtil.Type.PHYSICAL);
+        if (champ.getAbility(0) instanceof fr.lolmc.ability.base.BasicAttackAbility baa)
+            baa.applyOnHit(attacker, champ.getStats(), target, rawDamage);
+        if (killed) {
             var pmKill = LolPlugin.getInstance().getPassiveManager();
             if (pmKill != null) pmKill.onAutoAttackEntity(attacker, target);
             return true;

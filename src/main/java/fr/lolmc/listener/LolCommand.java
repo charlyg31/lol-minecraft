@@ -496,8 +496,8 @@ private void handleSolo(Player player, String[] args) {
     var soloChamp = plugin.getChampionManager().getChampion(player);
     if (soloChamp != null) {
         soloChamp.getLevelSystem().setLevel(18);
-        soloChamp.getStats().setChampionLevel(18);
-        soloChamp.getLevelSystem().maxOutAbilities();
+        soloChamp.onLevelChanged(18);
+        soloChamp.getLevelSystem().maxOutAbilities(); soloChamp.onAbilityRanksChanged();
         plugin.getHotbarManager().renderPage(player, soloChamp);
     }
     plugin.getRuneManager().applyRuneStats(player);
@@ -534,8 +534,8 @@ private void handleSolo(Player player, String[] args) {
         lvl = Math.clamp(lvl, 1, 18);
         var champ = cm.getChampion(player);
         champ.getLevelSystem().setLevel(lvl);
-        champ.getLevelSystem().maxOutAbilities();
-        champ.getStats().setChampionLevel(lvl);
+        champ.getLevelSystem().maxOutAbilities(); champ.onAbilityRanksChanged();
+        champ.onLevelChanged(lvl);
         LolPlugin.getInstance().getHotbarManager().renderPage(player, champ);
         player.sendMessage(Component.text("✔ Niveau " + lvl + " — sorts débloqués", NamedTextColor.GREEN));
     }

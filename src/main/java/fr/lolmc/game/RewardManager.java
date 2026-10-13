@@ -379,7 +379,7 @@ public class RewardManager {
         int levelsGained = champ.getLevelSystem().addXP(xp);
         if (levelsGained > 0) {
             int newLevel = champ.getLevelSystem().getLevel();
-            champ.getStats().setChampionLevel(newLevel);
+            champ.onLevelChanged(newLevel);
             // Titre + son + particules level-up
             player.showTitle(net.kyori.adventure.title.Title.title(
                 net.kyori.adventure.text.Component.text("⬆ NIVEAU " + newLevel,

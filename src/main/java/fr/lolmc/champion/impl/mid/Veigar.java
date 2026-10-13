@@ -17,14 +17,14 @@ import java.util.*;
 public final class Veigar extends BaseChampion implements fr.lolmc.champion.base.StatefulChampion {
     public Veigar() {
         super("veigar", "Veigar", ChampionRole.MID,
-                new ChampionStats(550,52,0,18,30,0.625,0,340,5.5,6.0));
-        getStats().setGrowthStats(108.0,2.6,4.0,1.30,0.02240,0.60);
+                new ChampionStats(580,52,0,18,32,0.625,0,340,5.5,6.5));
+        getStats().setGrowthStats(108,2.7,5.2,1.3,0.0224,0.6);
+        setLolAttackRange(550); // stats LoL (wiki)
     }
     @Override protected void registerAbilities() {
         setAbility(0,new AA()); setAbility(1,new Q());
         setAbility(2,new W()); setAbility(3,new E()); setAbility(4,new R());
-        initSystems(491, 6.0, ResourceSystem.ResourceType.MANA, 490, 11.0);
-        setAutoAttackRange(10.8);
+        initSystems(6.5, ResourceSystem.ResourceType.MANA, 490, 26, 8, 0.8);
     }
 
     public static final Map<UUID,Integer> apStacks=new java.util.concurrent.ConcurrentHashMap<>();
@@ -32,22 +32,37 @@ public final class Veigar extends BaseChampion implements fr.lolmc.champion.base
     @Override public void resetState(UUID id){ apStacks.remove(id); }
     @Override public void resetAllState(){ apStacks.clear(); }
 
-    /** Passif Malfaisance : +AP permanent sur kill/assist de champion. */
+    /** Passif Malfaisance : +5 stacks (1 AP chacun) par kill/assist de champion (LoL). */
     public static void onTakedown(java.util.UUID id) {
-        int stacks = apStacks.merge(id, 1, Integer::sum);
         var player = org.bukkit.Bukkit.getPlayer(id);
         if (player == null) return;
         var cm = LolPlugin.getInstance().getChampionManager();
-        if (cm.hasChampion(player)) {
-            cm.getChampion(player).getStats().addBonusAP(5.0); // +5 AP par takedown de champion (LoL)
-            player.sendActionBar(net.kyori.adventure.text.Component.text(
-                "📈 Malfaisance! +" + stacks + " AP total",
-                net.kyori.adventure.text.format.NamedTextColor.DARK_PURPLE));
-        }
+        if (!cm.hasChampion(player)) return;
+        int gain = Math.max(0, Math.min(5, MAX_AP_STACKS - apStacks.getOrDefault(id, 0)));
+        if (gain == 0) return;
+        int stacks = apStacks.merge(id, gain, Integer::sum);
+        cm.getChampion(player).getStats().addBonusAP(gain);
+        // (avant : le message affichait le nombre de takedowns comme « AP total »)
+        player.sendActionBar(net.kyori.adventure.text.Component.text(
+            "📈 Malfaisance! +" + gain + " AP (" + stacks + " au total)",
+            net.kyori.adventure.text.format.NamedTextColor.DARK_PURPLE));
     }
 
     static class AA extends BasicAttackAbility {
         AA(){super("veigar",Material.PURPLE_DYE,5.5f,DamageType.MAGICAL);}
+    }
+
+    /** Malfaisance : +n stacks (1 AP chacun), dans la limite du plafond. */
+    static void gainStacks(Player c, ChampionStats s, int n) {
+        int gain = Math.max(0, Math.min(n, MAX_AP_STACKS - apStacks.getOrDefault(c.getUniqueId(), 0)));
+        if (gain == 0) return;
+        s.addBonusAP(gain);
+        apStacks.merge(c.getUniqueId(), gain, Integer::sum);
+    }
+
+    /** Passif (wiki) : +1 stack par champion ennemi touché par un sort. */
+    static void onChampionHit(Player c, ChampionStats s, org.bukkit.entity.LivingEntity t) {
+        if (t instanceof Player) gainStacks(c, s, 1);
     }
 
     static class Q extends BaseAbility {
@@ -58,18 +73,19 @@ public final class Veigar extends BaseChampion implements fr.lolmc.champion.base
             double[] base=fr.lolmc.util.Balance.base("q_veigar",new double[]{80,120,160,200,240});
             double[] apR={0.50,0.55,0.60,0.65,0.70};
             double dmg=base[getLevel()-1]+s.getFinalAP()*apR[getLevel()-1];
-            var hits=TargetingUtil.skillshot(c, 9.0, 0.8, true);
+            var hits=TargetingUtil.skillshot(c, 10.5, 0.7, true); // 1050 unités
             int touched=0;
             for(var __t : hits){
                 if(touched>=2) break;
-                double hpBefore=TargetingUtil.getRealHealth(__t);
                 TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);
-                if(hpBefore-dmg<=0 && apStacks.getOrDefault(c.getUniqueId(),0) < MAX_AP_STACKS){
-                    boolean big=(__t instanceof Player)||fr.lolmc.game.JungleManager.isJungleMonster(__t);
-                    int gain=big?2:1;
-                    s.addBonusAP(gain);
-                    apStacks.merge(c.getUniqueId(),gain,Integer::sum);
-                    c.sendActionBar(Component.text("📈 +"+gain+" AP! Total stacks: "+apStacks.get(c.getUniqueId()),NamedTextColor.DARK_PURPLE));
+                onChampionHit(c, s, __t);
+                boolean killed = __t.isDead() || TargetingUtil.getRealHealth(__t) <= 0;
+                if(killed){
+                    // Wiki : 1 stack par kill, 3 sur gros sbire ou monstre
+                    String mt=fr.lolmc.game.MinionManager.getMinionTypeTag(__t);
+                    boolean big=fr.lolmc.game.JungleManager.isJungleMonster(__t) || "cannon".equals(mt) || "super".equals(mt);
+                    gainStacks(c, s, big?3:1);
+                    c.sendActionBar(Component.text("📈 Malfaisance! Total stacks: "+apStacks.getOrDefault(c.getUniqueId(),0),NamedTextColor.DARK_PURPLE));
                 }
                 touched++;
             }
@@ -87,15 +103,20 @@ public final class Veigar extends BaseChampion implements fr.lolmc.champion.base
                 new double[]{10,9,8,7,6},20,3,DamageType.MAGICAL);
             resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            Location loc=TargetingUtil.getAimedGroundLocation(c, 9.0);
+            Location loc=TargetingUtil.getAimedGroundLocation(c, 9.5);
             fr.lolmc.util.VisualEffectUtil.groundRing(loc.getWorld(), loc, 3.0,
                     Material.PURPLE_STAINED_GLASS, 18, 0.35f, 0.1f, 25L);
             loc.getWorld().playSound(loc, Sound.ENTITY_ENDER_DRAGON_GROWL, 0.6f, 1.5f);
             new BukkitRunnable(){
                 @Override public void run(){
-                    double[] base=fr.lolmc.util.Balance.base("w_veigar",new double[]{80,120,160,200,240});double dmg=base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("w_veigar","ap",1.0);
-                    TargetingUtil.dealDamageAll(c,
-                            TargetingUtil.entitiesInRadius(c, loc, 3.0), dmg, TargetingUtil.DmgType.MAGICAL);
+                    // Wiki : 85-305 (+70/80/90/100/110 % AP)
+                    double[] base=fr.lolmc.util.Balance.base("w_veigar",new double[]{85,140,195,250,305});
+                    double[] apR={0.70,0.80,0.90,1.00,1.10};
+                    double dmg=base[getLevel()-1]+s.getFinalAP()*apR[getLevel()-1];
+                    for(var __t : TargetingUtil.entitiesInRadius(c, loc, 3.0)){
+                        TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);
+                        onChampionHit(c, s, __t);
+                    }
                     fr.lolmc.util.VisualEffectUtil.impactBurst(loc.getWorld(),
                             loc, Material.PURPLE_STAINED_GLASS, 0.35f, 1.5, 10, 8L);
                     loc.getWorld().playSound(loc, Sound.ENTITY_GENERIC_EXPLODE, 1f, 0.8f);
@@ -103,8 +124,9 @@ public final class Veigar extends BaseChampion implements fr.lolmc.champion.base
             }.runTaskLater(LolPlugin.getInstance(),24L);
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            double[] base=fr.lolmc.util.Balance.base("w_veigar",new double[]{80,120,160,200,240});
-            return String.format("%.0f dégâts (+100%%AP) après 1.2s sur zone visée.",base[getLevel()-1]+s.getFinalAP());
+            double[] base=fr.lolmc.util.Balance.base("w_veigar",new double[]{85,140,195,250,305});
+            double[] apR={0.70,0.80,0.90,1.00,1.10};
+            return String.format("%.0f dégâts (+%.0f%%AP) après 1.2s sur zone visée.",base[getLevel()-1]+s.getFinalAP()*apR[getLevel()-1],apR[getLevel()-1]*100);
         }
     }
 
@@ -162,23 +184,23 @@ public final class Veigar extends BaseChampion implements fr.lolmc.champion.base
                 new double[]{120,90,60},20,0,DamageType.MAGICAL);
             resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            org.bukkit.entity.LivingEntity tgt = (t!=null && TargetingUtil.isEnemy(c,t))?t:TargetingUtil.getTargetedEnemy(c,8.0); if(tgt==null){c.sendActionBar(Component.text("☠ Aucune cible visée",NamedTextColor.GRAY));return;}
-            double[] base=fr.lolmc.util.Balance.base("r_veigar",new double[]{175,350,525});int rr=Math.min(getLevel()-1,2);
-            double baseDmg=base[rr]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("r_veigar","ap",1.2);
-
-            // Augmenté jusqu'à +100% selon PV manquants de la cible (PV LoL)
+            org.bukkit.entity.LivingEntity tgt = (t!=null && TargetingUtil.isEnemy(c,t))?t:TargetingUtil.getTargetedEnemy(c,7.2); if(tgt==null){cancelCast();c.sendActionBar(Component.text("☠ Aucune cible visée",NamedTextColor.GRAY));return;}
+            // Wiki : 175/250/325 (+65/70/75 % AP), jusqu'à ×2 selon les PV manquants (max à 66.7 %)
+            double[] base=fr.lolmc.util.Balance.base("r_veigar",new double[]{175,250,325});int rr=Math.min(getLevel()-1,2);
+            double baseDmg=base[rr]+s.getFinalAP()*new double[]{0.65,0.70,0.75}[rr];
             double missingPct=1.0-(TargetingUtil.getRealHealth(tgt)/Math.max(1, TargetingUtil.getRealMaxHealth(tgt)));
-            double dmg=baseDmg*(1.0+missingPct);
+            double dmg=baseDmg*(1.0+Math.min(1.0, missingPct/0.6667));
             tgt.getWorld().strikeLightningEffect(tgt.getLocation());
             fr.lolmc.util.VisualEffectUtil.impactBurst(tgt.getWorld(),
                     tgt.getLocation().add(0,1,0), Material.PURPLE_STAINED_GLASS, 0.42f, 0.6, 12, 10L);
             TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.MAGICAL);
+            onChampionHit(c, s, tgt);
             if(tgt instanceof Player _tp)_tp.sendMessage(Component.text("☠ EXPLOSION PRIMORDIALE!",NamedTextColor.DARK_PURPLE));
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_WITHER_SHOOT, 1.5f, 0.6f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            double[] base=fr.lolmc.util.Balance.base("r_veigar",new double[]{175,350,525});int r=Math.min(getLevel()-1,2);
-            return String.format("%.0f dégâts (+120%%AP), jusqu'à ×2 selon PV manquants.",base[r]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("r_veigar","ap",1.2));
+            double[] base=fr.lolmc.util.Balance.base("r_veigar",new double[]{175,250,325});int r=Math.min(getLevel()-1,2);
+            return String.format("%.0f dégâts (+%.0f%%AP), jusqu'à ×2 selon PV manquants.",base[r]+s.getFinalAP()*new double[]{0.65,0.70,0.75}[r],new double[]{65,70,75}[r]);
         }
     }
 }

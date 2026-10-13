@@ -18,14 +18,14 @@ import org.bukkit.util.Vector;
 public final class Malphite extends BaseChampion implements fr.lolmc.champion.base.StatefulChampion {
     public Malphite() {
         super("malphite", "Malphite", ChampionRole.TOP,
-            new ChampionStats(644,62,0,37,32,0.736,0,335,1.25,7.0));
-        getStats().setGrowthStats(90.0,4.0,4.2,2.05,0.02600,0.55);
-        setAutoAttackRange(2.3);
+            new ChampionStats(665,62,0,40,28,0.736,0,335,1.25,7));
+        getStats().setGrowthStats(104,4,4.95,2.05,0.034,0.55);
+        setLolAttackRange(125); // stats LoL (wiki)
     }
     @Override protected void registerAbilities() {
         setAbility(0,new AA()); setAbility(1,new Q());
         setAbility(2,new W()); setAbility(3,new E()); setAbility(4,new R());
-        initSystems(574, 8.5, ResourceSystem.ResourceType.MANA, 480, 11.0);
+        initSystems(7, ResourceSystem.ResourceType.MANA, 280, 60, 7.3, 0.55);
     }
 
     // Passif Granite Shield : bouclier 10% HP max, se recharge 10s hors combat
@@ -35,10 +35,14 @@ public final class Malphite extends BaseChampion implements fr.lolmc.champion.ba
     public static void onDamageTaken(java.util.UUID id) { shieldCooldown.put(id, System.currentTimeMillis()); }
     public static void tickGraniteShield(org.bukkit.entity.Player p, fr.lolmc.champion.base.BaseChampion champ) {
         Long last = shieldCooldown.get(p.getUniqueId());
-        if (last == null || (System.currentTimeMillis() - last) >= 10_000L) {
+        // Recharge après 8/7/6 s sans dégâts selon le niveau (wiki ; avant : 10 s)
+        int lvl = champ.getLevelSystem().getLevel();
+        long refresh = lvl >= 13 ? 6000L : lvl >= 7 ? 7000L : 8000L;
+        if (last == null || (System.currentTimeMillis() - last) >= refresh) {
             double shield = champ.getStats().getFinalMaxHP() * 0.10;
+            // Recharge jusqu'à 10 % des PV max (avant : effaçait aussi les autres boucliers)
             if (champ.getStats().getShield() < shield) {
-                champ.getStats().clearShields(); champ.getStats().addShield(shield);
+                champ.getStats().addShield(shield - champ.getStats().getShield());
             }
         }
     }
@@ -46,12 +50,12 @@ public final class Malphite extends BaseChampion implements fr.lolmc.champion.ba
     static class AA extends BasicAttackAbility {
         AA(){super("malphite",Material.STONE_SWORD,2.5f,DamageType.PHYSICAL);}
         @Override protected void onHit(Player c, ChampionStats s, org.bukkit.entity.LivingEntity tgt, double dmg){
-            // Coup de Tonnerre actif : dégâts bonus en cône (+25-85 +15% AP)
+            // Coup de Tonnerre actif : dégâts en cône 15-55 (+30 % AP) (+15 % armure) (wiki)
             if (hasThunderclap(c.getUniqueId())) {
                 int wlvl = LolPlugin.getInstance().getChampionManager().hasChampion(c)
                     ? Math.max(1, LolPlugin.getInstance().getChampionManager().getChampion(c).getAbility(2).getLevel()) : 1;
-                double[] bonus={25,40,55,70,85};
-                double coneDmg = bonus[Math.min(wlvl-1,4)] + s.getFinalAP()*0.15;
+                double[] bonus={15,25,35,45,55};
+                double coneDmg = bonus[Math.min(wlvl-1,4)] + s.getFinalAP()*0.30 + s.getFinalArmor()*0.15;
                 for (var e : TargetingUtil.enemiesAround(c, 3.0))
                     TargetingUtil.dealDamage(c, e, coneDmg, TargetingUtil.DmgType.PHYSICAL);
                 fr.lolmc.util.VisualEffectUtil.impact(c.getWorld(),
@@ -65,22 +69,24 @@ public final class Malphite extends BaseChampion implements fr.lolmc.champion.ba
             new double[]{8,7.5,7,6.5,6},20,0,DamageType.MAGICAL);
             resourceCost = 70;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            org.bukkit.entity.LivingEntity tgt = (t!=null && TargetingUtil.isEnemy(c,t))?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null){c.sendActionBar(Component.text("🪨 Aucune cible",NamedTextColor.GRAY));return;}
+            org.bukkit.entity.LivingEntity tgt = (t!=null && TargetingUtil.isEnemy(c,t))?t:TargetingUtil.getTargetedEnemy(c,6.9); if(tgt==null){cancelCast();c.sendActionBar(Component.text("🪨 Aucune cible",NamedTextColor.GRAY));return;}
             double[] base=fr.lolmc.util.Balance.base("q_malphite",new double[]{70,120,170,220,270});
             double dmg=base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("q_malphite","ap",0.6);
             TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.MAGICAL);
             // LoL : slow 30/35/40/45/50% sur 3s (60 ticks), Malphite vole la vitesse
             int qrank=getLevel()-1;
-            int slowAmp=(qrank>=3)?2:1; // ~30-50% via amplifier
-            if(tgt instanceof Player __p) __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,60,slowAmp,false,true));
-            c.addPotionEffect(new PotionEffect(PotionEffectType.SPEED,60,slowAmp,false,true)); // vol de vitesse 3s
+            // Wiki : ralentit 20-40 % pendant 3 s et Malphite gagne cette vitesse
+            double slowPct=new double[]{0.20,0.25,0.30,0.35,0.40}[qrank];
+            fr.lolmc.LolPlugin.getInstance().getCCManager().slowPct(tgt, slowPct, 60);
+            fr.lolmc.LolPlugin.getInstance().getCCManager().speedPct(c, slowPct, 60);
             fr.lolmc.util.VisualEffectUtil.impactBurst(tgt.getWorld(),
                     tgt.getLocation().add(0,1,0), Material.STONE, 0.28f, 0.3, 6, 5L);
             c.getWorld().playSound(c.getLocation(), Sound.BLOCK_STONE_BREAK, 1f, 0.8f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            return String.format("%.0f dégâts magiques (70+60%%AP+10%%HP). Ralentit 2s.",
-                70+s.getFinalAP()*fr.lolmc.util.Balance.ratio("q_malphite","ap",0.6)+s.getFinalMaxHP()*0.1);
+            double[] base=fr.lolmc.util.Balance.base("q_malphite",new double[]{70,120,170,220,270});
+            return String.format("%.0f dégâts magiques (+60%%AP). Ralentit 3s et vole la vitesse.",
+                base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("q_malphite","ap",0.6));
         }
     }
 
@@ -100,8 +106,8 @@ public final class Malphite extends BaseChampion implements fr.lolmc.champion.ba
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_LIGHTNING_BOLT_THUNDER, 0.6f, 1.5f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            double[] bonus={25,40,55,70,85};int r=getLevel()-1;
-            return String.format("6s : tes attaques frappent en cône (+%.0f +15%%AP).",bonus[r]+s.getFinalAP()*0.15);
+            double[] bonus={15,25,35,45,55};int r=getLevel()-1;
+            return String.format("6s : tes attaques frappent en cône (%.0f, +30%%AP +15%%armure).",bonus[r]+s.getFinalAP()*0.30+s.getFinalArmor()*0.15);
         }
     }
 
@@ -132,16 +138,15 @@ public final class Malphite extends BaseChampion implements fr.lolmc.champion.ba
             new double[]{130,105,80},6.5,4,DamageType.MAGICAL);
             resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            org.bukkit.entity.LivingEntity tgt = (t!=null && TargetingUtil.isEnemy(c,t))?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null)return;
+            org.bukkit.entity.LivingEntity tgt = (t!=null && TargetingUtil.isEnemy(c,t))?t:TargetingUtil.getTargetedEnemy(c,10.0); if(tgt==null){cancelCast();return;} // 1000 unités
             Location dest=safeTeleport(c.getLocation(),tgt.getLocation());
             c.teleport(dest);
             // LoL : 200/300/400 + 90% AP, knockup + stun 1.5s (30 ticks)
             double[] baseR={200,300,400};int rr=Math.min(getLevel()-1,2);double dmg=baseR[rr]+s.getFinalAP()*0.9;
             var cc=LolPlugin.getInstance().getCCManager();
-            for(var __t : TargetingUtil.enemiesAround(c, 4.0)){
+            for(var __t : TargetingUtil.enemiesAround(c, 3.9)){ // rayon 325 (wiki)
                 TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);
-                __t.setVelocity(new Vector(0,1.2,0));
-                if(cc!=null) cc.stun(__t, 30); // stun 1.5s
+                if(cc!=null){ cc.setAirborne(__t, 30); cc.stun(__t, 30); } // projeté 1.5 s (wiki)
                 if(__t instanceof Player __p)
                     __p.sendActionBar(Component.text("🪨 KNOCKUP + STUN Malphite!",NamedTextColor.DARK_GRAY));
             }

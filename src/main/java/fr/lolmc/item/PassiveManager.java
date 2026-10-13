@@ -99,7 +99,7 @@ public class PassiveManager {
                 }
                 // Janna : Grâce de la Tempête (vitesse de déplacement bonus = 8% AS)
                 if ("janna".equals(ch.getId())) {
-                    fr.lolmc.champion.impl.support.Janna.tickJannaPassive(ch);
+                    fr.lolmc.champion.impl.support.Janna.tickJannaPassive(p);
                 }
                 // Blitzcrank : Statique Mana (bouclier d'urgence sous 20% HP)
                 if ("blitzcrank".equals(ch.getId())) {
@@ -438,10 +438,10 @@ public class PassiveManager {
         }
 
         // ── Leona Lumière du Soleil : allié frappe cible marquée ──
-        if (fr.lolmc.champion.impl.support.Leona.consumeMark(victim)) {
+        if (fr.lolmc.champion.impl.support.Leona.consumeMark(attacker, victim)) {
             var cm2 = LolPlugin.getInstance().getChampionManager();
             int lvl2 = cm2.hasChampion(attacker) ? cm2.getChampion(attacker).getLevelSystem().getLevel() : 1;
-            double sunDmg = 35 + lvl2 * 2.6; // 35-80 selon le niveau
+            double sunDmg = 32 + (151 - 32) * (lvl2 - 1) / 17.0; // 32-151 selon le niveau (wiki)
             TargetingUtil.dealDamage(attacker, victim, sunDmg, TargetingUtil.DmgType.MAGICAL);
             attacker.sendActionBar(Component.text(
                     "☀ Lumière du Soleil! +" + (int)sunDmg, NamedTextColor.YELLOW));

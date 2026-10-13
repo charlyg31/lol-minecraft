@@ -20,14 +20,14 @@ import java.util.*;
 public final class LeeSin extends BaseChampion implements fr.lolmc.champion.base.StatefulChampion {
     public LeeSin() {
         super("leesin", "Lee Sin", ChampionRole.JUNGLE,
-                new ChampionStats(645,68,0,36,32,0.651,0,345,1.25,7.5));
-        getStats().setGrowthStats(109.0,3.7,4.5,2.05,0.03000,0.70);
-        setAutoAttackRange(2.7);
+                new ChampionStats(645,66,0,36,32,0.651,0,345,1.25,7.5));
+        getStats().setGrowthStats(108,3.4,4.5,2.05,0.03,0.7);
+        setLolAttackRange(125); // stats LoL (wiki)
     }
     @Override protected void registerAbilities() {
         setAbility(0,new AA()); setAbility(1,new Q());
         setAbility(2,new W()); setAbility(3,new E()); setAbility(4,new R());
-        initSystems(570, 8.0, ResourceSystem.ResourceType.ENERGY, 200, 50.0);
+        initSystems(7.5, ResourceSystem.ResourceType.ENERGY, 200, 0, 50, 0);
     }
 
     // Passif Flurry : après chaque sort, les 2 prochaines AA restituent 15 énergie
@@ -46,9 +46,13 @@ public final class LeeSin extends BaseChampion implements fr.lolmc.champion.base
                 flurryCharges.put(c.getUniqueId(), charges - 1);
                 var cm = LolPlugin.getInstance().getChampionManager();
                 if (cm.hasChampion(c)) {
-                    cm.getChampion(c).getResourceSystem().addCurrent(15);
+                    // Wiki : 20/30/40 énergie à la 1re attaque, 10/15/20 à la 2e (selon le niveau)
+                    int lvl = cm.getChampion(c).getLevelSystem().getLevel();
+                    int tier = lvl >= 13 ? 2 : lvl >= 7 ? 1 : 0;
+                    int gain = charges == 2 ? new int[]{20,30,40}[tier] : new int[]{10,15,20}[tier];
+                    cm.getChampion(c).getResourceSystem().addCurrent(gain);
                     c.sendActionBar(net.kyori.adventure.text.Component.text(
-                        "⚡ Flurry! +15 énergie (" + (charges-1) + " charge restante)",
+                        "⚡ Rafale! +" + gain + " énergie (" + (charges-1) + " charge restante)",
                         net.kyori.adventure.text.format.NamedTextColor.YELLOW));
                 }
             }
@@ -72,26 +76,33 @@ public final class LeeSin extends BaseChampion implements fr.lolmc.champion.base
                 org.bukkit.entity.LivingEntity tgt=null;
                 for(var e: c.getWorld().getNearbyLivingEntities(c.getLocation(),15)) if(e.getUniqueId().equals(marked)) tgt=e;
                 if(tgt!=null){
-                    var dest=tgt.getLocation().clone().subtract(tgt.getLocation().getDirection().multiply(1.0));
-                    dest.setY(c.getLocation().getY());
-                    c.teleport(dest);
+                    dashTo(c, tgt, -1.0);
                     double[] base=fr.lolmc.util.Balance.base("q_leesin",new double[]{60,90,120,150,180});
 
                     double missingPct=1.0-(TargetingUtil.getRealHealth(tgt)/Math.max(1, TargetingUtil.getRealMaxHealth(tgt)));
-                    double dmg=(base[getLevel()-1]+s.getFinalAD()*fr.lolmc.util.Balance.ratio("q_leesin","ad",0.9))*(1.0+missingPct);
+                    double dmg=(base[getLevel()-1]+s.getBonusAD()*fr.lolmc.util.Balance.ratio("q_leesin","ad",0.9))*(1.0+missingPct);
                     TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.PHYSICAL);
                     c.getWorld().playSound(c.getLocation(), Sound.ENTITY_PLAYER_ATTACK_CRIT, 1f, 0.9f);
                 }
                 sonicTarget.remove(c.getUniqueId());
                 return;
             }
-            double[] base=fr.lolmc.util.Balance.base("q_leesin",new double[]{60,90,120,150,180});double dmg=base[getLevel()-1]+s.getFinalAD()*fr.lolmc.util.Balance.ratio("q_leesin","ad",0.9);
+            double[] base=fr.lolmc.util.Balance.base("q_leesin",new double[]{60,90,120,150,180});double dmg=base[getLevel()-1]+s.getBonusAD()*fr.lolmc.util.Balance.ratio("q_leesin","ad",0.9);
             var hits=TargetingUtil.skillshot(c, 12.0, 0.8, false);
             if(hits.isEmpty()){c.sendActionBar(Component.text("🌊 Onde Sonique manquée!",NamedTextColor.GRAY));return;}
             var tgt=hits.getFirst();
             TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.PHYSICAL);
             sonicTarget.put(c.getUniqueId(), tgt.getUniqueId());
-            new BukkitRunnable(){@Override public void run(){sonicTarget.remove(c.getUniqueId());}}.runTaskLater(LolPlugin.getInstance(),60L);
+            // Recharge différée : la 2e activation (Coup Résonnant) reste possible 3 s ; avant, la
+            // recharge partait au 1er lancer et la marque expirait avant de pouvoir relancer
+            deferCooldown();
+            final BaseAbility q = this; final UUID markedId = tgt.getUniqueId();
+            new BukkitRunnable(){@Override public void run(){
+                if(markedId.equals(sonicTarget.get(c.getUniqueId()))){
+                    sonicTarget.remove(c.getUniqueId());
+                    q.triggerCooldown(c, s);
+                }
+            }}.runTaskLater(LolPlugin.getInstance(),60L);
             if(tgt instanceof Player _tp)_tp.sendActionBar(Component.text("🌊 Onde Sonique! (recast pour dash)",NamedTextColor.YELLOW));
             fr.lolmc.util.VisualEffectUtil.impact(c.getWorld(),
                     tgt.getLocation().add(0,1,0), Material.LIGHT_GRAY_STAINED_GLASS, 0.4f, 5L);
@@ -99,7 +110,7 @@ public final class LeeSin extends BaseChampion implements fr.lolmc.champion.base
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] base=fr.lolmc.util.Balance.base("q_leesin",new double[]{60,90,120,150,180});
-            return String.format("Skillshot: %.0f dégâts (+90%%AD). Recast = dash + bonus PV manquants.",base[getLevel()-1]+s.getFinalAD()*fr.lolmc.util.Balance.ratio("q_leesin","ad",0.9));
+            return String.format("Skillshot: %.0f dégâts (+90%%AD bonus). Recast = dash + bonus PV manquants.",base[getLevel()-1]+s.getBonusAD()*fr.lolmc.util.Balance.ratio("q_leesin","ad",0.9));
         }
     }
 
@@ -148,12 +159,12 @@ public final class LeeSin extends BaseChampion implements fr.lolmc.champion.base
         @Override public void cast(Player c,ChampionStats s,Player t){
             fr.lolmc.champion.impl.jungle.LeeSin.onSpellCast(c.getUniqueId()); // Flurry
 
-            double[] base=fr.lolmc.util.Balance.base("e_leesin",new double[]{35,60,85,110,135});double dmg=base[getLevel()-1]+s.getFinalAD()*fr.lolmc.util.Balance.ratio("e_leesin","ad",0.9);
-            for(var __t : TargetingUtil.enemiesAround(c, 4.0)){
+            double[] base=fr.lolmc.util.Balance.base("e_leesin",new double[]{35,60,85,110,135});double dmg=base[getLevel()-1]+s.getBonusAD()*fr.lolmc.util.Balance.ratio("e_leesin","ad",0.9);
+            for(var __t : TargetingUtil.enemiesAround(c, 5.0)){ // rayon 450 (wiki)
                 TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);
                 if(__t instanceof Player __p){
-                    int slowAmp=Math.min(4, 1+getLevel()/2); // ~35-75% selon rang
-                    __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,80,slowAmp,false,true)); // decay 4s
+                    // Boiterie (wiki) : 35-75 %, décroît sur 4 s
+                    fr.lolmc.LolPlugin.getInstance().getCCManager().slowDecaying(__p, new double[]{0.35,0.45,0.55,0.65,0.75}[getLevel()-1], 80);
                 }
             }
             fr.lolmc.util.VisualEffectUtil.impactBurst(c.getWorld(),
@@ -162,7 +173,7 @@ public final class LeeSin extends BaseChampion implements fr.lolmc.champion.base
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] base=fr.lolmc.util.Balance.base("e_leesin",new double[]{35,60,85,110,135});
-            return String.format("%.0f dégâts magiques autour (+90%%AD) + ralentit (Boiterie).",base[getLevel()-1]+s.getFinalAD()*fr.lolmc.util.Balance.ratio("e_leesin","ad",0.9));
+            return String.format("%.0f dégâts magiques autour (+90%%AD bonus) + ralentit (Boiterie).",base[getLevel()-1]+s.getBonusAD()*fr.lolmc.util.Balance.ratio("e_leesin","ad",0.9));
         }
     }
 
@@ -171,25 +182,32 @@ public final class LeeSin extends BaseChampion implements fr.lolmc.champion.base
                 new double[]{110,85,60},5,0,DamageType.PHYSICAL);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            org.bukkit.entity.LivingEntity tgt = (t!=null && TargetingUtil.isEnemy(c,t))?t:TargetingUtil.getTargetedEnemy(c,4.0); if(tgt==null){c.sendActionBar(Component.text("🐉 Aucune cible visée",NamedTextColor.GRAY));return;}
-            double[] base=fr.lolmc.util.Balance.base("r_leesin",new double[]{150,300,450});
+            org.bukkit.entity.LivingEntity tgt = (t!=null && TargetingUtil.isEnemy(c,t))?t:TargetingUtil.getTargetedEnemy(c,4.4); if(tgt==null){cancelCast();c.sendActionBar(Component.text("🐉 Aucune cible visée",NamedTextColor.GRAY));return;}
+            double[] base=fr.lolmc.util.Balance.base("r_leesin",new double[]{175,400,625});
             int r=Math.min(getLevel()-1,2);
-            double dmg=base[r]+s.getFinalAD()*fr.lolmc.util.Balance.ratio("r_leesin","ad",2.0);
+            double dmg=base[r]+s.getBonusAD()*fr.lolmc.util.Balance.ratio("r_leesin","ad",2.0);
+            // Ennemis percutés : + 12/15/18 % des PV bonus de la cible projetée (wiki)
+            double kickedBonusHP=0;
+            var cmR=LolPlugin.getInstance().getChampionManager();
+            if(tgt instanceof Player kp && cmR.hasChampion(kp)) kickedBonusHP=cmR.getChampion(kp).getStats().getBonusHP();
+            double collideDmg=dmg+kickedBonusHP*new double[]{0.12,0.15,0.18}[r];
             TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.PHYSICAL);
             Vector dir=tgt.getLocation().toVector().subtract(c.getLocation().toVector()).normalize();
-            Vector kb=dir.clone().multiply(2.5); kb.setY(0.8); tgt.setVelocity(kb);
+            Vector kb=dir.clone().multiply(2.5); kb.setY(0.8);
+            fr.lolmc.LolPlugin.getInstance().getCCManager().setAirborne(tgt, 20); // projeté 1 s (wiki)
+            tgt.setVelocity(kb);
             Location landing=tgt.getLocation().clone().add(dir.clone().multiply(4));
             for(var __t : TargetingUtil.entitiesInRadius(c, landing, 3.0)){
                 if(__t.equals(tgt)) continue;
-                TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.PHYSICAL);
-                __t.setVelocity(new Vector(0,1.0,0));
+                TargetingUtil.dealDamage(c, __t, collideDmg, TargetingUtil.DmgType.PHYSICAL);
+                fr.lolmc.LolPlugin.getInstance().getCCManager().setAirborne(__t, 20); // percuté : projeté 1 s
             }
             if(tgt instanceof Player _tp)_tp.sendMessage(Component.text("🐉 FURIE DU DRAGON!",NamedTextColor.RED));
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_ENDER_DRAGON_GROWL, 1f, 1.2f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            double[] base=fr.lolmc.util.Balance.base("r_leesin",new double[]{150,300,450});int r=Math.min(getLevel()-1,2);
-            return String.format("Kick: %.0f dégâts (+200%%AD), projette la cible. Ennemis percutés: mêmes dégâts + knockup.",base[r]+s.getFinalAD()*fr.lolmc.util.Balance.ratio("r_leesin","ad",2.0));
+            double[] base=fr.lolmc.util.Balance.base("r_leesin",new double[]{175,400,625});int r=Math.min(getLevel()-1,2);
+            return String.format("Kick: %.0f dégâts (+200%%AD bonus), projette la cible. Ennemis percutés: + %% PV bonus de la cible.",base[r]+s.getBonusAD()*fr.lolmc.util.Balance.ratio("r_leesin","ad",2.0));
         }
     }
 }

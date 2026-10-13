@@ -19,14 +19,14 @@ import java.util.*;
 public final class Nasus extends BaseChampion implements fr.lolmc.champion.base.StatefulChampion {
     public Nasus() {
         super("nasus", "Nasus", ChampionRole.TOP,
-            new ChampionStats(631,67,0,34,32,0.638,0,350,1.25,9.0));
-        getStats().setGrowthStats(104.0,3.5,4.3,2.05,0.03480,0.90);
-        setAutoAttackRange(2.7);
+            new ChampionStats(650,67,0,34,32,0.638,0,350,1.25,9));
+        getStats().setGrowthStats(104,4,4.7,2.05,0.0348,0.9);
+        setLolAttackRange(125); // stats LoL (wiki)
     }
     @Override protected void registerAbilities() {
         setAbility(0,new AA()); setAbility(1,new Q());
         setAbility(2,new W()); setAbility(3,new E()); setAbility(4,new R());
-        initSystems(616, 9.0, ResourceSystem.ResourceType.MANA, 380, 9.0);
+        initSystems(9, ResourceSystem.ResourceType.MANA, 326, 62, 7.45, 0.5);
     }
 
     // Stacks Q globaux par UUID
@@ -43,7 +43,7 @@ public final class Nasus extends BaseChampion implements fr.lolmc.champion.base.
             var cm = LolPlugin.getInstance().getChampionManager();
             if (cm.hasChampion(c)) {
                 int lvl = cm.getChampion(c).getLevelSystem().getLevel();
-                double vamp = lvl >= 13 ? 0.24 : (lvl >= 7 ? 0.18 : 0.12);
+                double vamp = lvl >= 13 ? 0.20 : (lvl >= 7 ? 0.15 : 0.10);
                 cm.getChampion(c).getHPSystem().heal(dmg * vamp);
             }
         }
@@ -54,17 +54,20 @@ public final class Nasus extends BaseChampion implements fr.lolmc.champion.base.
             new double[]{8,7,6,5,4},5,0,DamageType.PHYSICAL);
             resourceCost = 20;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            org.bukkit.entity.LivingEntity tgt = (t!=null && TargetingUtil.isEnemy(c,t))?t:TargetingUtil.getTargetedEnemy(c,2.5); if(tgt==null){c.sendActionBar(Component.text("💀 Aucune cible",NamedTextColor.GRAY));return;}
+            org.bukkit.entity.LivingEntity tgt = (t!=null && TargetingUtil.isEnemy(c,t))?t:TargetingUtil.getTargetedEnemy(c,2.5); if(tgt==null){cancelCast();c.sendActionBar(Component.text("💀 Aucune cible",NamedTextColor.GRAY));return;}
             // LoL : AD + bonus par rang (30/50/70/90/110) + stacks permanents
-            double[] bonus={40,60,80,100,120};
+            double[] bonus={30,50,70,90,110}; // wiki
             int stacks=qStacks.getOrDefault(c.getUniqueId(),0);
             double dmg=s.getFinalAD()+bonus[getLevel()-1]+stacks;
-            boolean kills = TargetingUtil.getRealHealth(tgt)-dmg<=0;
             TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.PHYSICAL);
-            // Stacks : +12 sur champion/gros monstre tué, +3 sinon (plafonné pour éviter un scaling infini)
+            // Kill vérifié après les dégâts (avant : sur les dégâts bruts, sans l'armure)
+            boolean kills = tgt.isDead() || TargetingUtil.getRealHealth(tgt) <= 0;
+            // Stacks (wiki) : +10 sur champion, gros sbire (canon/super) ou gros monstre, +4 sinon
             if(kills){
-                boolean big = (tgt instanceof Player) || fr.lolmc.game.JungleManager.isJungleMonster(tgt);
-                qStacks.merge(c.getUniqueId(), big?12:3, Integer::sum);
+                String mt = fr.lolmc.game.MinionManager.getMinionTypeTag(tgt);
+                boolean big = (tgt instanceof Player) || fr.lolmc.game.JungleManager.isJungleMonster(tgt)
+                        || "cannon".equals(mt) || "super".equals(mt);
+                qStacks.merge(c.getUniqueId(), big?10:4, Integer::sum);
                 if(qStacks.get(c.getUniqueId()) > MAX_Q_STACKS) qStacks.put(c.getUniqueId(), MAX_Q_STACKS);
                 c.sendActionBar(Component.text("💀 Stacks Q: "+qStacks.get(c.getUniqueId()),NamedTextColor.GOLD));
             }
@@ -73,8 +76,8 @@ public final class Nasus extends BaseChampion implements fr.lolmc.champion.base.
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_SKELETON_HURT, 1f, 0.6f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            double[] bonus={40,60,80,100,120};
-            return String.format("AD + %.0f + stacks. +3/kill (+12 champion/gros). RESET attaque.",bonus[getLevel()-1]);
+            double[] bonus={30,50,70,90,110};
+            return String.format("AD + %.0f + stacks. +4/kill (+10 champion/gros). RESET attaque.",bonus[getLevel()-1]);
         }
     }
 
@@ -83,15 +86,17 @@ public final class Nasus extends BaseChampion implements fr.lolmc.champion.base.
             new double[]{15,14,13,12,11},6.0,0,DamageType.MAGICAL);
             resourceCost = 80;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            org.bukkit.entity.LivingEntity tgt = (t!=null && TargetingUtil.isEnemy(c,t))?t:TargetingUtil.getTargetedEnemy(c,6.0); if(tgt==null){c.sendActionBar(Component.text("💀 Aucune cible",NamedTextColor.GRAY));return;}
+            org.bukkit.entity.LivingEntity tgt = (t!=null && TargetingUtil.isEnemy(c,t))?t:TargetingUtil.getTargetedEnemy(c,7.5); if(tgt==null){cancelCast();c.sendActionBar(Component.text("💀 Aucune cible",NamedTextColor.GRAY));return;}
             // LoL : ralentit 35% montant jusqu'à 95% sur 5s (+ ralentit vitesse d'attaque)
             // Approximation : lenteur progressive (amplifier croît) sur 5s
             new BukkitRunnable(){
                 int sec=0;
                 @Override public void run(){
                     if(sec>=5 || tgt.isDead()){cancel();return;}
-                    int amp=2+sec; // amplifier croît -> ralentissement de plus en plus fort
-                    tgt.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,25,Math.min(amp,6),false,true));
+                    // Wiki : +3/6/9/12/15 % par seconde jusqu'à 47/59/71/83/95 %
+                    double[] maxSlow={0.47,0.59,0.71,0.83,0.95}; double[] perSec={0.03,0.06,0.09,0.12,0.15};
+                    int r=getLevel()-1;
+                    fr.lolmc.LolPlugin.getInstance().getCCManager().slowPct(tgt, maxSlow[r]-perSec[r]*(4-sec), 25);
                     fr.lolmc.util.VisualEffectUtil.impact(tgt.getWorld(),
                             tgt.getLocation().add(0,1,0), Material.GRAY_STAINED_GLASS, 0.26f, 8L);
                     sec++;
@@ -100,7 +105,7 @@ public final class Nasus extends BaseChampion implements fr.lolmc.champion.base.
             if(tgt instanceof Player _tp)_tp.sendActionBar(Component.text("💀 Flétri! Ralentissement croissant",NamedTextColor.DARK_PURPLE));
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_WITHER_SHOOT, 0.8f, 1.5f);
         }
-        @Override public String getDynamicDescription(ChampionStats s){return "Ralentit 35%% montant à 95%% sur 5s (déplacement + vitesse d'attaque).";}
+        @Override public String getDynamicDescription(ChampionStats s){return "Ralentit 35% montant à 95% sur 5s (déplacement + vitesse d'attaque).";}
     }
 
     static class E extends BaseAbility {
@@ -109,7 +114,7 @@ public final class Nasus extends BaseChampion implements fr.lolmc.champion.base.
             resourceCost = 70;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : burst initial + dot/s pendant 5s + réduction armure 30-50%
-            Location loc=TargetingUtil.getAimedGroundLocation(c, 8.0);
+            Location loc=TargetingUtil.getAimedGroundLocation(c, 7.0); // 650 unités
             int rank=getLevel()-1;
             double[] burstBase={50,80,110,140,170};
             double[] dotBase={10,16,22,28,34};
@@ -118,12 +123,12 @@ public final class Nasus extends BaseChampion implements fr.lolmc.champion.base.
             // Délai 0.264s (5 ticks) avant le burst initial — LoL
             c.getWorld().playSound(loc, Sound.ENTITY_BLAZE_SHOOT, 1f, 0.8f);
             new BukkitRunnable(){@Override public void run(){
-                for(var __t : TargetingUtil.entitiesInRadius(c, loc, 3.5))
+                for(var __t : TargetingUtil.entitiesInRadius(c, loc, 4.0))
                     TargetingUtil.dealDamage(c, __t, burst, TargetingUtil.DmgType.MAGICAL);
             }}.runTaskLater(LolPlugin.getInstance(), 5L);
             // Zone persistante 5s : dot/s + réduction d'armure 25-45 %
             // (la potion Faiblesse n'avait aucun effet sur les dégâts LoL)
-            double[] shredPct={0.25,0.30,0.35,0.40,0.45};
+            double[] shredPct={0.30,0.35,0.40,0.45,0.50}; // wiki
             double shred=shredPct[rank];
             var shredded=new java.util.HashMap<java.util.UUID, Double>(); // champion -> armure retirée
             var cmE=LolPlugin.getInstance().getChampionManager();
@@ -138,7 +143,7 @@ public final class Nasus extends BaseChampion implements fr.lolmc.champion.base.
                         }
                         cancel();return;
                     }
-                    for(var __t : TargetingUtil.entitiesInRadius(c, loc, 3.5)){
+                    for(var __t : TargetingUtil.entitiesInRadius(c, loc, 4.0)){
                         TargetingUtil.dealDamage(c, __t, perSec, TargetingUtil.DmgType.MAGICAL);
                         if(__t instanceof Player __p && cmE.hasChampion(__p) && !shredded.containsKey(__p.getUniqueId())){
                             var st=cmE.getChampion(__p).getStats();
@@ -155,7 +160,7 @@ public final class Nasus extends BaseChampion implements fr.lolmc.champion.base.
         }
         @Override public String getDynamicDescription(ChampionStats s){
             int rank=getLevel()-1;double[] burstBase={50,80,110,140,170};double[] dotBase={10,16,22,28,34};
-            return String.format("Burst %.0f (+60%%AP) puis %.0f/s sur 5s (+12%%AP). Armure -30-50%%.",burstBase[rank]+s.getFinalAP()*0.6,dotBase[rank]+s.getFinalAP()*0.12);
+            return String.format("Burst %.0f (+60%%AP) puis %.0f/s sur 5s (+12%%AP). Armure -30 à -50%%.",burstBase[rank]+s.getFinalAP()*0.6,dotBase[rank]+s.getFinalAP()*0.12);
         }
     }
 
@@ -169,7 +174,7 @@ public final class Nasus extends BaseChampion implements fr.lolmc.champion.base.
             double[] hpBonus={300,450,600};
             double[] pctArr={0.03,0.04,0.05};
             double pctHP=pctArr[rank]; // 3/4/5% HP max/s
-            double[] resists={15,35,55};
+            double[] resists={40,55,70}; // wiki
             double resist=resists[Math.min(rank,2)];
             c.sendActionBar(Component.text("☀ Furie des Sables! (15s, Q -50%% CD)",NamedTextColor.GOLD));
             // Bonus HP réel (300/450/600 selon rang), jamais appliqué auparavant
@@ -194,10 +199,10 @@ public final class Nasus extends BaseChampion implements fr.lolmc.champion.base.
                         }
                         cancel();return;
                     }
-                    for(var __t : TargetingUtil.entitiesInRadius(c, c.getLocation(), 3)){
+                    for(var __t : TargetingUtil.entitiesInRadius(c, c.getLocation(), 4.0)){
                         double tgtMaxHP = 200; // défaut sbire/monstre
                         if(__t instanceof Player __p && cm.hasChampion(__p)) tgtMaxHP=cm.getChampion(__p).getHPSystem().getMaxHP();
-                        double dmg=Math.min(tgtMaxHP*pctHP, 120); // cap 240/s sur 2 ticks
+                        double dmg=Math.min(tgtMaxHP*(pctHP+s.getFinalAP()/100*0.01), 240); // plafond 240/s (wiki)
                         TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);
                     }
                     tick+=20;
@@ -205,7 +210,7 @@ public final class Nasus extends BaseChampion implements fr.lolmc.champion.base.
             }.runTaskTimer(LolPlugin.getInstance(),0L,20L);
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            return "15s : +HP/Armure/MR, draine 3-5%% PV max des ennemis autour/s, Q -50%% CD.";
+            return "15s : +HP/Armure/MR, draine 3-5% PV max des ennemis autour/s, Q -50% CD.";
         }
     }
 }

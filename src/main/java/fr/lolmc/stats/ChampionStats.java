@@ -144,7 +144,9 @@ public final class ChampionStats {
     public double getHealShieldPower() { return healShieldPower; }
     public void addHealShieldPower(double v) { healShieldPower = Math.max(0, healShieldPower + v); }
 
-    public double getFinalAttackSpeed()  { return Math.min((baseAttackSpeed + growthBonus(growthAttackSpeed) + bonusAttackSpeed) * multAttackSpeed, 2.5); }
+    // LoL : vitesse = base × (1 + croissance % + bonus %) (avant : croissance et bonus ajoutés en
+    // valeur absolue, donc +25 % d'objet donnaient +0.25 attaque/s au lieu de +25 % de la base)
+    public double getFinalAttackSpeed()  { return Math.min(baseAttackSpeed * (1 + growthBonus(growthAttackSpeed) + bonusAttackSpeed) * multAttackSpeed, 2.5); }
     public double getFinalCritChance()   { return Math.min(baseCritChance + bonusCritChance * critChanceMultiplier, 1.0); }
 
     /** Multiplicateur des chances de critique des objets (Yasuo : x2, Voie du Vagabond). */
@@ -154,6 +156,10 @@ public final class ChampionStats {
     public double getFinalMovementSpeed(){ return (baseMovementSpeed + bonusMovementSpeed) * multMovementSpeed; }
     public double getFinalRange()        { return baseRange + bonusRange; }
     public double getFinalHPRegen()      { return baseHPRegen + growthBonus(growthHPRegen) + bonusHPRegen; }
+    /** Part de la régénération de PV due au niveau (croissance LoL). */
+    public double getHPRegenGrowth()     { return growthBonus(growthHPRegen); }
+    /** Croissance LoL d'une stat quelconque au niveau actuel (même formule que les stats). */
+    public double growthAt(double g)     { return growthBonus(g); }
     public double getFinalLethality()    { return baseLethality + bonusLethality; }
     public double getFinalLifeSteal()    { return Math.min(bonusLifeSteal, 1.0); }
     public double getFinalOmnivamp()     { return Math.min(bonusOmnivamp, 1.0); }
@@ -286,6 +292,7 @@ public final class ChampionStats {
         return true;
     }
     public double getShield()                   { return shieldAmount + magicShieldAmount; }
+    public double getMagicShield()              { return magicShieldAmount; }
 
     /**
      * Absorbe des dégâts avec les boucliers. Retourne les dégâts restants à infliger aux HP.

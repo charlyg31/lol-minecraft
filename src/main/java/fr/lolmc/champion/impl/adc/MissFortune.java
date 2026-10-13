@@ -18,8 +18,9 @@ import org.bukkit.scheduler.BukkitRunnable;
 public final class MissFortune extends BaseChampion implements fr.lolmc.champion.base.StatefulChampion {
     public MissFortune() {
         super("missfortune", "Miss Fortune", ChampionRole.ADC,
-            new ChampionStats(640,52,0,28,30,0.656,0,325,5.5,3.8));
-        getStats().setGrowthStats(103.0,3.0,4.5,1.30,0.03010,0.65);
+            new ChampionStats(625,55,0,25,33,0.656,0,325,5.5,3.75));
+        getStats().setGrowthStats(100,2.4,4,1.1,0.03,0.65);
+        setLolAttackRange(550); // stats LoL (wiki)
     }
     @Override public void resetState(java.util.UUID id) { lastTarget.remove(id); }
     @Override public void resetAllState() { lastTarget.clear(); }
@@ -27,8 +28,7 @@ public final class MissFortune extends BaseChampion implements fr.lolmc.champion
     @Override protected void registerAbilities() {
         setAbility(0,new AA()); setAbility(1,new Q());
         setAbility(2,new W()); setAbility(3,new E()); setAbility(4,new R());
-        initSystems(523, 3.0, ResourceSystem.ResourceType.NONE, 0, 0.0);
-        setAutoAttackRange(10.0);
+        initSystems(3.75, ResourceSystem.ResourceType.MANA, 300, 40, 8, 0.8);
     }
 
     // Passif Love Tap : première AA sur une nouvelle cible inflige 50-110% AD bonus physiques
@@ -42,7 +42,8 @@ public final class MissFortune extends BaseChampion implements fr.lolmc.champion
                 // Nouvelle cible : Love Tap, 49-105% AD selon niveau (LoL)
                 var cm0=LolPlugin.getInstance().getChampionManager();
                 int lvl=cm0.hasChampion(c)?cm0.getChampion(c).getLevelSystem().getLevel():1;
-                double lovePct=0.49+(1.05-0.49)*((lvl-1)/17.0); // interpolation 49%→105%
+                double lovePct=0.50+(1.00-0.50)*((lvl-1)/17.0); // 50 % → 100 % AD (wiki)
+                if (!(tgt instanceof Player)) lovePct *= 0.5;     // moitié contre les sbires
                 double bonusDmg = s.getFinalAD() * lovePct;
                 fr.lolmc.util.TargetingUtil.dealDamage(c, tgt, bonusDmg, fr.lolmc.util.TargetingUtil.DmgType.PHYSICAL);
                 fr.lolmc.util.VisualEffectUtil.impact(c.getWorld(),
@@ -58,11 +59,12 @@ public final class MissFortune extends BaseChampion implements fr.lolmc.champion
             resourceCost = 43;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : tir sur 1 cible qui ricoche sur celle derrière. 1ère: 20-100+100%AD. 2ème: 20-80+85%AD +crit
-            org.bukkit.entity.LivingEntity tgt = (t!=null && TargetingUtil.isEnemy(c,t))?t:TargetingUtil.getTargetedEnemy(c,6.0); if(tgt==null){c.sendActionBar(Component.text("🔫 Aucune cible",NamedTextColor.GRAY));return;}
-            double[] base=fr.lolmc.util.Balance.base("q_missfortune",new double[]{20,40,60,80,100});double d1=base[getLevel()-1]+s.getFinalAD();
+            org.bukkit.entity.LivingEntity tgt = (t!=null && TargetingUtil.isEnemy(c,t))?t:TargetingUtil.getTargetedEnemy(c,6.2); if(tgt==null){cancelCast();c.sendActionBar(Component.text("🔫 Aucune cible",NamedTextColor.GRAY));return;}
+            // Wiki : 20-120 (+100 % AD +35 % AP) ; la balle ricoche avec les mêmes dégâts, critique
+            // (×1.5) si la 1re cible meurt
+            double[] base=fr.lolmc.util.Balance.base("q_missfortune",new double[]{20,45,70,95,120});double d1=base[getLevel()-1]+s.getFinalAD()+s.getFinalAP()*0.35;
             TargetingUtil.dealDamage(c, tgt, d1, TargetingUtil.DmgType.PHYSICAL);
-            // Ricochet : 2e cible la plus proche derrière la 1ère
-            double[] base2={20,35,50,65,80};double d2=(base2[getLevel()-1]+s.getFinalAD()*0.85)*1.35;
+            double d2 = (tgt.isDead() || TargetingUtil.getRealHealth(tgt) <= 0) ? d1*1.5 : d1;
             org.bukkit.entity.LivingEntity second=null; double best=Double.MAX_VALUE;
             for(var __t : TargetingUtil.entitiesInRadius(c, tgt.getLocation(), 5.0)){
                 if(__t.equals(tgt)) continue;
@@ -79,8 +81,8 @@ public final class MissFortune extends BaseChampion implements fr.lolmc.champion
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_FIREWORK_ROCKET_BLAST, 1f, 1.5f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            double[] base=fr.lolmc.util.Balance.base("q_missfortune",new double[]{20,40,60,80,100});
-            return String.format("1ère balle: %.0f (+100%%AD). Ricoche sur la 2ème cible (+35%%).",base[getLevel()-1]+s.getFinalAD());
+            double[] base=fr.lolmc.util.Balance.base("q_missfortune",new double[]{20,45,70,95,120});
+            return String.format("Balle: %.0f (+100%%AD +35%%AP), ricoche sur la cible derrière (critique si la 1re meurt).",base[getLevel()-1]+s.getFinalAD()+s.getFinalAP()*0.35);
         }
     }
 
@@ -89,11 +91,14 @@ public final class MissFortune extends BaseChampion implements fr.lolmc.champion
             new double[]{19,17,15,13,11},0,0,DamageType.TRUE);
             resourceCost = 30;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            c.addPotionEffect(new PotionEffect(PotionEffectType.SPEED,60,1,false,true));
-            c.addPotionEffect(new PotionEffect(PotionEffectType.HASTE,60,2,false,true));
-            c.sendActionBar(Component.text("💃 Strut 3s!",NamedTextColor.LIGHT_PURPLE));
+            // Wiki : +40-100 % de vitesse d'attaque pendant 4 s (+ vitesse de déplacement)
+            double asBonus=new double[]{0.40,0.55,0.70,0.85,1.00}[getLevel()-1];
+            s.addBonusAttackSpeed(asBonus);
+            new BukkitRunnable(){@Override public void run(){ s.addBonusAttackSpeed(-asBonus); }}.runTaskLater(LolPlugin.getInstance(), 80L);
+            fr.lolmc.LolPlugin.getInstance().getCCManager().speedPct(c, new double[]{0.30,0.35,0.40,0.45,0.50}[getLevel()-1]/3.25, 80); // 30-50 vitesse
+            c.sendActionBar(Component.text("💃 Fanfaronnade 4s!",NamedTextColor.LIGHT_PURPLE));
         }
-        @Override public String getDynamicDescription(ChampionStats s){return "+20%% vitesse et +haste 3s. Passif: vitesse hors combat.";}
+        @Override public String getDynamicDescription(ChampionStats s){return "4s: +40-100% vitesse d'attaque et vitesse de déplacement.";}
     }
 
     static class E extends BaseAbility {
@@ -115,7 +120,7 @@ public final class MissFortune extends BaseChampion implements fr.lolmc.champion
                     for(var __t : TargetingUtil.entitiesInRadius(c, loc, 3.5)){
                         TargetingUtil.dealDamage(c, __t, perTick, TargetingUtil.DmgType.MAGICAL);
                         if(__t instanceof Player __p)
-                            __p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,10,2,false,true));
+                            fr.lolmc.LolPlugin.getInstance().getCCManager().slowPct(__p, 0.40+0.06*s.getFinalAP()/100.0, 10); // 40 % (+6 %/100 AP)
                     }
                     fr.lolmc.util.VisualEffectUtil.impactBurst(loc.getWorld(),
                             loc, Material.PURPLE_STAINED_GLASS, 0.2f, 3.0, 5, 5L);
@@ -137,16 +142,17 @@ public final class MissFortune extends BaseChampion implements fr.lolmc.champion
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : canalise 3s, ~8 vagues de balles en CÔNE devant. Chaque vague = 75% AD + 35% AP (peut critiquer)
             c.sendActionBar(Component.text("🔫 DÉLUGE DE BALLES! 3s",NamedTextColor.RED));
-            double perWave=s.getFinalAD()*fr.lolmc.util.Balance.ratio("r_missfortune","ad",0.75)+s.getFinalAP()*fr.lolmc.util.Balance.ratio("r_missfortune","ap",0.25);
-            // Nombre de vagues selon rang : 12/14/16
-            int[] waveCount={12,14,16};
+            // Wiki : 14/16/18 vagues, 20/30/40 (+60 % AD +25 % AP) par vague, cône de 30° sur 1450
+            double perWave=new double[]{20,30,40}[Math.min(getLevel()-1,2)]
+                    +s.getFinalAD()*fr.lolmc.util.Balance.ratio("r_missfortune","ad",0.6)+s.getFinalAP()*fr.lolmc.util.Balance.ratio("r_missfortune","ap",0.25);
+            int[] waveCount={14,16,18};
             final int totalWaves=waveCount[Math.min(getLevel()-1,2)];
             new BukkitRunnable(){
                 int waves=0;
                 @Override public void run(){
                     if(waves>=totalWaves){cancel();return;} // 12-16 vagues sur 3s
                     // Vague en cône devant
-                    var targets=TargetingUtil.enemiesInCone(c, 9.0, 40);
+                    var targets=TargetingUtil.enemiesInCone(c, 14.5, 30);
                     for(var __t : targets){
                         double dmg=perWave;
                         // Chaque vague peut critiquer
@@ -165,8 +171,9 @@ public final class MissFortune extends BaseChampion implements fr.lolmc.champion
             }.runTaskTimer(LolPlugin.getInstance(),0L,Math.max(1L,(long)(60.0/totalWaves))); // étalé sur ~3s
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            double perWave=s.getFinalAD()*fr.lolmc.util.Balance.ratio("r_missfortune","ad",0.75)+s.getFinalAP()*fr.lolmc.util.Balance.ratio("r_missfortune","ap",0.25);
-            int[] waveCount={12,14,16};int n=waveCount[Math.min(getLevel()-1,2)];
+            double perWave=new double[]{20,30,40}[Math.min(getLevel()-1,2)]
+                    +s.getFinalAD()*fr.lolmc.util.Balance.ratio("r_missfortune","ad",0.6)+s.getFinalAP()*fr.lolmc.util.Balance.ratio("r_missfortune","ap",0.25);
+            int[] waveCount={14,16,18};int n=waveCount[Math.min(getLevel()-1,2)];
             return String.format("Canalise 3s: %d vagues en cône, %.0f dégâts/vague (peut critiquer).",n,perWave);
         }
     }

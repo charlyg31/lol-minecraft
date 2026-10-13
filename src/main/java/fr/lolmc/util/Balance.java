@@ -57,6 +57,14 @@ public final class Balance {
         return l.isEmpty() ? null : toArray(l);
     }
 
+    /** Coûts par rang d'un sort (cost: [..] dans champions.yml), ou null. */
+    public static double[] costs(String abilityId) {
+        String path = abilityId + ".cost";
+        if (!cfg().isList(path)) return null;
+        List<Double> l = cfg().getDoubleList(path);
+        return l.isEmpty() ? null : toArray(l);
+    }
+
     /** Coût en ressource d'un sort, ou la valeur par défaut du code si non défini. */
     public static double cost(String abilityId, double def) {
         String path = abilityId + ".cost";

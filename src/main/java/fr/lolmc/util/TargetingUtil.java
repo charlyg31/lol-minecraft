@@ -112,9 +112,15 @@ public final class TargetingUtil {
      * @return liste des ennemis touchés
      */
     public static List<LivingEntity> skillshot(Player caster, double range, double width, boolean pierce) {
+        return skillshotFrom(caster, caster.getEyeLocation(), caster.getEyeLocation().getDirection(), range, width, pierce);
+    }
+
+    /** Skillshot lancé depuis une autre position (ex. l'ombre de Zed), dans une direction donnée. */
+    public static List<LivingEntity> skillshotFrom(Player caster, Location origin, Vector direction,
+                                                   double range, double width, boolean pierce) {
         List<LivingEntity> hit = new ArrayList<>();
-        Location start = caster.getEyeLocation();
-        Vector dir = start.getDirection().normalize();
+        Location start = origin.clone();
+        Vector dir = direction.clone().normalize();
 
         // Liste des ennemis candidats dans la portée
         List<LivingEntity> candidates = new ArrayList<>();
@@ -127,10 +133,14 @@ public final class TargetingUtil {
         // après coup sur toute la distance effective, cf. plus bas).
         double step = 0.5;
         double stopDist = range;
+        Location prev = start.clone();
         for (double d = 0; d <= range; d += step) {
             Location point = start.clone().add(dir.clone().multiply(d));
             // Mur ? on arrête
             if (point.getBlock().getType().isSolid()) { stopDist = d; break; }
+            // Mur du Vent ennemi (Yasuo) : le projectile est détruit
+            if (fr.lolmc.champion.impl.mid.Yasuo.blocksProjectile(caster, prev, point)) { stopDist = d; break; }
+            prev = point;
             // Ennemi touché ?
             for (var e : candidates) {
                 if (hit.contains(e)) continue;

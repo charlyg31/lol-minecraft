@@ -31,6 +31,10 @@ public abstract class BaseAbility {
     protected double resourceCost; // coût en mana/énergie par cast (0 = gratuit)
     protected double dynamicCooldownOverride = -1; // -1 = utiliser baseCooldown, sinon override (pour l'AA)
     private final Map<UUID, Long> cooldownEnds = new HashMap<>();    // timestamp fin (avec CDR appliqué)
+    // Positionnés par cast() : sort annulé (aucune cible → ni recharge ni ressource dépensée),
+    // ou recharge différée (sort en deux temps, ex. Onde Sonique de Lee Sin)
+    private boolean castCancelled = false;
+    private boolean cooldownDeferred = false;
 
     public enum AbilitySlot { AA, Q, W, E, R }
     public enum DamageType  { PHYSICAL, MAGICAL, TRUE, MIXED }
@@ -66,33 +70,121 @@ public abstract class BaseAbility {
      */
     public abstract String getDynamicDescription(ChampionStats stats);
 
+    // ─── Annulation / recharge différée ──────────────────────────
+
+    /**
+     * À appeler dans cast() quand le sort ne part pas (aucune cible valide) : BaseChampion
+     * rembourse alors la ressource et ne déclenche pas la recharge. Avant, appuyer sur un sort
+     * ciblé sans cible le mettait en recharge et dépensait le mana.
+     */
+    protected void cancelCast() { castCancelled = true; }
+
+    /** À appeler dans cast() pour gérer soi-même la recharge (sort réactivable). */
+    protected void deferCooldown() { cooldownDeferred = true; }
+
+    /** Lit et remet à zéro l'annulation (usage BaseChampion). */
+    public boolean consumeCancelled() { boolean c = castCancelled; castCancelled = false; return c; }
+    /** Lit et remet à zéro la recharge différée (usage BaseChampion). */
+    public boolean consumeDeferred() { boolean d = cooldownDeferred; cooldownDeferred = false; return d; }
+
+    /**
+     * Dash du lanceur vers une cible, sans traverser les murs. {@code offset} > 0 : au-delà de la
+     * cible (« à travers »), < 0 : juste devant. La direction est celle lanceur → cible (avant :
+     * l'orientation de la cible, qui pouvait téléporter n'importe où, y compris dans un mur).
+     */
+    protected void dashTo(Player caster, org.bukkit.entity.LivingEntity target, double offset) {
+        Location from = caster.getLocation();
+        Location to = target.getLocation();
+        org.bukkit.util.Vector dir = to.toVector().subtract(from.toVector()).setY(0);
+        if (dir.lengthSquared() < 1e-6) return;
+        dir.normalize();
+        Location dest = to.clone().add(dir.clone().multiply(offset));
+        dest.setY(to.getY());
+        Location safe = safeTeleport(from, dest);
+        safe.setDirection(offset > 0 ? dir.clone().multiply(-1) : dir);
+        caster.teleport(safe);
+    }
+
     // ─── Cooldown ────────────────────────────────────────────────
 
+    // ── Charges (LoL : Faucon d'Ashe, Bandage d'Amumu…) ──
+    // maxCharges > 1 : la recharge (cooldown) régénère UNE charge ; chargeLockout = délai minimal
+    // entre deux lancers.
+    protected int maxCharges = 1;
+    protected double chargeLockout = 0;
+    private final Map<UUID, Integer> charges = new HashMap<>();
+    private final Map<UUID, Long> nextChargeAt = new HashMap<>();
+    private final Map<UUID, Long> rechargeMs = new HashMap<>();
+    private final Map<UUID, Long> lockoutUntil = new HashMap<>();
+
+    private int refreshCharges(UUID id) {
+        long now = System.currentTimeMillis();
+        int c = charges.getOrDefault(id, maxCharges);
+        Long next = nextChargeAt.get(id);
+        while (next != null && now >= next && c < maxCharges) {
+            c++;
+            next = c < maxCharges ? next + rechargeMs.getOrDefault(id, 1000L) : null;
+        }
+        charges.put(id, c);
+        if (next == null) nextChargeAt.remove(id); else nextChargeAt.put(id, next);
+        return c;
+    }
+
+    /** Charges disponibles (1 pour un sort sans charges). */
+    public int getCharges(Player player) {
+        return maxCharges > 1 ? refreshCharges(player.getUniqueId()) : (isOnCooldown(player) ? 0 : 1);
+    }
+
     public boolean isOnCooldown(Player player) {
+        if (maxCharges > 1) {
+            UUID id = player.getUniqueId();
+            return refreshCharges(id) <= 0 || System.currentTimeMillis() < lockoutUntil.getOrDefault(id, 0L);
+        }
         Long end = cooldownEnds.get(player.getUniqueId());
         if (end == null) return false;
         return System.currentTimeMillis() < end;
     }
 
     public double getRemainingCooldown(Player player) {
+        long now = System.currentTimeMillis();
+        if (maxCharges > 1) {
+            UUID id = player.getUniqueId();
+            if (refreshCharges(id) > 0) return Math.max(0, (lockoutUntil.getOrDefault(id, 0L) - now) / 1000.0);
+            Long next = nextChargeAt.get(id);
+            return next == null ? 0 : Math.max(0, (next - now) / 1000.0);
+        }
         Long end = cooldownEnds.get(player.getUniqueId());
         if (end == null) return 0;
-        double remaining = (end - System.currentTimeMillis()) / 1000.0;
+        double remaining = (end - now) / 1000.0;
         return Math.max(0, remaining);
+    }
+
+    private void startCooldown(Player player, double cd) {
+        long now = System.currentTimeMillis();
+        if (maxCharges > 1 && cd > 0.01) {
+            UUID id = player.getUniqueId();
+            int c = refreshCharges(id);
+            charges.put(id, Math.max(0, c - 1));
+            rechargeMs.put(id, (long) (cd * 1000));
+            nextChargeAt.putIfAbsent(id, now + (long) (cd * 1000));
+            lockoutUntil.put(id, now + (long) (chargeLockout * 1000));
+            return;
+        }
+        if (maxCharges > 1) { // remise à zéro (cd ~0) : toutes les charges reviennent
+            charges.put(player.getUniqueId(), maxCharges);
+            nextChargeAt.remove(player.getUniqueId());
+        }
+        cooldownEnds.put(player.getUniqueId(), now + (long)(cd * 1000));
     }
 
     /** Déclenche le cooldown en appliquant la réduction de CD (CDR) des stats. */
     public void triggerCooldown(Player player, ChampionStats stats) {
-        long now = System.currentTimeMillis();
-        double cd = getCurrentCooldown(stats); // avec CDR appliqué
-        cooldownEnds.put(player.getUniqueId(), now + (long)(cd * 1000));
+        startCooldown(player, getCurrentCooldown(stats)); // avec CDR appliqué
     }
 
     /** Version sans stats (fallback — CD de base sans CDR). */
     public void triggerCooldown(Player player) {
-        long now = System.currentTimeMillis();
-        double cd = getCurrentCooldown(null);
-        cooldownEnds.put(player.getUniqueId(), now + (long)(cd * 1000));
+        startCooldown(player, getCurrentCooldown(null));
     }
 
     /**
@@ -101,6 +193,12 @@ public abstract class BaseAbility {
      * n'est pas actuellement en recharge.
      */
     public void reduceCooldown(Player player, double seconds) {
+        if (maxCharges > 1) {
+            Long next = nextChargeAt.get(player.getUniqueId());
+            if (next != null) nextChargeAt.put(player.getUniqueId(),
+                    Math.max(System.currentTimeMillis(), next - (long)(seconds * 1000)));
+            return;
+        }
         Long end = cooldownEnds.get(player.getUniqueId());
         if (end == null) return; // pas en cooldown, rien à réduire
         long now = System.currentTimeMillis();
@@ -217,7 +315,11 @@ public abstract class BaseAbility {
                 .append(Component.text(val, NamedTextColor.WHITE).decoration(TextDecoration.ITALIC, false));
     }
     // ─── Ressource ───────────────────────────────────────────────
-    public double getResourceCost() { return fr.lolmc.util.Balance.cost(id, resourceCost); }
+    public double getResourceCost() {
+        double[] byRank = fr.lolmc.util.Balance.costs(id); // coût par rang (LoL)
+        if (byRank != null) return byRank[Math.max(0, Math.min(level - 1, byRank.length - 1))];
+        return fr.lolmc.util.Balance.cost(id, resourceCost);
+    }
     public void setResourceCost(double cost) { this.resourceCost = cost; }
 
     // ─── Getters ─────────────────────────────────────────────────

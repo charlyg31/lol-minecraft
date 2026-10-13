@@ -20,19 +20,32 @@ import java.util.*;
 public final class Annie extends BaseChampion implements fr.lolmc.champion.base.StatefulChampion {
     public Annie() {
         super("annie", "Annie", ChampionRole.MID,
-                new ChampionStats(560,50,0,23,30,0.610,0,335,6.25,5.5));
-        getStats().setGrowthStats(96.0,2.6,4.0,1.30,0.01360,0.55);
+                new ChampionStats(560,50,0,23,30,0.61,0,335,6.25,5.5));
+        getStats().setGrowthStats(96,2.65,4,1.3,0.0136,0.55);
+        setLolAttackRange(625); // stats LoL (wiki)
     }
     @Override protected void registerAbilities() {
         setAbility(0,new AA()); setAbility(1,new Q());
         setAbility(2,new W()); setAbility(3,new E()); setAbility(4,new R());
-        initSystems(528, 5.5, ResourceSystem.ResourceType.MANA, 528, 11.0);
-        setAutoAttackRange(9.6);
+        initSystems(5.5, ResourceSystem.ResourceType.MANA, 418, 25, 8, 0.8);
     }
 
     // ── API publique Tibbers ──────────────────────────────────────
     public static org.bukkit.entity.LivingEntity getActiveTibbers(Player owner) {
         return activeTibbers.get(owner.getUniqueId());
+    }
+
+    /** Annie qui contrôle ce Tibbers (ou null). */
+    public static Player getTibbersOwner(org.bukkit.entity.Entity e) {
+        for (var en : activeTibbers.entrySet())
+            if (en.getValue().getUniqueId().equals(e.getUniqueId())) return org.bukkit.Bukkit.getPlayer(en.getKey());
+        return null;
+    }
+
+    // Dégâts d'une attaque de Tibbers (wiki : 30/45/60 +10 % AP, magiques) par Annie
+    private static final Map<UUID, Double> tibbersAttack = new java.util.concurrent.ConcurrentHashMap<>();
+    public static double getTibbersAttackDamage(org.bukkit.entity.Entity tibbers) {
+        return tibbersAttack.getOrDefault(tibbers.getUniqueId(), 30.0);
     }
 
     // ── État statique ─────────────────────────────────────────────
@@ -51,7 +64,7 @@ public final class Annie extends BaseChampion implements fr.lolmc.champion.base.
         return pyroStacks.getOrDefault(id, 0) == 0 && pyroStacks.containsKey(id);
     }
     public static int pyroStunTicks(int level) {
-        return level >= 13 ? 35 : (level >= 7 ? 30 : 25);
+        return level >= 11 ? 35 : (level >= 6 ? 30 : 25); // 1.25/1.5/1.75 s aux niveaux 1/6/11 (wiki)
     }
 
     // ── Reset ─────────────────────────────────────────────────────
@@ -66,6 +79,19 @@ public final class Annie extends BaseChampion implements fr.lolmc.champion.base.
     public void resetAllState() {
         activeTibbers.values().forEach(t -> { if (t != null && t.isValid()) t.remove(); });
         activeTibbers.clear(); pyroStacks.clear(); rCooldowns.clear(); enrageUntil.clear();
+    }
+
+    // ── Bouclier en Fusion : renvoi de dégâts (wiki 25-65 +40 % AP) aux attaquants ──
+    private record MoltenShield(UUID annie, double damage, long until) {}
+    private static final Map<UUID, MoltenShield> moltenShield = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** Un champion protégé par le Bouclier en Fusion subit une attaque : l'attaquant est brûlé. */
+    public static void onShieldedAttacked(Player shielded, Player attacker) {
+        MoltenShield ms = moltenShield.get(shielded.getUniqueId());
+        if (ms == null || ms.until() < System.currentTimeMillis()) return;
+        Player annie = org.bukkit.Bukkit.getPlayer(ms.annie());
+        if (annie == null) return;
+        fr.lolmc.util.DamageUtil.damage(annie, attacker, ms.damage(), true, fr.lolmc.util.DamageUtil.Type.MAGICAL);
     }
 
     // ── Annie meurt → Tibbers s'enrage ───────────────────────────
@@ -135,17 +161,18 @@ public final class Annie extends BaseChampion implements fr.lolmc.champion.base.
                 new double[]{4,3.5,3,2.5,2},20,0,DamageType.MAGICAL);
             resourceCost = 60;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            var target = TargetingUtil.getTargetedEnemy(c, 6.5);
-            if(target==null){c.sendActionBar(Component.text("Aucune cible",NamedTextColor.GRAY));return;}
+            var target = TargetingUtil.getTargetedEnemy(c, 6.9); // 625 unités
+            if(target==null){cancelCast();c.sendActionBar(Component.text("Aucune cible",NamedTextColor.GRAY));return;}
             double[] base=fr.lolmc.util.Balance.base("q_annie",new double[]{80,125,170,215,260});
             double dmg=base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("q_annie","ap",0.80);
-            boolean kills=TargetingUtil.getRealHealth(target)-dmg<=0;
             if(hasPyromancyStun(c.getUniqueId())){
                 var cc=LolPlugin.getInstance().getCCManager();
                 int lvl=LolPlugin.getInstance().getChampionManager().hasChampion(c)?LolPlugin.getInstance().getChampionManager().getChampion(c).getLevelSystem().getLevel():1;
                 if(cc!=null) cc.stun(target, pyroStunTicks(lvl));
             }
             TargetingUtil.dealDamage(c, target, dmg, TargetingUtil.DmgType.MAGICAL);
+            // Kill vérifié après les dégâts (avant : sur les dégâts bruts, sans la RM)
+            boolean kills = target.isDead() || TargetingUtil.getRealHealth(target) <= 0;
             if(kills){
                 // Remboursement de 50 % : appliqué au CD que BaseChampion déclenche juste après ce cast,
                 // puis retour au CD normal (sinon la réduction restait et se cumulait à chaque kill)
@@ -200,8 +227,12 @@ public final class Annie extends BaseChampion implements fr.lolmc.champion.base.
             double shield=shieldBase[getLevel()-1]+s.getFinalAP()*0.40;
             var cm=LolPlugin.getInstance().getChampionManager();
             if(cm.hasChampion(dest)) cm.getChampion(dest).getStats().addShield(shield);
-            dest.addPotionEffect(new PotionEffect(PotionEffectType.SPEED,30,1,false,true));
+            // Vitesse 20-50 % (selon le niveau) qui décroît sur 1.5 s (wiki)
+            int alvl=cm.hasChampion(c)?cm.getChampion(c).getLevelSystem().getLevel():1;
+            fr.lolmc.LolPlugin.getInstance().getCCManager().speedDecaying(dest, 0.20+0.30*(alvl-1)/17.0, 30);
             dest.sendActionBar(Component.text(String.format("🔥 Bouclier Ardent %.0f!",shield),NamedTextColor.GOLD));
+            double reflect=new double[]{25,35,45,55,65}[getLevel()-1]+s.getFinalAP()*0.40;
+            moltenShield.put(dest.getUniqueId(), new MoltenShield(c.getUniqueId(), reflect, System.currentTimeMillis()+3000L));
             final Player fd=dest; final double fsh=shield;
             new BukkitRunnable(){@Override public void run(){
                 if(cm.hasChampion(fd)) cm.getChampion(fd).getStats().addShield(-fsh);
@@ -209,7 +240,8 @@ public final class Annie extends BaseChampion implements fr.lolmc.champion.base.
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] shieldBase={60,95,130,165,200};
-            return String.format("Bouclier %.0f (+40%%AP) 3s + vitesse.",shieldBase[getLevel()-1]+s.getFinalAP()*0.40);
+            return String.format("Bouclier %.0f (+40%%AP) 3s + vitesse. Les attaquants subissent %.0f dégâts.",
+                    shieldBase[getLevel()-1]+s.getFinalAP()*0.40, new double[]{25,35,45,55,65}[getLevel()-1]+s.getFinalAP()*0.40);
         }
     }
 
@@ -222,7 +254,7 @@ public final class Annie extends BaseChampion implements fr.lolmc.champion.base.
         @Override public void cast(Player c, ChampionStats s, Player t){
             UUID uuid = c.getUniqueId();
             long now = System.currentTimeMillis();
-            double[] realCDs = {120,100,80};
+            double[] realCDs = {130,115,100}; // wiki
             int r = Math.min(getLevel()-1,2);
             R thisAbility = this;
 
@@ -275,14 +307,7 @@ public final class Annie extends BaseChampion implements fr.lolmc.champion.base.
                 bear.setVisualFire(net.kyori.adventure.util.TriState.TRUE);
                 bear.setRemoveWhenFarAway(false);
                 bear.setInvulnerable(false);
-                // HP
-                var hp = bear.getAttribute(fr.lolmc.util.Compat.maxHealth());
-                if (hp != null) {
-                    hp.setBaseValue(200.0 + finalAP*0.5);
-                    bear.setHealth(hp.getValue());
-                } else {
-                    bear.setHealth(200.0 + finalAP*0.5);
-                }
+                // (PV LoL appliqués juste après l'apparition : 1150-4100 selon le niveau +50 % AP)
                 // Vitesse
                 var sp = bear.getAttribute(fr.lolmc.util.Compat.movementSpeed());
                 if (sp != null) sp.setBaseValue(0.38);
@@ -295,6 +320,12 @@ public final class Annie extends BaseChampion implements fr.lolmc.champion.base.
                 bear.getScoreboardTags().add("tibbers_"+c.getUniqueId().toString().substring(0,8));
             });
 
+            // PV de Tibbers (wiki) : 1150 → 4100 selon le niveau (+50 % AP), en PV virtuels (avant : 200)
+            fr.lolmc.util.VirtualHP.init(tibbers, 1150 + (4100 - 1150) * (lvl - 1) / 17.0 + finalAP * 0.5);
+            // Armure / RM 30 → 100 selon le niveau (wiki), dégâts d'attaque 30/45/60 (+10 % AP)
+            double tibRes = 30 + 70.0 * (lvl - 1) / 17.0;
+            fr.lolmc.util.MobCombat.setStats(tibbers, 0, 0.625, tibRes, tibRes, 0, 0);
+            tibbersAttack.put(tibbers.getUniqueId(), new double[]{30,45,60}[r] + finalAP * 0.10);
             activeTibbers.put(uuid, tibbers);
             thisAbility.resourceCost = 0;
 
@@ -371,7 +402,8 @@ public final class Annie extends BaseChampion implements fr.lolmc.champion.base.
 
                     // Dégâts aura (toutes les 2 ticks = 1s pour ne pas flood)
                     if (ticks % 2 == 0) {
-                        double auraDmg = (20 + finalAP*0.12) * (enraged ? 1.5 : 1.0);
+                        // Aura (wiki) : 2/3/4 (+1 % AP) toutes les 0.25 s → ×4 par seconde
+                        double auraDmg = (new double[]{2,3,4}[r] + finalAP*0.01) * 4 * (enraged ? 1.5 : 1.0);
                         for (Entity entity : tibbers.getNearbyEntities(3.5,3.5,3.5)) {
                             if (!(entity instanceof org.bukkit.entity.LivingEntity target)) continue;
                             if (entity.equals(c) || entity.equals(tibbers)) continue;

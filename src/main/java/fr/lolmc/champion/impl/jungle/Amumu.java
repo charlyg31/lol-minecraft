@@ -17,19 +17,27 @@ import org.bukkit.util.Vector;
 public final class Amumu extends BaseChampion implements fr.lolmc.champion.base.StatefulChampion {
     public Amumu() {
         super("amumu", "Amumu", ChampionRole.JUNGLE,
-                new ChampionStats(685,57,0,33,32,0.736,0,335,1.25,9.0));
-        getStats().setGrowthStats(94.0,3.8,4.0,2.05,0.02180,0.85);
-        setAutoAttackRange(2.3);
+                new ChampionStats(685,57,0,33,32,0.736,0,335,1.25,9));
+        getStats().setGrowthStats(94,3.8,4,2.05,0.0218,0.85);
+        setLolAttackRange(125); // stats LoL (wiki)
     }
+    // Caprice (wiki) : chaque attaque de base subie réduit la recharge du E de 0.75 s
+    @Override public void onBasicAttacked(Player self, Player attacker) {
+        var e = getAbility(3);
+        if (e != null && getLevelSystem().getAbilityRank(3) > 0) e.reduceCooldown(self, 0.75);
+    }
+
     @Override protected void registerAbilities() {
         setAbility(0,new AA()); setAbility(1,new Q());
         setAbility(2,new W()); setAbility(3,new E()); setAbility(4,new R());
-        initSystems(613, 8.0, ResourceSystem.ResourceType.MANA, 480, 10.0);
+        initSystems(9, ResourceSystem.ResourceType.MANA, 285, 40, 7.4, 0.55);
     }
 
     // Passif Toucher Maudit : les AA et le R appliquent la Malédiction 3s.
     // Les cibles maudites subissent +10% de dégâts VRAIS de toute source magique.
     private static final java.util.Map<java.util.UUID, Long> cursed = new java.util.concurrent.ConcurrentHashMap<>();
+    // Désespoir actif (une seule aura par Amumu : la relancer la désactive)
+    private static final java.util.Map<java.util.UUID, org.bukkit.scheduler.BukkitTask> despair = new java.util.concurrent.ConcurrentHashMap<>();
     public static void applyCurse(org.bukkit.entity.LivingEntity tgt) { cursed.put(tgt.getUniqueId(), System.currentTimeMillis()+3000L); }
     public static boolean isCursed(java.util.UUID id) { Long u=cursed.get(id); return u!=null && u>System.currentTimeMillis(); }
     @Override public void resetState(java.util.UUID id) { cursed.remove(id); }
@@ -50,15 +58,13 @@ public final class Amumu extends BaseChampion implements fr.lolmc.champion.base.
 
     static class Q extends BaseAbility {
         Q(){super("q_amumu","Lancer de Bandage",Material.STRING,AbilitySlot.Q,
-                new double[]{12,11,10,9,8},20,0,DamageType.MAGICAL);
-            resourceCost = 50;}
+                new double[]{16,15,14,13,12},20,0,DamageType.MAGICAL);
+            resourceCost = 50; maxCharges = 2; chargeLockout = 3;} // 2 charges, 3 s entre deux (wiki)
         @Override public void cast(Player c,ChampionStats s,Player t){
-            var hits=TargetingUtil.skillshot(c, 12.0, 1.0, false);
+            var hits=TargetingUtil.skillshot(c, 11.0, 0.8, false); // 1100 unités
             if(hits.isEmpty()){c.sendActionBar(Component.text("🧻 Bandage manqué!",NamedTextColor.GRAY));return;}
             var tgt=hits.getFirst();
-            Location dest=tgt.getLocation().clone().subtract(tgt.getLocation().getDirection().multiply(1.5));
-            dest.setY(c.getLocation().getY());
-            c.teleport(dest);
+            dashTo(c, tgt, -1.2); // tiré vers la cible
             double[] base=fr.lolmc.util.Balance.base("q_amumu",new double[]{70,95,120,145,170});double dmg=base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("q_amumu","ap",0.85);
             TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.MAGICAL);
             onMagicHit(c, tgt, dmg);
@@ -77,21 +83,39 @@ public final class Amumu extends BaseChampion implements fr.lolmc.champion.base.
 
     static class W extends BaseAbility {
         W(){super("w_amumu","Désespoir",Material.CRYING_OBSIDIAN,AbilitySlot.W,
-                new double[]{0,0,0,0,0},0,3,DamageType.MAGICAL);
-            resourceCost = 8;}
+                new double[]{1,1,1,1,1},0,3,DamageType.MAGICAL);
+            resourceCost = 0;} // 8 mana/s prélevés pendant l'aura
         @Override public void cast(Player c,ChampionStats s,Player t){
-            c.sendActionBar(Component.text("😢 Désespoir actif 5s!",NamedTextColor.DARK_BLUE));
-            double[] pctHP={0.01,0.015,0.02,0.025,0.03};
-            double pct=pctHP[getLevel()-1];
-            new BukkitRunnable(){
+            // Wiki : aura à (dés)activer, 8 mana/s ; toutes les 0.5 s : 5 + 0.5-1 % (+0.25 %/100 AP)
+            // des PV max de la cible. Avant : 5 s seulement et 1-3 % des PV max par 0.5 s.
+            var running = despair.remove(c.getUniqueId());
+            if (running != null && !running.isCancelled()) {
+                running.cancel();
+                c.sendActionBar(Component.text("😢 Désespoir désactivé",NamedTextColor.GRAY));
+                return;
+            }
+            c.sendActionBar(Component.text("😢 Désespoir activé (8 mana/s)",NamedTextColor.DARK_BLUE));
+            double[] pctHP={0.005,0.00625,0.0075,0.00875,0.01};
+            final W self=this;
+            despair.put(c.getUniqueId(), new BukkitRunnable(){
                 int ticks=0;
                 @Override public void run(){
-                    if(ticks>=10){cancel();return;}
-                    for(var __t : TargetingUtil.entitiesInRadius(c, c.getLocation(), 3.5)){
-                        // PV max LoL (l'attribut Minecraft vaut 40 pour un champion)
-                        double maxHealth = TargetingUtil.getRealMaxHealth(__t);
-
-                        double dmg=maxHealth*pct+s.getFinalAP()*fr.lolmc.util.Balance.ratio("w_amumu","ap",0.01);
+                    var cm=LolPlugin.getInstance().getChampionManager();
+                    if(!c.isOnline() || !cm.hasChampion(c) || c.getGameMode()==GameMode.SPECTATOR){
+                        despair.remove(c.getUniqueId()); cancel(); return;
+                    }
+                    // 8 mana par seconde ; arrêt si plus assez de mana
+                    if(ticks%2==0){
+                        var res=cm.getChampion(c).getResourceSystem();
+                        if(res!=null && !res.consume(8)){
+                            despair.remove(c.getUniqueId());
+                            c.sendActionBar(Component.text("😢 Désespoir : plus de mana",NamedTextColor.GRAY));
+                            cancel(); return;
+                        }
+                    }
+                    double pct=pctHP[self.getLevel()-1]+s.getFinalAP()/100.0*0.0025;
+                    for(var __t : TargetingUtil.entitiesInRadius(c, c.getLocation(), 4.0)){
+                        double dmg=5+TargetingUtil.getRealMaxHealth(__t)*pct;
                         TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);
                         onMagicHit(c, __t, dmg);
                     }
@@ -99,11 +123,11 @@ public final class Amumu extends BaseChampion implements fr.lolmc.champion.base.
                             c.getLocation().add(0,1,0), 2.0, Material.GRAY_STAINED_GLASS, 14, 0.3f, 0.1f, 6L);
                     ticks++;
                 }
-            }.runTaskTimer(LolPlugin.getInstance(),0L,10L);
+            }.runTaskTimer(LolPlugin.getInstance(),0L,10L));
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            double[] pctHP={1,1.5,2,2.5,3};
-            return String.format("Aura 5s: %.1f%% PV max de la cible/0.5s (dégâts magiques).",pctHP[getLevel()-1]);
+            double[] pctHP={0.5,0.625,0.75,0.875,1};
+            return String.format("Aura (relancer : désactive, 8 mana/s): 5 + %.2f%% PV max de la cible/0.5s.",pctHP[getLevel()-1]);
         }
     }
 
@@ -113,7 +137,7 @@ public final class Amumu extends BaseChampion implements fr.lolmc.champion.base.
             resourceCost = 35;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             double[] base=fr.lolmc.util.Balance.base("e_amumu",new double[]{65,100,135,170,205});double dmg=base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("e_amumu","ap",0.5);
-            for(var __t : TargetingUtil.entitiesInRadius(c, c.getLocation(), 3.0)){
+            for(var __t : TargetingUtil.entitiesInRadius(c, c.getLocation(), 4.0)){ // rayon 350 (wiki)
                 TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);
                 onMagicHit(c, __t, dmg);
             }
@@ -123,7 +147,7 @@ public final class Amumu extends BaseChampion implements fr.lolmc.champion.base.
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] base=fr.lolmc.util.Balance.base("e_amumu",new double[]{65,100,135,170,205});
-            return String.format("%.0f dégâts magiques autour (+50%%AP). CD réduit quand frappé.",base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("e_amumu","ap",0.5));
+            return String.format("%.0f dégâts magiques autour (+50%%AP). -0.75s de recharge par attaque subie.",base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("e_amumu","ap",0.5));
         }
     }
 
@@ -133,7 +157,7 @@ public final class Amumu extends BaseChampion implements fr.lolmc.champion.base.
             resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             double[] base=fr.lolmc.util.Balance.base("r_amumu",new double[]{200,300,400});int rr=Math.min(getLevel()-1,2);double dmg=base[rr]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("r_amumu","ap",0.8);
-            for(var __t : TargetingUtil.enemiesAround(c, 5.0)){
+            for(var __t : TargetingUtil.enemiesAround(c, 6.0)){ // rayon 550 (wiki)
                 applyCurse(__t); // R applique la Malédiction
                 TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);
                 onMagicHit(c, __t, dmg);

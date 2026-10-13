@@ -39,8 +39,41 @@ public abstract class BaseChampion {
                                ResourceSystem.ResourceType resType,
                                double maxResource, double resRegen) {
         this.hpSystem = new HPSystem(maxHP, hpRegen);
-        this.hpSystem.linkStats(this.stats); // lier pour GW
+        this.hpSystem.linkStats(this.stats); // PV max = stats LoL (base + croissance + bonus)
         this.resourceSystem = new ResourceSystem(resType, maxResource, resRegen);
+    }
+
+    /** Comme initSystems, avec la croissance par niveau de la ressource et de sa régénération (LoL). */
+    protected void initSystems(double hpRegen, ResourceSystem.ResourceType resType, double maxResource,
+                               double resGrowth, double resRegen, double resRegenGrowth) {
+        initSystems(stats.getFinalMaxHP(), hpRegen, resType, maxResource, resRegen);
+        this.resourceGrowth = resGrowth;
+        this.resourceRegenGrowth = resRegenGrowth;
+    }
+
+    // Croissance par niveau de la ressource (mana) et de sa régénération, et part déjà appliquée
+    private double resourceGrowth = 0, resourceRegenGrowth = 0;
+    private double appliedResGrowth = 0, appliedResRegenGrowth = 0;
+
+    /**
+     * À appeler quand le niveau change : met à jour le niveau des stats et la ressource max /
+     * régénération (croissance LoL). Avant, le mana max ne grandissait jamais.
+     */
+    public void onLevelChanged(int level) {
+        stats.setChampionLevel(level);
+        if (resourceSystem == null) return;
+        double g = stats.growthAt(resourceGrowth), rg = stats.growthAt(resourceRegenGrowth);
+        resourceSystem.addMaxResource(g - appliedResGrowth);
+        resourceSystem.addRegen(rg - appliedResRegenGrowth);
+        appliedResGrowth = g; appliedResRegenGrowth = rg;
+    }
+
+    /**
+     * Portée d'attaque LoL (unités, bord à bord) convertie en blocs centre à centre :
+     * (portée + ~130 unités de rayons de collision) / 100 (LolUnits : 100 unités = 1 bloc).
+     */
+    protected void setLolAttackRange(double units) {
+        this.autoAttackRange = (units + 130) / 100.0;
     }
 
     protected abstract void registerAbilities();
@@ -125,8 +158,17 @@ public abstract class BaseChampion {
         }
 
         ability.setLevel(levelSystem.getAbilityRank(slot));
+        ability.consumeCancelled(); ability.consumeDeferred(); // état d'un cast précédent
         ability.cast(caster, stats, target);
+        // Sort sans cible : ressource rendue, pas de recharge, pas d'interruption du recall
+        if (ability.consumeCancelled()) {
+            if (resourceSystem != null && ability.getResourceCost() > 0)
+                resourceSystem.addCurrent(ability.getResourceCost());
+            ability.consumeDeferred();
+            return;
+        }
         fr.lolmc.instance.InstanceHelper.baseManager(caster).onAction(caster); // un sort interrompt le recall
+        boolean deferred = ability.consumeDeferred();
 
 // Cas particulier : Zed W gère son cooldown lui-même.
 // Cela permet le second lancer pour échanger avec l'ombre.
@@ -136,7 +178,7 @@ public abstract class BaseChampion {
                         && (fr.lolmc.champion.impl.mid.Zed.getShadowLocation(caster.getUniqueId()) != null
                         || fr.lolmc.champion.impl.mid.Zed.isWOnCooldown(caster.getUniqueId()));
 
-        if (!manualCooldown) {
+        if (!manualCooldown && !deferred) {
             ability.triggerCooldown(caster, stats);
         }
 
@@ -178,10 +220,20 @@ public abstract class BaseChampion {
                 a.setLevel(levelSystem.getAbilityRank(slot));
                 refreshSlot(player, slot);
             }
+            onAbilityRanksChanged();
             return true;
         }
         return false;
     }
+
+    /**
+     * Appelé quand les rangs des sorts changent (montée, restauration, commande admin) : les
+     * champions à effet passif de rang (ex. pénétration du E de Darius) le recalculent ici.
+     */
+    public void onAbilityRanksChanged() { }
+
+    /** Le champion subit une attaque de base d'un champion ennemi (ex. Caprice d'Amumu). */
+    public void onBasicAttacked(Player self, Player attacker) { }
 
     public BaseAbility[]     getAbilities()   { return abilities; }
     public BaseAbility       getAbility(int i){ return (i>=0&&i<5)?abilities[i]:null; }
