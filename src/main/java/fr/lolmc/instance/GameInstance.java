@@ -119,13 +119,20 @@ public final class GameInstance {
         LolPlugin.getInstance().getPlantManager().clearAll(world);
         gameManager.stopGame();
         minionManager.stopWaves();
-        jungleManager.stopJungle();
+        jungleManager.dispose();
         fogManager.stopTask();
         turretManager.stopTasks();
         baseManager.stopHealRingTask();
         // Le PassiveManager est partagé : ne nettoyer que l'état des joueurs de cette partie
         // (GameManager.stopGame arrête ses tâches quand la dernière partie se termine).
-        for (UUID uid : participants) passiveManager.cleanup(uid);
+        var lp = LolPlugin.getInstance();
+        for (UUID uid : participants) {
+            passiveManager.cleanup(uid);
+            // États statiques des champions / CC : sinon conservés jusqu'à la partie suivante
+            fr.lolmc.util.ChampionStateReset.resetPlayer(uid);
+            lp.getCCManager().clear(uid);
+            lp.getDeathRecapManager().cleanup(uid);
+        }
         participants.clear();
         teams.clear();
     }

@@ -69,6 +69,30 @@ public final class VirtualHP {
     }
 
     /**
+     * Tue une entité (sbire, monstre…) en attribuant la mort à {@code killer}, pour que
+     * EntityDeathEvent#getKiller renvoie le tueur (or de last-hit, CS, buffs de jungle).
+     * Un simple setHealth(0) ne l'attribue pas. Le coup est marqué « isDying » pour que
+     * les listeners qui annulent les dégâts vanilla des champions le laissent passer.
+     */
+    public static void kill(LivingEntity entity, Player killer) {
+        if (entity.isDead()) return;
+        var pdc = entity.getPersistentDataContainer();
+        // On neutralise le délai d'invincibilité Minecraft (noDamageTicks) : sinon, si ce
+        // coup arrive juste après un dégât vanilla venant d'être annulé (setCancelled), il
+        // peut être silencieusement ignoré et l'entité reste bloquée en isDying=true pour
+        // toujours (elle ignorerait alors définitivement tout dégât futur).
+        entity.setNoDamageTicks(0);
+        pdc.set(keyDying(), PersistentDataType.BYTE, (byte) 1);
+        if (killer != null) entity.damage(4096.0, killer);
+        if (!entity.isDead()) entity.setHealth(0);
+        // Si l'entité est toujours vivante après le coup (invulnérable pour une autre
+        // raison, ex. plugin tiers, GameMode, etc.), ne pas rester bloqué en isDying.
+        if (!entity.isDead()) {
+            pdc.set(keyDying(), PersistentDataType.BYTE, (byte) 0);
+        }
+    }
+
+    /**
      * Inflige des dégâts virtuels. Met à jour la HealthBar et la vie vanilla
      * proportionnelle. À 0 : tue l'entité avec attribution au tueur.
      *
@@ -81,20 +105,7 @@ public final class VirtualHP {
         pdc.set(keyCur(), PersistentDataType.DOUBLE, cur);
 
         if (cur <= 0) {
-            // Coup fatal vanilla pour déclencher EntityDeathEvent avec killer.
-            // On neutralise le délai d'invincibilité Minecraft (noDamageTicks) : sinon, si ce
-            // coup arrive juste après un dégât vanilla venant d'être annulé (setCancelled), il
-            // peut être silencieusement ignoré et l'entité reste bloquée en isDying=true pour
-            // toujours (elle ignorerait alors définitivement tout dégât futur).
-            entity.setNoDamageTicks(0);
-            pdc.set(keyDying(), PersistentDataType.BYTE, (byte) 1);
-            if (killer != null) entity.damage(4096.0, killer);
-            else entity.setHealth(0);
-            // Si l'entité est toujours vivante après le coup (invulnérable pour une autre
-            // raison, ex. plugin tiers, GameMode, etc.), ne pas rester bloqué en isDying.
-            if (!entity.isDead()) {
-                pdc.set(keyDying(), PersistentDataType.BYTE, (byte) 0);
-            }
+            kill(entity, killer);
             return 0;
         }
 

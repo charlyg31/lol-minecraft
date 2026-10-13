@@ -42,7 +42,8 @@ public class TurretManager {
     private static final int MAX_PLATING = 5;
     private static final long PLATING_END_MS = 14 * 60 * 1000L;
     private long gameStartMs = 0;
-    public void setGameStart() { gameStartMs = System.currentTimeMillis(); }
+    /** Début de partie : démarre la fenêtre des plaques (14 min) et remet toutes les plaques. */
+    public void setGameStart() { gameStartMs = System.currentTimeMillis(); platingLeft.clear(); }
 
     // Aggro tourelle : cible actuelle de chaque tourelle (UUID joueur visé)
     private final Map<String, UUID> turretAggro = new HashMap<>();

@@ -617,6 +617,9 @@ public class AbilityListener implements Listener {
     public void onDamage(EntityDamageByEntityEvent e) {
         if (!(e.getDamager() instanceof Player caster)) return;
         if (!manager.hasChampion(caster)) return;
+        // Coup fatal du système LoL (VirtualHP.kill) : il doit tuer pour attribuer la mort
+        if (e.getEntity() instanceof org.bukkit.entity.LivingEntity dying
+                && fr.lolmc.util.VirtualHP.isDying(dying)) return;
 
         // ANTI-SPAM ÉPÉE : un joueur-champion ne fait JAMAIS de dégât de mêlée vanilla.
         // Tous les dégâts passent par le système LoL (AA cadencée ou sorts).

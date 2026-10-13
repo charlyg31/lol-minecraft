@@ -79,6 +79,22 @@ public class RewardManager {
             .put(attacker, System.currentTimeMillis());
     }
 
+    /** Dernier joueur ayant blessé {@code victim} dans les 10 s (null si aucun) — sans vider le suivi. */
+    public java.util.UUID getLastAttacker(java.util.UUID victim) {
+        var contribs = damageContrib.get(victim);
+        if (contribs == null) return null;
+        long threshold = System.currentTimeMillis() - ASSIST_WINDOW_MS;
+        java.util.UUID best = null;
+        long bestTime = Long.MIN_VALUE;
+        for (var entry : contribs.entrySet()) {
+            if (entry.getValue() >= threshold && entry.getValue() > bestTime) {
+                best = entry.getKey();
+                bestTime = entry.getValue();
+            }
+        }
+        return best;
+    }
+
     /** Retourne les joueurs éligibles à l'assist (ont infligé des dégâts dans les 10s). */
     public java.util.Set<java.util.UUID> getAssistants(java.util.UUID victim, java.util.UUID killer) {
         var contribs = damageContrib.remove(victim);

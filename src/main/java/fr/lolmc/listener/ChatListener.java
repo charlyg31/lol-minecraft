@@ -43,9 +43,17 @@ public class ChatListener implements Listener {
             String text = msg.startsWith("/a ") ? msg.substring(3) : msg.substring(5);
             org.bukkit.Bukkit.getScheduler().runTask(LolPlugin.getInstance(), () -> {
                 String formatted = "§7[Tous] §f" + p.getName() + "§7: " + text;
-                for (Player online : org.bukkit.Bukkit.getOnlinePlayers()) {
-                    if (fr.lolmc.util.WorldContext.isInGameWorld(online))
-                        online.sendMessage(net.kyori.adventure.text.Component.text(formatted));
+                // Uniquement les joueurs de la même partie (instance du joueur, sinon partie unique)
+                var inst = fr.lolmc.instance.InstanceHelper.instanceOf(p);
+                var im = LolPlugin.getInstance().getInstanceManager();
+                var component = net.kyori.adventure.text.Component.text(formatted);
+                if (inst != null) {
+                    for (Player online : inst.getOnlinePlayers()) online.sendMessage(component);
+                } else {
+                    for (Player online : fr.lolmc.util.WorldContext.getGamePlayers()) {
+                        if (im != null && im.getInstanceOf(online) != null) continue;
+                        online.sendMessage(component);
+                    }
                 }
             });
             return;

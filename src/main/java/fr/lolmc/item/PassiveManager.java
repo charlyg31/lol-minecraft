@@ -623,7 +623,7 @@ public class PassiveManager {
                     state.dematerializerBonus = Math.min(0.12, state.dematerializerBonus + bonus);
                     var champStats = championManager.getChampion(attacker).getStats();
                     champStats.setMinionDamageBonus(state.dematerializerBonus);
-                    victim.setHealth(0);
+                    fr.lolmc.util.VirtualHP.kill(victim, attacker);
                     attacker.sendActionBar(Component.text(
                             "💨 Sbire dématérialisé ! (+" + (int) (state.dematerializerBonus * 100) + "% dégâts sbires)",
                             NamedTextColor.LIGHT_PURPLE));

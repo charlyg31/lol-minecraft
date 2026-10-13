@@ -351,6 +351,13 @@ public class AutoAttackManager {
                 rawDamage *= 1.0 + champ.getStats().getMinionDamageBonus();
             }
             double newHealth = Math.max(0, target.getHealth() - rawDamage);
+            if (newHealth <= 0) {
+                // Coup fatal attribué à l'attaquant (last-hit : or, CS)
+                fr.lolmc.util.VirtualHP.kill(target, attacker);
+                var pmKill = LolPlugin.getInstance().getPassiveManager();
+                if (pmKill != null) pmKill.onAutoAttackEntity(attacker, target);
+                return true;
+            }
             target.setHealth(newHealth);
             var maxHpAttr = target.getAttribute(fr.lolmc.util.Compat.maxHealth());
             double maxHp = maxHpAttr != null ? maxHpAttr.getValue() : 20.0;

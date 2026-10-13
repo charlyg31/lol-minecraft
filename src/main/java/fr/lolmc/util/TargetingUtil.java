@@ -235,6 +235,7 @@ public final class TargetingUtil {
                 }
             }
             double newHealth = Math.max(0, target.getHealth() - amount);
+            if (newHealth <= 0) { VirtualHP.kill(target, caster); return; }
             target.setHealth(newHealth);
             double maxHp = Compat.maxHealthOf(target);
             HealthBar.update(target, newHealth, maxHp);

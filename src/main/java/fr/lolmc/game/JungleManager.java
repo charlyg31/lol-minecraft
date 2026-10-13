@@ -620,8 +620,17 @@ public class JungleManager {
         }
     }
 
+    private org.bukkit.scheduler.BukkitTask respawnTask;
+
+    /** Libère la tâche de réapparition des camps (fin d'une instance : le manager est jeté). */
+    public void dispose() {
+        stopJungle();
+        if (respawnTask != null) { respawnTask.cancel(); respawnTask = null; }
+    }
+
     private void startRespawnTask() {
-        new BukkitRunnable() {
+        if (respawnTask != null) return;
+        respawnTask = new BukkitRunnable() {
             @Override public void run() {
                 if (!active) return;
                 long now = System.currentTimeMillis();

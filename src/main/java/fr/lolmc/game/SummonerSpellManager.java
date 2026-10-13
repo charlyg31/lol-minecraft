@@ -426,15 +426,20 @@ public class SummonerSpellManager {
         // HP réels (virtuels si Baron/Elder/canon, sinon vanilla)
         double cur = fr.lolmc.util.VirtualHP.has(target)
             ? fr.lolmc.util.VirtualHP.getCurrent(target) : target.getHealth();
+        // Dégâts directs (un target.damage() vanilla serait annulé par AbilityListener)
         if (smiteDamage >= cur) {
             if (fr.lolmc.util.VirtualHP.has(target))
                 fr.lolmc.util.VirtualHP.damage(target, cur + 100, caster);
-            else target.damage(cur + 100, caster);
+            else fr.lolmc.util.VirtualHP.kill(target, caster);
             caster.sendActionBar(Component.text("⚔ Châtiment — EXÉCUTÉ!", NamedTextColor.GOLD));
         } else {
             if (fr.lolmc.util.VirtualHP.has(target))
                 fr.lolmc.util.VirtualHP.damage(target, smiteDamage, caster);
-            else target.damage(smiteDamage, caster);
+            else {
+                double left = target.getHealth() - smiteDamage;
+                target.setHealth(left);
+                fr.lolmc.util.HealthBar.update(target, left, fr.lolmc.util.Compat.maxHealthOf(target));
+            }
             caster.sendActionBar(Component.text("⚔ Châtiment! (" + (int) smiteDamage + ")", NamedTextColor.GOLD));
         }
         fr.lolmc.util.VisualEffectUtil.impactBurst(target.getWorld(),

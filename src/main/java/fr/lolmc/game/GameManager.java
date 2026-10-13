@@ -142,6 +142,12 @@ public class GameManager {
     public void startGame() {
         gameRunning = true;
         gameStartTime = System.currentTimeMillis();
+        // Horloges de partie : plaques de tourelles (14 min), or croissant des sbires, séries de kills
+        var lp = LolPlugin.getInstance();
+        var rewards = gameInstance != null ? gameInstance.getRewardManager() : lp.getRewardManager();
+        if (rewards != null) { rewards.resetKillStreaks(); rewards.setGameStart(); }
+        var turrets = gameInstance != null ? gameInstance.getTurretManager() : lp.getTurretManager();
+        if (turrets != null) turrets.setGameStart();
         startSystems();
         // Démarrer les sous-systèmes
         var __pm = LolPlugin.getInstance().getPassiveManager();

@@ -37,6 +37,7 @@ public class TabScoreboardManager {
     }
 
     public void start() {
+        if (updateTask != null) stop(); // relance (/lola start en cours de partie) : pas de tâche en double
         var sm = Bukkit.getScoreboardManager();
         board = sm.getNewScoreboard();
 

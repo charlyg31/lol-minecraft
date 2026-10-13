@@ -17,11 +17,9 @@ import org.bukkit.event.entity.EntityDeathEvent;
 public class EntityDeathListener implements Listener {
 
     private final ChampionManager championManager;
-    private final RewardManager rewardManager;
 
-    public EntityDeathListener(ChampionManager championManager, RewardManager rewardManager) {
+    public EntityDeathListener(ChampionManager championManager) {
         this.championManager = championManager;
-        this.rewardManager = rewardManager;
     }
 
     /** XP de proximité : quand un sbire meurt, tous les champions alliés dans 14 blocs reçoivent de l'XP. */
@@ -72,22 +70,9 @@ public class EntityDeathListener implements Listener {
             e.getDrops().clear();
             e.setDroppedExp(0);
             fr.lolmc.instance.InstanceHelper.minionManager(dead).onMinionDeath(dead.getUniqueId());
-            // XP partagée : alliés dans un rayon de 14 blocs du sbire
-            double sharedXP = RewardManager.XP_MINION * 0.50; // 50% XP si pas le last-hit
-            for (org.bukkit.entity.Player nearby : dead.getWorld().getNearbyPlayers(dead.getLocation(), 14)) {
-                if (!championManager.hasChampion(nearby)) continue;
-                if (nearby.equals(killer)) continue; // le killer reçoit déjà sa XP complète
-                // N'attribuer qu'aux alliés du killer (même équipe)
-                var tm = LolPlugin.getInstance().getTeamManager();
-                if (killer != null && tm.getTeam(killer) != null
-                        && tm.getTeam(killer) == tm.getTeam(nearby)) {
-                    rewardManager.onMinionKill(nearby, 0, sharedXP); // XP seule, pas d'or
-                }
-            }
+            // XP de proximité des autres champions : gérée par onMinionDeath
             if (killer != null && championManager.hasChampion(killer)) {
-                // CS (Creep Score)
-                LolPlugin.getInstance().getMatchScoreboard().addCS(killer);
-                // Or/XP selon le type de sbire
+                // Or/XP (et CS) selon le type de sbire
                 String minionType = fr.lolmc.game.MinionManager.getMinionTypeTag(dead);
                 int gold = "caster".equals(minionType) ? RewardManager.GOLD_MINION_CASTER
                          : "cannon".equals(minionType) ? RewardManager.GOLD_MINION_CANNON
@@ -98,77 +83,86 @@ public class EntityDeathListener implements Listener {
                     case "super"  -> RewardManager.XP_MINION_SUPER;
                     default       -> RewardManager.XP_MINION;
                 };
-                rewardManager.onMinionKill(killer, gold, xp);
+                fr.lolmc.instance.InstanceHelper.rewardManager(killer).onMinionKill(killer, gold, xp);
             }
         }
     }
 
     // ── Mort de champion (joueur) → or/XP au tueur ──
+    /** Mort vanilla d'un champion (ex. /kill) : les morts LoL passent par HUDManager.triggerDeath. */
     @EventHandler
     public void onPlayerDeath(org.bukkit.event.entity.PlayerDeathEvent e) {
         Player victim = e.getEntity();
-        Player killer = victim.getKiller();
-        if (championManager.hasChampion(victim)) {
-            // ── Assists : tous ceux qui ont infligé des dégâts dans les 10s ──
-            java.util.UUID killerUUID = (killer != null) ? killer.getUniqueId() : null;
-            var assistants = rewardManager.getAssistants(victim.getUniqueId(), killerUUID);
-            for (java.util.UUID aid : assistants) {
-                var assistant = LolPlugin.getInstance().getServer().getPlayer(aid);
-                if (assistant != null && assistant.isOnline()
-                        && championManager.hasChampion(assistant)) {
-                    LolPlugin.getInstance().getGoldManager().addGold(aid, fr.lolmc.game.RewardManager.GOLD_ASSIST);
-                    rewardManager.grantProximityXP(assistant, fr.lolmc.game.RewardManager.XP_ASSIST);
-                    assistant.sendActionBar(net.kyori.adventure.text.Component.text(
-                        String.format("🤝 ASSIST! +%d or +%.0f XP", fr.lolmc.game.RewardManager.GOLD_ASSIST, fr.lolmc.game.RewardManager.XP_ASSIST),
-                        net.kyori.adventure.text.format.NamedTextColor.YELLOW));
-                    LolPlugin.getInstance().getMatchScoreboard().addAssist(assistant);
-                    LolPlugin.getInstance().getRuneManager().onTakedown(assistant);
-                }
+        if (!championManager.hasChampion(victim)) return;
+        if (victim.getGameMode() == org.bukkit.GameMode.SPECTATOR) return; // déjà mort côté LoL
+        handleChampionDeath(victim, victim.getKiller());
+    }
+
+    /**
+     * Récompenses et suivi d'une mort de champion : assists, kill (or, bounty, XP, annonces,
+     * passifs), scoreboard, Premier Sang, death recap. Le respawn est géré par l'appelant.
+     */
+    public void handleChampionDeath(Player victim, Player killer) {
+        if (!championManager.hasChampion(victim)) return;
+        var plugin = LolPlugin.getInstance();
+        var rewards = fr.lolmc.instance.InstanceHelper.rewardManager(victim);
+        if (killer != null && (killer.equals(victim) || !championManager.hasChampion(killer))) killer = null;
+
+        // ── Assists : tous ceux qui ont infligé des dégâts dans les 10s ──
+        java.util.UUID killerUUID = (killer != null) ? killer.getUniqueId() : null;
+        var assistants = rewards.getAssistants(victim.getUniqueId(), killerUUID);
+        var tm = plugin.getTeamManager();
+        for (java.util.UUID aid : assistants) {
+            var assistant = plugin.getServer().getPlayer(aid);
+            if (assistant != null && assistant.isOnline()
+                    && championManager.hasChampion(assistant)
+                    && tm.getTeam(assistant) != tm.getTeam(victim)) {
+                plugin.getGoldManager().addGold(aid, RewardManager.GOLD_ASSIST);
+                rewards.grantProximityXP(assistant, RewardManager.XP_ASSIST);
+                assistant.sendActionBar(net.kyori.adventure.text.Component.text(
+                    String.format("🤝 ASSIST! +%d or +%.0f XP", RewardManager.GOLD_ASSIST, RewardManager.XP_ASSIST),
+                    net.kyori.adventure.text.format.NamedTextColor.YELLOW));
+                plugin.getMatchScoreboard().addAssist(assistant);
+                plugin.getRuneManager().onTakedown(assistant);
             }
         }
-        if (killer != null && !killer.equals(victim)
-                && championManager.hasChampion(killer)
-                && championManager.hasChampion(victim)) {
-            rewardManager.onChampionKill(killer, victim);
-            // Annonce (Premier Sang, multi-kills)
-            fr.lolmc.instance.InstanceHelper.announcementManager(killer).announceKill(killer);
-            fr.lolmc.instance.InstanceHelper.announcementManager(killer).onPlayerDeath(victim);
-            // MasterYi Highlander reset sur kill
-            var killerChamp = championManager.getChampion(killer);
-            if ("masteryi".equals(killerChamp.getId()))
-                fr.lolmc.champion.impl.jungle.MasterYi.onKillDuringHighlander(killer);
-            // Veigar passif Malfaisance
-            if ("veigar".equals(killerChamp.getId()))
-                fr.lolmc.champion.impl.mid.Veigar.onTakedown(killer.getUniqueId());
-            // Jinx passif Get Excited
-            if ("jinx".equals(killerChamp.getId()))
-                fr.lolmc.champion.impl.adc.Jinx.getExcited(killer);
-            // Death recap
-            var drm = LolPlugin.getInstance().getDeathRecapManager();
-            if (drm != null) drm.showRecap(victim);
-            // Annie meurt → Tibbers s'enrage
-            var victimChamp = championManager.getChampion(victim);
-            if ("annie".equals(victimChamp.getId()))
-                fr.lolmc.champion.impl.mid.Annie.onAnnieDeath(victim);
-            // Scoreboard de partie
-            // Scoreboard de partie — reste global : MatchScoreboard n'a pas encore été
-            // routé par instance dans tout le projet (des dizaines d'appelants), donc en
-            // mode multi-instances les scores de plusieurs parties simultanées se
-            // mélangeraient si on ne routait qu'ici. Limite connue du mode instances.
-            LolPlugin.getInstance().getMatchScoreboard().addKill(killer);
-            LolPlugin.getInstance().getMatchScoreboard().addDeath(victim);
-            // Feat of Strength : Premier Sang
-            var killerTeam = LolPlugin.getInstance().getTeamManager().getTeam(killer);
-            if (killerTeam != null)
-                fr.lolmc.instance.InstanceHelper.featManager(killer).claim(
-                    fr.lolmc.game.FeatManager.Feat.FIRST_BLOOD, killerTeam, killer);
-            // Timer de respawn
-            fr.lolmc.instance.InstanceHelper.gameManager(killer).onPlayerDeath(victim);
-            // Consommables : annule les potions de soin en cours à la mort
-            var cm = LolPlugin.getInstance().getConsumableManager();
-            if (cm != null) cm.onPlayerDeath(victim);
-            // Runes : Triomphe, Absorption (soin/or sur takedown)
-            LolPlugin.getInstance().getRuneManager().onTakedown(killer);
-        }
+
+        // ── Suivi commun à toutes les morts ──
+        plugin.getMatchScoreboard().addDeath(victim);
+        fr.lolmc.instance.InstanceHelper.announcementManager(victim).onPlayerDeath(victim);
+        var drm = plugin.getDeathRecapManager();
+        if (drm != null) drm.showRecap(victim);
+        // Consommables : annule les potions de soin en cours à la mort
+        var cm = plugin.getConsumableManager();
+        if (cm != null) cm.onPlayerDeath(victim);
+        // Annie meurt → Tibbers s'enrage
+        if ("annie".equals(championManager.getChampion(victim).getId()))
+            fr.lolmc.champion.impl.mid.Annie.onAnnieDeath(victim);
+
+        if (killer == null) return;
+
+        // ── Kill de champion ──
+        rewards.onChampionKill(killer, victim);
+        // Annonce (Premier Sang, multi-kills)
+        fr.lolmc.instance.InstanceHelper.announcementManager(killer).announceKill(killer);
+        var killerChamp = championManager.getChampion(killer);
+        // MasterYi Highlander reset sur kill
+        if ("masteryi".equals(killerChamp.getId()))
+            fr.lolmc.champion.impl.jungle.MasterYi.onKillDuringHighlander(killer);
+        // Veigar passif Malfaisance
+        if ("veigar".equals(killerChamp.getId()))
+            fr.lolmc.champion.impl.mid.Veigar.onTakedown(killer.getUniqueId());
+        // Jinx passif Get Excited
+        if ("jinx".equals(killerChamp.getId()))
+            fr.lolmc.champion.impl.adc.Jinx.getExcited(killer);
+        // Scoreboard de partie (stats indexées par joueur : les parties simultanées ne se mélangent pas)
+        plugin.getMatchScoreboard().addKill(killer);
+        // Feat of Strength : Premier Sang
+        var killerTeam = tm.getTeam(killer);
+        if (killerTeam != null)
+            fr.lolmc.instance.InstanceHelper.featManager(killer).claim(
+                fr.lolmc.game.FeatManager.Feat.FIRST_BLOOD, killerTeam, killer);
+        // Runes : Triomphe, Absorption (soin/or sur takedown)
+        plugin.getRuneManager().onTakedown(killer);
     }
 }

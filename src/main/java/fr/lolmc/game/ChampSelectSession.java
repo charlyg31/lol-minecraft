@@ -358,7 +358,8 @@ public class ChampSelectSession {
             var plugin = LolPlugin.getInstance();
             plugin.getMapManager().resetAllStructures();
             plugin.getPlantManager().spawnAll();
-            plugin.getMatchScoreboard().startMatch(ranked);
+            // Remise à zéro limitée à ces joueurs : ne pas effacer les stats d'autres parties
+            plugin.getMatchScoreboard().startMatch(ranked, new HashSet<>(participants));
             plugin.getGameManager().startGame();
             plugin.getMinionManager().startWaves();
             LolPlugin.getInstance().getJungleManager().startJungle();

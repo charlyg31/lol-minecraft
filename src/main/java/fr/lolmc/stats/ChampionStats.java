@@ -255,8 +255,10 @@ public final class ChampionStats {
     // ══════════════════════════════════════════════
 
     public void addShield(double amount)       {
-        if (hasSerpentVenom()) amount *= (1 - serpentVenomReduction);
-        shieldAmount += amount;
+        if (amount > 0 && hasSerpentVenom()) amount *= (1 - serpentVenomReduction);
+        // Un montant négatif retire un bouclier expiré : borné à 0, sinon un bouclier déjà
+        // consommé par des dégâts laisserait un solde négatif qui annulerait le suivant.
+        shieldAmount = Math.max(0, shieldAmount + amount);
     }
     public void addMagicShield(double amount)   { magicShieldAmount += amount; }
     public double getShield()                   { return shieldAmount + magicShieldAmount; }

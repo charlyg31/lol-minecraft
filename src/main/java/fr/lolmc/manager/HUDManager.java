@@ -241,15 +241,30 @@ public class HUDManager {
         syncMinecraftHP(player, hp);
     }
 
+    /**
+     * Mort d'un champion (PV LoL à 0). Le joueur ne meurt pas au sens Minecraft : on traite
+     * directement récompenses/annonces (EntityDeathListener) puis le respawn.
+     *
+     * @param killer tueur connu, ou null : le dernier champion ennemi l'ayant blessé dans les
+     *               10 s obtient alors le kill (mort achevée par un sbire, une tourelle…)
+     */
     public void triggerDeath(Player victim, Player killer) {
         // Éviter de déclencher deux fois si déjà en spectateur
         if (victim.getGameMode() == org.bukkit.GameMode.SPECTATOR) return;
-        onDeath(victim);
-        // Déclencher l'event de mort pour EntityDeathListener (rewards, assists)
-        LolPlugin.getInstance().getServer().getScheduler().runTask(LolPlugin.getInstance(), () -> {
-            victim.setHealth(0.0001);
-            // setHealth(0) déclenche EntityDeathEvent → géré par EntityDeathListener
-        });
+        var plugin = LolPlugin.getInstance();
+        if (killer == null) {
+            var last = fr.lolmc.instance.InstanceHelper.rewardManager(victim).getLastAttacker(victim.getUniqueId());
+            Player p = last != null ? plugin.getServer().getPlayer(last) : null;
+            var tm = plugin.getTeamManager();
+            if (p != null && p.isOnline() && !p.equals(victim) && championManager.hasChampion(p)
+                    && tm.getTeam(p) != tm.getTeam(victim)) killer = p;
+        }
+        var deaths = plugin.getEntityDeathListener();
+        if (deaths != null) deaths.handleChampionDeath(victim, killer);
+        // Respawn : timer de la partie (table LoL + BossBar), sinon timer simple (hors partie)
+        var gm = fr.lolmc.instance.InstanceHelper.gameManager(victim);
+        if (gm.isRunning()) gm.onPlayerDeath(victim);
+        if (victim.getGameMode() != org.bukkit.GameMode.SPECTATOR) onDeath(victim);
     }
 
     private void onDeath(Player player) {

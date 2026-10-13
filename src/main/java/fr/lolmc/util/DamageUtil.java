@@ -33,13 +33,11 @@ public class DamageUtil {
         } else {
             // Sbire ou monstre : dégât direct sur les PV (PAS de victim.damage() -> évite StackOverflow)
             double newHealth = Math.max(0, victim.getHealth() - rawAmount);
-            victim.setHealth(newHealth);
             fr.lolmc.util.VisualEffectUtil.impact(victim.getWorld(),
                     victim.getLocation().add(0, 1, 0), Material.WHITE_STAINED_GLASS, 0.26f, 4L);
-            if (newHealth <= 0 && attacker != null) {
-                // Laisser MC gérer la mort (drop d'or géré par EntityDeathListener)
-                victim.setHealth(0);
-            }
+            // Mort attribuée à l'attaquant (or/XP gérés par EntityDeathListener)
+            if (newHealth <= 0) fr.lolmc.util.VirtualHP.kill(victim, attacker);
+            else victim.setHealth(newHealth);
         }
     }
 

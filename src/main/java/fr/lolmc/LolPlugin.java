@@ -110,6 +110,7 @@ public class LolPlugin extends JavaPlugin {
     private fr.lolmc.game.PlantManager plantManager;
     private fr.lolmc.game.MinimapManager minimapManager;
     private fr.lolmc.manager.SkinManager skinManager;
+    private EntityDeathListener entityDeathListener;
 
     @Override
     public void onEnable() {
@@ -273,8 +274,8 @@ public class LolPlugin extends JavaPlugin {
         structureDamageListener = new fr.lolmc.listener.StructureDamageListener(mapManager, championManager, teamManager);
         getServer().getPluginManager().registerEvents(structureDamageListener, this);
         getServer().getPluginManager().registerEvents(new fr.lolmc.listener.ChatListener(), this);
-        getServer().getPluginManager().registerEvents(
-                new EntityDeathListener(championManager, rewardManager), this);
+        entityDeathListener = new EntityDeathListener(championManager);
+        getServer().getPluginManager().registerEvents(entityDeathListener, this);
     }
 
     /**
@@ -410,6 +411,7 @@ public class LolPlugin extends JavaPlugin {
     public RankedManager getRankedManager()     { return rankedManager; }
 
     public AbilityListener getAbilityListener() { return abilityListener; }
+    public EntityDeathListener getEntityDeathListener() { return entityDeathListener; }
 
     public fr.lolmc.bridge.BridgeManager getBridgeManager() { return bridgeManager; }
 
