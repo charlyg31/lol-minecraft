@@ -133,10 +133,10 @@ public final class BridgeManager implements PluginMessageListener {
         String playersStr = data.getOrDefault("players", "");
         if (playersStr.isEmpty()) { log.warning("[Bridge] GAME_READY sans joueurs"); return; }
 
-        List<UUID> expected = new java.util.ArrayList<>();
-        for (String s : playersStr.split(",")) {
-            try { expected.add(UUID.fromString(s.trim())); } catch (IllegalArgumentException ignored) {}
-        }
+        List<UUID> expected = parseUuids(playersStr);
+        // Équipes calculées par le proxy (groupes jamais séparés) ; absentes avec un ancien proxy
+        final List<UUID> proxyBlue = parseUuids(data.getOrDefault("blue", ""));
+        final List<UUID> proxyRed  = parseUuids(data.getOrDefault("red", ""));
 
         log.info("[Bridge] GAME_READY reçu — " + expected.size() + " joueurs, ranked=" + ranked);
 
@@ -158,14 +158,19 @@ public final class BridgeManager implements PluginMessageListener {
                     Bukkit.getScheduler().runTask(plugin, () -> {
                         var csm = plugin.getChampSelectManager();
                         csm.freeze(connected);
+                        // Équipes : celles du proxy, sinon par groupes (avant : un joueur sur deux,
+                        // ce qui séparait les membres d'un même groupe)
+                        List<UUID> blue = new java.util.ArrayList<>();
+                        List<UUID> red  = new java.util.ArrayList<>();
+                        buildTeams(connected, proxyBlue, proxyRed, blue, red);
                         if (!plugin.getConfig().getBoolean("world.use-instances", false)) {
+                            var tm = plugin.getTeamManager();
+                            for (UUID id : blue) { Player pl = Bukkit.getPlayer(id); if (pl != null) tm.setTeam(pl, fr.lolmc.team.TeamManager.Team.BLUE); }
+                            for (UUID id : red)  { Player pl = Bukkit.getPlayer(id); if (pl != null) tm.setTeam(pl, fr.lolmc.team.TeamManager.Team.RED); }
                             csm.startSelection(connected, ranked);
                             return;
                         }
                         // Mode instances : copie du monde template → monde de partie dédié
-                        List<UUID> blue = new java.util.ArrayList<>();
-                        List<UUID> red  = new java.util.ArrayList<>();
-                        for (int i = 0; i < connected.size(); i++) (i % 2 == 0 ? blue : red).add(connected.get(i));
                         for (UUID id : connected) {
                             Player pl = Bukkit.getPlayer(id);
                             if (pl != null) pl.sendMessage(net.kyori.adventure.text.Component.text(
@@ -200,6 +205,44 @@ public final class BridgeManager implements PluginMessageListener {
                 }
             }
         }.runTaskTimerAsynchronously(plugin, 40L, 40L); // vérifie toutes les 2s, commence après 2s
+    }
+
+    private static List<UUID> parseUuids(String csv) {
+        List<UUID> list = new java.util.ArrayList<>();
+        if (csv == null || csv.isBlank()) return list;
+        for (String s : csv.split(",")) {
+            try { list.add(UUID.fromString(s.trim())); } catch (IllegalArgumentException ignored) {}
+        }
+        return list;
+    }
+
+    /**
+     * Répartit les joueurs connectés : équipes du proxy si fournies ; sinon groupes du serveur
+     * gardés entiers, chaque groupe allant dans l'équipe la moins remplie (plus gros d'abord).
+     * Les joueurs non prévus par le proxy complètent l'équipe la moins remplie.
+     */
+    private void buildTeams(List<UUID> connected, List<UUID> proxyBlue, List<UUID> proxyRed,
+                            List<UUID> blue, List<UUID> red) {
+        Set<UUID> placed = new HashSet<>();
+        if (!proxyBlue.isEmpty() || !proxyRed.isEmpty()) {
+            for (UUID id : proxyBlue) if (connected.contains(id)) { blue.add(id); placed.add(id); }
+            for (UUID id : proxyRed)  if (connected.contains(id)) { red.add(id);  placed.add(id); }
+        }
+        // Groupes restants (repli) : unités indivisibles
+        List<List<UUID>> units = new java.util.ArrayList<>();
+        var pm = plugin.getPartyManager();
+        for (UUID id : connected) {
+            if (placed.contains(id)) continue;
+            Player p = Bukkit.getPlayer(id);
+            List<UUID> unit = new java.util.ArrayList<>();
+            for (UUID m : (p != null ? pm.getMembers(p) : List.of(id)))
+                if (connected.contains(m) && !placed.contains(m)) unit.add(m);
+            if (unit.isEmpty()) unit.add(id);
+            placed.addAll(unit);
+            units.add(unit);
+        }
+        units.sort((a, b) -> b.size() - a.size());
+        for (List<UUID> unit : units) (blue.size() <= red.size() ? blue : red).addAll(unit);
     }
 
     private void handlePlayerData(Map<String, String> data) {

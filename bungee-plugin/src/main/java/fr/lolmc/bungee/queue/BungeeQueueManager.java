@@ -307,6 +307,14 @@ public class BungeeQueueManager {
             }
         }, 2, TimeUnit.SECONDS);
 
+        // Équipes : groupes jamais séparés, un joueur par rôle dans chaque équipe si possible
+        Map<UUID, List<String>> override = fillUUID != null && fillRole != null
+                ? Map.of(fillUUID, List.of(fillRole)) : Map.of();
+        List<List<UUID>> split = splitTeams(allPlayers, override, true);
+        if (split == null) split = splitTeams(allPlayers, override, false); // repli : tailles + groupes
+        final List<UUID> blueTeam = split != null ? split.get(0) : allPlayers;
+        final List<UUID> redTeam  = split != null ? split.get(1) : List.of();
+
         // GAME_READY après 6s (2s connect + 4s chargement)
         ProxyServer.getInstance().getScheduler().schedule(plugin, () -> {
             String json = "{"
@@ -315,6 +323,10 @@ public class BungeeQueueManager {
                     + "\"count\":" + allPlayers.size() + ","
                     + "\"players\":\""
                     + String.join(",", allPlayers.stream().map(UUID::toString).toList())
+                    + "\",\"blue\":\""
+                    + String.join(",", blueTeam.stream().map(UUID::toString).toList())
+                    + "\",\"red\":\""
+                    + String.join(",", redTeam.stream().map(UUID::toString).toList())
                     + "\"}";
             sendPluginMessage(gameServer, json);
             plugin.getLogger().info("[Queue] GAME_READY envoyé pour " + allPlayers.size() + " joueurs (ranked=" + isRanked + ")");
@@ -362,7 +374,7 @@ public class BungeeQueueManager {
         if (candidates.size() < size) return null;
         // Essai simple : les `size` premiers — sans couper un groupe en deux
         List<UUID> attempt = takeWholeParties(candidates, size);
-        if (attempt != null && hasValidMatching(attempt)) return attempt;
+        if (attempt != null && isLaunchable(attempt)) return attempt;
 
         // Heuristique (pas exhaustive) : groupes d'abord, puis solos
         List<UUID> groups = new ArrayList<>();
@@ -374,7 +386,7 @@ public class BungeeQueueManager {
         List<UUID> mixed = new ArrayList<>(groups);
         mixed.addAll(solos);
         List<UUID> attempt2 = takeWholeParties(mixed, size);
-        return attempt2 != null && hasValidMatching(attempt2) ? attempt2 : null;
+        return attempt2 != null && isLaunchable(attempt2) ? attempt2 : null;
     }
 
     /**
@@ -396,6 +408,94 @@ public class BungeeQueueManager {
             if (result.size() == size) return result;
         }
         return null;
+    }
+
+    /**
+     * Partie complète : les rôles doivent pouvoir se répartir ET les joueurs se couper en
+     * 2 équipes (groupes jamais séparés, un joueur par rôle dans chaque équipe).
+     * Pour le groupe incomplet (N-1, en attente d'un fill), seul le matching global est vérifié.
+     */
+    private boolean isLaunchable(List<UUID> players) {
+        if (!hasValidMatching(players)) return false;
+        if (players.size() < playersNeeded) return true;
+        return splitTeams(players, Map.of(), true) != null;
+    }
+
+    /**
+     * Coupe les joueurs en deux équipes (bleue = ceil(n/2), rouge = le reste) sans jamais
+     * séparer un groupe. En mode strict, chaque équipe doit aussi avoir une assignation de
+     * rôles valide (un joueur par poste) ; sinon la première répartition de bonne taille
+     * est acceptée (repli).
+     *
+     * @param roleOverride rôle imposé à certains joueurs (ex. le fill)
+     * @return [bleus, rouges], ou null si impossible
+     */
+    private List<List<UUID>> splitTeams(List<UUID> players, Map<UUID, List<String>> roleOverride, boolean strict) {
+        // Unités indivisibles : chaque groupe (restreint aux joueurs de la partie), sinon le solo
+        List<List<UUID>> units = new ArrayList<>();
+        Set<UUID> seen = new HashSet<>();
+        Set<UUID> pool = new HashSet<>(players);
+        for (UUID uid : players) {
+            if (seen.contains(uid)) continue;
+            List<UUID> unit = new ArrayList<>();
+            for (UUID m : partyManager.getPartyMembers(uid)) if (pool.contains(m)) unit.add(m);
+            if (unit.isEmpty()) unit.add(uid);
+            seen.addAll(unit);
+            units.add(unit);
+        }
+        int blueSize = (players.size() + 1) / 2;
+        List<List<UUID>> fallback = new ArrayList<>(1);
+        List<List<UUID>> found = splitRec(units, 0, new ArrayList<>(), new ArrayList<>(),
+                blueSize, players.size() - blueSize, roleOverride, strict, fallback);
+        if (found != null) return found;
+        return strict ? null : (fallback.isEmpty() ? null : fallback);
+    }
+
+    private List<List<UUID>> splitRec(List<List<UUID>> units, int i, List<UUID> blue, List<UUID> red,
+                                      int blueSize, int redSize, Map<UUID, List<String>> roleOverride,
+                                      boolean strict, List<List<UUID>> fallback) {
+        if (blue.size() > blueSize || red.size() > redSize) return null;
+        if (i == units.size()) {
+            if (blue.size() != blueSize || red.size() != redSize) return null;
+            if (fallback.isEmpty()) { fallback.add(new ArrayList<>(blue)); fallback.add(new ArrayList<>(red)); }
+            if (validTeam(blue, roleOverride) && validTeam(red, roleOverride))
+                return List.of(new ArrayList<>(blue), new ArrayList<>(red));
+            return null;
+        }
+        List<UUID> unit = units.get(i);
+        blue.addAll(unit);
+        var r = splitRec(units, i + 1, blue, red, blueSize, redSize, roleOverride, strict, fallback);
+        blue.subList(blue.size() - unit.size(), blue.size()).clear();
+        if (r != null) return r;
+        if (i == 0) return null; // symétrie : le 1er groupe peut toujours aller en bleu
+        red.addAll(unit);
+        r = splitRec(units, i + 1, blue, red, blueSize, redSize, roleOverride, strict, fallback);
+        red.subList(red.size() - unit.size(), red.size()).clear();
+        return r;
+    }
+
+    /** Une équipe est valide si chaque joueur peut tenir un poste différent. */
+    private boolean validTeam(List<UUID> team, Map<UUID, List<String>> roleOverride) {
+        List<List<String>> playerRoles = new ArrayList<>();
+        for (UUID uid : team) playerRoles.add(roleOverride.getOrDefault(uid, getRolesFor(uid)));
+        int[] match = new int[ROLES.size()];
+        Arrays.fill(match, -1);
+        int matched = 0;
+        for (int pi = 0; pi < playerRoles.size(); pi++)
+            if (augmentRoles(pi, playerRoles, match, new boolean[ROLES.size()])) matched++;
+        return matched == team.size();
+    }
+
+    private boolean augmentRoles(int pi, List<List<String>> playerRoles, int[] match, boolean[] visited) {
+        for (int ri = 0; ri < ROLES.size(); ri++) {
+            if (visited[ri] || !playerRoles.get(pi).contains(ROLES.get(ri))) continue;
+            visited[ri] = true;
+            if (match[ri] == -1 || augmentRoles(match[ri], playerRoles, match, visited)) {
+                match[ri] = pi;
+                return true;
+            }
+        }
+        return false;
     }
 
     /** Vérifie qu'il existe une assignation valide de chaque joueur à un poste. */
