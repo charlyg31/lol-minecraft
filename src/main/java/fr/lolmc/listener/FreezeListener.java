@@ -13,7 +13,6 @@ public class FreezeListener implements Listener {
         if (csm == null || !csm.isFrozen(e.getPlayer().getUniqueId())) return;
         var from = e.getFrom();
         var to = e.getTo();
-        if (to == null) return;
         // Position bloquée, la rotation de la tête reste libre
         if (from.getX() != to.getX() || from.getY() != to.getY() || from.getZ() != to.getZ()) {
             to.setX(from.getX());
