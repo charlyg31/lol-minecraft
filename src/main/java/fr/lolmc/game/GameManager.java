@@ -531,9 +531,16 @@ public class GameManager {
 
     private void startInhibitorRespawnCheck(String key) {
         new org.bukkit.scheduler.BukkitRunnable() {
+            boolean warned = false;
             @Override public void run() {
                 Long at = inhibitorRespawnAt.get(key);
                 if (at == null || !gameRunning) { cancel(); return; }
+                // Annonce 15 s avant la repousse (LoL)
+                if (!warned && at - System.currentTimeMillis() <= 15_000L) {
+                    warned = true;
+                    announce(net.kyori.adventure.text.Component.text(
+                        "🏛 Inhibiteur " + key + " : repousse dans 15 secondes!", net.kyori.adventure.text.format.NamedTextColor.YELLOW));
+                }
                 if (System.currentTimeMillis() >= at) {
                     inhibitorRespawnAt.remove(key);
                     // Notifier MapManager de reconstruire l'inhibiteur

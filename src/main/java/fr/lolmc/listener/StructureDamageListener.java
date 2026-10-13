@@ -68,6 +68,15 @@ public class StructureDamageListener implements Listener {
         }
 
         var tm = fr.lolmc.instance.InstanceHelper.turretManager(player);
+        if (structure.getType() != Type.TURRET) {
+            // Inhibiteur / Nexus (wiki) : 100 % AD + 60 % AP, physique si l'AD bonus dépasse 60 %
+            // de l'AP, sinon magique ; armure 20, RM 0, la pénétration n'a pas d'effet
+            var st = champ.getStats();
+            double ap = st.getFinalAP() * 0.60;
+            damage += ap;
+            boolean physical = st.getBonusAD() > ap;
+            if (physical) damage *= fr.lolmc.util.MobCombat.resistMultiplier(20);
+        }
         if (structure.getType() == Type.TURRET) {
             // Les tourelles prennent 20 % de dégâts en plus des champions de mêlée (LoL)
             if (champ.getAutoAttackRange() <= 3.0) damage *= 1.20;
@@ -75,9 +84,9 @@ public class StructureDamageListener implements Listener {
             damage = champ.getStats().calcPhysicalDamageVs(damage, tm.getArmor(structure));
         }
 
-        // Armure renforcée (LoL) : -80 % de dégâts sans sbire de l'attaquant à proximité.
+        // Armure renforcée (LoL, tourelles) : -80 % de dégâts sans sbire de l'attaquant à proximité.
         // (L'ancienne « fortification » des 5 premières minutes n'existe plus sur la Faille.)
-        boolean minionNearby = false;
+        boolean minionNearby = structure.getType() != Type.TURRET;
         for (var ent : structure.getCenter().getWorld()
                 .getNearbyEntities(structure.getCenter(), 12, 8, 12)) {
             if (ent instanceof org.bukkit.entity.LivingEntity le
@@ -230,8 +239,9 @@ public class StructureDamageListener implements Listener {
                 c, Material.GRAY_STAINED_GLASS, 0.45f, 1.0, 14, 10L);
         c.getWorld().playSound(c, Sound.ENTITY_GENERIC_EXPLODE, 1f, 1f);
 
-        // ── Victoire si Nexus principal détruit ──
+        // ── Victoire si Nexus principal détruit (50 or au last-hit, wiki) ──
         if (structure.getType() == Type.NEXUS_BASE) {
+            LolPlugin.getInstance().getGoldManager().addGold(destroyer.getUniqueId(), 50);
             Team winner = enemyTeam.opposite();
             endMatch(winner, destroyer);
         }

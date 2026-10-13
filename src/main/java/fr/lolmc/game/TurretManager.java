@@ -465,6 +465,12 @@ public class TurretManager {
         turretTask = new BukkitRunnable() {
             @Override public void run() {
                 for (GameStructure turret : mapManager.getStructures()) {
+                    // Inhibiteurs (15 PV/s) et Nexus (20 PV/s) régénèrent jusqu'au maximum (wiki)
+                    if ((turret.getType() == Type.INHIBITOR || turret.getType() == Type.NEXUS_BASE)
+                            && gameStartMs != 0 && !turret.isDestroyed()) {
+                        double perSec = turret.getType() == Type.INHIBITOR ? 15 : 20;
+                        if (turret.heal(perSec * SECONDS_PER_SHOT, 1.0)) mapManager.updateStructurePhase(turret);
+                    }
                     if (turret.getType() != Type.TURRET) continue;
                     if (gameStartMs != 0) regenAndRespawn(turret);
                     if (turret.isDestroyed()) continue;

@@ -266,18 +266,20 @@ public class MapManager {
     // RÈGLE DE PROTECTION DU NEXUS & HELPERS
     // ══════════════════════════════════════════════════════════════
 
+    /**
+     * Le Nexus est invulnérable tant que ses 3 inhibiteurs, ou au moins une de ses tourelles,
+     * tiennent (wiki LoL). Un « nexus de lane » détruit compte comme un inhibiteur tombé.
+     * Avant : il fallait un nexus de lane (structure absente de LoL) — sans elle sur la carte, le
+     * Nexus restait invulnérable pour toujours ; idem sans tourelles de base.
+     */
     public boolean canAttackBaseNexus(Team team) {
-        boolean aNexusDown = structures.stream()
-                .filter(s -> s.getTeam() == team && s.getType() == Type.NEXUS)
+        boolean anInhibitorDown = structures.stream()
+                .filter(s -> s.getTeam() == team && (s.getType() == Type.INHIBITOR || s.getType() == Type.NEXUS))
                 .anyMatch(GameStructure::isDestroyed);
-
-        List<GameStructure> baseTurrets = structures.stream()
+        boolean allBaseTurretsDown = structures.stream()
                 .filter(s -> s.getTeam() == team && s.getType() == Type.TURRET && "base".equals(s.getLane()))
-                .toList();
-        boolean allBaseTurretsDown = !baseTurrets.isEmpty()
-                && baseTurrets.stream().allMatch(GameStructure::isDestroyed);
-
-        return aNexusDown && allBaseTurretsDown;
+                .allMatch(GameStructure::isDestroyed);
+        return anInhibitorDown && allBaseTurretsDown;
     }
 
     /**
@@ -454,6 +456,9 @@ public class MapManager {
             String sKey = s.getType().name() + "_" + s.getTeam() + "_" + s.getLane();
             if (sKey.equals(key) && s.getType() == Type.INHIBITOR) {
                 s.respawn();
+                // Recoller la schématique intacte (avant : l'inhibiteur repoussait invisible)
+                updateStructurePhase(s);
+                s.updateHealthBarNametag();
                 return;
             }
         }

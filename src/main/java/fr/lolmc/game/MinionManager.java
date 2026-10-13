@@ -246,14 +246,19 @@ public class MinionManager {
                     }
                 }.runTaskLater(LolPlugin.getInstance(), delay);
             }
-            // Super-sbire si l'inhibiteur ennemi est détruit sur cette lane
+            // Super-sbire si l'inhibiteur ennemi de cette lane est détruit ; 2 par lane quand les
+            // 3 inhibiteurs ennemis sont tombés (wiki LoL)
             if (hasSuperMinions(team, lane)) {
                 final Location sp = spawnPoint;
-                new BukkitRunnable() {
-                    @Override public void run() {
-                        if (spawning) spawnSuperMinion(team, lane, sp);
-                    }
-                }.runTaskLater(LolPlugin.getInstance(), count * 8 + 4);
+                boolean allDown = hasSuperMinions(team, "top") && hasSuperMinions(team, "mid")
+                        && hasSuperMinions(team, "bot");
+                for (int k = 0; k < (allDown ? 2 : 1); k++) {
+                    new BukkitRunnable() {
+                        @Override public void run() {
+                            if (spawning) spawnSuperMinion(team, lane, sp);
+                        }
+                    }.runTaskLater(LolPlugin.getInstance(), count * 8 + 4 + k * 8L);
+                }
             }
         }
     }
@@ -656,19 +661,18 @@ public class MinionManager {
         }
     }
 
-    /** Désactive les super-sbires sur une lane (inhibiteur repoussé). */
+    /**
+     * Inhibiteur repoussé : l'équipe ADVERSE de son propriétaire perd ses super-sbires sur cette
+     * lane. Clé « INHIBITOR_RED_top » (équipe propriétaire). Avant, la clé était mal découpée
+     * (« INHIBITOR » lu comme équipe) et les super-sbires ne s'arrêtaient jamais.
+     */
     public void onInhibitorRespawned(String key) {
-        // key format: "BLUE_top" ou "RED_mid"
-        String[] parts = key.split("_", 2);
-        if (parts.length == 2) {
-            try {
-                disableSuperMinions(Team.valueOf(parts[0]), parts[1]);
-                return;
-            } catch (IllegalArgumentException ignored) {
-                // format inattendu, fallback ci-dessous
-            }
-        }
-        superMinionLanes.remove(key);
+        String[] parts = key.split("_", 3);
+        if (parts.length != 3) return;
+        try {
+            Team owner = Team.valueOf(parts[1]);
+            disableSuperMinions(owner.opposite(), parts[2]);
+        } catch (IllegalArgumentException ignored) {}
     }
 
 
