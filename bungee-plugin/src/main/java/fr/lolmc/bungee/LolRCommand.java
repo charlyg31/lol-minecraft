@@ -14,7 +14,7 @@ import java.util.*;
  * /lolr — File ranked (classé) avec phase de pick + ban.
  *
  * Mêmes règles de rôles que /lol (minimum 2 rôles ou "all").
- * Force ranked=true dans la config au moment du lancement.
+ * Les joueurs rejoignent la file classée (séparée de la file normale /lol).
  *
  * Sous-commandes admin :
  *   /lolr on   — active les parties classées
@@ -109,20 +109,17 @@ public class LolRCommand extends Command implements TabExecutor {
     private void handleQueue(ProxiedPlayer player, List<String> roles) {
         BungeePartyManager pm = plugin.getPartyManager();
 
-        // Forcer ranked=true dans la config avant de lancer
-        plugin.setRankedMode(true);
-
         if (pm.inParty(player.getUniqueId())) {
             boolean launchQueue = pm.setRolesAndCheckReady(player, roles);
             if (launchQueue) {
                 for (UUID uid : pm.getPartyMembers(player.getUniqueId())) {
                     ProxiedPlayer member = ProxyServer.getInstance().getPlayer(uid);
-                    if (member != null) plugin.getQueueManager().join(member);
+                    if (member != null) plugin.getQueueManager().join(member, true);
                 }
             }
         } else {
             plugin.getRoleManager().setRoles(player.getUniqueId(), roles);
-            plugin.getQueueManager().join(player);
+            plugin.getQueueManager().join(player, true);
             player.sendMessage(new TextComponent("§6⚔ Classé — en recherche de partie..."));
         }
     }

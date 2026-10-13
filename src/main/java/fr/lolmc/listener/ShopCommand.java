@@ -59,8 +59,8 @@ public class ShopCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        // Ouvrir la boutique
-        shopGUI.open(player);
+        // Ouvrir la boutique (soumise à la règle « base uniquement » en partie)
+        fr.lolmc.LolPlugin.getInstance().getShopListener().openShop(player);
         return true;
     }
 

@@ -50,14 +50,15 @@ public class FeatManager {
             case FIRST_EPIC  -> "Premier Objectif Épique";
         };
 
-        // Annonce à tous
-        Bukkit.broadcast(Component.text(
+        org.bukkit.World world = actor != null ? actor.getWorld() : null;
+        // Annonce aux joueurs de la partie
+        fr.lolmc.util.WorldContext.broadcast(world, Component.text(
             String.format("⚡ FEAT OF STRENGTH — %s par l'équipe %s!",
                 featName, team == Team.BLUE ? "Bleue" : "Rouge"),
             team.chatColor));
 
         // Son pour l'équipe qui gagne le feat
-        for (Player p : Bukkit.getOnlinePlayers()) {
+        for (Player p : playersOf(world)) {
             if (!LolPlugin.getInstance().getTeamManager().hasTeam(p)) continue;
             Sound snd = LolPlugin.getInstance().getTeamManager().getTeam(p) == team
                     ? Sound.ENTITY_PLAYER_LEVELUP
@@ -65,18 +66,26 @@ public class FeatManager {
             p.playSound(p.getLocation(), snd, 1f, 1.2f);
         }
 
-        checkAllFeats(team);
+        checkAllFeats(team, world);
         return true;
     }
 
+    /** Joueurs de la partie qui se joue dans {@code world} (null = monde de jeu global). */
+    private static java.util.Collection<Player> playersOf(org.bukkit.World world) {
+        var im = LolPlugin.getInstance().getInstanceManager();
+        if (world != null && im != null && im.getInstanceByWorldName(world.getName()) != null)
+            return world.getPlayers();
+        return fr.lolmc.util.WorldContext.getGamePlayers();
+    }
+
     /** Vérifie si une équipe a remporté les 3 feats → bonus Atakhan. */
-    private void checkAllFeats(Team team) {
+    private void checkAllFeats(Team team, org.bukkit.World world) {
         if (bonusGranted) return;
         long teamFeats = claimed.values().stream().filter(t -> t == team).count();
         if (teamFeats < 3) return;
 
         bonusGranted = true;
-        Bukkit.broadcast(Component.text(
+        fr.lolmc.util.WorldContext.broadcast(world, Component.text(
             "🔥 " + (team == Team.BLUE ? "BLEUE" : "ROUGE")
             + " remporte les 3 FEATS OF STRENGTH — Avantage global!",
             NamedTextColor.GOLD));
@@ -85,7 +94,7 @@ public class FeatManager {
         var gm = LolPlugin.getInstance().getGoldManager();
         var tm = LolPlugin.getInstance().getTeamManager();
 
-        for (Player p : Bukkit.getOnlinePlayers()) {
+        for (Player p : playersOf(world)) {
             if (!tm.hasTeam(p) || tm.getTeam(p) != team) continue;
             // +150 or
             if (gm != null) gm.addGold(p.getUniqueId(), 150);

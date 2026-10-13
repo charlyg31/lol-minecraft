@@ -241,8 +241,16 @@ public class BaseManager {
     // ANNEAU DE SOIN (régénération à la base)
     // ══════════════════════════════════════════════════════════════
 
+    private org.bukkit.scheduler.BukkitTask healRingTask;
+
+    /** Arrête la tâche de l'anneau de soin (fin de l'instance). */
+    public void stopHealRingTask() {
+        if (healRingTask != null) { healRingTask.cancel(); healRingTask = null; }
+    }
+
     public void startHealRingTask() {
-        new BukkitRunnable() {
+        if (healRingTask != null) return;
+        healRingTask = new BukkitRunnable() {
             @Override public void run() {
                 var cm = LolPlugin.getInstance().getChampionManager();
                 var tm = LolPlugin.getInstance().getTeamManager();

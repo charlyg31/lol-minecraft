@@ -47,11 +47,11 @@ max-party-size: 5           # taille maximale d'un groupe
 
 Rôles valides : `top` · `jungle` · `mid` · `adc` · `support`
 
-**Test solo — `/lols [rôle]`** (par défaut `mid`) : simule une « partie trouvée » en solo pour tester l'enchaînement file → sélection de champion → partie, sans attendre d'autres joueurs.
+**Test solo — `/lols [rôle]`** (par défaut `mid`, permission `lolmc.admin`) : simule une « partie trouvée » en solo pour tester l'enchaînement file → sélection de champion → partie, sans attendre d'autres joueurs.
 
 **File classée — `/lolr`**
 
-Mêmes règles de rôles que `/lol`, mais avec bans et pick en début de partie. `/lolr stop` quitte la file classée. Une sous-commande admin (`/lolr on` / `/lolr off`) active ou coupe les parties classées côté proxy.
+Mêmes règles de rôles que `/lol`, mais avec bans et pick en début de partie. La file classée est séparée de la file normale : un joueur de `/lol` n'est jamais placé dans une partie classée. `/lolr stop` quitte la file classée. Une sous-commande admin (`/lolr on` / `/lolr off`) active ou coupe les parties classées côté proxy.
 
 ### Fonctionnalités
 
@@ -105,12 +105,15 @@ minimap:
   scale: CLOSE                    # CLOSEST=128b CLOSE=256 NORMAL=512 FAR=1024 FARTHEST=2048
 
 database:
-  type: sqlite                    # sqlite | mysql | mongodb
-  mysql: { host: localhost, port: 3306, database: lolmc, user: root, password: "" }
+  type: sqlite                    # sqlite | mysql
+  mysql: { host: localhost, port: 3306, database: lolmc, user: root, password: "", ssl: false }
 
 api:
   enabled: false                  # API web REST des statistiques (voir plus bas)
+  bind: "127.0.0.1"               # "0.0.0.0" pour écouter sur toutes les interfaces
   port: 8080
+  key: ""                         # clé exigée dans l'en-tête X-Api-Key (vide = pas d'auth)
+  cors-origin: "*"
 ```
 
 Un bloc `heads:` liste les 20 champions avec un champ `PASTE_VALUE_HERE` à remplir avec la valeur base64 d'une tête custom (ex. minecraft-heads.com).
@@ -207,13 +210,13 @@ Activable via `api.enabled: true` dans `config.yml`. Expose un serveur HTTP loca
 | `GET /api/online` | Joueurs en ligne, statut de partie et numéro d'instance |
 | `GET /api/status` | Statut général du serveur, avec le détail de chaque instance (`instances`) |
 
-Nécessite un port ouvert côté hébergeur pour un accès depuis un site externe.
+Par défaut l'API n'écoute que sur `127.0.0.1`. Pour un accès depuis un site externe : `api.bind: "0.0.0.0"`, un port ouvert côté hébergeur, et de préférence une clé `api.key` (envoyée dans l'en-tête `X-Api-Key`).
 
 ---
 
 ## Persistance
 
-Trois backends au choix (`database.type` dans `config.yml`) : `sqlite` (par défaut, local), `mysql`, ou `mongodb`.
+Deux backends au choix (`database.type` dans `config.yml`) : `sqlite` (par défaut, local) ou `mysql`. Les colonnes ajoutées par les mises à jour sont créées automatiquement dans une base existante.
 
 ---
 
@@ -303,12 +306,10 @@ En mode instances, sauvegarde et **décharge** `lolmc_template` avant de lancer 
 
 | Composant | Version |
 |-----------|---------|
-| Paper API | 26.1.2 |
+| Paper API | 26.2 (build 111, compatible api-version 26.1) |
 | Java | 25 |
-| HikariCP | 7.1.0 |
 | SQLite JDBC | 3.53.2.1 |
-| MySQL Connector/J | 9.7.0 |
-| MongoDB Driver (sync) | 5.9.0 |
+| MySQL Connector/J | 26.7.0 |
 | Multiverse-Core | 4.3.12 (soft-depend) |
 
 Build avec Maven (`mvn package`), un `pom.xml` par projet. Le JAR final embarque ses dépendances (maven-shade-plugin).

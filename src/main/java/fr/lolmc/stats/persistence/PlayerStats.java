@@ -99,7 +99,7 @@ public class PlayerStats {
             "\"normal\":{\"games\":%d,\"wins\":%d,\"losses\":%d," +
             "\"kills\":%d,\"deaths\":%d,\"assists\":%d,\"winrate\":%.1f}," +
             "\"top_champions\":%s}",
-            uuid, name, elo, getTier(),
+            uuid, Json.esc(name), elo, getTier(),
             rankedGames, rankedWins, rankedGames - rankedWins,
             rankedKills, rankedDeaths, rankedAssists, rankedKDA(),
             rankedWinrate(), rankedAvgCS(), rankedAvgDmg(),
@@ -131,7 +131,7 @@ public class PlayerStats {
             return String.format(java.util.Locale.US,
                 "{\"champion\":\"%s\",\"games\":%d,\"wins\":%d," +
                 "\"kda\":%.2f,\"winrate\":%.1f,\"avg_cs\":%.1f}",
-                championId, games, wins, kda(), winrate(), avgCS());
+                Json.esc(championId), games, wins, kda(), winrate(), avgCS());
         }
     }
 }

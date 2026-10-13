@@ -4,11 +4,11 @@ import fr.lolmc.bungee.LolBungeePlugin;
 import net.md_5.bungee.api.ProxyServer;
 import net.md_5.bungee.api.chat.TextComponent;
 import net.md_5.bungee.api.connection.ProxiedPlayer;
+import net.md_5.bungee.api.connection.Server;
 import net.md_5.bungee.api.event.PluginMessageEvent;
 import net.md_5.bungee.api.plugin.Listener;
 import net.md_5.bungee.event.EventHandler;
 
-import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
@@ -39,34 +39,43 @@ public class BungeeMessageListener implements Listener {
     @EventHandler
     public void onPluginMessage(PluginMessageEvent e) {
         if (!e.getTag().equals("lolmc:bridge")) return;
+        // Jamais relayé (ni vers le client, ni vers le serveur) : seul le proxy traite ce canal
         e.setCancelled(true);
+        // Un client moddé peut envoyer n'importe quel message sur ce canal : on n'accepte
+        // que ceux qui viennent d'un serveur du réseau.
+        if (!(e.getSender() instanceof Server source)) return;
 
-        // Lire le JSON
-        String json;
-        try (DataInputStream in = new DataInputStream(new ByteArrayInputStream(e.getData()))) {
-            // Format BungeeCord Forward : SubChannel, serveur, longueur, données
-            // Si c'est un Forward on lit différemment
-            byte[] raw = e.getData();
-            json = new String(raw, StandardCharsets.UTF_8);
-        } catch (Exception ex) {
-            return;
-        }
-
+        String json = new String(e.getData(), StandardCharsets.UTF_8);
         Map<String, String> data = parseJson(json);
         String type = data.getOrDefault("type", "");
+        String sourceName = source.getInfo().getName();
 
         switch (type) {
-            case "GAME_END"     -> handleGameEnd(data);
-            case "QUEUE_JOIN"   -> handleQueueJoin(data);
-            case "QUEUE_LEAVE"  -> handleQueueLeave(data);
-            case "SET_ROLE"     -> handleSetRole(data);
-            case "PARTY_INVITE" -> handlePartyInvite(data);
-            case "PARTY_ACCEPT" -> handlePartyAccept(data);
-            case "PARTY_LEAVE"  -> handlePartyLeave(data);
+            case "GAME_END" -> {
+                // Seul le serveur de jeu peut renvoyer des joueurs vers leur origine
+                String gameServer = plugin.getConfig().getString("game-server", "lolmc-01");
+                if (gameServer.equals(sourceName)) handleGameEnd(data, source);
+            }
+            default -> {
+                // Actions joueur (menu /lol des serveurs Spigot) : le joueur visé doit être
+                // connecté au serveur qui envoie le message.
+                ProxiedPlayer p = getPlayer(data);
+                if (p == null || p.getServer() == null
+                        || !p.getServer().getInfo().getName().equals(sourceName)) return;
+                switch (type) {
+                    case "QUEUE_JOIN"   -> handleQueueJoin(p, data);
+                    case "QUEUE_LEAVE"  -> plugin.getQueueManager().leave(p);
+                    case "SET_ROLE"     -> handleSetRole(p, data);
+                    case "PARTY_INVITE" -> handlePartyInvite(p, data);
+                    case "PARTY_ACCEPT" -> plugin.getPartyManager().accept(p);
+                    case "PARTY_LEAVE"  -> plugin.getPartyManager().leave(p);
+                    default -> { }
+                }
+            }
         }
     }
 
-    private void handleGameEnd(Map<String, String> d) {
+    private void handleGameEnd(Map<String, String> d, Server source) {
         // Le serveur de jeu signale la fin de partie
         // Renvoyer chaque joueur vers son serveur d'origine
         String playersStr = d.getOrDefault("players", "");
@@ -75,7 +84,9 @@ public class BungeeMessageListener implements Listener {
             try {
                 UUID uuid = UUID.fromString(uuidStr.trim());
                 ProxiedPlayer p = ProxyServer.getInstance().getPlayer(uuid);
-                if (p == null) continue;
+                // Uniquement les joueurs encore sur le serveur de jeu
+                if (p == null || p.getServer() == null
+                        || !p.getServer().getInfo().equals(source.getInfo())) continue;
                 String origin = plugin.getOriginTracker().getPreviousServer(uuid);
                 if (origin != null) {
                     var srv = ProxyServer.getInstance().getServerInfo(origin);
@@ -89,44 +100,26 @@ public class BungeeMessageListener implements Listener {
         }
     }
 
-    private void handleQueueJoin(Map<String, String> d) {
-        ProxiedPlayer p = getPlayer(d);
-        if (p != null) plugin.getQueueManager().join(p);
+    private void handleQueueJoin(ProxiedPlayer p, Map<String, String> d) {
+        boolean ranked = "true".equalsIgnoreCase(d.getOrDefault("ranked", "false"));
+        plugin.getQueueManager().join(p, ranked);
     }
 
-    private void handleQueueLeave(Map<String, String> d) {
-        ProxiedPlayer p = getPlayer(d);
-        if (p != null) plugin.getQueueManager().leave(p);
-    }
-
-    private void handleSetRole(Map<String, String> d) {
-        ProxiedPlayer p = getPlayer(d);
-        if (p == null) return;
+    private void handleSetRole(ProxiedPlayer p, Map<String, String> d) {
         String role = d.get("role");
         if (role != null) {
-            var roles = java.util.List.of(role.split(","));
+            var roles = java.util.List.of(role.toUpperCase(java.util.Locale.ROOT).split(","));
             plugin.getRoleManager().setRoles(p.getUniqueId(), roles);
             p.sendMessage(new TextComponent("§a✔ Rôles : §l" + role));
         }
     }
 
-    private void handlePartyInvite(Map<String, String> d) {
-        ProxiedPlayer leader = getPlayer(d);
+    private void handlePartyInvite(ProxiedPlayer leader, Map<String, String> d) {
         String targetName = d.get("target");
-        if (leader == null || targetName == null) return;
+        if (targetName == null) return;
         ProxiedPlayer target = ProxyServer.getInstance().getPlayer(targetName);
         if (target == null) { leader.sendMessage(new TextComponent("§cJoueur introuvable.")); return; }
         plugin.getPartyManager().invite(leader, target);
-    }
-
-    private void handlePartyAccept(Map<String, String> d) {
-        ProxiedPlayer p = getPlayer(d);
-        if (p != null) plugin.getPartyManager().accept(p);
-    }
-
-    private void handlePartyLeave(Map<String, String> d) {
-        ProxiedPlayer p = getPlayer(d);
-        if (p != null) plugin.getPartyManager().leave(p);
     }
 
     private ProxiedPlayer getPlayer(Map<String, String> d) {

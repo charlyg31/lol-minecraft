@@ -83,7 +83,7 @@ public class ShopNpcManager implements Listener {
         }
 
         // Ouvrir la boutique
-        LolPlugin.getInstance().getShopGUI().open(player);
+        LolPlugin.getInstance().getShopListener().openShop(player);
     }
 
     private void save() {

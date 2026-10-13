@@ -789,11 +789,7 @@ public class AbilityListener implements Listener {
     public void onJoinBridge(PlayerJoinEvent e) {
         var bridge = LolPlugin.getInstance().getBridgeManager();
         if (bridge != null && bridge.isEnabled()) bridge.onPlayerJoin(e.getPlayer());
-        // Restaurer l'état si reconnexion en pleine partie
-        var gm = fr.lolmc.instance.InstanceHelper.gameManager(e.getPlayer());
-        if (gm != null && gm.isRunning())
-            org.bukkit.Bukkit.getScheduler().runTaskLater(LolPlugin.getInstance(),
-                () -> gm.onPlayerRejoin(e.getPlayer()), 40L);
+        // La restauration de l'état en cas de reconnexion est faite par HealthListener.onJoin
     }
 
     /**
@@ -827,11 +823,6 @@ public class AbilityListener implements Listener {
         } else {
             cleanupPlayer(p);
         }
-    }
-
-    @EventHandler
-    public void onKick(PlayerKickEvent e) {
-        cleanupPlayer(e.getPlayer());
     }
 
     /** Nettoyage léger (déconnexion en cours de partie) : garde champion/équipe/objets. */

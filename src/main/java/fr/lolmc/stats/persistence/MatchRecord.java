@@ -45,11 +45,11 @@ public class MatchRecord {
             + "\"healing_done\":%d,\"wards_placed\":%d,\"wards_killed\":%d,"
             + "\"first_blood\":%b,\"largest_killing_spree\":%d,"
             + "\"items\":%s,\"duration_seconds\":%d,\"damage_per_min\":%.0f}",
-            uuid, matchId != null ? matchId : "", playedAt,
-            ranked, won, team != null ? team : "UNKNOWN",
-            champion, kills, deaths, assists, kda(), cs, csPerMin(),
+            uuid, Json.esc(matchId), playedAt,
+            ranked, won, team != null ? Json.esc(team) : "UNKNOWN",
+            Json.esc(champion), kills, deaths, assists, kda(), cs, csPerMin(),
             gold, damageDealt, damageTaken, healingDone,
             wardsPlaced, wardsKilled, firstBlood, largestKillingSpree,
-            items != null ? items : "[]", durationSeconds, damagePerMin());
+            items != null && items.startsWith("[") ? items : "[]", durationSeconds, damagePerMin());
     }
 }

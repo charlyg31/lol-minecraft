@@ -132,7 +132,7 @@ turrets:
 # BASE DE DONNÉES
 # ═══════════════════════════════════════════════════════
 database:
-  # Type de base : "sqlite" (local, simple), "mysql", ou "mongodb"
+  # Type de base : "sqlite" (local, simple) ou "mysql"
   type: sqlite
   mysql:
     host: localhost
@@ -140,6 +140,8 @@ database:
     database: lolmc
     user: root
     password: ""
+    # Chiffrer la connexion (recommandé si la base n'est pas sur la même machine)
+    ssl: false
 
 # ═══════════════════════════════════════════════════════
 # API WEB (stats des joueurs)
@@ -148,7 +150,13 @@ database:
 # accessible depuis un site web externe.
 api:
   enabled: false
+  # Adresse d'écoute : "127.0.0.1" = local uniquement, "0.0.0.0" = toutes les interfaces
+  bind: "127.0.0.1"
   port: 8080
+  # Clé exigée dans l'en-tête X-Api-Key (vide = pas d'authentification)
+  key: ""
+  # En-tête Access-Control-Allow-Origin ("" = pas d'en-tête CORS)
+  cors-origin: "*"
 
 # ═══════════════════════════════════════════════════════
 # FOG OF WAR (brouillard de guerre)

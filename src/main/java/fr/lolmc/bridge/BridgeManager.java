@@ -27,6 +27,8 @@ import java.util.logging.Logger;
  *     {"type":"GAME_START","players":["uuid1",...],"server":"lolmc-01"}
  *     {"type":"GAME_END","winner":"BLUE","duration":1847,"players":[
  *       {"uuid":"...","kills":5,"deaths":2,"assists":8}]}
+ *   GAME → PROXY (canal "lolmc:bridge", traité par LolMC-Bungee) :
+ *     {"type":"GAME_END","players":"uuid1,uuid2,..."} → renvoi des joueurs vers leur serveur d'origine
  * Activation dans config.yml :
  *   bridge:
  *     enabled: true
@@ -66,6 +68,7 @@ public class BridgeManager implements PluginMessageListener {
             // Enregistrer les canaux PluginMessage
             plugin.getServer().getMessenger().registerIncomingPluginChannel(plugin, CHANNEL_IN, this);
             plugin.getServer().getMessenger().registerOutgoingPluginChannel(plugin, CHANNEL_OUT);
+            plugin.getServer().getMessenger().registerOutgoingPluginChannel(plugin, CHANNEL_IN);
             log.info("[Bridge] Activé — lobby=" + lobbyServer + " game=" + gameServer);
         }
     }
@@ -92,8 +95,19 @@ public class BridgeManager implements PluginMessageListener {
         }
     }
 
+    /** UUID du message, ou null (message ignoré) s'il est absent/invalide. */
+    private UUID uuidOf(Map<String, String> data) {
+        try {
+            return UUID.fromString(data.getOrDefault("uuid", ""));
+        } catch (IllegalArgumentException e) {
+            log.warning("[Bridge] UUID invalide dans le message " + data.getOrDefault("type", "?"));
+            return null;
+        }
+    }
+
     private void handleQueueJoin(Map<String, String> data) {
-        UUID uuid = UUID.fromString(data.getOrDefault("uuid", ""));
+        UUID uuid = uuidOf(data);
+        if (uuid == null) return;
         // Stocker les données pour quand le joueur se connecte
         pendingPlayerData.put(uuid, data);
         // Chercher si le joueur est déjà connecté (il peut arriver avant le message)
@@ -105,7 +119,8 @@ public class BridgeManager implements PluginMessageListener {
     }
 
     private void handleQueueLeave(Map<String, String> data) {
-        UUID uuid = UUID.fromString(data.getOrDefault("uuid", ""));
+        UUID uuid = uuidOf(data);
+        if (uuid == null) return;
         pendingPlayerData.remove(uuid);
         Player player = Bukkit.getPlayer(uuid);
         if (player != null) {
@@ -188,7 +203,8 @@ public class BridgeManager implements PluginMessageListener {
     }
 
     private void handlePlayerData(Map<String, String> data) {
-        UUID uuid = UUID.fromString(data.getOrDefault("uuid", ""));
+        UUID uuid = uuidOf(data);
+        if (uuid == null) return;
         pendingPlayerData.put(uuid, data);
     }
 
@@ -294,7 +310,7 @@ public class BridgeManager implements PluginMessageListener {
 
     /** Notifie le lobby de la fin de partie (stats, résultat). */
     public void notifyGameEnd(String winner, long durationSeconds,
-                              java.util.List<fr.lolmc.stats.persistence.PlayerStats> stats) {
+                              java.util.List<fr.lolmc.game.MatchScoreboard.MatchStats> stats) {
         StringBuilder sb = new StringBuilder();
         sb.append("{\"type\":\"GAME_END\",\"winner\":\"").append(winner)
           .append("\",\"duration\":").append(durationSeconds)
@@ -303,11 +319,36 @@ public class BridgeManager implements PluginMessageListener {
         boolean first = true;
         for (var st : stats) {
             if (!first) sb.append(",");
-            sb.append("{\"uuid\":\"").append(st.uuid).append("\"}");
+            sb.append("{\"uuid\":\"").append(st.uuid)
+              .append("\",\"kills\":").append(st.kills)
+              .append(",\"deaths\":").append(st.deaths)
+              .append(",\"assists\":").append(st.assists).append("}");
             first = false;
         }
         sb.append("]}");
         sendToLobby(sb.toString());
+    }
+
+    /**
+     * Demande au proxy (LolMC-Bungee) de renvoyer ces joueurs vers leur serveur d'origine.
+     * Le message part sur le canal lolmc:bridge vers le proxy, qui l'intercepte.
+     * @return false si aucun joueur ne peut porter le message
+     */
+    public boolean requestReturnToOrigin(java.util.Collection<UUID> players) {
+        if (!enabled || players.isEmpty()) return false;
+        Player carrier = null;
+        StringBuilder ids = new StringBuilder();
+        for (UUID id : players) {
+            Player p = Bukkit.getPlayer(id);
+            if (p == null) continue;
+            if (carrier == null) carrier = p;
+            if (!ids.isEmpty()) ids.append(",");
+            ids.append(id);
+        }
+        if (carrier == null) return false;
+        String json = "{\"type\":\"GAME_END\",\"server\":\"" + gameServer + "\",\"players\":\"" + ids + "\"}";
+        carrier.sendPluginMessage(plugin, CHANNEL_IN, json.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        return true;
     }
 
     /**
@@ -394,6 +435,7 @@ public class BridgeManager implements PluginMessageListener {
         if (!enabled) return;
         try {
             plugin.getServer().getMessenger().unregisterIncomingPluginChannel(plugin, CHANNEL_IN);
+            plugin.getServer().getMessenger().unregisterOutgoingPluginChannel(plugin);
         } catch (Exception ex) { fr.lolmc.LolPlugin.getInstance().getLogger().log(java.util.logging.Level.WARNING, "[BridgeManager] erreur ignorée (ligne 397)", ex); }
     }
 

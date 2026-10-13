@@ -15,7 +15,7 @@ public class LolSoloCommand extends Command implements TabExecutor {
     private final LolBungeePlugin plugin;
 
     public LolSoloCommand(LolBungeePlugin plugin) {
-        super("lols");
+        super("lols", "lolmc.admin"); // commande de test : réservée aux admins
         this.plugin = plugin;
     }
 

@@ -45,7 +45,17 @@ public class ShopListener implements Listener {
 
     /** Ouvre la boutique pour un joueur (appelable depuis /lol shop). */
     public void openShop(Player player) {
-        // LoL : la boutique n'est accessible qu'a la fontaine
+        if (!canShopHere(player)) {
+            player.sendMessage(net.kyori.adventure.text.Component.text(
+                    "🏪 La boutique n'est accessible qu'a la base !",
+                    net.kyori.adventure.text.format.NamedTextColor.RED));
+            return;
+        }
+        shopGUI.open(player);
+    }
+
+    /** LoL : en partie, la boutique n'est accessible qu'à la fontaine (shop.base-only). */
+    public boolean canShopHere(Player player) {
         var gm = fr.lolmc.instance.InstanceHelper.gameManager(player);
         boolean baseOnly = LolPlugin.getInstance().getConfig()
                 .getBoolean("shop.base-only", true);
@@ -55,15 +65,10 @@ public class ShopListener implements Listener {
             var mm = fr.lolmc.instance.InstanceHelper.mapManager(player);
             org.bukkit.Location base = (team != null && mm != null) ? mm.getSpawn(team, 0) : null;
             double radius = LolPlugin.getInstance().getConfig().getDouble("shop.base-radius", 15.0);
-            if (base == null || !base.getWorld().equals(player.getWorld())
-                    || base.distanceSquared(player.getLocation()) > radius * radius) {
-                player.sendMessage(net.kyori.adventure.text.Component.text(
-                        "🏪 La boutique n'est accessible qu'a la base !",
-                        net.kyori.adventure.text.format.NamedTextColor.RED));
-                return;
-            }
+            return base != null && base.getWorld().equals(player.getWorld())
+                    && base.distanceSquared(player.getLocation()) <= radius * radius;
         }
-        shopGUI.open(player);
+        return true;
     }
 
     private final java.util.Set<java.util.UUID> awaitingSearch =
@@ -117,6 +122,13 @@ public class ShopListener implements Listener {
             // CORRECTION : Utiliser getRawSlot() pour ne valider que la grille supérieure (0-53)
             int raw = event.getRawSlot();
             if (raw >= 0 && raw < event.getView().getTopInventory().getSize()) {
+                // Boutique ouverte à la base puis joueur parti : plus d'achat possible
+                if (!canShopHere(player)) {
+                    player.closeInventory();
+                    player.sendMessage(Component.text(
+                            "🏪 La boutique n'est accessible qu'a la base !", NamedTextColor.RED));
+                    return;
+                }
                 handleShopClick(player, raw);
             }
             return;

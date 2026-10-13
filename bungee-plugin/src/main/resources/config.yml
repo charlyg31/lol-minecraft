@@ -2,6 +2,9 @@
 # Nom EXACT du serveur de jeu LoL dans ta config BungeeCord (config.yml du proxy)
 game-server: "lolmc-01"
 
+# Nom du serveur lobby dans la config BungeeCord
+lobby-server: "lobby"
+
 # Serveur où renvoyer le joueur si son serveur d'origine est inconnu
 fallback-server: "survie"
 
@@ -12,6 +15,3 @@ players-per-game: 10
 # ── Groupes ────────────────────────────────────────────────────────────
 max-party-size: 5
 
-# ── Mode de jeu ────────────────────────────────────────────────────────
-# true = classé (pick + ban), false = normal (pick uniquement)
-ranked-mode: false

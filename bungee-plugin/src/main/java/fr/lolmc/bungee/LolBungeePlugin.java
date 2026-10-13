@@ -102,10 +102,4 @@ public class LolBungeePlugin extends Plugin {
     public BungeePartyManager  getPartyManager()  { return partyManager; }
     public BungeeRoleManager   getRoleManager()   { return roleManager; }
     public OriginTracker       getOriginTracker() { return originTracker; }
-
-    /** Force ranked=true pour la prochaine partie (appelé par /lolr). */
-    public void setRankedMode(boolean ranked) {
-        // Mettre à jour la config en mémoire
-        config.set("ranked-mode", ranked);
-    }
 }

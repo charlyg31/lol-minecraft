@@ -25,14 +25,18 @@ import java.util.*;
  * Config config.yml :
  *   api:
  *     enabled: false
+ *     bind: "127.0.0.1"  # "0.0.0.0" pour écouter sur toutes les interfaces
  *     port: 8080
- *     key: ""        # laisser vide = pas d'auth
+ *     key: ""            # laisser vide = pas d'auth
+ *     cors-origin: "*"   # valeur de Access-Control-Allow-Origin ("" = en-tête absent)
  */
 public class ApiServer {
 
     private HttpServer server;
+    private java.util.concurrent.ExecutorService executor;
     private final DatabaseManager database;
     private String apiKey;
+    private String corsOrigin;
 
     public ApiServer(DatabaseManager database) {
         this.database = database;
@@ -45,10 +49,13 @@ public class ApiServer {
             return;
         }
         int port   = config.getInt("api.port", 8080);
+        String bind = config.getString("api.bind", "127.0.0.1").trim();
         apiKey     = config.getString("api.key", "").trim();
+        corsOrigin = config.getString("api.cors-origin", "*").trim();
 
         try {
-            server = HttpServer.create(new InetSocketAddress(port), 0);
+            server = HttpServer.create(bind.isEmpty() ? new InetSocketAddress(port)
+                    : new InetSocketAddress(bind, port), 0);
 
             server.createContext("/api/player/name/",        this::handlePlayerByName);
             server.createContext("/api/player/",               this::handlePlayerByUuid);
@@ -60,11 +67,19 @@ public class ApiServer {
             server.createContext("/api/online",                this::handleOnline);
             server.createContext("/api/status",                this::handleStatus);
 
-            server.setExecutor(java.util.concurrent.Executors.newFixedThreadPool(4));
+            executor = java.util.concurrent.Executors.newFixedThreadPool(4, r -> {
+                Thread t = new Thread(r, "LolMC-API");
+                t.setDaemon(true);
+                return t;
+            });
+            server.setExecutor(executor);
             server.start();
             LolPlugin.getInstance().getLogger().info(
-                "API web démarrée sur le port " + port
+                "API web démarrée sur " + (bind.isEmpty() ? "*" : bind) + ":" + port
                 + (apiKey.isEmpty() ? " (sans authentification)" : " (clé API requise)"));
+            if (apiKey.isEmpty() && !bind.startsWith("127.") && !bind.equals("localhost"))
+                LolPlugin.getInstance().getLogger().warning(
+                    "API web exposée sans clé (api.key vide) : définis une clé ou api.bind: 127.0.0.1.");
         } catch (Exception e) {
             LolPlugin.getInstance().getLogger().warning("Échec démarrage API: " + e.getMessage());
         }
@@ -72,6 +87,7 @@ public class ApiServer {
 
     public void stop() {
         if (server != null) { server.stop(0); server = null; }
+        if (executor != null) { executor.shutdownNow(); executor = null; }
     }
 
     // ── Auth ──────────────────────────────────────────────────────
@@ -79,7 +95,9 @@ public class ApiServer {
     private boolean isAuthorized(HttpExchange ex) {
         if (apiKey == null || apiKey.isEmpty()) return true;
         String header = ex.getRequestHeaders().getFirst("X-Api-Key");
-        return apiKey.equals(header);
+        if (header == null) return false;
+        return java.security.MessageDigest.isEqual(
+                apiKey.getBytes(StandardCharsets.UTF_8), header.getBytes(StandardCharsets.UTF_8));
     }
 
     // ── Routes ────────────────────────────────────────────────────
@@ -118,10 +136,12 @@ public class ApiServer {
         String path = ex.getRequestURI().getPath();
         boolean normal = path.endsWith("/normal");
         // Lire depuis la BDD pour avoir tous les joueurs (pas seulement le cache)
-        List<PlayerStats> all = database.getAllFromDb();
-        if (all.isEmpty()) all = new ArrayList<>(database.getAllCached());
-        if (normal) all.sort((a, b) -> b.normalWins - a.normalWins);
-        else        all.sort((a, b) -> b.elo - a.elo);
+        List<PlayerStats> all = database.getTopPlayers(normal, 50);
+        if (all.isEmpty()) {
+            all = new ArrayList<>(database.getAllCached());
+            if (normal) all.sort((a, b) -> b.normalWins - a.normalWins);
+            else        all.sort((a, b) -> b.elo - a.elo);
+        }
         StringBuilder json = new StringBuilder("[");
         int limit = Math.min(all.size(), 50);
         for (int i = 0; i < limit; i++) {
@@ -178,7 +198,7 @@ public class ApiServer {
         var players = database.getMatchPlayers(matchId);
         if (players.isEmpty()) { respond(ex, 404, err("match not found")); return; }
         StringBuilder json = new StringBuilder("{");
-        json.append("\"match_id\":\"").append(matchId).append("\",");
+        json.append("\"match_id\":\"").append(Json.esc(matchId)).append("\",");
         json.append("\"played_at\":").append(players.getFirst().playedAt).append(",");
         json.append("\"ranked\":").append(players.getFirst().ranked).append(",");
         json.append("\"duration_seconds\":").append(players.getFirst().durationSeconds).append(",");
@@ -210,8 +230,9 @@ public class ApiServer {
         for (var champ : cm.getAllChampions()) {
             if (!first) json.append(","); first = false;
             json.append(String.format(
+                java.util.Locale.US,
                 "{\"id\":\"%s\",\"name\":\"%s\",\"role\":\"%s\",\"aa_range\":%.1f}",
-                champ.getId(), champ.getDisplayName(),
+                Json.esc(champ.getId()), Json.esc(champ.getDisplayName()),
                 champ.getRole() != null ? champ.getRole().name() : "UNKNOWN",
                 champ.getAutoAttackRange()));
         }
@@ -254,7 +275,7 @@ public class ApiServer {
                         inst.append(String.format(
                             "{\"id\":%d,\"world\":\"%s\",\"state\":\"%s\",\"game_running\":%b,"
                             + "\"game_elapsed_seconds\":%d,\"players\":%d}",
-                            gi.getId(), gi.getWorldName(), gi.getState(), running, el,
+                            gi.getId(), Json.esc(gi.getWorldName()), gi.getState(), running, el,
                             gi.getWorld().getPlayers().size()));
                     }
                 }
@@ -271,14 +292,14 @@ public class ApiServer {
         StringBuilder inst = new StringBuilder(snap.instances());
         int online = snap.online();
         var db = plugin.getDatabaseManager();
-        int totalPlayers = db.getAllFromDb().size();
+        int totalPlayers = db.countPlayers();
         // game_running / game_elapsed_seconds : vrai si AU MOINS une partie tourne (globale ou instance),
         // durée de la plus longue — champs conservés pour compatibilité ; le détail est dans "instances".
         String json = String.format(
             "{\"online_players\":%d,\"game_running\":%b,\"game_elapsed_seconds\":%d,"
             + "\"total_registered_players\":%d,\"server_version\":\"%s\",\"instances\":%s}",
             online, anyRunning, elapsed, totalPlayers,
-            org.bukkit.Bukkit.getVersion(), inst);
+            Json.esc(org.bukkit.Bukkit.getVersion()), inst);
         respond(ex, 200, json);
     }
 
@@ -299,7 +320,7 @@ public class ApiServer {
                     var gi = fr.lolmc.instance.InstanceHelper.instanceOf(p);
                     json.append(String.format(
                         "{\"name\":\"%s\",\"uuid\":\"%s\",\"champion\":%s,\"inGame\":%b,\"instance\":%d}",
-                        p.getName(), p.getUniqueId(),
+                        Json.esc(p.getName()), p.getUniqueId(),
                         champ != null ? "\"" + champ + "\"" : "null",
                         fr.lolmc.instance.InstanceHelper.gameManager(p).isGameRunning(),
                         gi != null ? gi.getId() : 0));
@@ -319,12 +340,13 @@ public class ApiServer {
     private void respond(HttpExchange ex, int code, String body) throws java.io.IOException {
         byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
         ex.getResponseHeaders().set("Content-Type", "application/json; charset=utf-8");
-        ex.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
+        if (corsOrigin != null && !corsOrigin.isEmpty())
+            ex.getResponseHeaders().set("Access-Control-Allow-Origin", corsOrigin);
         ex.sendResponseHeaders(code, bytes.length);
         try (OutputStream os = ex.getResponseBody()) { os.write(bytes); }
     }
 
     private String err(String msg) {
-        return "{\"error\":\"" + msg + "\"}";
+        return "{\"error\":\"" + Json.esc(msg) + "\"}";
     }
 }

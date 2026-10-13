@@ -312,9 +312,15 @@ public class RewardManager {
                 "🏛 Tourelle T" + turretIndex + "! +" + (globalGold + GOLD_TURRET_KILLER) + " or",
                 net.kyori.adventure.text.format.NamedTextColor.GOLD));
         }
-        org.bukkit.Bukkit.broadcast(net.kyori.adventure.text.Component.text(
+        announce(net.kyori.adventure.text.Component.text(
             "🏛 Tourelle T" + turretIndex + " détruite! +" + globalGold + " or — Équipe " + teamName,
             net.kyori.adventure.text.format.NamedTextColor.YELLOW));
+    }
+
+    /** Annonce aux seuls joueurs de cette partie. */
+    private void announce(net.kyori.adventure.text.Component message) {
+        fr.lolmc.util.WorldContext.broadcast(gameInstance != null ? gameInstance.getWorld()
+                : fr.lolmc.util.WorldContext.getGameWorld(), message);
     }
 
     public void onTurretDestroyed(Player lastHit, fr.lolmc.team.TeamManager.Team attackingTeam) {
@@ -339,7 +345,7 @@ public class RewardManager {
                 "💎 Inhibiteur! +" + (GOLD_INHIBITOR_GLOBAL + GOLD_INHIBITOR_KILLER) + " or",
                 net.kyori.adventure.text.format.NamedTextColor.AQUA));
         }
-        org.bukkit.Bukkit.broadcast(net.kyori.adventure.text.Component.text(
+        announce(net.kyori.adventure.text.Component.text(
             "💎 Inhibiteur détruit! +" + GOLD_INHIBITOR_GLOBAL + " or — Équipe " + teamName,
             net.kyori.adventure.text.format.NamedTextColor.AQUA));
     }

@@ -2,7 +2,6 @@ package fr.lolmc.bungee;
 
 import net.md_5.bungee.api.connection.ProxiedPlayer;
 
-import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.UUID;
@@ -10,11 +9,14 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Logger;
 
 /**
- * Suivi du serveur d'origine de chaque joueur.
+ * Suivi du serveur d'origine de chaque joueur (où le renvoyer après la partie).
  *
- * Quand un joueur change de serveur vers le lobby :
- *   - On mémorise le serveur depuis lequel il venait
- *   - On l'envoie au plugin lobby via PluginMessage (canal lolmc:bridge)
+ * L'origine est le dernier serveur, autre que le lobby et le serveur de jeu, sur lequel le
+ * joueur se trouvait avant d'être envoyé en partie. Elle est conservée jusqu'à son retour
+ * (fin de partie) ou sa déconnexion du proxy.
+ *
+ * Quand un joueur arrive sur le lobby, l'origine est aussi envoyée au plugin lobby
+ * via PluginMessage (canal lolmc:bridge).
  *
  * Format du message envoyé au lobby :
  *   JSON : {"type":"PLAYER_ORIGIN","uuid":"...","server":"survie"}
@@ -33,11 +35,13 @@ public class OriginTracker {
     private final LolBungeePlugin plugin;
     private final Logger log;
     private final String lobbyServerName;
+    private final String gameServerName;
 
     public OriginTracker(LolBungeePlugin plugin) {
         this.plugin          = plugin;
         this.log             = plugin.getLogger();
         this.lobbyServerName = plugin.getConfig().getString("lobby-server", "lobby");
+        this.gameServerName  = plugin.getConfig().getString("game-server", "lolmc-01");
     }
 
     /**
@@ -49,21 +53,24 @@ public class OriginTracker {
      */
     public void onServerSwitch(ProxiedPlayer player, String fromServer, String toServer) {
         if (fromServer == null) return; // première connexion → pas de "depuis"
+        boolean fromHub = lobbyServerName.equals(fromServer) || gameServerName.equals(fromServer);
 
-        // Le joueur rejoint le lobby depuis un autre serveur
-        if (lobbyServerName.equals(toServer) && !lobbyServerName.equals(fromServer)) {
+        // Départ d'un serveur « normal » (survie, skyblock…) → c'est l'origine à mémoriser
+        if (!fromHub) {
             previousServer.put(player.getUniqueId(), fromServer);
-            log.info("[OriginTracker] " + player.getName()
-                + " : " + fromServer + " → " + toServer
+            log.info("[OriginTracker] " + player.getName() + " : " + fromServer + " → " + toServer
                 + " (origine sauvegardée : " + fromServer + ")");
-
-            // Envoyer l'info au plugin lobby via PluginMessage
-            sendOriginToLobby(player, fromServer);
         }
 
-        // Le joueur quitte le lobby → nettoyer (il repart sur son serveur d'origine)
-        if (lobbyServerName.equals(fromServer) && !lobbyServerName.equals(toServer)) {
-            previousServer.remove(player.getUniqueId());
+        // Arrivée sur le lobby : transmettre l'origine connue au plugin lobby
+        if (lobbyServerName.equals(toServer)) {
+            String origin = previousServer.get(player.getUniqueId());
+            if (origin != null) sendOriginToLobby(player, origin);
+        }
+
+        // Retour sur un serveur « normal » après la partie → origine consommée
+        if (!lobbyServerName.equals(toServer) && !gameServerName.equals(toServer)) {
+            if (fromHub) previousServer.remove(player.getUniqueId());
         }
     }
 
@@ -78,29 +85,13 @@ public class OriginTracker {
 
         byte[] data = json.getBytes(StandardCharsets.UTF_8);
 
-        // Envoyer via le canal PluginMessage au serveur lobby
+        // Envoi direct au serveur lobby (ProxiedPlayer#sendData écrirait vers le CLIENT)
         var lobbyServer = plugin.getProxy().getServerInfo(lobbyServerName);
         if (lobbyServer == null) {
             log.warning("[OriginTracker] Serveur lobby '" + lobbyServerName + "' introuvable dans BungeeCord.");
             return;
         }
-
-        // Le joueur est maintenant sur le lobby → on peut lui envoyer le message
-        // via son channel (le canal est bidirectionnel entre proxy et serveur)
-        plugin.getProxy().getScheduler().runAsync(plugin, () -> {
-            try (ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                 DataOutputStream out = new DataOutputStream(baos)) {
-                out.writeUTF("Forward");
-                out.writeUTF(lobbyServerName);
-                out.writeUTF(CHANNEL);
-                out.writeShort(data.length);
-                out.write(data);
-                // Envoyer via le joueur (il est maintenant sur le lobby)
-                player.sendData(CHANNEL, baos.toByteArray());
-            } catch (IOException e) {
-                log.warning("[OriginTracker] Erreur envoi origine: " + e.getMessage());
-            }
-        });
+        lobbyServer.sendData(CHANNEL, data, true);
     }
 
     public String getPreviousServer(UUID uuid) { return previousServer.get(uuid); }

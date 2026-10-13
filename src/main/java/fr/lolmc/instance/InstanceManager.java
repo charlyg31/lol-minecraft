@@ -66,6 +66,8 @@ public class InstanceManager {
         this.plugin            = plugin;
         this.log               = plugin.getLogger();
         this.templateWorldName = plugin.getConfig().getString("world.template", "lolmc_template");
+        // Nom du monde principal lu ici (thread principal) : les suppressions asynchrones en ont besoin
+        if (!Bukkit.getWorlds().isEmpty()) this.mainWorldName = Bukkit.getWorlds().getFirst().getName();
         startCleanupTask();
     }
 
@@ -364,7 +366,7 @@ public class InstanceManager {
             try {
                 var mv = (com.onarandombox.MultiverseCore.MultiverseCore) mvPlugin;
                 if (mv.getMVWorldManager().unloadWorld(name)) return true;
-            } catch (Exception ex) { fr.lolmc.LolPlugin.getInstance().getLogger().log(java.util.logging.Level.WARNING, "[InstanceManager] erreur ignorée (ligne 366)", ex); }
+            } catch (Exception ex) { log.log(java.util.logging.Level.WARNING, "[InstanceManager] Multiverse : échec du déchargement de " + name, ex); }
         }
 
         // Fallback
@@ -496,10 +498,13 @@ public class InstanceManager {
     private Path migratedDir(String worldName) {
         String main = mainWorldName;
         if (main == null) {
-            // Lu sur le thread principal (premier appel) ; les appels asynchrones utilisent la valeur en cache
-            main = Bukkit.isPrimaryThread() && !Bukkit.getWorlds().isEmpty()
-                    ? Bukkit.getWorlds().getFirst().getName() : "world";
-            mainWorldName = main;
+            // Lu sur le thread principal ; hors thread principal on ne fige pas une valeur par défaut
+            if (Bukkit.isPrimaryThread() && !Bukkit.getWorlds().isEmpty()) {
+                main = Bukkit.getWorlds().getFirst().getName();
+                mainWorldName = main;
+            } else {
+                main = "world";
+            }
         }
         return new File(Bukkit.getWorldContainer(), main).toPath()
                 .resolve("dimensions").resolve("minecraft").resolve(worldName);
@@ -531,7 +536,7 @@ public class InstanceManager {
     /** Arrête toutes les instances actives (onDisable). */
     public void shutdownAll() {
         for (GameInstance instance : new ArrayList<>(instances.values())) {
-            try { instance.stop(); } catch (Exception ex) { fr.lolmc.LolPlugin.getInstance().getLogger().log(java.util.logging.Level.WARNING, "[InstanceManager] erreur ignorée (ligne 467)", ex); }
+            try { instance.stop(); } catch (Exception ex) { log.log(java.util.logging.Level.WARNING, "[InstanceManager] Arrêt de l'instance #" + instance.getId(), ex); }
         }
         instances.clear();
         playerMap.clear();

@@ -315,9 +315,10 @@ public class LolPlugin extends JavaPlugin {
         fr.lolmc.util.ChampionStateReset.resetAll();
         // ── 3. Chunks + services externes ───────────────────────────────────
         if (chunkLoaderManager != null) chunkLoaderManager.clearAllForcedChunks();
+        // Instances avant la base : leur arrêt peut encore écrire des résultats
+        if (instanceManager != null) instanceManager.shutdownAll();
         if (apiServer != null) apiServer.stop();
         if (databaseManager != null) databaseManager.close();
-        if (instanceManager != null) instanceManager.shutdownAll();
         if (abilityPreview != null) abilityPreview.stopAll();
         if (bridgeManager != null) bridgeManager.disable();
         fr.lolmc.util.DebugLogger.close();

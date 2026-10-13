@@ -70,7 +70,9 @@ public class GameInstance {
         this.baseManager         = new BaseManager(world, mapManager);
         this.fogManager          = new FogOfWarManager(lp.getTeamManager(), world);
         this.fogManager.setGameInstance(this); // lier à cette instance
-        this.passiveManager      = new PassiveManager(lp.getChampionManager(), lp.getHUDManager(), lp.getShopListener());
+        // Un seul PassiveManager pour tout le serveur : ses tâches parcourent déjà tous les joueurs,
+        // en créer un par instance multipliait les effets par le nombre de parties.
+        this.passiveManager      = lp.getPassiveManager();
         this.announcementManager = new AnnouncementManager();
         this.announcementManager.setGameInstance(this);
         this.featManager         = new FeatManager();
@@ -110,7 +112,6 @@ public class GameInstance {
         jungleManager.startJungle();
         baseManager.startHealRingTask();
         fogManager.startTask();
-        passiveManager.startTasks();
     }
 
     public void stop() {
@@ -120,8 +121,11 @@ public class GameInstance {
         minionManager.stopWaves();
         jungleManager.stopJungle();
         fogManager.stopTask();
-        passiveManager.stopTasks();
-        passiveManager.cleanupAll();
+        turretManager.stopTasks();
+        baseManager.stopHealRingTask();
+        // Le PassiveManager est partagé : ne nettoyer que l'état des joueurs de cette partie
+        // (GameManager.stopGame arrête ses tâches quand la dernière partie se termine).
+        for (UUID uid : participants) passiveManager.cleanup(uid);
         participants.clear();
         teams.clear();
     }

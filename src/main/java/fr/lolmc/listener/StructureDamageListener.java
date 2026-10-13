@@ -40,6 +40,12 @@ public class StructureDamageListener implements Listener {
         this.teamManager = teamManager;
     }
 
+    /** Carte de la partie du joueur : celle de son instance, sinon la carte globale. */
+    private MapManager map(Player player) {
+        var inst = fr.lolmc.instance.InstanceHelper.instanceOf(player);
+        return inst != null ? inst.getMapManager() : mapManager;
+    }
+
     /**
      * Applique les dégâts d'une auto-attaque sur une structure.
      * Appelé depuis AbilityListener quand un joueur attaque depuis sa portée AA LoL.
@@ -51,7 +57,7 @@ public class StructureDamageListener implements Listener {
         if (structure.isDestroyed()) return;
 
         // Protection Nexus
-        if (structure.getType() == Type.NEXUS_BASE && !mapManager.canAttackBaseNexus(structure.getTeam())) {
+        if (structure.getType() == Type.NEXUS_BASE && !map(player).canAttackBaseNexus(structure.getTeam())) {
             player.sendActionBar(Component.text(
                 "🛡 Le Nexus est protégé !", NamedTextColor.RED));
             return;
@@ -128,7 +134,7 @@ public class StructureDamageListener implements Listener {
         if (structure.isDestroyed()) {
             onStructureDestroyed(structure, player);
         } else {
-            if (phaseChanged) mapManager.updateStructurePhase(structure);
+            if (phaseChanged) map(player).updateStructurePhase(structure);
             player.sendActionBar(Component.text(String.format(
                 "%s : %.0f/%.0f HP (%.0f%%)",
                 structureName(structure), structure.getCurrentHP(),
@@ -149,7 +155,7 @@ public class StructureDamageListener implements Listener {
         // On vise jusqu'à 6 blocs devant
         for (double d = 0; d <= 6.0; d += 0.5) {
             Location point = eye.clone().add(eye.getDirection().multiply(d));
-            GameStructure s = mapManager.getStructureAt(point, ATTACK_RADIUS);
+            GameStructure s = map(player).getStructureAt(point, ATTACK_RADIUS);
             if (s != null) { structure = s; break; }
         }
         if (structure == null) return;
@@ -159,7 +165,7 @@ public class StructureDamageListener implements Listener {
 
         // ── Règle de protection du Nexus principal ──
         if (structure.getType() == Type.NEXUS_BASE) {
-            if (!mapManager.canAttackBaseNexus(structure.getTeam())) {
+            if (!map(player).canAttackBaseNexus(structure.getTeam())) {
                 player.sendActionBar(Component.text(
                         "🛡 Le Nexus est protégé ! Détruis d'abord un nexus de lane et les 2 tourelles de base.",
                         NamedTextColor.RED));
@@ -188,7 +194,7 @@ public class StructureDamageListener implements Listener {
         } else {
             // Mettre à jour la schématique si changement de phase
             if (phaseChanged) {
-                mapManager.updateStructurePhase(structure);
+                map(player).updateStructurePhase(structure);
             }
             player.sendActionBar(Component.text(String.format(
                     "%s : %.0f/%.0f HP (%.0f%%)",
@@ -219,7 +225,7 @@ public class StructureDamageListener implements Listener {
         }
 
         // Annonce
-        LolPlugin.getInstance().getServer().broadcast(Component.text(
+        fr.lolmc.util.WorldContext.broadcast(destroyer.getWorld(), Component.text(
                 "💥 " + name + " (" + enemyTeam.name() + ") détruit par " + destroyer.getName() + "!",
                 NamedTextColor.GOLD));
 
@@ -238,20 +244,29 @@ public class StructureDamageListener implements Listener {
         // ── Victoire si Nexus principal détruit ──
         if (structure.getType() == Type.NEXUS_BASE) {
             Team winner = enemyTeam.opposite();
-            announceVictory(winner, destroyer);
+            endMatch(winner, destroyer);
         }
     }
 
-    private void announceVictory(Team winner, Player destroyer) {
+    /**
+     * Fin de partie (Nexus détruit ou abandon) : annonce, tableau de score, arrêt des systèmes,
+     * puis retour des joueurs (serveur d'origine via BungeeCord, sinon position d'avant-partie)
+     * et fermeture de l'instance après 30 s.
+     *
+     * @param ref un joueur de la partie (sert à retrouver l'instance et ses managers)
+     */
+    public void endMatch(Team winner, Player ref) {
+        var gm = fr.lolmc.instance.InstanceHelper.gameManager(ref);
+        if (!gm.isGameRunning()) return; // fin déjà traitée (double déclenchement)
+
         Component msg = Component.text("🏆 VICTOIRE DE L'ÉQUIPE " + winner.name() + " ! 🏆",
                 winner.chatColor);
-        var inst = fr.lolmc.instance.InstanceHelper.instanceOf(destroyer);
+        var inst = fr.lolmc.instance.InstanceHelper.instanceOf(ref);
         // En mode instances, n'annoncer qu'aux joueurs de CETTE partie (pas tout le serveur,
-        // qui pourrait héberger d'autres parties en cours) ; sinon (mode partie unique), tout
-        // le monde partagé.
-        java.util.Collection<? extends Player> audience = inst != null
-                ? inst.getOnlinePlayers() : LolPlugin.getInstance().getServer().getOnlinePlayers();
-        for (Player p : audience) {
+        // qui pourrait héberger d'autres parties en cours) ; sinon, aux joueurs du monde de jeu.
+        java.util.List<Player> group = new java.util.ArrayList<>(inst != null
+                ? inst.getOnlinePlayers() : fr.lolmc.util.WorldContext.getGamePlayers());
+        for (Player p : group) {
             p.showTitle(net.kyori.adventure.title.Title.title(
                     Component.text("VICTOIRE " + winner.name(), winner.chatColor),
                     Component.empty(),
@@ -261,50 +276,27 @@ public class StructureDamageListener implements Listener {
                         java.time.Duration.ofMillis(1000))));
             p.sendMessage(msg);
         }
-        // Afficher le tableau de score de fin de partie
         final java.util.List<java.util.UUID> groupIds = new java.util.ArrayList<>();
-        for (Player gp : (inst != null ? inst.getOnlinePlayers()
-                : fr.lolmc.util.WorldContext.getGamePlayers())) groupIds.add(gp.getUniqueId());
-        {
-            java.util.List<Player> grp = new java.util.ArrayList<>();
-            for (java.util.UUID id : groupIds) { Player gp = org.bukkit.Bukkit.getPlayer(id); if (gp != null) grp.add(gp); }
-            LolPlugin.getInstance().getMatchScoreboard().showEndScreen(winner, grp,
-                    fr.lolmc.instance.InstanceHelper.gameManager(destroyer));
-        }
+        for (Player gp : group) groupIds.add(gp.getUniqueId());
+        // Tableau de score de fin de partie (et persistance des résultats)
+        LolPlugin.getInstance().getMatchScoreboard().showEndScreen(winner, group, gm);
         // Arrêter la partie
-        fr.lolmc.instance.InstanceHelper.minionManager(destroyer).stopWaves();
-        fr.lolmc.instance.InstanceHelper.jungleManager(destroyer).stopJungle();
-        fr.lolmc.instance.InstanceHelper.gameManager(destroyer).stopGame();
+        fr.lolmc.instance.InstanceHelper.minionManager(ref).stopWaves();
+        fr.lolmc.instance.InstanceHelper.jungleManager(ref).stopJungle();
+        gm.stopGame();
         // Retour au lobby après 30s
         var mm  = LolPlugin.getInstance().getMatchmakingManager();
         var im  = LolPlugin.getInstance().getInstanceManager();
-        // Trouver l'instance du joueur qui a détruit le Nexus
-        var winnerInstance = (destroyer != null) ? im.getInstanceOf(destroyer) : null;
         new org.bukkit.scheduler.BukkitRunnable() {
             int countdown = 30;
             @Override public void run() {
                 if (countdown <= 0) {
-                    var bridge = LolPlugin.getInstance().getBridgeManager();
-                    // Pour chaque joueur : retour sur son serveur d'origine
-                    // (ou téléportation locale si pas de BungeeCord)
-                    for (java.util.UUID gid : groupIds) {
-                        Player p = org.bukkit.Bukkit.getPlayer(gid);
-                        if (p == null || !p.isOnline()) continue;
-                        if (bridge != null && bridge.isEnabled()) {
-                            // BungeeCord : envoyer vers le serveur d'origine
-                            bridge.sendPlayerToOrigin(p);
-                        } else {
-                            // Pas de BungeeCord : téléporter à la position sauvegardée
-                            if (mm != null) mm.returnPlayerToPreGameLocation(p);
-                        }
-                    }
-                    // Mode partie unique : nettoyer toutes les positions mémorisées
-                    // (en instances, seuls les joueurs de CETTE partie sont renvoyés)
-                    if (mm != null && winnerInstance == null) mm.returnAllToPreGameLocations();
-                    // Fermer l'instance
-                    if (winnerInstance != null)
-                        im.closeInstance(winnerInstance, 60L);
                     cancel();
+                    returnPlayers(groupIds, mm);
+                    // Mode partie unique : nettoyer toutes les positions mémorisées
+                    if (mm != null && inst == null) mm.returnAllToPreGameLocations();
+                    // Fermer l'instance (laisse le temps aux transferts BungeeCord)
+                    if (inst != null) im.closeInstance(inst, 100L);
                     return;
                 }
                 if (countdown <= 10 || countdown % 10 == 0) {
@@ -319,6 +311,31 @@ public class StructureDamageListener implements Listener {
                 countdown--;
             }
         }.runTaskTimer(LolPlugin.getInstance(), 20L, 20L);
+    }
+
+    /**
+     * Renvoie les joueurs de la partie : via le proxy (LolMC-Bungee) vers leur serveur d'origine,
+     * puis, pour ceux encore là 3 s plus tard, vers l'origine connue ou le lobby. Sans BungeeCord :
+     * retour à la position d'avant-partie.
+     */
+    private void returnPlayers(java.util.List<java.util.UUID> groupIds, fr.lolmc.matchmaking.MatchmakingManager mm) {
+        var bridge = LolPlugin.getInstance().getBridgeManager();
+        if (bridge != null && bridge.isEnabled()) {
+            bridge.requestReturnToOrigin(groupIds);
+            org.bukkit.Bukkit.getScheduler().runTaskLater(LolPlugin.getInstance(), () -> {
+                for (java.util.UUID gid : groupIds) {
+                    Player p = org.bukkit.Bukkit.getPlayer(gid);
+                    if (p == null || !p.isOnline()) continue;
+                    if (bridge.getOriginServer(gid) != null) bridge.sendPlayerToOrigin(p);
+                    else bridge.sendPlayerToLobby(p);
+                }
+            }, 60L);
+            return;
+        }
+        for (java.util.UUID gid : groupIds) {
+            Player p = org.bukkit.Bukkit.getPlayer(gid);
+            if (p != null && p.isOnline() && mm != null) mm.returnPlayerToPreGameLocation(p);
+        }
     }
 
     private String structureName(GameStructure s) {

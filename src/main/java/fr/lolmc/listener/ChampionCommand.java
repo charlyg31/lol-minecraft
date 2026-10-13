@@ -45,6 +45,14 @@ public class ChampionCommand implements CommandExecutor, TabCompleter {
                     player.sendMessage("§cUsage: /champion pick <nom>");
                     return true;
                 }
+                // En partie ou en sélection, le champion est verrouillé (sinon on contourne bans et doublons)
+                boolean locked = (fr.lolmc.instance.InstanceHelper.gameManager(player).isGameRunning()
+                        && manager.hasChampion(player))
+                        || fr.lolmc.LolPlugin.getInstance().getChampSelectManager().isParticipant(player.getUniqueId());
+                if (locked && !player.hasPermission("lolmc.admin.test")) {
+                    player.sendMessage("§c❌ Impossible de changer de champion pendant une partie ou une sélection.");
+                    return true;
+                }
                 if (!player.hasPermission("lolmc.champion." + args[1].toLowerCase())) {
                     player.sendMessage("§c❌ Tu n'as pas accès à ce champion.");
                     return true;

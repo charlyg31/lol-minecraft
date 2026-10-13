@@ -40,6 +40,12 @@ public class JungleManager {
     public void setGameInstance(fr.lolmc.instance.GameInstance inst) { this.gameInstance = inst; }
     public fr.lolmc.instance.GameInstance getGameInstance() { return gameInstance; }
 
+    /** Annonce aux seuls joueurs de cette partie. */
+    private void announce(Component message) {
+        fr.lolmc.util.WorldContext.broadcast(gameInstance != null ? gameInstance.getWorld()
+                : fr.lolmc.util.WorldContext.getGameWorld(), message);
+    }
+
     /** Résout un manager-frère : celui de cette instance si elle existe, sinon le global. */
     private RewardManager siblingRewardManager() {
         return gameInstance != null ? gameInstance.getRewardManager() : LolPlugin.getInstance().getRewardManager();
@@ -79,7 +85,7 @@ public class JungleManager {
         spawnedDragonElements.add(pick);
         if (spawnedDragonElements.size() == 3) {
             lockedDragonElement = pick;
-            Bukkit.broadcast(Component.text(
+            announce(Component.text(
                 "🐉 La Faille se transforme : élément " + pick.displayName + " !",
                 NamedTextColor.LIGHT_PURPLE));
         }
@@ -572,7 +578,7 @@ public class JungleManager {
                                     ? lockedDragonElement.buff.replace("drake_", "")
                                     : dragonSoulType.getOrDefault(dteam, "infernal");
                                 applyTeamBuff(killer, "dragon_soul_" + soul);
-                                LolPlugin.getInstance().getServer().broadcast(Component.text(
+                                announce(Component.text(
                                         "🐉 L'équipe de " + killer.getName() + " a obtenu l'ÂME DU DRAGON!",
                                         NamedTextColor.LIGHT_PURPLE));
                             }
@@ -601,7 +607,7 @@ public class JungleManager {
             }
 
             if (type.isEpic() && (camp == null || camp.liveEntities.isEmpty())) {
-                LolPlugin.getInstance().getServer().broadcast(Component.text(
+                announce(Component.text(
                         "🌟 " + type.displayName + " tué par " + killer.getName() + "!",
                         NamedTextColor.GOLD));
                 // Feat of Strength : Premier Objectif Épique (Dragon ou Héraut)
@@ -909,7 +915,7 @@ public class JungleManager {
                     if (phaseChanged) mm.updateStructurePhase(ft);
                     if (ft.isDestroyed()) {
                         // Détruire proprement via le flux normal
-                        LolPlugin.getInstance().getServer().broadcast(
+                        announce(
                             Component.text(
                                 "👁 Le Héraut a détruit une tourelle!",
                                 NamedTextColor.LIGHT_PURPLE));

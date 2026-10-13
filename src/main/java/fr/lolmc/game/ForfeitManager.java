@@ -139,8 +139,13 @@ public class ForfeitManager {
                 NamedTextColor.RED);
             for (Player gp : groupOf(ref)) gp.sendMessage(ffMsg);
             Team winner = team == Team.BLUE ? Team.RED : Team.BLUE;
-            LolPlugin.getInstance().getMatchScoreboard().showEndScreen(winner, groupOf(ref), gm);
-            fr.lolmc.instance.InstanceHelper.gameManager(player).stopGame();
+            var sdl = LolPlugin.getInstance().getStructureDamageListener();
+            if (sdl != null) {
+                sdl.endMatch(winner, player);
+            } else {
+                LolPlugin.getInstance().getMatchScoreboard().showEndScreen(winner, groupOf(ref), gm);
+                fr.lolmc.instance.InstanceHelper.gameManager(player).stopGame();
+            }
         }
         return true;
     }

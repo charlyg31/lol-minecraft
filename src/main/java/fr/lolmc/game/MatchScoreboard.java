@@ -170,48 +170,45 @@ public class MatchScoreboard {
         var bridge = LolPlugin.getInstance().getBridgeManager();
         if (bridge != null && bridge.isEnabled()) {
             long duration = timeSrc.getElapsedSeconds();
-            List<fr.lolmc.stats.persistence.PlayerStats> endStats = new ArrayList<>();
-            for (UUID id : stats.keySet()) {
-                if (group != null && !group.contains(id)) continue;
-                endStats.add(new fr.lolmc.stats.persistence.PlayerStats(id, ""));
+            List<MatchStats> endStats = new ArrayList<>();
+            for (var entry : stats.entrySet()) {
+                if (group != null && !group.contains(entry.getKey())) continue;
+                endStats.add(entry.getValue());
             }
             bridge.notifyGameEnd(winner.name(), duration, endStats);
         }
     }
 
     private void persistResults(Team winner, fr.lolmc.team.TeamManager tm, Set<UUID> group, GameManager timeSrc) {
-        var db = LolPlugin.getInstance().getDatabaseManager();
-        var ranked = LolPlugin.getInstance().getRankedManager();
+        var plugin = LolPlugin.getInstance();
+        var db = plugin.getDatabaseManager();
+        var ranked = plugin.getRankedManager();
         if (db == null || ranked == null) return;
 
         List<UUID> winners = new ArrayList<>(tm.getTeamMembers(winner));
         List<UUID> losers = new ArrayList<>(tm.getTeamMembers(winner.opposite()));
         if (group != null) { winners.retainAll(group); losers.retainAll(group); }
 
-        // Reporter les KDA de la partie dans les stats persistantes
+        // Construire les fiches de partie sur le thread principal (accès à l'état Bukkit)
         long duration = timeSrc.getElapsedSeconds();
         String matchId = java.util.UUID.randomUUID().toString(); // ID unique pour cette partie
         long now = System.currentTimeMillis();
-        var tm2 = LolPlugin.getInstance().getTeamManager();
-        var cm2 = LolPlugin.getInstance().getChampionManager();
+        var cm = plugin.getChampionManager();
+        List<fr.lolmc.stats.persistence.MatchRecord> records = new ArrayList<>();
+        Map<UUID, String> names = new HashMap<>();
         for (var entry : stats.entrySet()) {
             if (group != null && !group.contains(entry.getKey())) continue;
             MatchStats s = entry.getValue();
-            boolean isRk = isRanked(entry.getKey());
-            var mode = isRk ? fr.lolmc.stats.persistence.RankedManager.Mode.RANKED
-                    : fr.lolmc.stats.persistence.RankedManager.Mode.NORMAL;
             org.bukkit.entity.Player mp = org.bukkit.Bukkit.getPlayer(entry.getKey());
-            // Construire MatchRecord enrichi
             var mr = new fr.lolmc.stats.persistence.MatchRecord();
             mr.uuid    = entry.getKey();
             mr.matchId = matchId;
             mr.playedAt = now;
-            mr.ranked  = isRk;
+            mr.ranked  = isRanked(entry.getKey());
             mr.won     = winners.contains(entry.getKey());
-            mr.team    = (mp != null && tm2.getTeam(mp) != null)
-                         ? tm2.getTeam(mp).name() : "UNKNOWN";
-            mr.champion = (mp != null && cm2.hasChampion(mp))
-                         ? cm2.getChampion(mp).getId() : "?";
+            var team   = mp != null ? tm.getTeam(mp) : null;
+            mr.team    = team != null ? team.name() : "UNKNOWN";
+            mr.champion = (mp != null && cm.hasChampion(mp)) ? cm.getChampion(mp).getId() : "?";
             mr.kills   = s.kills;     mr.deaths       = s.deaths;
             mr.assists = s.assists;   mr.cs            = s.cs;
             mr.gold    = s.gold;      mr.damageDealt   = s.damageDealt;
@@ -222,43 +219,41 @@ public class MatchScoreboard {
             mr.durationSeconds = (int) duration;
             // Items équipés
             if (mp != null) {
-                var inv = LolPlugin.getInstance().getShopListener().getOrCreate(mp);
+                var inv = plugin.getShopListener().getOrCreate(mp);
                 StringBuilder items = new StringBuilder("[");
                 boolean fi = true;
                 for (fr.lolmc.item.LolItem item : inv.getEquippedItems()) {
                     if (item == null) continue;
-                    if (!fi) items.append(","); fi = false;
+                    if (!fi) items.append(",");
+                    fi = false;
                     items.append("\"").append(item.getId()).append("\"");
                 }
                 items.append("]");
                 mr.items = items.toString();
             }
-            db.saveMatch(mr);
-            var ps = db.getCached(entry.getKey());
-            if (ps == null) continue;
-            if (mode == fr.lolmc.stats.persistence.RankedManager.Mode.RANKED) {
-                ps.rankedKills += s.kills;
-                ps.rankedDeaths += s.deaths;
-                ps.rankedAssists += s.assists;
-            } else {
-                ps.normalKills += s.kills;
-                ps.normalDeaths += s.deaths;
-                ps.normalAssists += s.assists;
-            }
-            db.saveStats(ps);
+            records.add(mr);
+            names.put(mr.uuid, s.name);
         }
 
-        // Mettre à jour Elo (classé) ou stats (amical)
         boolean groupRanked = this.ranked;
         if (group != null) {
             groupRanked = false;
             for (UUID id : group) if (isRanked(id)) { groupRanked = true; break; }
         }
-        if (groupRanked) {
-            ranked.updateEloAfterRanked(winners, losers);
-        } else {
-            ranked.updateAfterNormal(winners, losers);
-        }
+        final boolean eloUpdate = groupRanked;
+
+        // Écritures en base hors du thread principal (MySQL = latence réseau)
+        Runnable write = () -> {
+            for (var mr : records) {
+                db.saveMatch(mr);
+                var ps = db.getStats(mr.uuid, names.get(mr.uuid));
+                ps.recordMatch(mr);
+                db.saveStats(ps);
+            }
+            if (eloUpdate) ranked.updateEloAfterRanked(winners, losers);
+        };
+        if (plugin.isEnabled()) org.bukkit.Bukkit.getScheduler().runTaskAsynchronously(plugin, write);
+        else write.run();
     }
 
     public Map<UUID, MatchStats> getStats() { return stats; }

@@ -86,6 +86,23 @@ public final class WorldContext {
     }
 
     /**
+     * Annonce limitée à la partie qui se joue dans {@code world} : dans un monde d'instance,
+     * seuls les joueurs de ce monde la reçoivent ; sinon (partie unique), tous les joueurs
+     * qui ne sont pas dans une instance (les autres parties ne sont pas spammées).
+     */
+    public static void broadcast(World world, net.kyori.adventure.text.Component message) {
+        var im = LolPlugin.getInstance().getInstanceManager();
+        if (world != null && im != null && im.getInstanceByWorldName(world.getName()) != null) {
+            for (Player p : world.getPlayers()) p.sendMessage(message);
+            return;
+        }
+        for (Player p : Bukkit.getOnlinePlayers()) {
+            if (im != null && im.getInstanceOf(p) != null) continue;
+            p.sendMessage(message);
+        }
+    }
+
+    /**
      * Vrai si le joueur est dans le monde lobby.
      */
     public static boolean isInLobbyWorld(Player player) {
