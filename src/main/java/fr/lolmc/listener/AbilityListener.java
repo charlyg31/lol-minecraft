@@ -827,8 +827,14 @@ public class AbilityListener implements Listener {
     /** Nettoyage léger (déconnexion en cours de partie) : garde champion/équipe/objets. */
     private void lightCleanup(Player p) {
         LolPlugin.getInstance().getFlashManager().cleanup(p.getUniqueId());
-        LolPlugin.getInstance().getWardManager().cleanup(p.getUniqueId());
+        // (les wards du joueur restent en place pendant sa déconnexion, comme dans LoL)
         LolPlugin.getInstance().getBushManager().cleanup(p.getUniqueId());
+    }
+
+    /** On ne peut pas prendre la torche d'une ward (ArmorStand). */
+    @EventHandler
+    public void onWardManipulate(org.bukkit.event.player.PlayerArmorStandManipulateEvent e) {
+        if (e.getRightClicked().getScoreboardTags().contains("lol_ward")) e.setCancelled(true);
     }
 
     private void cleanupPlayer(Player p) {

@@ -209,9 +209,9 @@ public class DamageUtil {
             if (fr.lolmc.game.JungleManager.hasElderBuff(attacker) && type != Type.TRUE)
                 elderEffects(attacker, victim);
         }
-        // Révéler la victime si elle est dans un bush (combat = visible)
+        // Attaquer depuis un bush révèle l'attaquant 2 s (LoL) ; être touché ne révèle pas
         var bushMgr = LolPlugin.getInstance().getBushManager();
-        if (bushMgr != null) bushMgr.revealOnDamage(victim);
+        if (bushMgr != null && attacker != null) bushMgr.revealOnAttack(attacker);
         var baseMgr = fr.lolmc.instance.InstanceHelper.baseManager(victim);
         if (baseMgr != null) baseMgr.onDamage(victim);
         var runeMgr = LolPlugin.getInstance().getRuneManager();

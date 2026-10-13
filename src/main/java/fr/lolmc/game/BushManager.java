@@ -22,9 +22,12 @@ import java.util.*;
  * Règles :
  *  - Un bush = un ensemble de blocs identiques (configurés) collés entre eux.
  *  - Un joueur dans/sur un bush est INVISIBLE pour les ennemis uniquement.
- *  - Si un ennemi est dans le MÊME bush, le joueur redevient visible (pour cet ennemi).
- *  - Si le joueur prend des dégâts, il est révélé 5 secondes.
+ *  - Une équipe voit l'intérieur d'un bush si l'un de ses champions vivants y est, ou si l'une
+ *    de ses wards y est posée (une ward hors du bush ne voit pas dedans, wiki LoL).
+ *  - Attaquer ou lancer un sort ciblé révèle le joueur 2 secondes (prendre des dégâts, non).
  *  - Les alliés voient toujours le joueur.
+ * Si le brouillard de guerre est actif, c'est lui qui applique la visibilité (avec hidesFrom) :
+ * les deux tâches se contredisaient (le BushManager réaffichait tout ennemi hors bush).
  */
 public class BushManager implements Listener {
 
@@ -42,7 +45,7 @@ public class BushManager implements Listener {
     // Joueur révélé suite à des dégâts → timestamp d'expiration
     private final Map<UUID, Long> revealedUntil = new HashMap<>();
 
-    private static final long REVEAL_AFTER_DAMAGE_MS = 5000L;
+    private static final long REVEAL_AFTER_ATTACK_MS = 2000L;
 
     public BushManager(TeamManager teamManager) {
         this.teamManager = teamManager;
@@ -101,6 +104,10 @@ public class BushManager implements Listener {
         // Nettoyer les révélations expirées
         revealedUntil.entrySet().removeIf(e -> now > e.getValue());
 
+        // Brouillard de guerre actif : il gère toute la visibilité (bushes compris)
+        var fog = LolPlugin.getInstance().getFogOfWarManager();
+        if (fog != null && fog.isEnabled()) return;
+
         // 2. Recalculer la visibilité — uniquement pour les paires proches
         //    et seulement si la cible est dans un bush (sinon toujours visible).
         var players = new ArrayList<>(WorldContext.getGamePlayers());
@@ -130,41 +137,35 @@ public class BushManager implements Listener {
         }
     }
 
-    /**
-     * Détermine si `target` doit être visible pour `viewer`.
-     */
+    /** Détermine si `target` doit être visible pour `viewer` (brouillard de guerre désactivé). */
     private void updateVisibility(Player viewer, Player target) {
-        // Les alliés (et soi-même) se voient toujours
-        if (!teamManager.areEnemies(viewer, target)) {
-            showTo(viewer, target);
-            return;
-        }
+        if (hidesFrom(viewer, target)) hideFrom(viewer, target);
+        else showTo(viewer, target);
+    }
 
-        // target est-il caché dans un bush ?
+    /**
+     * Le bush cache-t-il {@code target} à {@code viewer} ? Oui si target est un ennemi dans un
+     * bush, non révélé par une attaque, et que l'équipe du viewer n'a ni champion vivant ni
+     * ward active dans ce bush.
+     */
+    public boolean hidesFrom(Player viewer, Player target) {
+        if (!teamManager.areEnemies(viewer, target)) return false;
         String targetBush = playerBush.get(target.getUniqueId());
-        if (targetBush == null) {
-            // Pas dans un bush → visible
-            showTo(viewer, target);
-            return;
+        if (targetBush == null || isRevealed(target)) return false;
+        var viewerTeam = teamManager.getTeam(viewer);
+        for (var e : playerBush.entrySet()) {
+            if (!targetBush.equals(e.getValue())) continue;
+            Player p = org.bukkit.Bukkit.getPlayer(e.getKey());
+            if (p != null && p.getGameMode() != org.bukkit.GameMode.SPECTATOR
+                    && teamManager.getTeam(p) == viewerTeam) return false; // un allié est dans le bush
         }
-
-        // target a-t-il été révélé par des dégâts récents, ou détecté par une ward ennemie ?
         var wardMgr = LolPlugin.getInstance().getWardManager();
-        if (isRevealed(target) || (wardMgr != null && wardMgr.isRevealed(target))) {
-            showTo(viewer, target);
-            return;
-        }
+        return wardMgr == null || viewerTeam == null || !wardMgr.hasVisionAt(viewerTeam, target.getLocation());
+    }
 
-        // L'ennemi (viewer) est-il dans le MÊME bush ?
-        String viewerBush = playerBush.get(viewer.getUniqueId());
-        if (targetBush.equals(viewerBush)) {
-            // Même bush → visible
-            showTo(viewer, target);
-            return;
-        }
-
-        // Sinon : target est caché pour viewer
-        hideFrom(viewer, target);
+    /** Identifiant du bush à cette position (null hors bush). */
+    public String bushIdAt(Location loc) {
+        return loc.getWorld() == null ? null : getBushAt(loc);
     }
 
     private void showTo(Player viewer, Player target) {
@@ -290,11 +291,12 @@ public class BushManager implements Listener {
     // ══════════════════════════════════════════════════════════════
 
     /**
-     * Appelé quand un joueur prend des dégâts : le révèle 5s.
+     * Le joueur attaque ou lance un sort ciblé : il est révélé 2 secondes (wiki LoL : rayon de
+     * 300 unités autour de lui pendant 2 s). Avant, c'était la VICTIME qui était révélée 5 s.
      */
-    public void revealOnDamage(Player player) {
+    public void revealOnAttack(Player player) {
         revealedUntil.put(player.getUniqueId(),
-                System.currentTimeMillis() + REVEAL_AFTER_DAMAGE_MS);
+                System.currentTimeMillis() + REVEAL_AFTER_ATTACK_MS);
     }
 
     public boolean isRevealed(Player player) {

@@ -16,26 +16,49 @@ import org.bukkit.scheduler.BukkitRunnable;
 import java.util.*;
 
 /**
- * Gère les wards posées sur la carte avec leur équipe propriétaire.
+ * Gère les wards posées sur la carte avec leur équipe propriétaire (règles du wiki LoL).
  *
- * Les wards sont des ArmorStand invisibles. Le nom flottant est visible
- * uniquement par les alliés (hideEntity sur les ennemis). Une ward furtive
- * peut être révélée par Control Ward ou Oracle Lens — l'entité devient alors
- * visible pour les ennemis qui peuvent la détruire en cliquant dessus.
+ * <ul>
+ *   <li>Ward furtive : 900 unités de vision, 90 à 120 s (niveau moyen), 3 coups, 3 posées max
+ *       par joueur (la plus ancienne est remplacée), invisible pour les ennemis sauf révélée.</li>
+ *   <li>Control Ward : 900 unités, durée illimitée, 4 coups, 1 posée max, visible ; révèle et
+ *       désactive les wards ennemies dans sa portée (une ward désactivée ne donne plus de vision).</li>
+ *   <li>Ward de vision lointaine : 500 unités, durée illimitée, 1 coup, visible, sans limite.</li>
+ * </ul>
+ * Une ward ne voit dans un bush que si elle est posée dans ce bush.
  */
 public class WardManager {
+
+    public enum WardType {
+        STEALTH(9.0, 3, 10), CONTROL(9.0, 4, 30), FARSIGHT(5.0, 1, 15);
+
+        /** Rayon de vision en blocs (900 / 500 unités LoL, 100 unités = 1 bloc). */
+        public final double radius;
+        public final int hits;
+        public final int goldBounty;
+
+        WardType(double radius, int hits, int goldBounty) {
+            this.radius = radius; this.hits = hits; this.goldBounty = goldBounty;
+        }
+    }
 
     private final TeamManager teamManager;
     private final List<Ward> wards = new ArrayList<>();
     private final Map<UUID, Long> revealedUntil = new HashMap<>();
     private final Map<UUID, Team> revealedToTeam = new HashMap<>();
-    /** BlockDisplay du faisceau de révélation par joueur révélé (10 segments + 6 anneau). */
+    /** BlockDisplay du faisceau de révélation par joueur révélé (10 segments + 1 anneau). */
     private final Map<UUID, java.util.List<org.bukkit.entity.BlockDisplay>> beamDisplays = new HashMap<>();
-    // Wards révélées aux ennemis : UUID entité → timestamp fin de révélation
+    // Wards révélées aux ennemis (Oracle Lens) : UUID entité → timestamp fin de révélation
     private final Map<UUID, Long> revealedWards = new HashMap<>();
+    // Anti double-coup (le client envoie deux paquets d'interaction sur un ArmorStand)
+    private final Map<String, Long> lastHit = new HashMap<>();
 
-    private static final double WARD_RADIUS = 9.0;
-    private static final long REVEAL_DURATION_MS = 5000L;
+    /** Rayon de vision d'une ward furtive / Control Ward, en blocs. */
+    public static final double WARD_RADIUS = WardType.STEALTH.radius;
+    // La vision d'une ward s'arrête quand on quitte sa portée (tâche toutes les 0,5 s)
+    private static final long REVEAL_DURATION_MS = 750L;
+    private static final int MAX_STEALTH_PER_PLAYER = 3;
+    private static final int MAX_CONTROL_PER_PLAYER = 1;
 
     public WardManager(TeamManager teamManager) {
         this.teamManager = teamManager;
@@ -49,53 +72,97 @@ public class WardManager {
         public final Location location;
         public final Team team;
         public final UUID owner;
-        public final long expireAt;
-        public final UUID entityId; // ArmorStand représentant la ward
+        public final long expireAt;   // Long.MAX_VALUE = illimitée
+        public final UUID entityId;   // ArmorStand représentant la ward (null : ward sans entité)
+        public final WardType type;
+        public final boolean countsToLimit;
+        public int hitsLeft;
 
-        public Ward(Location location, Team team, UUID owner, int durationSeconds, UUID entityId) {
+        public Ward(Location location, Team team, UUID owner, int durationSeconds, UUID entityId,
+                    WardType type, boolean countsToLimit) {
             this.location = location;
             this.team = team;
             this.owner = owner;
-            this.expireAt = System.currentTimeMillis() + durationSeconds * 1000L;
+            this.expireAt = durationSeconds <= 0 ? Long.MAX_VALUE
+                    : System.currentTimeMillis() + durationSeconds * 1000L;
             this.entityId = entityId;
+            this.type = type;
+            this.countsToLimit = countsToLimit;
+            this.hitsLeft = type.hits;
         }
     }
 
-    /** Pose une ward pour l'équipe d'un joueur avec entité associée. */
-    public void placeWard(Player owner, Location location, int durationSeconds, UUID entityId) {
+    /**
+     * Pose une ward. {@code durationSeconds} ≤ 0 = durée illimitée. Au-delà de la limite du
+     * joueur (3 furtives, 1 Control Ward), sa ward la plus ancienne de ce type est retirée.
+     */
+    public void placeWard(Player owner, Location location, int durationSeconds, UUID entityId, WardType type) {
         Team team = teamManager.getTeam(owner);
         if (team == null) team = Team.BLUE;
-        Ward ward = new Ward(location.clone(), team, owner.getUniqueId(), durationSeconds, entityId);
+        int max = type == WardType.STEALTH ? MAX_STEALTH_PER_PLAYER
+                : type == WardType.CONTROL ? MAX_CONTROL_PER_PLAYER : Integer.MAX_VALUE;
+        List<Ward> mine = new ArrayList<>();
+        for (Ward w : wards)
+            if (w.countsToLimit && w.type == type && w.owner.equals(owner.getUniqueId())) mine.add(w);
+        while (mine.size() >= max) {
+            Ward oldest = mine.removeFirst(); // liste dans l'ordre de pose
+            removeWardEntity(oldest);
+            wards.remove(oldest);
+        }
+        Ward ward = new Ward(location.clone(), team, owner.getUniqueId(), durationSeconds, entityId, type, true);
         wards.add(ward);
-        if (entityId != null) applyWardVisibility(ward, false);
+        if (entityId != null) applyWardVisibility(ward, type != WardType.STEALTH);
     }
 
-    /** Compatibilité ancienne signature sans entityId. */
-    public void placeWard(Player owner, Location location, int durationSeconds) {
-        placeWard(owner, location, durationSeconds, null);
+    /** Pose une ward furtive avec entité (compatibilité). */
+    public void placeWard(Player owner, Location location, int durationSeconds, UUID entityId) {
+        placeWard(owner, location, durationSeconds, entityId, WardType.STEALTH);
     }
 
     /**
-     * Applique la visibilité de la ward selon l'équipe.
-     * revealed=true → visible par TOUS les joueurs (Control Ward / Oracle Lens).
-     * revealed=false → visible uniquement par les alliés.
+     * Ward sans entité (Ward Zombie, Poro Fantôme, sanctuaire du Crabe…) : vision seulement,
+     * hors limite de wards posées (LoL).
+     */
+    public void placeWard(Player owner, Location location, int durationSeconds) {
+        Team team = teamManager.getTeam(owner);
+        if (team == null) team = Team.BLUE;
+        wards.add(new Ward(location.clone(), team, owner.getUniqueId(), durationSeconds, null, WardType.STEALTH, false));
+    }
+
+    /**
+     * Applique la visibilité de l'entité de la ward selon l'équipe.
+     * revealed=true → visible par TOUS les joueurs ; false → visible uniquement par les alliés.
      */
     public void applyWardVisibility(Ward ward, boolean revealed) {
         Entity ent = ward.entityId != null ? Bukkit.getEntity(ward.entityId) : null;
         if (ent == null) return;
-        for (Player p : Bukkit.getOnlinePlayers()) {
-            if (!teamManager.hasTeam(p)) continue;
-            boolean ally = teamManager.getTeam(p) == ward.team;
-            if (ally || revealed) {
-                p.showEntity(LolPlugin.getInstance(), ent);
-            } else {
-                p.hideEntity(LolPlugin.getInstance(), ent);
-            }
+        for (Player p : ent.getWorld().getPlayers()) {
+            boolean ally = teamManager.hasTeam(p) && teamManager.getTeam(p) == ward.team;
+            if (ally || revealed) p.showEntity(LolPlugin.getInstance(), ent);
+            else p.hideEntity(LolPlugin.getInstance(), ent);
         }
     }
 
+    /** Ward désactivée : une Control Ward ennemie la couvre (elle ne donne plus de vision). */
+    public boolean isDisabled(Ward w) {
+        if (w.type == WardType.CONTROL) return false; // une Control Ward ne peut pas être désactivée
+        for (Ward c : wards) {
+            if (c.type != WardType.CONTROL || c.team == w.team) continue;
+            if (!c.location.getWorld().equals(w.location.getWorld())) continue;
+            if (c.location.distanceSquared(w.location) <= c.type.radius * c.type.radius) return true;
+        }
+        return false;
+    }
+
+    /** Révélée aux ennemis : par une Control Ward ennemie, par Oracle Lens, ou de type visible. */
+    private boolean isVisibleToEnemies(Ward w) {
+        if (w.type != WardType.STEALTH) return true;
+        Long until = w.entityId != null ? revealedWards.get(w.entityId) : null;
+        return (until != null && until > System.currentTimeMillis()) || isDisabled(w);
+    }
+
     /**
-     * Révèle les wards ennemies dans un rayon (Oracle Lens / Control Ward).
+     * Révèle les wards ennemies dans un rayon (Oracle Lens).
      * Elles deviennent visibles par les ennemis et peuvent être détruites.
      */
     public int revealEnemyWards(Player player, Location center, double radius, long durMs) {
@@ -103,11 +170,11 @@ public class WardManager {
         if (myTeam == null) return 0;
         int count = 0;
         for (Ward w : wards) {
-            if (w.team == myTeam) continue;
+            if (w.team == myTeam || w.entityId == null) continue;
             if (w.location.getWorld() == null || !w.location.getWorld().equals(center.getWorld())) continue;
             if (w.location.distance(center) > radius) continue;
-            applyWardVisibility(w, true);
             revealedWards.put(w.entityId, System.currentTimeMillis() + durMs);
+            applyWardVisibility(w, true);
             fr.lolmc.util.VisualEffectUtil.impact(center.getWorld(),
                     w.location.clone().add(0,0.5,0), Material.WHITE_STAINED_GLASS, 0.28f, 5L);
             count++;
@@ -115,7 +182,7 @@ public class WardManager {
         return count;
     }
 
-    /** Détruit les wards ennemies dans un rayon (Control Ward). */
+    /** Détruit les wards ennemies dans un rayon (effets d'objets). */
     public int destroyEnemyWards(Player player, Location center, double radius) {
         Team myTeam = teamManager.getTeam(player);
         if (myTeam == null) return 0;
@@ -134,8 +201,9 @@ public class WardManager {
     }
 
     /**
-     * Détruit la ward dont l'entité correspond à entityId.
-     * Seul un ennemi peut détruire, et seulement si la ward est révélée.
+     * Frappe la ward dont l'entité correspond à entityId : 1 dégât par coup (3 pour une furtive,
+     * 4 pour une Control Ward, 1 pour une ward de vision lointaine). Seul un ennemi peut la
+     * frapper, et une ward furtive doit être révélée.
      */
     public boolean destroyWardByEntity(UUID entityId, Player attacker) {
         Team myTeam = teamManager.getTeam(attacker);
@@ -144,20 +212,30 @@ public class WardManager {
             Ward w = it.next();
             if (!entityId.equals(w.entityId)) continue;
             if (w.team == myTeam) return false; // pas sa propre ward
-            Long rev = revealedWards.get(entityId);
-            if (rev == null || System.currentTimeMillis() > rev) {
+            if (!isVisibleToEnemies(w)) {
                 attacker.sendActionBar(Component.text("👁 Ward non révélée! Utilisez Oracle Lens ou Control Ward.", NamedTextColor.GRAY));
                 return false;
             }
+            long now = System.currentTimeMillis();
+            String hitKey = attacker.getUniqueId() + ":" + entityId;
+            Long last = lastHit.get(hitKey);
+            if (last != null && now - last < 400) return false;
+            lastHit.put(hitKey, now);
+            if (--w.hitsLeft > 0) {
+                attacker.sendActionBar(Component.text("🔨 Ward : " + w.hitsLeft + " coup(s) restant(s)", NamedTextColor.YELLOW));
+                attacker.getWorld().playSound(w.location, Sound.BLOCK_WOOD_HIT, 1f, 1.2f);
+                return true;
+            }
             removeWardEntity(w);
             it.remove();
+            LolPlugin.getInstance().getGoldManager().addGold(attacker.getUniqueId(), w.type.goldBounty);
             // Rune Zombie Ward : la destruction crée une ward amie au même endroit
             var rm = fr.lolmc.LolPlugin.getInstance().getRuneManager();
             boolean zombieWard = rm != null && rm.getPage(attacker.getUniqueId()).has("zombie_ward");
             if (zombieWard) placeWard(attacker, w.location, 90);
             attacker.sendActionBar(Component.text(
-                    zombieWard ? "💥 Ward détruite ! 🧟 Ward Zombie posée!" : "💥 Ward ennemie détruite!",
-                    NamedTextColor.GREEN));
+                    (zombieWard ? "💥 Ward détruite ! 🧟 Ward Zombie posée!" : "💥 Ward ennemie détruite!")
+                    + " +" + w.type.goldBounty + " or", NamedTextColor.GREEN));
             attacker.getWorld().playSound(attacker.getLocation(), Sound.ENTITY_ITEM_BREAK, 1f, 1.5f);
             // Tracker dans le scoreboard
             var msb = fr.lolmc.LolPlugin.getInstance().getMatchScoreboard();
@@ -174,8 +252,8 @@ public class WardManager {
         if (w.entityId != null) {
             Entity ent = Bukkit.getEntity(w.entityId);
             if (ent != null) ent.remove();
+            revealedWards.remove(w.entityId);
         }
-        revealedWards.remove(w.entityId);
     }
 
     // ── Tâche de détection (toutes les 10 ticks = 0.5s) ───────────
@@ -190,35 +268,44 @@ public class WardManager {
                     if (now > w.expireAt) { removeWardEntity(w); return true; }
                     return false;
                 });
+                revealedWards.entrySet().removeIf(e -> now > e.getValue());
+                lastHit.entrySet().removeIf(e -> now - e.getValue() > 5000L);
 
-                // Révélations de wards expirées → re-masquer aux ennemis
-                revealedWards.entrySet().removeIf(e -> {
-                    if (now > e.getValue()) {
-                        wards.stream().filter(w -> e.getKey().equals(w.entityId))
-                             .findFirst().ifPresent(w -> applyWardVisibility(w, false));
-                        return true;
-                    }
-                    return false;
-                });
+                // Visibilité des entités de ward (aussi pour les joueurs arrivés après la pose)
+                for (Ward ward : wards)
+                    if (ward.entityId != null) applyWardVisibility(ward, isVisibleToEnemies(ward));
 
-                // Détecter les ennemis dans les rayons des wards
+                // Détecter les ennemis vus par les wards
                 for (Ward ward : wards) {
-                    if (ward.location.getWorld() == null) continue;
+                    if (ward.location.getWorld() == null || isDisabled(ward)) continue;
                     for (Player p : ward.location.getWorld().getPlayers()) {
                         if (!teamManager.hasTeam(p)) continue;
                         if (teamManager.getTeam(p) == ward.team) continue;
-                        if (p.getLocation().distance(ward.location) <= WARD_RADIUS) {
-                            boolean wasRevealed = revealedUntil.containsKey(p.getUniqueId())
-                                    && now < revealedUntil.get(p.getUniqueId());
-                            revealedUntil.put(p.getUniqueId(), now + REVEAL_DURATION_MS);
-                            revealedToTeam.put(p.getUniqueId(), ward.team);
-                            if (!wasRevealed) playDetectionSound(ward.team, ward.location.getWorld());
-                        }
+                        if (p.getGameMode() == org.bukkit.GameMode.SPECTATOR) continue;
+                        if (!wardSees(ward, p.getLocation())) continue;
+                        boolean wasRevealed = revealedUntil.containsKey(p.getUniqueId())
+                                && now < revealedUntil.get(p.getUniqueId());
+                        revealedUntil.put(p.getUniqueId(), now + REVEAL_DURATION_MS);
+                        revealedToTeam.put(p.getUniqueId(), ward.team);
+                        if (!wasRevealed) playDetectionSound(ward.team, ward.location.getWorld());
                     }
                 }
                 revealedUntil.entrySet().removeIf(e -> now > e.getValue());
             }
         }.runTaskTimer(LolPlugin.getInstance(), 0L, 10L);
+    }
+
+    /**
+     * La ward voit-elle cette position ? Portée de la ward, et règle des bushes : une position
+     * dans un bush n'est vue que par une ward posée dans ce même bush.
+     */
+    private boolean wardSees(Ward ward, Location loc) {
+        if (!ward.location.getWorld().equals(loc.getWorld())) return false;
+        if (ward.location.distanceSquared(loc) > ward.type.radius * ward.type.radius) return false;
+        var bush = LolPlugin.getInstance().getBushManager();
+        if (bush == null) return true;
+        String locBush = bush.bushIdAt(loc);
+        return locBush == null || locBush.equals(bush.bushIdAt(ward.location));
     }
 
     private void playDetectionSound(Team team, org.bukkit.World world) {
@@ -247,6 +334,9 @@ public class WardManager {
                     if (revealedTeam == null) continue;
                     drawBeam(revealed, revealedTeam, viewerTeam);
                 }
+                // Faisceaux des joueurs qui ne sont plus révélés
+                for (UUID id : new java.util.ArrayList<>(beamDisplays.keySet()))
+                    if (!revealedUntil.containsKey(id)) expired.add(id);
                 for (UUID id : expired) {
                     revealedUntil.remove(id);
                     revealedToTeam.remove(id);
@@ -312,9 +402,20 @@ public class WardManager {
 
     // ── Helpers ───────────────────────────────────────────────────
 
+    /** Joueur actuellement vu par une ward ennemie. */
     public boolean isRevealed(Player player) {
         Long until = revealedUntil.get(player.getUniqueId());
         return until != null && System.currentTimeMillis() < until;
+    }
+
+    /** Une ward active (non désactivée) de {@code team} voit-elle cette position (bushes compris) ? */
+    public boolean hasVisionAt(Team team, Location loc) {
+        for (Ward w : wards) {
+            if (w.team != team || w.location.getWorld() == null) continue;
+            if (isDisabled(w)) continue;
+            if (wardSees(w, loc)) return true;
+        }
+        return false;
     }
 
     public int getActiveWardCount() { return wards.size(); }
@@ -332,10 +433,9 @@ public class WardManager {
         return false;
     }
 
-    /** True si cette ward est révélée (pour la minimap). */
+    /** True si cette ward est visible des ennemis (pour la minimap). */
     public boolean isRevealed(Ward ward) {
-        Long until = revealedWards.get(ward.entityId);
-        return until != null && until > System.currentTimeMillis();
+        return isVisibleToEnemies(ward);
     }
 
     /** Retire toutes les wards d'un monde (fermeture d'une instance, avant son déchargement). */
@@ -347,9 +447,15 @@ public class WardManager {
         });
     }
 
+    /** Le joueur quitte le jeu : ses wards et ses révélations disparaissent (entités comprises). */
     public void cleanup(UUID uuid) {
         revealedUntil.remove(uuid);
         revealedToTeam.remove(uuid);
-        wards.removeIf(w -> w.owner.equals(uuid));
+        removeBeamDisplays(uuid);
+        wards.removeIf(w -> {
+            if (!w.owner.equals(uuid)) return false;
+            removeWardEntity(w); // avant : l'ArmorStand restait sur la carte
+            return true;
+        });
     }
 }

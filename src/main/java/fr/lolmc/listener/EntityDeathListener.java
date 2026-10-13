@@ -32,7 +32,7 @@ public class EntityDeathListener implements Listener {
         };
     }
 
-    /** Champions ennemis du sbire, vivants, à moins de 14 blocs : ils se partagent son XP. */
+    /** Champions ennemis du sbire, vivants, à moins de 15 blocs (1500 unités) : ils se partagent son XP. */
     private java.util.List<Player> minionXpEarners(LivingEntity le, fr.lolmc.team.TeamManager.Team minionTeam) {
         var list = new java.util.ArrayList<Player>();
         for (Player p : le.getWorld().getPlayers()) {
@@ -40,7 +40,7 @@ public class EntityDeathListener implements Listener {
             if (p.getGameMode() == org.bukkit.GameMode.SPECTATOR) continue; // mort
             fr.lolmc.team.TeamManager.Team pTeam = LolPlugin.getInstance().getTeamManager().getTeam(p);
             if (pTeam == null || pTeam == minionTeam) continue; // allié du sbire
-            if (p.getLocation().distance(le.getLocation()) > 14.0) continue;
+            if (p.getLocation().distance(le.getLocation()) > 15.0) continue;
             list.add(p);
         }
         return list;
@@ -143,14 +143,14 @@ public class EntityDeathListener implements Listener {
         if (killer == null) validAssists.clear();
         // Avant le kill : la prime de la victime n'a pas encore baissé
         int assistGold = rewards.getAssistGoldEach(victim.getUniqueId(), validAssists.size());
-        // XP du kill : tueur, assistants et alliés vivants à moins de 15 blocs (1600 unités, LoL)
+        // XP du kill : tueur, assistants et alliés vivants à moins de 16 blocs (1600 unités, LoL)
         var nearbyAllies = new java.util.ArrayList<Player>();
         if (killer != null) {
             var killerTeam = tm.getTeam(killer);
             for (Player p : victim.getWorld().getPlayers()) {
                 if (p.equals(killer) || validAssists.contains(p) || !championManager.hasChampion(p)) continue;
                 if (p.getGameMode() == org.bukkit.GameMode.SPECTATOR || tm.getTeam(p) != killerTeam) continue;
-                if (p.getLocation().distance(victim.getLocation()) <= 15.0) nearbyAllies.add(p);
+                if (p.getLocation().distance(victim.getLocation()) <= 16.0) nearbyAllies.add(p);
             }
         }
         int participants = 1 + validAssists.size() + nearbyAllies.size();

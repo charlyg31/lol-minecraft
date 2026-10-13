@@ -13,7 +13,9 @@ import org.bukkit.scheduler.BukkitRunnable;
  * Combine avec les wards (un ennemi révélé par ward reste visible) et
  * les bushes (déjà gérés par BushManager).
  *
- * La distance de vision est réglable dans config.yml (fog.vision-range).
+ * Portées de vision (wiki LoL, 100 unités = 1 bloc) : champions et tourelles 1350 (13,5 blocs),
+ * sbires 1200 (12 blocs), wards 900 / 500 (WardManager). La portée des champions est réglable
+ * dans config.yml (fog.vision-range). Les morts ne donnent pas de vision.
  */
 public class FogOfWarManager {
     private fr.lolmc.instance.GameInstance gameInstance = null;
@@ -22,6 +24,12 @@ public class FogOfWarManager {
     private MapManager siblingMapManager() {
         return gameInstance != null ? gameInstance.getMapManager() : LolPlugin.getInstance().getMapManager();
     }
+
+    /** Vision des champions et des tourelles : 1350 unités LoL. */
+    public static final double CHAMPION_SIGHT = 13.5;
+    private static final double TURRET_SIGHT = 13.5;
+    /** Vision des sbires : 1200 unités LoL. */
+    private static final double MINION_SIGHT = 12.0;
 
     private final TeamManager teamManager;
     private double visionRange;
@@ -45,7 +53,7 @@ public class FogOfWarManager {
         this.teamManager = teamManager;
         var config = LolPlugin.getInstance().getConfig();
         this.enabled = config.getBoolean("fog.enabled", true);
-        this.visionRange = config.getDouble("fog.vision-range", 30.0);
+        this.visionRange = config.getDouble("fog.vision-range", CHAMPION_SIGHT);
         if (enabled) startFogTask();
     }
 
@@ -55,7 +63,7 @@ public class FogOfWarManager {
         this.scopedWorld  = world;
         var config = LolPlugin.getInstance().getConfig();
         this.enabled = config.getBoolean("fog.enabled", true);
-        this.visionRange = config.getDouble("fog.vision-range", 30.0);
+        this.visionRange = config.getDouble("fog.vision-range", CHAMPION_SIGHT);
         // Ne pas démarrer ici — démarré par GameInstance.start()
     }
 
@@ -76,10 +84,9 @@ public class FogOfWarManager {
     }
 
     /**
-     * Vérifie si un ennemi est visible par les tourelles alliées
-     * (tourelles non détruites révèlent un rayon de 10 blocs).
+     * Vérifie si une position est vue par les tourelles alliées (non détruites).
      */
-    private boolean revealedByAllyTurret(Player viewer, Player target) {
+    private boolean revealedByAllyTurret(Player viewer, org.bukkit.Location loc) {
         var tm = LolPlugin.getInstance().getTeamManager();
         var team = tm.getTeam(viewer);
         if (team == null) return false;
@@ -89,8 +96,8 @@ public class FogOfWarManager {
             if (s.isDestroyed()) continue;
             if (s.getType() != fr.lolmc.game.GameStructure.Type.TURRET) continue;
             try {
-                if (s.getCenter().getWorld().equals(target.getWorld())
-                        && s.getCenter().distance(target.getLocation()) <= 10.0)
+                if (s.getCenter().getWorld().equals(loc.getWorld())
+                        && s.getCenter().distanceSquared(loc) <= TURRET_SIGHT * TURRET_SIGHT)
                     return true;
             } catch (Exception ignored) {}
         }
@@ -101,18 +108,16 @@ public class FogOfWarManager {
      * Vérifie si un ennemi est visible par les sbires alliés
      * (un sbire allié à portée révèle les ennemis proches).
      */
-    private boolean revealedByAllyMinion(org.bukkit.entity.Player viewer,
-                                         org.bukkit.entity.Player target) {
+    private boolean revealedByAllyMinion(org.bukkit.entity.Player viewer, org.bukkit.entity.Entity target) {
         var tm = LolPlugin.getInstance().getTeamManager();
         var team = tm.getTeam(viewer);
         if (team == null) return false;
-        // Chercher un sbire allié à portée de la cible ennemie
-        for (var entity : target.getNearbyEntities(8, 4, 8)) {
-            if (entity instanceof org.bukkit.entity.LivingEntity le && fr.lolmc.game.MinionManager.isMinion(le)) {
-                var minionTeam = fr.lolmc.game.MinionManager.getMinionTeam(
-                        (org.bukkit.entity.LivingEntity) entity);
-                if (minionTeam == team) return true;
-            }
+        // Chercher un sbire allié à portée de vision de la cible
+        for (var entity : target.getNearbyEntities(MINION_SIGHT, 4, MINION_SIGHT)) {
+            if (entity instanceof org.bukkit.entity.LivingEntity le && fr.lolmc.game.MinionManager.isMinion(le)
+                    && fr.lolmc.game.MinionManager.getMinionTeam(le) == team
+                    && le.getLocation().distanceSquared(target.getLocation()) <= MINION_SIGHT * MINION_SIGHT)
+                return true;
         }
         return false;
     }
@@ -147,28 +152,27 @@ public class FogOfWarManager {
                     continue;
                 }
 
-                // Le BushManager gère l'invisibilité dans les bushes : on ne touche pas un ennemi
-                // caché dans un bush. Ce test passe AVANT la vision des sbires/tourelles, sinon les
-                // deux tâches se contredisaient (l'ennemi clignotait dans le bush).
-                if (bushMgr != null && bushMgr.isInBush(target) && !bushMgr.isRevealed(target)
-                        && (wardMgr == null || !wardMgr.isRevealed(target))) {
+                // Bush : caché sauf si l'équipe du viewer y a un champion ou une ward, ou si la
+                // cible vient d'attaquer (avant, le BushManager et ce test se contredisaient)
+                if (bushMgr != null && bushMgr.hidesFrom(viewer, target)) {
+                    viewer.hidePlayer(LolPlugin.getInstance(), target);
                     continue;
                 }
 
                 // Ennemi vu par un sbire ou une tourelle alliée
-                if (revealedByAllyMinion(viewer, target) || revealedByAllyTurret(viewer, target)) {
+                if (revealedByAllyMinion(viewer, target) || revealedByAllyTurret(viewer, target.getLocation())) {
                     viewer.showPlayer(LolPlugin.getInstance(), target);
                     continue;
                 }
 
-                // Révélé par une ward → visible
-                if (wardMgr != null && wardMgr.isRevealed(target)) {
+                // Vu par une ward de l'équipe du viewer → visible
+                var viewerTeam = teamManager.getTeam(viewer);
+                if (wardMgr != null && viewerTeam != null && wardMgr.hasVisionAt(viewerTeam, target.getLocation())) {
                     viewer.showPlayer(LolPlugin.getInstance(), target);
                     continue;
                 }
 
                 // Révélé par un effet ponctuel (Faucon d'Ashe, etc.) → visible
-                var viewerTeam = teamManager.getTeam(viewer);
                 if (viewerTeam != null && isRevealedByPoint(viewerTeam, target.getLocation())) {
                     viewer.showPlayer(LolPlugin.getInstance(), target);
                     continue;
@@ -216,23 +220,27 @@ public class FogOfWarManager {
                 }
             }
 
-            // Entité ennemie/neutre : visible si un allié est à portée de vision
+            // Entité ennemie/neutre : visible si un allié vivant est à portée de vision
             boolean visible = false;
             for (Player ally : players) {
                 if (!ally.equals(viewer) && !tm.areAllies(viewer, ally)) continue;
                 if (!ally.getWorld().equals(world)) continue;
+                if (ally.getGameMode() == org.bukkit.GameMode.SPECTATOR) continue; // mort
                 if (ally.getLocation().distanceSquared(entity.getLocation())
                         <= visionRange * visionRange) {
                     visible = true;
                     break;
                 }
             }
-            // Wards : une ward alliée proche révèle aussi
+            // Wards, sbires et tourelles alliés (avant : les sbires ennemis qui se battaient
+            // contre les vôtres restaient invisibles sans champion à côté)
             if (!visible) {
                 var wardMgr = plugin.getWardManager();
-                if (wardMgr != null && wardMgr.hasWardNear(team, entity.getLocation(), 12.0))
+                if (wardMgr != null && wardMgr.hasVisionAt(team, entity.getLocation()))
                     visible = true;
             }
+            if (!visible && (revealedByAllyMinion(viewer, entity) || revealedByAllyTurret(viewer, entity.getLocation())))
+                visible = true;
             // Révélation ponctuelle (Faucon d'Ashe, etc.)
             if (!visible && isRevealedByPoint(team, entity.getLocation())) {
                 visible = true;
@@ -249,9 +257,10 @@ public class FogOfWarManager {
      */
     private boolean hasVisionOf(Player viewer, Player target, java.util.List<Player> players) {
         for (Player ally : players) {
-            // Allié du viewer (ou lui-même)
+            // Allié du viewer (ou lui-même), vivant
             if (!ally.equals(viewer) && !teamManager.areAllies(viewer, ally)) continue;
             if (!ally.getWorld().equals(target.getWorld())) continue;
+            if (ally.getGameMode() == org.bukkit.GameMode.SPECTATOR) continue; // mort : pas de vision
             if (ally.getLocation().distanceSquared(target.getLocation()) <= visionRange * visionRange) {
                 return true;
             }

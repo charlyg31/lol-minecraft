@@ -255,7 +255,10 @@ public class ConsumableManager {
     // WARDS (vision)
     // ════════════════════════════════════════════════════════
 
-    /** Place une ward visible (bloc de lumière temporaire) */
+    /**
+     * Pose une ward : furtive (90 à 120 s selon le niveau moyen, 3 max) ou de vision lointaine
+     * (visible, durée illimitée). Durées, limites et coups : WardManager (wiki LoL).
+     */
     public boolean placeWard(Player player, boolean visible) {
         var targetBlock = player.getTargetBlockExact(20);
         Location target = targetBlock != null
@@ -265,40 +268,39 @@ public class ConsumableManager {
         // Pose sur la surface (au-dessus du sol visé) sans détruire de bloc.
         final Location wardLoc = surfaceLocation(target);
 
-        // Durée: ward normale = 150s visible, 60s invisible
-        long duration = visible ? 3000L : 1200L;
-        int wardDuration = visible ? 150 : 60;
+        // Ward furtive : 90 à 120 s selon le niveau moyen des champions ; vision lointaine : illimitée
+        int wardDuration = visible ? 0 : (int) Math.round(90 + 30 * (averageLevel(player) - 1) / 17.0);
 
-        // Entité invisible représentant la ward (ArmorStand marqueur + tête de torche).
         Material headMat = visible ? Material.TORCH : Material.SOUL_TORCH;
         final UUID wardEntityId = spawnWardEntity(wardLoc, headMat,
-                visible ? "🔵 Totem de vision" : "👁 Ward furtive", visible);
+                visible ? "🔵 Ward de vision lointaine" : "👁 Ward furtive", visible);
 
-        new BukkitRunnable() {
-            @Override public void run() {
-                org.bukkit.entity.Entity ent = org.bukkit.Bukkit.getEntity(wardEntityId);
-                if (ent != null) {
-                    fr.lolmc.util.VisualEffectUtil.impact(ent.getWorld(),
-                            ent.getLocation().add(0,0.3,0), Material.GRAY_STAINED_GLASS, 0.24f, 5L);
-                    ent.remove();
-                }
-            }
-        }.runTaskLater(LolPlugin.getInstance(), duration);
-
-        // Enregistrer la ward dans le WardManager (avec entityId pour la visibilité)
-        LolPlugin.getInstance().getWardManager().placeWard(player, wardLoc, wardDuration, wardEntityId);
-        // Tracker dans le scoreboard
+        LolPlugin.getInstance().getWardManager().placeWard(player, wardLoc, wardDuration, wardEntityId,
+                visible ? fr.lolmc.ward.WardManager.WardType.FARSIGHT : fr.lolmc.ward.WardManager.WardType.STEALTH);
         var msb = LolPlugin.getInstance().getMatchScoreboard();
         if (msb != null) msb.addWardPlaced(player);
 
-        String wardType = visible ? "🔵 Totem de vision" : "👁 Ward furtive";
-        player.sendActionBar(Component.text(
-            String.format("%s placée! (dure %ds)", wardType, wardDuration),
-            NamedTextColor.YELLOW));
+        player.sendActionBar(Component.text(visible ? "🔵 Ward de vision lointaine placée!"
+                : String.format("👁 Ward furtive placée! (dure %ds)", wardDuration), NamedTextColor.YELLOW));
         return true;
     }
 
-    /** Control Ward: révèle et détruit les wards ennemies proches */
+    /** Niveau moyen des champions de la partie du joueur. */
+    private double averageLevel(Player player) {
+        var cm = LolPlugin.getInstance().getChampionManager();
+        double sum = 0; int n = 0;
+        for (Player p : player.getWorld().getPlayers()) {
+            if (!cm.hasChampion(p)) continue;
+            sum += cm.getChampion(p).getLevelSystem().getLevel();
+            n++;
+        }
+        return n > 0 ? sum / n : 1;
+    }
+
+    /**
+     * Control Ward : visible, durée illimitée, 1 posée par joueur ; révèle et désactive les
+     * wards ennemies dans sa portée tant qu'elle est en vie (avant : les détruisait d'un coup).
+     */
     public void placeControlWard(Player player) {
         var targetBlock = player.getTargetBlockExact(15);
         Location target = targetBlock != null
@@ -307,28 +309,12 @@ public class ConsumableManager {
 
         final Location wardLoc = surfaceLocation(target);
 
-        // Détruire les wards ennemies ET révéler les survivantes dans un rayon de 6 blocs
-        int destroyed = LolPlugin.getInstance().getWardManager()
-                .destroyEnemyWards(player, wardLoc, 6.0);
-        LolPlugin.getInstance().getWardManager().revealEnemyWards(player, wardLoc, 6.0, 10_000L);
-
-        // Entité invisible (control ward = chandelle rose)
         final UUID wardEntityId = spawnWardEntity(wardLoc, Material.PINK_CANDLE,
                 "🔮 Control Ward", true);
+        LolPlugin.getInstance().getWardManager().placeWard(player, wardLoc, 0, wardEntityId,
+                fr.lolmc.ward.WardManager.WardType.CONTROL);
 
-        // Enregistrer la control ward elle-même (équipe du poseur)
-        LolPlugin.getInstance().getWardManager().placeWard(player, wardLoc, 240, wardEntityId);
-
-        // Dure jusqu'à expiration (~240s)
-        new BukkitRunnable() {
-            @Override public void run() {
-                org.bukkit.entity.Entity ent = org.bukkit.Bukkit.getEntity(wardEntityId);
-                if (ent != null) ent.remove();
-            }
-        }.runTaskLater(LolPlugin.getInstance(), 4800L);
-
-        player.sendActionBar(Component.text(
-            String.format("🔮 Control Ward placée! (%d ward(s) ennemie(s) détruite(s))", destroyed),
+        player.sendActionBar(Component.text("🔮 Control Ward placée! Les wards ennemies proches sont désactivées.",
             NamedTextColor.BLUE));
     }
 
@@ -351,7 +337,8 @@ public class ConsumableManager {
     /** Spawn un ArmorStand invisible marqueur portant une tête (torche/chandelle) comme ward. */
     private UUID spawnWardEntity(Location loc, Material headMat, String name, boolean nameVisible) {
         org.bukkit.entity.ArmorStand as = loc.getWorld().spawn(loc, org.bukkit.entity.ArmorStand.class, stand -> {
-            stand.setMarker(true);          // pas de hitbox, n'interfère pas avec les clics
+            // Petite hitbox (pas marqueur) : sinon personne ne pouvait cliquer dessus pour la détruire
+            stand.setMarker(false);
             stand.setVisible(false);        // corps invisible
             stand.setGravity(false);
             stand.setInvulnerable(true);
@@ -379,7 +366,7 @@ public class ConsumableManager {
             case "elixir_wrath", "elixir_wrath2"         -> buildItem(Material.DRAGON_BREATH,    "⚔ Élixir de Fureur",      "+30 AD + vol de vie 3 minutes.",         NamedTextColor.RED,    500);
             case "elixir_iron", "elixir_iron2"           -> buildItem(Material.FERMENTED_SPIDER_EYE,"🛡 Élixir de Fer",   "+300 HP + Ténacité 3 minutes.",          NamedTextColor.GRAY,   500);
             case "elixir_sorcery", "elixir_sorcery2"     -> buildItem(Material.MAGENTA_DYE,      "✨ Élixir de Sorcellerie","+50 AP 3 minutes.",                      NamedTextColor.BLUE,   500);
-            case "stealth_ward", "stealth_ward2"         -> buildItem(Material.SOUL_TORCH,        "👁 Totem furtif",         "Place une ward furtive (60s).",          NamedTextColor.YELLOW, 0);
+            case "stealth_ward", "stealth_ward2"         -> buildItem(Material.SOUL_TORCH,        "👁 Totem furtif",         "Place une ward furtive (90-120s).",          NamedTextColor.YELLOW, 0);
             case "control_ward", "control_ward2"         -> buildItem(Material.PINK_CANDLE,       "🔮 Control Ward",         "Révèle et détruit wards ennemies (75g).",NamedTextColor.AQUA,   75);
             case "oracle_lens", "oracle_lens2"           -> buildItem(Material.SPYGLASS,          "🔍 Lentille Oracle",      "Révèle wards proches 10s.",              NamedTextColor.YELLOW, 0);
             case "farsight", "farsight2"                 -> buildItem(Material.COMPASS,           "🔭 Vision Lointaine",     "Place ward révélatrice à longue portée.",NamedTextColor.YELLOW, 0);

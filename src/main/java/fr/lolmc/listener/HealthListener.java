@@ -86,8 +86,6 @@ public class HealthListener implements Listener {
                 fr.lolmc.champion.impl.top.Malphite.onDamageTaken(p.getUniqueId());
             // Vérifier passifs défensifs (Sterak's, Guardian Angel)
             PassiveManager pm = LolPlugin.getInstance().getPassiveManager();
-            var bushMgr = LolPlugin.getInstance().getBushManager();
-            if (bushMgr != null) bushMgr.revealOnDamage(p);
             if (pm != null) pm.onDamageTaken(p);
             hud.updateHUD(p, champ);
         }

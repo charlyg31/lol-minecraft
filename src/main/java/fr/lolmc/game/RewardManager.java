@@ -45,8 +45,8 @@ public class RewardManager {
     public static final long TURRET_PLATE_DURATION = 14 * 60 * 1000L;
     // Inhibiteur : 50 or au seul last-hit
     public static final int GOLD_INHIBITOR_KILLER = 50;
-    // Rayon « local » (1200 unités LoL ; 14 blocs = 1500 unités pour l'XP des sbires)
-    public static final double LOCAL_RADIUS = 11.0;
+    // Rayon « local » : 1200 unités LoL (100 unités = 1 bloc, LolUnits)
+    public static final double LOCAL_RADIUS = 12.0;
 
     public static final double XP_MINION = 62;         // mêlée (wiki LoL)
     public static final double XP_MINION_CASTER = 31;  // caster

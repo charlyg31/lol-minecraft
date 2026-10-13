@@ -66,6 +66,9 @@ public final class MobCombat {
         double amount = raw;
         var cm = LolPlugin.getInstance().getChampionManager();
         var stats = attacker != null && cm.hasChampion(attacker) ? cm.getChampion(attacker).getStats() : null;
+        // Attaquer un sbire/monstre depuis un bush révèle aussi l'attaquant 2 s (LoL)
+        var bush = LolPlugin.getInstance().getBushManager();
+        if (bush != null && stats != null) bush.revealOnAttack(attacker);
         if (stats != null && fr.lolmc.game.MinionManager.isMinion(target))
             amount *= 1.0 + stats.getMinionDamageBonus();
         if (type == DamageUtil.Type.PHYSICAL) {
