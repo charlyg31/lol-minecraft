@@ -41,15 +41,17 @@ max-party-size: 5           # taille maximale d'un groupe
 |----------|--------------|
 | `/lol <rôle1> <rôle2> ...` | Rejoindre la file avec les rôles souhaités (min. 2, ou 1 seul en groupe de 5) |
 | `/lol all` | Accepter tous les rôles |
-| `/lol leave` (alias `/lol quitter`) | Quitter la file |
+| `/lol leave` · `/lol stop` (alias `/lol quitter`) | Quitter la file (arrêter la recherche) |
 | `/lol accept` / `/lol refuse` | Accepter ou refuser une proposition de partie |
 | `/lol party invite/accept/decline/leave/kick/promote/disband/liste` | Gestion du groupe |
 
 Rôles valides : `top` · `jungle` · `mid` · `adc` · `support`
 
+**Test solo — `/lols [rôle]`** (par défaut `mid`) : simule une « partie trouvée » en solo pour tester l'enchaînement file → sélection de champion → partie, sans attendre d'autres joueurs.
+
 **File classée — `/lolr`**
 
-Mêmes règles de rôles que `/lol`, mais avec bans et pick en début de partie. Une sous-commande admin (`/lolr on` / `/lolr off`) active ou coupe les parties classées côté proxy.
+Mêmes règles de rôles que `/lol`, mais avec bans et pick en début de partie. `/lolr stop` quitte la file classée. Une sous-commande admin (`/lolr on` / `/lolr off`) active ou coupe les parties classées côté proxy.
 
 ### Fonctionnalités
 
@@ -73,9 +75,8 @@ Dépendance optionnelle : **Multiverse-Core** (chargement de mondes ; fonctionne
 ```yaml
 world:
   template: "lolmc_template"     # monde de référence, configuré une fois via /lola
-  instance-prefix: "lolmc_game_" # préfixe des mondes d'instance (ne pas changer après coup)
   use-instances: false           # EXPÉRIMENTAL — voir la section dédiée plus bas
-  max-instances: 1
+  max-instances: 4               # parties simultanées max (0 = illimité)
   name: "lolmc_template"         # monde de jeu réellement utilisé quand use-instances=false
   lobby: "lobby"                 # monde lobby optionnel
 
@@ -120,9 +121,13 @@ Un bloc `heads:` liste les 20 champions avec un champ `PASTE_VALUE_HERE` à remp
 
 Par défaut (`use-instances: false`), une seule vraie partie tourne à la fois, directement dans le monde `world.name`. C'est le mode stable et le plus testé.
 
-En activant `use-instances: true`, chaque match du matchmaking local copie le monde `world.template` dans un nouveau monde isolé (`lolmc_game_N`). Chaque instance a ses propres `GameManager`, `MinionManager`, `JungleManager`, `TurretManager`, `FogOfWarManager`, `RewardManager`, `AnnouncementManager`, `FeatManager`, `PassiveManager`, `BaseManager`.
+En activant `use-instances: true`, chaque match copie le monde `world.template` dans un nouveau monde isolé (`lolmc_game_1`, `lolmc_game_2`…, préfixe fixe). `world.max-instances` limite le nombre de parties simultanées (une création au-delà est refusée).
 
-**Limite connue :** le tableau de score de fin de partie (`MatchScoreboard` — kills, morts, CS, or) reste partagé entre toutes les instances. Avec `max-instances: 1` (la valeur par défaut), ce n'est pas un problème ; avec plusieurs instances simultanées, les scores de différentes parties se mélangeraient.
+**Ce qui est propre à chaque instance :** `GameManager`, `MinionManager`, `JungleManager`, `TurretManager`, `FogOfWarManager`, `RewardManager`, `AnnouncementManager`, `FeatManager`, `PassiveManager`, `BaseManager`, ainsi que la sélection de champion (chrono, bans, choix), le vote d'abandon, le tab et les stats de fin de partie (écran de score et sauvegarde en base limités aux joueurs de la partie).
+
+**Limite connue :** `TeamManager` reste global (une seule table joueur → équipe) ; les endroits qui listent des équipiers (pings, buffs, chat d'équipe, wards…) filtrent par monde pour ne pas mélanger deux parties. Les commandes de test `/lola` (hors `/lola instance`) visent le monde template.
+
+**BungeeTabListPlus :** si BTLP (avec son bridge Bukkit) est installé, LolMC enregistre les variables `lolmc_team`, `lolmc_champion`, `lolmc_kills`, `lolmc_deaths`, `lolmc_assists`, `lolmc_kda`, `lolmc_cs`, `lolmc_gold` et `lolmc_game` (à utiliser par ex. avec `${player lolmc_kda}`). Les valeurs sont propres à chaque joueur, donc à chaque instance. Les classes de l'API BTLP présentes dans `src/main/java/codecrafter47` sont de simples stubs de compilation, exclus du jar.
 
 **Nettoyage automatique :** un monde d'instance sans aucun joueur est supprimé (après 60 s pour une partie en cours, immédiatement pour un monde sans partie). Les mondes `lolmc_game_*` laissés par un crash sont supprimés au démarrage. Le monde template n'est jamais touché. Ce mode n'a jamais été testé sur un vrai serveur en conditions réelles.
 
@@ -174,9 +179,9 @@ Chaque champion a ses 4 sorts (Q/W/E/R) plus passif, avec scaling AP/AD, prévis
 
 ### Commandes admin — `/lola`
 
-`/lola <start|stop|set|position|center|lane|solo|give|level|gold|hp|resetcd|buff|spawn|wave|select|reload|debug|testgame|schem|road|jungle|shopnpc|mode|team|permcheck|help>` (alias `/lolAdmin`)
+`/lola <start|stop|instance|set|position|center|lane|solo|give|level|gold|hp|resetcd|buff|spawn|wave|select|reload|debug|testgame|schem|road|jungle|shopnpc|mode|team|permcheck|help>` (alias `/lolAdmin`)
 
-Les sous-commandes de configuration de carte (`set`, `position`, `center`, `lane`, `jungle`, `schem`, `road`, `shopnpc`, `mode`) s'appliquent au monde template, avant toute partie. Les sous-commandes de test (`solo`, `give`, `buff`, `wave`, `hp`, `gold`, `level`, `resetcd`) agissent sur la partie en cours.
+Les sous-commandes de configuration de carte (`set`, `position`, `center`, `lane`, `jungle`, `schem`, `road`, `shopnpc`, `mode`) s'appliquent au monde template, avant toute partie. `/lola instance` liste les instances actives ; `/lola instance <n>` téléporte l'admin dans l'instance n, `/lola instance template` dans le monde template. Les sous-commandes de test (`solo`, `give`, `buff`, `wave`, `hp`, `gold`, `level`, `resetcd`) agissent sur la partie en cours.
 
 ---
 
@@ -193,8 +198,8 @@ Activable via `api.enabled: true` dans `config.yml`. Expose un serveur HTTP loca
 | `GET /api/match/detail/{id}` | Détail d'une partie |
 | `GET /api/leaderboard` | Classement |
 | `GET /api/champions` | Liste des champions |
-| `GET /api/online` | Joueurs en ligne et statut de partie |
-| `GET /api/status` | Statut général du serveur |
+| `GET /api/online` | Joueurs en ligne, statut de partie et numéro d'instance |
+| `GET /api/status` | Statut général du serveur, avec le détail de chaque instance (`instances`) |
 
 Nécessite un port ouvert côté hébergeur pour un accès depuis un site externe.
 
@@ -306,4 +311,4 @@ Build avec Maven (`mvn package`), un `pom.xml` par projet. Le JAR final embarque
 
 ## État du projet
 
-Ce dépôt est en développement actif. Le mode partie unique est le chemin le plus testé. Le mode multi-instances est fonctionnel mais expérimental (voir la limite documentée plus haut). Aucun de ces deux modes n'a été validé par une vraie session de jeu prolongée ; les retours et rapports de bugs sont les bienvenus via les issues.
+Ce dépôt est en développement actif. Le mode partie unique est le chemin le plus testé. Le mode multi-instances est expérimental (voir la section dédiée plus haut) : l'isolation entre parties est implémentée mais n'a pas encore été validée par une partie à deux instances simultanées. Aucun de ces deux modes n'a été validé par une vraie session de jeu prolongée ; les retours et rapports de bugs sont les bienvenus via les issues.

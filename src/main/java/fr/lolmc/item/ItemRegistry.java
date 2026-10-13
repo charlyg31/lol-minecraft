@@ -415,7 +415,7 @@ public class ItemRegistry {
         reg(new LolItem("tear_of_goddess",    "Tear of the Goddess",      400,  Material.WATER_BUCKET,    UTILITY).mana(240).manaRegen(25).passive("Awe","Stacks mana sur AA/sorts."));
         reg(new LolItem("dark_seal",          "Dark Seal",                350,  Material.BLACKSTONE,      MAGE).ap(15).hp(60).passive("Dread","Stacks AP par kill. Perd 4 stacks à la mort."));
 
-        System.out.println("[ItemRegistry] " + ITEMS.size() + " items chargés.");
+        java.util.logging.Logger.getLogger("LolMC").info("[ItemRegistry] " + ITEMS.size() + " items chargés.");
     }
 
     private static void reg(LolItem item) { ITEMS.put(item.getId(), item); }

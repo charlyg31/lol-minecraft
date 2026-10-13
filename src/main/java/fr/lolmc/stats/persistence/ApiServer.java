@@ -219,34 +219,57 @@ public class ApiServer {
         respond(ex, 200, json.toString());
     }
 
+    /** Instantané de l'état du jeu, pris sur le thread principal. */
+    private record StatusSnap(boolean anyRunning, long elapsed, String instances, int online) {}
+
+    /** Exécute {@code c} sur le thread principal du serveur (3 s max). */
+    private <T> T onMain(java.util.concurrent.Callable<T> c) throws Exception {
+        return org.bukkit.Bukkit.getScheduler()
+                .callSyncMethod(LolPlugin.getInstance(), c).get(3, java.util.concurrent.TimeUnit.SECONDS);
+    }
+
     /** GET /api/status → état du serveur */
     private void handleStatus(HttpExchange ex) throws java.io.IOException {
         if (!isAuthorized(ex)) { respond(ex, 401, err("unauthorized")); return; }
         var plugin = LolPlugin.getInstance();
-        var gm = plugin.getGameManager();
-        boolean anyRunning = gm.isGameRunning();
-        long elapsed = anyRunning ? gm.getElapsedSeconds() : 0;
-        // Parties en instances : une entrée par instance
-        StringBuilder inst = new StringBuilder("[");
-        var im = plugin.getInstanceManager();
-        if (im != null) {
-            boolean first = true;
-            for (var gi : im.getAllInstances()) {
-                var igm = gi.getGameManager();
-                boolean running = igm.isGameRunning();
-                long el = running ? igm.getElapsedSeconds() : 0;
-                if (running) { anyRunning = true; elapsed = Math.max(elapsed, el); }
-                if (!first) inst.append(",");
-                first = false;
-                inst.append(String.format(
-                    "{\"id\":%d,\"world\":\"%s\",\"state\":\"%s\",\"game_running\":%b,"
-                    + "\"game_elapsed_seconds\":%d,\"players\":%d}",
-                    gi.getId(), gi.getWorldName(), gi.getState(), running, el,
-                    gi.getWorld().getPlayers().size()));
-            }
+        // L'état du jeu (Bukkit) ne doit être lu que depuis le thread principal du serveur.
+        StatusSnap snap;
+        try {
+            snap = onMain(() -> {
+                var gm = plugin.getGameManager();
+                boolean anyRunning = gm.isGameRunning();
+                long elapsed = anyRunning ? gm.getElapsedSeconds() : 0;
+                // Parties en instances : une entrée par instance
+                StringBuilder inst = new StringBuilder("[");
+                var im = plugin.getInstanceManager();
+                if (im != null) {
+                    boolean first = true;
+                    for (var gi : im.getAllInstances()) {
+                        var igm = gi.getGameManager();
+                        boolean running = igm.isGameRunning();
+                        long el = running ? igm.getElapsedSeconds() : 0;
+                        if (running) { anyRunning = true; elapsed = Math.max(elapsed, el); }
+                        if (!first) inst.append(",");
+                        first = false;
+                        inst.append(String.format(
+                            "{\"id\":%d,\"world\":\"%s\",\"state\":\"%s\",\"game_running\":%b,"
+                            + "\"game_elapsed_seconds\":%d,\"players\":%d}",
+                            gi.getId(), gi.getWorldName(), gi.getState(), running, el,
+                            gi.getWorld().getPlayers().size()));
+                    }
+                }
+                inst.append("]");
+                return new StatusSnap(anyRunning, elapsed, inst.toString(),
+                        org.bukkit.Bukkit.getOnlinePlayers().size());
+            });
+        } catch (Exception e) {
+            respond(ex, 503, err("server busy"));
+            return;
         }
-        inst.append("]");
-        int online = org.bukkit.Bukkit.getOnlinePlayers().size();
+        boolean anyRunning = snap.anyRunning();
+        long elapsed = snap.elapsed();
+        StringBuilder inst = new StringBuilder(snap.instances());
+        int online = snap.online();
         var db = plugin.getDatabaseManager();
         int totalPlayers = db.getAllFromDb().size();
         // game_running / game_elapsed_seconds : vrai si AU MOINS une partie tourne (globale ou instance),
@@ -262,23 +285,33 @@ public class ApiServer {
     /** GET /api/online */
     private void handleOnline(HttpExchange ex) throws java.io.IOException {
         if (!isAuthorized(ex)) { respond(ex, 401, err("unauthorized")); return; }
-        StringBuilder json = new StringBuilder("{\"online\":[");
-        boolean first = true;
-        for (org.bukkit.entity.Player p : org.bukkit.Bukkit.getOnlinePlayers()) {
-            if (!first) json.append(",");
-            first = false;
-            var cm = LolPlugin.getInstance().getChampionManager();
-            String champ = cm.hasChampion(p) ? cm.getChampion(p).getId() : null;
-            json.append(String.format(
-                "{\"name\":\"%s\",\"uuid\":\"%s\",\"champion\":%s,\"inGame\":%b,\"instance\":%d}",
-                p.getName(), p.getUniqueId(),
-                champ != null ? "\"" + champ + "\"" : "null",
-                fr.lolmc.instance.InstanceHelper.gameManager(p).isGameRunning(),
-                fr.lolmc.instance.InstanceHelper.instanceOf(p) != null
-                        ? fr.lolmc.instance.InstanceHelper.instanceOf(p).getId() : 0));
+        String body;
+        try {
+            // Lecture de l'état du jeu sur le thread principal du serveur
+            body = onMain(() -> {
+                StringBuilder json = new StringBuilder("{\"online\":[");
+                boolean first = true;
+                var cm = LolPlugin.getInstance().getChampionManager();
+                for (org.bukkit.entity.Player p : org.bukkit.Bukkit.getOnlinePlayers()) {
+                    if (!first) json.append(",");
+                    first = false;
+                    String champ = cm.hasChampion(p) ? cm.getChampion(p).getId() : null;
+                    var gi = fr.lolmc.instance.InstanceHelper.instanceOf(p);
+                    json.append(String.format(
+                        "{\"name\":\"%s\",\"uuid\":\"%s\",\"champion\":%s,\"inGame\":%b,\"instance\":%d}",
+                        p.getName(), p.getUniqueId(),
+                        champ != null ? "\"" + champ + "\"" : "null",
+                        fr.lolmc.instance.InstanceHelper.gameManager(p).isGameRunning(),
+                        gi != null ? gi.getId() : 0));
+                }
+                json.append("]}");
+                return json.toString();
+            });
+        } catch (Exception e) {
+            respond(ex, 503, err("server busy"));
+            return;
         }
-        json.append("]}");
-        respond(ex, 200, json.toString());
+        respond(ex, 200, body);
     }
 
     // ── Helpers ───────────────────────────────────────────────────

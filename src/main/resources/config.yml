@@ -29,9 +29,7 @@ world:
   # Nom du monde TEMPLATE (configuré une fois via /lol set, jamais utilisé en jeu)
   # Ce monde est copié pour chaque nouvelle instance de partie.
   template: "lolmc_template"
-  # Préfixe des mondes d'instance (lolmc_game_1, lolmc_game_2…)
-  # NE PAS modifier après le premier démarrage.
-  instance-prefix: "lolmc_game_"
+  # Les mondes d'instance sont nommés lolmc_game_1, lolmc_game_2… (préfixe fixe).
   # Mode instances (EXPERIMENTAL) : chaque match du matchmaking local joue dans une copie du monde template.
   # false (défaut) = une seule partie à la fois dans le monde "name" ci-dessous, mode stable.
   use-instances: false

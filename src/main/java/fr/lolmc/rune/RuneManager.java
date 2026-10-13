@@ -583,7 +583,6 @@ public class RuneManager {
                 }
             }
             int stacks = Math.min(8, kills.size());
-            int msBonus = 5 + stacks * 5; // +5 base +5/stack unique
             if (cm2.hasChampion(player)) {
                 // Recalculer depuis 0 (reset puis re-apply pour éviter accumulation)
                 var stats = cm2.getChampion(player).getStats();

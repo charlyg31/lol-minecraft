@@ -54,7 +54,6 @@ public class HUDManager {
                     res.tickRegen();
                     syncMinecraftHP(p, hp);
                     // Ticks passifs dependants du champion
-                    // // tickChampionPassives(p, champ);
                 }
             }
         }.runTaskTimer(LolPlugin.getInstance(), 100L, 100L);
