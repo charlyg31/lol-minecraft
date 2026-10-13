@@ -103,6 +103,7 @@ public class SummonerSpellManager {
 
         if (success) {
             triggerCooldown(caster, spell);
+            fr.lolmc.instance.InstanceHelper.baseManager(caster).onAction(caster);
             var rm = LolPlugin.getInstance().getRuneManager();
             if (rm != null) rm.applyNimbusCloak(caster);
         }
@@ -353,7 +354,7 @@ public class SummonerSpellManager {
         }
 
         // 3. Fallback : TP vers la base de l'equipe
-        var base = mapMgr != null && team != null ? mapMgr.getSpawn(team, 0) : null;
+        var base = mapMgr != null && team != null ? mapMgr.getBaseSpawn(team) : null;
         if (base != null && caster.isOnline()) {
             caster.sendActionBar(net.kyori.adventure.text.Component.text(
                 "\uD83C\uDF00 Retour a la base dans 4s...", net.kyori.adventure.text.format.NamedTextColor.AQUA));

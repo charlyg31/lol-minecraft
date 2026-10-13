@@ -102,8 +102,8 @@ public class ChampSelectSession {
                     : (i % 2 == 0 ? fr.lolmc.team.TeamManager.Team.BLUE : fr.lolmc.team.TeamManager.Team.RED);
             if (!tm.hasTeam(p)) tm.setTeam(p, team);
             i++;
-            var spawn = map.getSpawn(team, 0);
-            if (spawn == null) spawn = map.getSpawn(team, 1);
+            var spawn = map.getBaseSpawn(team);
+            if (spawn == null) spawn = map.getBaseSpawn(team);
             if (spawn != null) p.teleport(spawn);
             var gw = fr.lolmc.util.WorldContext.getGameWorld();
             if (gw == null || !gw.equals(p.getWorld())) {

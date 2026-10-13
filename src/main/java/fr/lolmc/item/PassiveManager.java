@@ -1030,6 +1030,7 @@ public class PassiveManager {
     // ════════════════════════════════════════════════════════
     public void activateItem(Player player, String itemId) {
         if (!championManager.hasChampion(player)) return;
+        fr.lolmc.instance.InstanceHelper.baseManager(player).onAction(player); // actif d'objet
         BaseChampion champ = championManager.getChampion(player);
         ItemState state = getState(player);
 

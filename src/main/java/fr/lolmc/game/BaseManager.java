@@ -75,12 +75,30 @@ public final class BaseManager {
         }
         var cm = LolPlugin.getInstance().getChampionManager();
         if (!cm.hasChampion(player)) return;
+        if (player.getGameMode() == org.bukkit.GameMode.SPECTATOR) return; // mort
+        var cc = LolPlugin.getInstance().getCCManager();
+        if (cc != null && !cc.canCastAbility(player.getUniqueId())) {
+            player.sendActionBar(Component.text("✖ Impossible de rappeler sous contrôle", NamedTextColor.RED));
+            return;
+        }
+        var ssm = LolPlugin.getInstance().getSummonerSpellManager();
+        if (ssm != null && ssm.isChanneling(player)) return; // Téléportation en cours
 
         recallStartLoc.put(player.getUniqueId(), player.getLocation().clone());
+        final var recallHp = cm.getChampion(player).getHPSystem();
+        final double[] lastHp = {recallHp.getCurrentHP()};
 
         BukkitRunnable task = new BukkitRunnable() {
             int ticks = 0;
             @Override public void run() {
+                if (!player.isOnline()) { cancel(); cleanup(player.getUniqueId()); return; }
+                // Annulation sur TOUT dégât (tourelles, sbires, DoT… ne passent pas tous par DamageUtil)
+                double hpNow = recallHp.getCurrentHP();
+                if (hpNow < lastHp[0] - 0.01) {
+                    cancelRecall(player, "Recall interrompu (dégâts)");
+                    return;
+                }
+                lastHp[0] = hpNow;
                 // Annulation si le joueur a bougé significativement
                 Location start = recallStartLoc.get(player.getUniqueId());
                 if (start == null || player.getLocation().distance(start) > 1.5) {
@@ -148,17 +166,18 @@ public final class BaseManager {
     }
 
     private void completeRecall(Player player) {
+        removeRecallDisplays(player); // toujours, même si la téléportation échoue (sinon 32 entités restaient)
         Team team = LolPlugin.getInstance().getTeamManager().getTeam(player);
         fr.lolmc.util.DebugLogger.log("Recall", "completeRecall: team=" + team);
         if (team == null) {
             player.sendActionBar(Component.text("❌ Recall: aucune équipe", NamedTextColor.RED));
             return;
         }
-        Location spawn = map().getSpawn(team, 1);
+        Location spawn = map().getBaseSpawn(team);
         fr.lolmc.util.DebugLogger.log("Recall", "completeRecall: spawn=" + spawn);
         if (spawn == null) {
             player.sendActionBar(Component.text(
-                "❌ Recall: spawn équipe non défini (/lol position " + team.name().toLowerCase() + ")",
+                "❌ Recall: spawn équipe non défini (/lola position " + team.name().toLowerCase() + " 1)",
                 NamedTextColor.RED));
             return;
         }
@@ -174,8 +193,6 @@ public final class BaseManager {
                 spawn.clone().add(0, 1, 0), Material.LIGHT_BLUE_STAINED_GLASS, 0.35f, 0.5, 8, 6L);
         player.playSound(spawn, Sound.ENTITY_ENDERMAN_TELEPORT, 1f, 1f);
         player.sendActionBar(Component.text("✔ De retour à la base!", NamedTextColor.GREEN));
-
-        removeRecallDisplays(player);
     }
 
     public void cancelRecall(Player player, String reason) {
@@ -230,6 +247,13 @@ public final class BaseManager {
         for (var d : list) if (d != null && !d.isDead()) d.remove();
     }
 
+    /** Le joueur agit (sort, auto-attaque, Flash, objet…) → interrompt le recall, comme dans LoL. */
+    public void onAction(Player player) {
+        if (activeRecalls.containsKey(player.getUniqueId())) {
+            cancelRecall(player, "Recall interrompu (action)");
+        }
+    }
+
     /** Appelé quand le joueur prend des dégâts → interrompt le recall. */
     public void onDamage(Player player) {
         if (activeRecalls.containsKey(player.getUniqueId())) {
@@ -261,7 +285,19 @@ public final class BaseManager {
                     Team team = tm.getTeam(p);
                     if (team == null) continue;
 
-                    Location base = mm.getSpawn(team, 1);
+                    // Fontaine adverse : vrais dégâts massifs (le laser de la base LoL)
+                    // (FOUNTAIN_DAMAGE_PER_SEC était défini mais jamais appliqué)
+                    Location enemyBase = mm.getBaseSpawn(team.opposite());
+                    if (enemyBase != null && p.getGameMode() != org.bukkit.GameMode.SPECTATOR
+                            && p.getWorld().equals(enemyBase.getWorld())
+                            && p.getLocation().distance(enemyBase) <= HEAL_RING_RADIUS) {
+                        fr.lolmc.util.DamageUtil.damage(null, p, FOUNTAIN_DAMAGE_PER_SEC, false,
+                                fr.lolmc.util.DamageUtil.Type.TRUE);
+                        p.sendActionBar(Component.text("☠ Fontaine ennemie !", NamedTextColor.DARK_RED));
+                        continue;
+                    }
+
+                    Location base = mm.getBaseSpawn(team);
                     if (base == null) continue;
                     if (!p.getWorld().equals(base.getWorld())) continue;
 

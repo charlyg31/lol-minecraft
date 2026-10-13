@@ -141,7 +141,7 @@ public class HealthListener implements Listener {
                         try { plugin.getHotbarManager().renderPage(p, champ); } catch (Exception ex) { fr.lolmc.LolPlugin.getInstance().getLogger().log(java.util.logging.Level.WARNING, "[HealthListener] erreur ignorée (ligne 140)", ex); }
                         plugin.getMinimapManager().giveMinimap(p);
                         var rejoinMap = rejoinInst != null ? rejoinInst.getMapManager() : plugin.getMapManager();
-                        var spawn = (team != null) ? rejoinMap.getSpawn(team, 1) : null;
+                        var spawn = (team != null) ? rejoinMap.getBaseSpawn(team) : null;
                         if (spawn != null) p.teleport(spawn);
                         p.sendMessage(net.kyori.adventure.text.Component.text(
                                 "🔄 Reconnecté à ta partie en cours.", net.kyori.adventure.text.format.NamedTextColor.GREEN));
@@ -177,7 +177,7 @@ public class HealthListener implements Listener {
         var team = tm.getTeam(p);
         if (team != null) {
             // Position = index du joueur dans l'équipe (simplifié: position 1-5)
-            var spawn = fr.lolmc.instance.InstanceHelper.mapManager(p).getSpawn(team, 1);
+            var spawn = fr.lolmc.instance.InstanceHelper.mapManager(p).getBaseSpawn(team);
             if (spawn != null) {
                 LolPlugin.getInstance().getServer().getScheduler().runTaskLater(
                     LolPlugin.getInstance(), () -> p.teleport(spawn), 2L);

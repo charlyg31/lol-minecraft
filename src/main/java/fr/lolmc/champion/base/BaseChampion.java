@@ -126,6 +126,7 @@ public abstract class BaseChampion {
 
         ability.setLevel(levelSystem.getAbilityRank(slot));
         ability.cast(caster, stats, target);
+        fr.lolmc.instance.InstanceHelper.baseManager(caster).onAction(caster); // un sort interrompt le recall
 
 // Cas particulier : Zed W gère son cooldown lui-même.
 // Cela permet le second lancer pour échanger avec l'ombre.

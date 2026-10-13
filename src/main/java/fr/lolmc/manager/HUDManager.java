@@ -313,7 +313,7 @@ public class HUDManager {
         // Téléporter à la base de l'équipe
         var team = tm.getTeam(player);
         if (team != null && mm != null) {
-            var spawn = mm.getSpawn(team, 1);
+            var spawn = mm.getBaseSpawn(team);
             if (spawn != null) player.teleport(spawn);
         }
 

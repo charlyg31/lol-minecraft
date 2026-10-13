@@ -381,7 +381,7 @@ public class GameManager {
         // Téléporter à la base de son équipe
         Team team = LolPlugin.getInstance().getTeamManager().getTeam(player);
         if (team != null) {
-            Location spawn = siblingMapManager().getSpawn(team, 1);
+            Location spawn = siblingMapManager().getBaseSpawn(team);
             if (spawn != null) player.teleport(spawn);
         }
     }
@@ -444,7 +444,7 @@ public class GameManager {
         // Téléporter au spawn de l'équipe
         Team team = LolPlugin.getInstance().getTeamManager().getTeam(player);
         if (team != null) {
-            Location spawn = siblingMapManager().getSpawn(team, 1);
+            Location spawn = siblingMapManager().getBaseSpawn(team);
             if (spawn != null) player.teleport(spawn);
         }
 

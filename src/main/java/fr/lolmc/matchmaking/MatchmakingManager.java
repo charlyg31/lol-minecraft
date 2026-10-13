@@ -267,7 +267,7 @@ public class MatchmakingManager {
             for (UUID id : blueF) {
                 Player p = Bukkit.getPlayer(id);
                 if (p != null) {
-                    org.bukkit.Location spawn = mapMgr.getSpawn(fr.lolmc.team.TeamManager.Team.BLUE, 0);
+                    org.bukkit.Location spawn = mapMgr.getBaseSpawn(fr.lolmc.team.TeamManager.Team.BLUE);
                     if (spawn != null) p.teleport(spawn);
                     LolPlugin.getInstance().getMinimapManager().giveMinimap(p);
                     p.sendMessage(net.kyori.adventure.text.Component.text(
@@ -278,7 +278,7 @@ public class MatchmakingManager {
             for (UUID id : redF) {
                 Player p = Bukkit.getPlayer(id);
                 if (p != null) {
-                    org.bukkit.Location spawn = mapMgr.getSpawn(fr.lolmc.team.TeamManager.Team.RED, 0);
+                    org.bukkit.Location spawn = mapMgr.getBaseSpawn(fr.lolmc.team.TeamManager.Team.RED);
                     if (spawn != null) p.teleport(spawn);
                     LolPlugin.getInstance().getMinimapManager().giveMinimap(p);
                     p.sendMessage(net.kyori.adventure.text.Component.text(
@@ -311,8 +311,8 @@ public class MatchmakingManager {
         for (UUID id : ids) {
             Player p = Bukkit.getPlayer(id);
             if (p == null) continue;
-            org.bukkit.Location spawn = map.getSpawn(team, 0);
-            if (spawn == null) spawn = map.getSpawn(team, 1);
+            org.bukkit.Location spawn = map.getBaseSpawn(team);
+            if (spawn == null) spawn = map.getBaseSpawn(team);
             if (spawn != null) p.teleport(spawn);
             LolPlugin.getInstance().getMinimapManager().giveMinimap(p);
             p.sendMessage(Component.text("⚔ Partie trouvée!", NamedTextColor.GOLD));

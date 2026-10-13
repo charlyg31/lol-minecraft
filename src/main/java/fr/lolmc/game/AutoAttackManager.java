@@ -587,6 +587,7 @@ public class AutoAttackManager {
         Long last = lastAttack.get(attacker.getUniqueId());
         if (last != null && (now - last) < cooldownMs) return false;
         lastAttack.put(attacker.getUniqueId(), now);
+        fr.lolmc.instance.InstanceHelper.baseManager(attacker).onAction(attacker); // une AA interrompt le recall
         return true;
     }
 

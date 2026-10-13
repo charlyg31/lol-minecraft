@@ -133,6 +133,19 @@ public class MapManager {
         return spawns.get(team.name().toLowerCase() + "_" + position);
     }
 
+    /**
+     * Point de la base (fontaine) d'une équipe : position 0 si elle existe, sinon la 1, sinon
+     * la première position définie. /lola position n'accepte que 1-5 : la position 0, lue par
+     * la boutique, le TP et le départ des instances, n'existait jamais.
+     */
+    public Location getBaseSpawn(Team team) {
+        for (int pos = 0; pos <= 5; pos++) {
+            Location l = getSpawn(team, pos);
+            if (l != null) return l;
+        }
+        return null;
+    }
+
     // ══════════════════════════════════════════════════════════════
     // RESET (au lancement de partie)
     // ══════════════════════════════════════════════════════════════

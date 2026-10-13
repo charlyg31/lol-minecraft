@@ -465,7 +465,7 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
         player.sendMessage(Component.text("Partie active: " + running, NamedTextColor.GRAY));
 
         if (team != null) {
-            var spawn = fr.lolmc.instance.InstanceHelper.mapManager(player).getSpawn(team, 1);
+            var spawn = fr.lolmc.instance.InstanceHelper.mapManager(player).getBaseSpawn(team);
             player.sendMessage(Component.text("Spawn équipe défini: " + (spawn != null), spawn != null ? NamedTextColor.GREEN : NamedTextColor.RED));
         }
         player.sendMessage(Component.text("═══════════════════", NamedTextColor.YELLOW));
@@ -507,7 +507,7 @@ private void handleSolo(Player player, String[] args) {
     spawnPlantsFor(player);
     gm.startGame();
     plugin.getMatchScoreboard().startMatch(false, java.util.Set.of(player.getUniqueId()));
-    var spawn = map.getSpawn(fr.lolmc.team.TeamManager.Team.BLUE, 1);
+    var spawn = map.getBaseSpawn(fr.lolmc.team.TeamManager.Team.BLUE);
     if (spawn != null) player.teleport(spawn);
 
     player.sendMessage(Component.text("🧪 MODE SOLO lancé!" + (inInstance ? " (instance #"
@@ -553,7 +553,7 @@ private void handleSolo(Player player, String[] args) {
         var team = parseTeam(args[1]);
         if (team == null) { player.sendMessage("§cÉquipe: blue ou red"); return; }
         LolPlugin.getInstance().getTeamManager().setTeam(player, team);
-        var spawn = fr.lolmc.instance.InstanceHelper.mapManager(player).getSpawn(team, 1);
+        var spawn = fr.lolmc.instance.InstanceHelper.mapManager(player).getBaseSpawn(team);
         if (spawn != null) player.teleport(spawn);
         player.sendMessage(Component.text("✔ Équipe: " + team.name(), NamedTextColor.GREEN));
     }
@@ -1023,7 +1023,7 @@ private void handleSolo(Player player, String[] args) {
                 player.sendMessage(Component.text("❌ Instance #" + id + " introuvable. /lola instance pour la liste.", NamedTextColor.RED));
                 return;
             }
-            dest = target.getMapManager().getSpawn(fr.lolmc.team.TeamManager.Team.BLUE, 0);
+            dest = target.getMapManager().getBaseSpawn(fr.lolmc.team.TeamManager.Team.BLUE);
             if (dest == null) dest = target.getWorld().getSpawnLocation();
             label = "instance #" + id;
         }

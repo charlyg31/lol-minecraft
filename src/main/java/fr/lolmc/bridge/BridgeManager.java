@@ -216,8 +216,8 @@ public final class BridgeManager implements PluginMessageListener {
                                 if (pl == null) continue;
                                 var team = blue.contains(id) ? fr.lolmc.team.TeamManager.Team.BLUE
                                                              : fr.lolmc.team.TeamManager.Team.RED;
-                                var spawn = mapMgr.getSpawn(team, 0);
-                                if (spawn == null) spawn = mapMgr.getSpawn(team, 1);
+                                var spawn = mapMgr.getBaseSpawn(team);
+                                if (spawn == null) spawn = mapMgr.getBaseSpawn(team);
                                 if (spawn != null) pl.teleport(spawn);
                                 else pl.teleport(instance.getWorld().getSpawnLocation());
                                 plugin.getMinimapManager().giveMinimap(pl);

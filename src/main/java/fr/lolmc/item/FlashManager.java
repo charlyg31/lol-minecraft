@@ -63,6 +63,7 @@ public class FlashManager {
 
         cooldowns.put(player.getUniqueId(), System.currentTimeMillis());
         player.sendActionBar(Component.text("✦ Flash!", NamedTextColor.AQUA));
+        fr.lolmc.instance.InstanceHelper.baseManager(player).onAction(player);
         // Icône grisée pendant la recharge, puis remise en couleur à la fin
         setFlashReady(player);
         org.bukkit.Bukkit.getScheduler().runTaskLater(LolPlugin.getInstance(), () -> {

@@ -63,7 +63,7 @@ public class ShopListener implements Listener {
                 && fr.lolmc.util.WorldContext.isInGameWorld(player)) {
             var team = LolPlugin.getInstance().getTeamManager().getTeam(player);
             var mm = fr.lolmc.instance.InstanceHelper.mapManager(player);
-            org.bukkit.Location base = (team != null && mm != null) ? mm.getSpawn(team, 0) : null;
+            org.bukkit.Location base = (team != null && mm != null) ? mm.getBaseSpawn(team) : null;
             double radius = LolPlugin.getInstance().getConfig().getDouble("shop.base-radius", 15.0);
             return base != null && base.getWorld().equals(player.getWorld())
                     && base.distanceSquared(player.getLocation()) <= radius * radius;
