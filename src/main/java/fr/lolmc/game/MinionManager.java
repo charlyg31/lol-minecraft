@@ -30,6 +30,36 @@ public class MinionManager {
     public void setGameInstance(fr.lolmc.instance.GameInstance inst) { this.gameInstance = inst; }
     public fr.lolmc.instance.GameInstance getGameInstance() { return gameInstance; }
 
+    /** Monde où évoluent les sbires : celui de l'instance, sinon le monde de jeu configuré. */
+    private org.bukkit.World myWorld() {
+        return gameInstance != null ? gameInstance.getWorld() : WorldContext.getGameWorld();
+    }
+
+    /** Route d'une lane avec ses points ramenés dans le monde de CETTE partie (copie du template). */
+    private List<Location> roadFor(String lane) {
+        List<Location> road = LolPlugin.getInstance().getRoadManager().getRoad(lane);
+        org.bukkit.World w = myWorld();
+        if (road == null || w == null) return road;
+        List<Location> out = new ArrayList<>(road.size());
+        for (Location l : road) {
+            out.add(l.getWorld() != null && l.getWorld().equals(w) ? l : new Location(w, l.getX(), l.getY(), l.getZ()));
+        }
+        return out;
+    }
+
+    private Location closestRoadPoint(String lane, Location from) {
+        List<Location> road = roadFor(lane);
+        if (road == null || road.isEmpty()) return null;
+        Location best = null;
+        double bd = Double.MAX_VALUE;
+        for (Location wp : road) {
+            if (!wp.getWorld().equals(from.getWorld())) continue;
+            double d = wp.distance(from);
+            if (d < bd) { bd = d; best = wp; }
+        }
+        return best;
+    }
+
     private GameManager siblingGameManager() {
         return gameInstance != null ? gameInstance.getGameManager() : LolPlugin.getInstance().getGameManager();
     }
@@ -84,7 +114,7 @@ public class MinionManager {
 
     public void startWaves() {
         if (spawning) return;
-        purgeAllWorlds();
+        purgeWorld(myWorld());
         spawning = true;
 
         waveTask = new BukkitRunnable() {
@@ -266,9 +296,8 @@ public class MinionManager {
     private static final double MAX_DEVIATION = 10.0;
 
     private void moveMinions() {
-        var roadManager = LolPlugin.getInstance().getRoadManager();
-        java.util.List<org.bukkit.World> __worlds = WorldContext.getGameWorld() != null
-                ? java.util.List.of(WorldContext.getGameWorld())
+        java.util.List<org.bukkit.World> __worlds = myWorld() != null
+                ? java.util.List.of(myWorld())
                 : java.util.List.of();
             for (var world : __worlds) {
             for (Zombie z : world.getEntitiesByClass(Zombie.class)) {
@@ -278,7 +307,7 @@ public class MinionManager {
                 String lane = getMinionLane(z);
 
                 // Distance au chemin le plus proche
-                Location roadPoint = roadManager.getClosestRoadPoint(lane, z.getLocation());
+                Location roadPoint = closestRoadPoint(lane, z.getLocation());
                 boolean tooFar = roadPoint != null
                         && roadPoint.getWorld().equals(z.getLocation().getWorld())
                         && roadPoint.distance(z.getLocation()) > MAX_DEVIATION;
@@ -328,7 +357,7 @@ public class MinionManager {
      * BLEU parcourt la route dans l'ordre de tracé, ROUGE en sens inverse.
      */
     private Location getNextRoadWaypoint(Team team, String lane, Location current) {
-        var road = LolPlugin.getInstance().getRoadManager().getRoad(lane);
+        var road = roadFor(lane);
         if (road == null || road.isEmpty()) return null;
 
         List<Location> path = new ArrayList<>(road);
@@ -443,7 +472,7 @@ public class MinionManager {
     }
 
     private Location getMinionSpawn(Team team, String lane) {
-        var road = LolPlugin.getInstance().getRoadManager().getRoad(lane);
+        var road = roadFor(lane);
         if (road == null || road.isEmpty()) return null;
         // Bleu spawn au début de la route, rouge à la fin
         return team == Team.BLUE
@@ -520,17 +549,32 @@ public class MinionManager {
     }
 
     public void clearAllMinions() {
-        // 1. Les sbires d'abord (monde quelconque), puis les modèles
-        purgeAllWorlds();
+        // Uniquement CETTE partie : ses sbires (monde de l'instance) et ses modèles.
+        purgeWorld(myWorld());
         for (List<UUID> parts : minionDeco.values()) {
             for (UUID pid : parts) {
                 Entity d = org.bukkit.Bukkit.getEntity(pid);
                 if (d != null) d.remove();
             }
         }
-        for (UUID id : minionDeco.keySet()) MobAnimator.unregister(id);
+        for (UUID id : minionDeco.keySet()) { MobAnimator.unregister(id); LIVE.remove(id); }
         minionDeco.clear();
-        LIVE.clear();
+    }
+
+    /** Supprime sbires et modèles d'UN monde. */
+    public static void purgeWorld(org.bukkit.World world) {
+        if (world == null || KEY_MINION == null) return;
+        for (Entity e : world.getEntities()) {
+            if (e instanceof LivingEntity le && isMinion(le)) {
+                LIVE.remove(e.getUniqueId());
+                e.remove();
+            } else if (e instanceof org.bukkit.entity.Display
+                    && fr.lolmc.util.MobAppearance.isDecoration(e)
+                    && (e.getVehicle() == null
+                        || (e.getVehicle() instanceof LivingEntity v && isMinion(v)))) {
+                e.remove();
+            }
+        }
     }
 
     /** Supprime une entité chargée si c'est un sbire ou un modèle orphelin (pas de cette session). */
