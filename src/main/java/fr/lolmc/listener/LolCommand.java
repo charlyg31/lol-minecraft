@@ -332,7 +332,8 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
         try { index = Integer.parseInt(args[4]); }
         catch (NumberFormatException e) { player.sendMessage("§cIndex invalide."); return; }
 
-        fr.lolmc.game.GameStructure.TurretTier tier = fr.lolmc.game.GameStructure.TurretTier.OUTER;
+        // Par défaut : niveau déduit de la lane et du rang (avant : toujours « extérieure »)
+        fr.lolmc.game.GameStructure.TurretTier tier = fr.lolmc.game.GameStructure.TurretTier.fromPosition(lane, index);
         if (type == Type.TURRET && args.length >= 6) {
             try {
                 tier = fr.lolmc.game.GameStructure.TurretTier.valueOf(args[5].toUpperCase());

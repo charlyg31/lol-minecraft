@@ -430,17 +430,15 @@ public class MinionManager {
         var mapManager = siblingMapManager();
         GameStructure s = mapManager.getStructureAt(minion.getLocation(), MINION_TURRET_RANGE);
         if (s == null) return null;
-        // La structure doit appartenir à l'équipe ADVERSE
-        if (s.getTeam() == team) return null;
+        // La structure doit appartenir à l'équipe ADVERSE et ne pas être protégée (anti-backdoor)
+        if (s.getTeam() == team || mapManager.isInvulnerable(s)) return null;
         return s;
     }
 
     /** Le sbire s'approche et inflige des dégâts à la structure (tourelle). */
     private void attackStructure(Zombie minion, GameStructure structure) {
-        // Même règle que pour les champions : Nexus principal protégé tant que
-        // l'inhibiteur/nexus de lane et les tourelles de base tiennent
-        if (structure.getType() == GameStructure.Type.NEXUS_BASE
-                && !siblingMapManager().canAttackBaseNexus(structure.getTeam())) return;
+        // Même règle que pour les champions : structure protégée (anti-backdoor)
+        if (siblingMapManager().isInvulnerable(structure)) return;
         // Se déplacer vers la structure si pas assez proche
         Location target = structure.getCenter();
         double dist = minion.getLocation().distance(target);
@@ -458,9 +456,13 @@ public class MinionManager {
             fr.lolmc.util.VisualEffectUtil.impact(target.getWorld(),
                     target.clone().add(0.5, 1, 0.5), Material.WHITE_STAINED_GLASS, 0.26f, 3L);
             boolean wasDestroyed = structure.isDestroyed();
-            // Une frappe par seconde : AD × vitesse d'attaque × 60 %
-            boolean phaseChanged = structure.takeDamage(fr.lolmc.util.MobCombat.getAD(minion)
-                    * fr.lolmc.util.MobCombat.getAttackSpeed(minion) * MINION_DAMAGE_VS_CHAMPIONS_STRUCTURES);
+            // Une frappe par seconde : AD × vitesse d'attaque × 60 % (canon : 84 %, patch 26.1)
+            double vsStructure = "cannon".equals(getMinionTypeTag(minion)) ? 0.84 : MINION_DAMAGE_VS_CHAMPIONS_STRUCTURES;
+            double dmg = fr.lolmc.util.MobCombat.getAD(minion) * fr.lolmc.util.MobCombat.getAttackSpeed(minion) * vsStructure;
+            var turrets = gameInstance != null ? gameInstance.getTurretManager() : LolPlugin.getInstance().getTurretManager();
+            boolean phaseChanged = structure.takeDamage(dmg);
+            // Plaques tombées sous les coups des sbires : perdues sans or (aucun champion)
+            if (turrets != null && TurretManager.hasPlatesTier(structure)) turrets.dropPlatesSilently(structure);
             if (phaseChanged) {
                 siblingMapManager().updateStructurePhase(structure);
             }

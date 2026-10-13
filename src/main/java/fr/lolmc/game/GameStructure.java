@@ -24,16 +24,21 @@ public class GameStructure {
         NEXUS_BASE    // nexus principal
     }
 
-    /** Niveau d'une tourelle (façon LoL : stats différentes). */
+    /** Niveau d'une tourelle : PV du wiki LoL (dégâts : TurretManager, selon la minute). */
     public enum TurretTier {
-        OUTER(3000, 100),    // tourelle extérieure
-        INNER(3500, 130),    // tourelle intérieure
-        INHIBITOR(4000, 150),// tourelle d'inhibiteur
-        NEXUS(4500, 180);    // tourelles de nexus
+        OUTER(9000),     // tourelle extérieure
+        INNER(5000),     // tourelle intérieure
+        INHIBITOR(4750), // tourelle d'inhibiteur
+        NEXUS(3500);     // tourelles de nexus
 
         public final double hp;
-        public final double damage;
-        TurretTier(double hp, double damage) { this.hp = hp; this.damage = damage; }
+        TurretTier(double hp) { this.hp = hp; }
+
+        /** Niveau d'une tourelle d'après sa lane et son rang (1 = extérieure). */
+        public static TurretTier fromPosition(String lane, int index) {
+            if ("base".equals(lane)) return NEXUS;
+            return index <= 1 ? OUTER : index == 2 ? INNER : INHIBITOR;
+        }
     }
 
     private final Type type;
@@ -123,6 +128,22 @@ public class GameStructure {
     public double getMaxHP()        { return maxHP; }
     public double getCurrentHP()    { return currentHP; }
     public void respawn() { this.currentHP = this.maxHP; this.destroyed = false; this.currentPhaseIndex = 0; }
+
+    /** Réapparition à un % des PV max (tourelles de nexus : 40 %). */
+    public void reviveAt(double ratio) {
+        destroyed = false;
+        currentHP = maxHP * ratio;
+        checkPhaseChange();
+        updateHealthBarNametag();
+    }
+
+    /** Soigne sans dépasser {@code capRatio} des PV max. @return true si la phase change. */
+    public boolean heal(double amount, double capRatio) {
+        if (destroyed || currentHP >= maxHP * capRatio) return false;
+        currentHP = Math.min(maxHP * capRatio, currentHP + amount);
+        updateHealthBarNametag();
+        return checkPhaseChange();
+    }
     public boolean isDestroyed()    { return destroyed; }
 
     /**
@@ -161,7 +182,7 @@ public class GameStructure {
         var plugin = fr.lolmc.LolPlugin.getInstance();
         var tm = plugin.getTeamManager();
         var fog = plugin.getFogOfWarManager();
-        double range = fog != null ? fog.getVisionRange() : 30.0;
+        double range = fog != null ? fog.getVisionRange() : FogOfWarManager.CHAMPION_SIGHT;
 
         for (var viewer : center.getWorld().getPlayers()) {
             var viewerTeam = tm.getTeam(viewer);
@@ -181,7 +202,7 @@ public class GameStructure {
             // Ward ennemie proche = vision aussi
             if (!visible) {
                 var wardMgr = plugin.getWardManager();
-                if (wardMgr != null && wardMgr.hasWardNear(viewerTeam, center, 12.0))
+                if (wardMgr != null && wardMgr.hasVisionAt(viewerTeam, center))
                     visible = true;
             }
             if (visible) viewer.showEntity(plugin, as);
@@ -198,7 +219,6 @@ public class GameStructure {
         this.tier = t;
         if (type == Type.TURRET) setMaxHP(t.hp);
     }
-    public double getTierDamage()        { return tier.damage; }
 
     /** Identifiant unique de la structure (ex: "turret_blue_top_1"). */
     public String getId() {

@@ -15,8 +15,6 @@ import org.bukkit.Material;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Listener;
-import org.bukkit.event.block.Action;
-import org.bukkit.event.player.PlayerInteractEvent;
 
 /**
  * Gère les dégâts infligés aux structures (tourelles/nexus).
@@ -30,9 +28,6 @@ public class StructureDamageListener implements Listener {
     private final MapManager mapManager;
     private final ChampionManager championManager;
     private final TeamManager teamManager;
-
-    // Rayon dans lequel un clic compte comme une attaque sur la structure
-    private static final double ATTACK_RADIUS = 3.0;
 
     public StructureDamageListener(MapManager mapManager, ChampionManager championManager, TeamManager teamManager) {
         this.mapManager = mapManager;
@@ -56,10 +51,10 @@ public class StructureDamageListener implements Listener {
         if (playerTeam == null || structure.getTeam() == playerTeam) return;
         if (structure.isDestroyed()) return;
 
-        // Protection Nexus
-        if (structure.getType() == Type.NEXUS_BASE && !map(player).canAttackBaseNexus(structure.getTeam())) {
+        // Protection anti-backdoor (tourelles suivantes, inhibiteur, base, Nexus)
+        if (map(player).isInvulnerable(structure)) {
             player.sendActionBar(Component.text(
-                "🛡 Le Nexus est protégé !", NamedTextColor.RED));
+                "🛡 Structure protégée : détruis d'abord celle qui la précède !", NamedTextColor.RED));
             return;
         }
 
@@ -72,16 +67,16 @@ public class StructureDamageListener implements Listener {
             damage *= jm.getVoidgrubDamageBonus(playerTeam);
         }
 
-        // Fortification LoL : les tours externes (T1) prennent -50% de
-        // degats pendant les 5 premieres minutes
-        if (structure.getType() == Type.TURRET
-                && structure.getIndex() == 1
-                && fr.lolmc.instance.InstanceHelper.gameManager(player).getElapsedSeconds() < 300) {
-            damage *= 0.5;
+        var tm = fr.lolmc.instance.InstanceHelper.turretManager(player);
+        if (structure.getType() == Type.TURRET) {
+            // Les tourelles prennent 20 % de dégâts en plus des champions de mêlée (LoL)
+            if (champ.getAutoAttackRange() <= 3.0) damage *= 1.20;
+            // Armure 60 (baisse 11:00-15:00 pour les extérieures, Rempart), pénétration comprise
+            damage = champ.getStats().calcPhysicalDamageVs(damage, tm.getArmor(structure));
         }
 
-        // Anti-backdoor : structure fortifiée (-66% dégâts) si aucun sbire
-        // allié de l'attaquant n'est à moins de 12 blocs (règle LoL)
+        // Armure renforcée (LoL) : -80 % de dégâts sans sbire de l'attaquant à proximité.
+        // (L'ancienne « fortification » des 5 premières minutes n'existe plus sur la Faille.)
         boolean minionNearby = false;
         for (var ent : structure.getCenter().getWorld()
                 .getNearbyEntities(structure.getCenter(), 12, 8, 12)) {
@@ -92,23 +87,34 @@ public class StructureDamageListener implements Listener {
             }
         }
         if (!minionNearby) {
-            damage *= 0.34; // fortification -66%
+            damage *= 0.20;
             player.sendActionBar(Component.text(
-                "🛡 Structure fortifiée (-66% sans sbires)", NamedTextColor.GRAY));
+                "🛡 Armure renforcée (-80% sans sbires)", NamedTextColor.GRAY));
+        } else if (structure.getType() == Type.TURRET) {
+            // Croissance cristalline : vrais dégâts bonus (pas consommée sous Armure renforcée)
+            double crystal = tm.consumeOvergrowth(structure, playerTeam);
+            if (crystal > 0) {
+                damage += crystal;
+                player.sendActionBar(Component.text(
+                    "💎 Croissance cristalline ! +" + (int) crystal + " vrais dégâts", NamedTextColor.LIGHT_PURPLE));
+                fr.lolmc.util.VisualEffectUtil.impactBurst(structure.getCenter().getWorld(),
+                    structure.getCenter().clone().add(0.5, 1.5, 0.5), Material.AMETHYST_BLOCK, 0.3f, 0.6, 10, 8L);
+            }
         }
 
-        // Plaques
-        var tm = fr.lolmc.instance.InstanceHelper.turretManager(player);
-        String structKey = structure.getType().name() + "_" + structure.getTeam() + "_" + structure.getLane();
-        boolean plated = structure.getType() == Type.TURRET
-                && structure.getTier() == GameStructure.TurretTier.OUTER && tm.hasPlating(structKey);
-        if (plated) damage *= 0.60;
+        // Plaques (patch 26.1 : elles ne réduisent plus les dégâts des sbires et des champions à
+        // distance ; remplacé par +20 % de dégâts des champions de mêlée, appliqué plus haut)
+        String structKey = fr.lolmc.game.TurretManager.platingKey(structure);
+        boolean plated = fr.lolmc.game.TurretManager.hasPlatesTier(structure) && tm.hasPlating(structKey);
 
+        double hpBefore = structure.getCurrentHP();
         boolean phaseChanged = structure.takeDamage(damage);
+        if (structure.getType() == Type.TURRET) tm.onTurretDamaged(structure, hpBefore, playerTeam);
         if (plated) breakPlates(player, structure, structKey, tm);
         player.playSound(player.getLocation(), Sound.BLOCK_ANVIL_HIT, 0.5f, 1.2f);
 
-        // Rune Demolish : 3 AA sur une tourelle consomment les stacks pour un dégât bonus (45s CD)
+        // Rune Démolition : la 3e attaque sur une tourelle inflige des dégâts bonus (30 s de délai ;
+        // mêlée 85 + 28 % des PV max, distance 50 + 20 %, patch 26.1)
         if (structure.getType() == Type.TURRET && !structure.isDestroyed()) {
             var rm = LolPlugin.getInstance().getRuneManager();
             var pm = LolPlugin.getInstance().getPassiveManager();
@@ -120,8 +126,10 @@ public class StructureDamageListener implements Listener {
                     int stacks = state.demolishStacks.merge(structId, 1, Integer::sum);
                     if (stacks >= 3) {
                         state.demolishStacks.remove(structId);
-                        state.demolishCooldown.put(structId, System.currentTimeMillis() + 45000L);
-                        double demolishDmg = 100.0 + champ.getStats().getFinalMaxHP() * 0.20;
+                        state.demolishCooldown.put(structId, System.currentTimeMillis() + 30000L);
+                        boolean melee = champ.getAutoAttackRange() <= 3.0;
+                        double demolishDmg = melee ? 85.0 + champ.getStats().getFinalMaxHP() * 0.28
+                                                   : 50.0 + champ.getStats().getFinalMaxHP() * 0.20;
                         structure.takeDamage(demolishDmg);
                         player.sendActionBar(Component.text(
                                 "💥 Démolition ! +" + (int) demolishDmg + " dégâts", NamedTextColor.GOLD));
@@ -138,65 +146,6 @@ public class StructureDamageListener implements Listener {
                 "%s : %.0f/%.0f HP (%.0f%%)",
                 structureName(structure), structure.getCurrentHP(),
                 structure.getMaxHP(), structure.getHealthPercent()), NamedTextColor.YELLOW));
-        }
-    }
-
-    public void onAttack(PlayerInteractEvent e) {
-        if (e.getAction() != Action.LEFT_CLICK_BLOCK && e.getAction() != Action.LEFT_CLICK_AIR) return;
-        Player player = e.getPlayer();
-        if (!championManager.hasChampion(player)) return;
-        Team playerTeam = teamManager.getTeam(player);
-        if (playerTeam == null) return;
-
-        // Chercher une structure ennemie dans le rayon d'attaque devant le joueur
-        Location eye = player.getEyeLocation();
-        GameStructure structure = null;
-        // On vise jusqu'à 6 blocs devant
-        for (double d = 0; d <= 6.0; d += 0.5) {
-            Location point = eye.clone().add(eye.getDirection().multiply(d));
-            GameStructure s = map(player).getStructureAt(point, ATTACK_RADIUS);
-            if (s != null) { structure = s; break; }
-        }
-        if (structure == null) return;
-
-        // On n'attaque que les structures ENNEMIES
-        if (structure.getTeam() == playerTeam) return;
-
-        // ── Règle de protection du Nexus principal ──
-        if (structure.getType() == Type.NEXUS_BASE) {
-            if (!map(player).canAttackBaseNexus(structure.getTeam())) {
-                player.sendActionBar(Component.text(
-                        "🛡 Le Nexus est protégé ! Détruis d'abord un nexus de lane et les 2 tourelles de base.",
-                        NamedTextColor.RED));
-                return;
-            }
-        }
-
-        // Infliger les degats (bases sur l'AD du champion)
-        BaseChampion champ = championManager.getChampion(player);
-        double damage = champ.getStats().getFinalAD();
-        // Turret Plating : -40% degats si plaques actives + or de plaque au frappeur
-        var tm = fr.lolmc.instance.InstanceHelper.turretManager(player);
-        String structKey = structure.getType().name() + "_" + structure.getTeam() + "_" + structure.getLane();
-        boolean plated = structure.getType() == Type.TURRET
-                && structure.getTier() == GameStructure.TurretTier.OUTER && tm.hasPlating(structKey);
-        if (plated) damage *= 0.60;
-
-        boolean phaseChanged = structure.takeDamage(damage);
-        if (plated) breakPlates(player, structure, structKey, tm);
-        player.playSound(player.getLocation(), Sound.BLOCK_ANVIL_HIT, 0.5f, 1.2f);
-
-        if (structure.isDestroyed()) {
-            onStructureDestroyed(structure, player);
-        } else {
-            // Mettre à jour la schématique si changement de phase
-            if (phaseChanged) {
-                map(player).updateStructurePhase(structure);
-            }
-            player.sendActionBar(Component.text(String.format(
-                    "%s : %.0f/%.0f HP (%.0f%%)",
-                    structureName(structure), structure.getCurrentHP(),
-                    structure.getMaxHP(), structure.getHealthPercent()), NamedTextColor.YELLOW));
         }
     }
 
@@ -235,18 +184,16 @@ public class StructureDamageListener implements Listener {
     }
 
     /**
-     * Plaques (tourelle extérieure, avant 14 min) : une plaque tombe tous les 20 % de PV perdus,
-     * et rapporte son or au joueur qui la fait tomber. Avant, chaque coup retirait une plaque :
-     * 5 auto-attaques = 625 or.
+     * Plaques : elles tombent à 90 / 75 / 55 / 30 / 0 % des PV (patch 26.1) et rapportent leur or
+     * aux champions proches. Avant, chaque coup retirait une plaque : 5 auto-attaques = 625 or.
      */
     private void breakPlates(Player player, GameStructure structure, String structKey,
                              fr.lolmc.game.TurretManager tm) {
-        int max = fr.lolmc.game.TurretManager.MAX_PLATING;
-        int shouldRemain = (int) Math.ceil(structure.getCurrentHP() / structure.getMaxHP() * max - 1e-9);
+        int shouldRemain = fr.lolmc.game.TurretManager.MAX_PLATING - fr.lolmc.game.TurretManager.platesFallen(structure);
         var rewards = fr.lolmc.instance.InstanceHelper.rewardManager(player);
         while (tm.hasPlating(structKey) && tm.getPlatingLeft(structKey) > shouldRemain) {
             tm.tickPlating(structKey);
-            rewards.onPlateDestroyed(player, structure, tm.getPlatingLeft(structKey));
+            rewards.onPlateDestroyed(player, structure, tm.getPlatingLeft(structKey), tm.plateGold(structure));
         }
     }
 

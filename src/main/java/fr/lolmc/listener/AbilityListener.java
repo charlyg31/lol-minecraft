@@ -392,6 +392,7 @@ public class AbilityListener implements Listener {
         for (var structure : mm.getStructures()) {
             if (structure.isDestroyed()) continue;
             if (structure.getTeam() == tm.getTeam(caster)) continue; // structure alliée
+            if (mm.isInvulnerable(structure)) continue;               // protection anti-backdoor
             var center = structure.getCenter().clone().add(0.5, 1, 0.5);
             if (!center.getWorld().equals(caster.getWorld())) continue;
             double dist = caster.getLocation().distance(center);

@@ -39,10 +39,9 @@ public class RewardManager {
     public static final int GOLD_TURRET_INHIBITOR_GLOBAL = 25;
     public static final int GOLD_TURRET_NEXUS_GLOBAL     = 50;
     public static final int GOLD_FIRST_TURRET            = 300;
-    // Plaque (tourelle extérieure, avant 14 min) : 120 or partagés entre les champions proches
+    // Plaque (toutes les tourelles sauf nexus, permanentes depuis 26.1) : 120 or partagés entre
+    // les champions proches (extérieures : -10 or par minute dès 11:00, max -40)
     public static final int GOLD_TURRET_PLATE     = 120;
-    public static final int TURRET_PLATE_MAX      = 5;
-    public static final long TURRET_PLATE_DURATION = 14 * 60 * 1000L;
     // Inhibiteur : 50 or au seul last-hit
     public static final int GOLD_INHIBITOR_KILLER = 50;
     // Rayon « local » : 1200 unités LoL (100 unités = 1 bloc, LolUnits)
@@ -461,14 +460,13 @@ public class RewardManager {
     }
 
     /**
-     * Plaque de tourelle détruite (avant 14 min) : 120 or partagés entre les champions vivants
-     * proches et celui qui la fait tomber. Le décompte des plaques est tenu par TurretManager.
+     * Plaque de tourelle détruite : son or est partagé entre les champions vivants proches et
+     * celui qui la fait tomber. Le décompte des plaques est tenu par TurretManager.
      */
-    public void onPlateDestroyed(Player attacker, GameStructure turret, int platesLeft) {
+    public void onPlateDestroyed(Player attacker, GameStructure turret, int platesLeft, int gold) {
         if (gameStartMs == 0) return;
-        if (System.currentTimeMillis() - gameStartMs > TURRET_PLATE_DURATION) return;
         var team = LolPlugin.getInstance().getTeamManager().getTeam(attacker);
-        splitGold(localChampions(turret.getCenter(), team, attacker), GOLD_TURRET_PLATE,
+        splitGold(localChampions(turret.getCenter(), team, attacker), gold,
                 "🏛 Plaque (" + platesLeft + " restantes)");
     }
 

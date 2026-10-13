@@ -227,11 +227,19 @@ public class MapManager {
             int angle = config.getInt(path + "angle", 0);
             structure.setAngle(angle);
 
-            String tierName = config.getString(path + "tier");
-            if (tierName != null && type == Type.TURRET) {
-                try {
-                    structure.setTier(GameStructure.TurretTier.valueOf(tierName));
-                } catch (IllegalArgumentException ignored) {}
+            // Niveau de tourelle : celui de map.yml, sinon déduit de la lane et du rang. /lola
+            // enregistrait OUTER par défaut : une tourelle « extérieure » de rang > 1 ou de base
+            // est donc corrigée (avant, elle donnait l'or et les plaques d'une extérieure)
+            if (type == Type.TURRET) {
+                var pos = GameStructure.TurretTier.fromPosition(lane, index);
+                GameStructure.TurretTier tier = pos;
+                String tierName = config.getString(path + "tier");
+                if (tierName != null) {
+                    try { tier = GameStructure.TurretTier.valueOf(tierName); }
+                    catch (IllegalArgumentException ignored) {}
+                }
+                if (tier == GameStructure.TurretTier.OUTER && pos != GameStructure.TurretTier.OUTER) tier = pos;
+                structure.setTier(tier);
             }
             structures.add(structure);
 
@@ -270,6 +278,30 @@ public class MapManager {
                 && baseTurrets.stream().allMatch(GameStructure::isDestroyed);
 
         return aNexusDown && allBaseTurretsDown;
+    }
+
+    /**
+     * Protection anti-backdoor (LoL) : une tourelle est invulnérable tant que la précédente de sa
+     * lane tient ; un inhibiteur tant qu'une tourelle de sa lane tient ; les tourelles de base
+     * tant qu'aucun inhibiteur n'est tombé ; un nexus de lane tant que son inhibiteur tient ;
+     * le Nexus principal selon canAttackBaseNexus.
+     */
+    public boolean isInvulnerable(GameStructure s) {
+        Team team = s.getTeam();
+        return switch (s.getType()) {
+            case TURRET -> {
+                if ("base".equals(s.getLane()))
+                    yield structures.stream().noneMatch(o -> o.getTeam() == team
+                            && o.getType() == Type.INHIBITOR && o.isDestroyed());
+                yield structures.stream().anyMatch(o -> o.getTeam() == team && o.getType() == Type.TURRET
+                        && s.getLane().equals(o.getLane()) && o.getIndex() < s.getIndex() && !o.isDestroyed());
+            }
+            case INHIBITOR -> structures.stream().anyMatch(o -> o.getTeam() == team
+                    && o.getType() == Type.TURRET && s.getLane().equals(o.getLane()) && !o.isDestroyed());
+            case NEXUS -> structures.stream().anyMatch(o -> o.getTeam() == team
+                    && o.getType() == Type.INHIBITOR && s.getLane().equals(o.getLane()) && !o.isDestroyed());
+            case NEXUS_BASE -> !canAttackBaseNexus(team);
+        };
     }
 
     public GameStructure getBaseNexus(Team team) {

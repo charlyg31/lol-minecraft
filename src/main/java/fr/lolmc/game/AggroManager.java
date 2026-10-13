@@ -25,6 +25,8 @@ public class AggroManager {
 
     // UUID attaquant → fin de l'aggro tour (la tour le priorise)
     private final Map<UUID, Long> turretAggro = new ConcurrentHashMap<>();
+    // UUID attaquant → dernier champion qu'il a blessé (la tourelle vérifie qu'il est allié et proche)
+    private final Map<UUID, UUID> lastVictim = new ConcurrentHashMap<>();
 
     /**
      * Appelé à CHAQUE attaque champion → champion (depuis DamageUtil).
@@ -50,6 +52,15 @@ public class AggroManager {
 
         // ── Aggro de tour : l'attaquant devient prioritaire 3s ──
         turretAggro.put(attacker.getUniqueId(), System.currentTimeMillis() + TURRET_AGGRO_MS);
+        lastVictim.put(attacker.getUniqueId(), victim.getUniqueId());
+    }
+
+    /** Champion blessé récemment (3 s) par ce joueur, ou null (appel à l'aide des tourelles). */
+    public Player getRecentChampionVictim(Player attacker) {
+        if (!hasTurretAggro(attacker)) return null;
+        UUID v = lastVictim.get(attacker.getUniqueId());
+        Player victim = v != null ? org.bukkit.Bukkit.getPlayer(v) : null;
+        return victim != null && victim.getGameMode() != org.bukkit.GameMode.SPECTATOR ? victim : null;
     }
 
     /** True si ce joueur a l'aggro de tour actif (à prioriser). */
@@ -69,6 +80,6 @@ public class AggroManager {
         return new org.bukkit.NamespacedKey(LolPlugin.getInstance(), "minion_aggro");
     }
 
-    public void cleanup(UUID uuid) { turretAggro.remove(uuid); }
-    public void reset() { turretAggro.clear(); }
+    public void cleanup(UUID uuid) { turretAggro.remove(uuid); lastVictim.remove(uuid); }
+    public void reset() { turretAggro.clear(); lastVictim.clear(); }
 }
