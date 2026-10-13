@@ -259,6 +259,10 @@ public class ChampSelectSession {
             if (p == null) continue;
             p.showBossBar(selectBar);
             p.sendMessage(Component.text("═══ SÉLECTION DE CHAMPION ═══", NamedTextColor.LIGHT_PURPLE));
+            var myRole = LolPlugin.getInstance().getRoleQueueManager().getAssignedRole(id);
+            if (myRole != null)
+                p.sendMessage(Component.text("🎯 Ton rôle : " + myRole.displayName
+                        + " (les champions de ce rôle sont mis en avant)", NamedTextColor.GOLD));
             p.sendMessage(Component.text("Menu de sélection ouvert — /pick pour le rouvrir.",
                     NamedTextColor.AQUA));
             p.sendMessage(Component.text(ranked
@@ -572,6 +576,20 @@ public class ChampSelectSession {
 
             String champ = finalChamp.getOrDefault(id, "garen");
             cm.assignChampion(p, champ);
+
+            // Position de départ selon le rôle (fontaine : positions 1-5 configurées par /lola position)
+            var role = LolPlugin.getInstance().getRoleQueueManager().getAssignedRole(id);
+            var team = LolPlugin.getInstance().getTeamManager().getTeam(p);
+            if (role != null && team != null) {
+                var inst = LolPlugin.getInstance().getInstanceManager() != null
+                        ? LolPlugin.getInstance().getInstanceManager().getInstanceOf(p) : null;
+                var map = inst != null ? inst.getMapManager() : LolPlugin.getInstance().getMapManager();
+                var spawn = map.getSpawn(team, fr.lolmc.game.RoleQueueManager.spawnPosition(role));
+                if (spawn != null) p.teleport(spawn);
+                p.sendMessage(Component.text("🎯 Rôle : " + role.displayName, NamedTextColor.GOLD));
+            }
+            // Rôle consommé : il ne doit pas réapparaître dans une partie suivante lancée sans rôle
+            LolPlugin.getInstance().getRoleQueueManager().setAssignedRole(id, null);
 
             // Runes (page par défaut si rien)
             RunePage page = chosenRunes.getOrDefault(id, RunePage.defaultPage());

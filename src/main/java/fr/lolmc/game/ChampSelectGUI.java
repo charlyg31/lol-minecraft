@@ -65,7 +65,7 @@ public class ChampSelectGUI implements Listener {
             String id = CHAMPIONS[i];
             if (csmMenu.isBanned(player.getUniqueId(), id)) inv.setItem(i, unavailableIcon(id, "⛔ Banni"));
             else if (csmMenu.isTaken(player.getUniqueId(), id)) inv.setItem(i, unavailableIcon(id, "✖ Déjà pris"));
-            else inv.setItem(i, championIcon(id));
+            else inv.setItem(i, championIcon(id, isMyRole(player, id)));
         }
         // Bouton sorts + bouton runes + bouton lock
         String[] spells = LolPlugin.getInstance().getChampSelectManager().getChosenSpells(player.getUniqueId());
@@ -96,14 +96,28 @@ public class ChampSelectGUI implements Listener {
         return item;
     }
 
-    private ItemStack championIcon(String champId) {
+    /** Le champion correspond-il au rôle attribué au joueur ? */
+    private boolean isMyRole(Player player, String champId) {
+        var role = LolPlugin.getInstance().getRoleQueueManager().getAssignedRole(player.getUniqueId());
+        var proto = LolPlugin.getInstance().getChampionManager().getPrototype(champId);
+        return role != null && proto != null && proto.getRole() != null
+                && proto.getRole().name().equals(role.name());
+    }
+
+    private ItemStack championIcon(String champId, boolean myRole) {
         ItemStack item = new ItemStack(championMaterial(champId));
         var meta = item.getItemMeta();
         if (meta != null) {
-            meta.displayName(Component.text(capitalize(champId), NamedTextColor.YELLOW)
-                    .decoration(TextDecoration.ITALIC, false));
-            meta.lore(List.of(Component.text("Clique pour choisir", NamedTextColor.GRAY)
-                    .decoration(TextDecoration.ITALIC, false)));
+            meta.displayName(Component.text((myRole ? "★ " : "") + capitalize(champId),
+                    myRole ? NamedTextColor.GOLD : NamedTextColor.YELLOW).decoration(TextDecoration.ITALIC, false));
+            var lore = new java.util.ArrayList<Component>();
+            if (myRole) lore.add(Component.text("★ Ton rôle", NamedTextColor.GOLD).decoration(TextDecoration.ITALIC, false));
+            lore.add(Component.text("Clique pour choisir", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+            meta.lore(lore);
+            if (myRole) {
+                meta.addEnchant(org.bukkit.enchantments.Enchantment.UNBREAKING, 1, true);
+                meta.addItemFlags(org.bukkit.inventory.ItemFlag.HIDE_ENCHANTS);
+            }
             item.setItemMeta(meta);
         }
         return item;

@@ -115,6 +115,17 @@ public class RoleQueueManager {
         for (UUID id : pool) inQueue.remove(id);
         assignedRole.putAll(assignment);
 
+        // Équipes : pour chaque rôle, le 1er joueur va en bleu, le 2e en rouge
+        // (avant : un joueur sur deux, donc parfois deux Top dans la même équipe)
+        var tm = LolPlugin.getInstance().getTeamManager();
+        Set<Role> blueTaken = EnumSet.noneOf(Role.class);
+        for (UUID id : pool) {
+            Player p = Bukkit.getPlayer(id);
+            if (p == null) continue;
+            Role r = assignment.get(id);
+            tm.setTeam(p, blueTaken.add(r) ? fr.lolmc.team.TeamManager.Team.BLUE : fr.lolmc.team.TeamManager.Team.RED);
+        }
+
         // Notifier et lancer la sélection
         for (UUID id : pool) {
             Player p = Bukkit.getPlayer(id);
@@ -170,6 +181,18 @@ public class RoleQueueManager {
 
     public Role getAssignedRole(UUID uuid) {
         return assignedRole.get(uuid);
+    }
+
+    /** Rôle attribué par le proxy (BungeeCord) pour la partie. */
+    public void setAssignedRole(UUID uuid, Role role) {
+        if (role == null) assignedRole.remove(uuid); else assignedRole.put(uuid, role);
+    }
+
+    /** Position de fontaine associée au rôle (/lola position <équipe> <1-5>). */
+    public static int spawnPosition(Role role) {
+        return switch (role) {
+            case TOP -> 1; case JUNGLE -> 2; case MID -> 3; case ADC -> 4; case SUPPORT -> 5;
+        };
     }
 
     public void cleanup(UUID uuid) {

@@ -137,6 +137,16 @@ public final class BridgeManager implements PluginMessageListener {
         // Équipes calculées par le proxy (groupes jamais séparés) ; absentes avec un ancien proxy
         final List<UUID> proxyBlue = parseUuids(data.getOrDefault("blue", ""));
         final List<UUID> proxyRed  = parseUuids(data.getOrDefault("red", ""));
+        // Poste de chaque joueur dans son équipe : "uuid=TOP,uuid=MID,…"
+        var rqm = plugin.getRoleQueueManager();
+        for (String pair : data.getOrDefault("roles", "").split(",")) {
+            int eq = pair.indexOf('=');
+            if (eq <= 0) continue;
+            try {
+                rqm.setAssignedRole(UUID.fromString(pair.substring(0, eq).trim()),
+                        fr.lolmc.game.RoleQueueManager.Role.valueOf(pair.substring(eq + 1).trim()));
+            } catch (IllegalArgumentException ignored) {}
+        }
 
         log.info("[Bridge] GAME_READY reçu — " + expected.size() + " joueurs, ranked=" + ranked);
 

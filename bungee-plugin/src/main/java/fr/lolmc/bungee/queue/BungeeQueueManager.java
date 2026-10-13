@@ -314,6 +314,14 @@ public class BungeeQueueManager {
         if (split == null) split = splitTeams(allPlayers, override, false); // repli : tailles + groupes
         final List<UUID> blueTeam = split != null ? split.get(0) : allPlayers;
         final List<UUID> redTeam  = split != null ? split.get(1) : List.of();
+        // Poste de chaque joueur dans son équipe (transmis au serveur de jeu)
+        Map<UUID, String> roles = new LinkedHashMap<>();
+        Map<UUID, String> blueRoles = assignTeamRoles(blueTeam, override, true);
+        Map<UUID, String> redRoles  = assignTeamRoles(redTeam, override, true);
+        if (blueRoles != null) roles.putAll(blueRoles);
+        if (redRoles != null)  roles.putAll(redRoles);
+        final String rolesCsv = String.join(",", roles.entrySet().stream()
+                .map(e -> e.getKey() + "=" + e.getValue()).toList());
 
         // GAME_READY après 6s (2s connect + 4s chargement)
         ProxyServer.getInstance().getScheduler().schedule(plugin, () -> {
@@ -327,6 +335,7 @@ public class BungeeQueueManager {
                     + String.join(",", blueTeam.stream().map(UUID::toString).toList())
                     + "\",\"red\":\""
                     + String.join(",", redTeam.stream().map(UUID::toString).toList())
+                    + "\",\"roles\":\"" + rolesCsv
                     + "\"}";
             sendPluginMessage(gameServer, json);
             plugin.getLogger().info("[Queue] GAME_READY envoyé pour " + allPlayers.size() + " joueurs (ranked=" + isRanked + ")");
@@ -476,6 +485,15 @@ public class BungeeQueueManager {
 
     /** Une équipe est valide si chaque joueur peut tenir un poste différent. */
     private boolean validTeam(List<UUID> team, Map<UUID, List<String>> roleOverride) {
+        return assignTeamRoles(team, roleOverride, false) != null;
+    }
+
+    /**
+     * Poste de chaque joueur de l'équipe (un par rôle, selon ses préférences).
+     * @param complete true : les joueurs sans poste compatible reçoivent un poste resté libre
+     *                 (repli) ; false : null si l'équipe ne peut pas être couverte
+     */
+    private Map<UUID, String> assignTeamRoles(List<UUID> team, Map<UUID, List<String>> roleOverride, boolean complete) {
         List<List<String>> playerRoles = new ArrayList<>();
         for (UUID uid : team) playerRoles.add(roleOverride.getOrDefault(uid, getRolesFor(uid)));
         int[] match = new int[ROLES.size()];
@@ -483,7 +501,14 @@ public class BungeeQueueManager {
         int matched = 0;
         for (int pi = 0; pi < playerRoles.size(); pi++)
             if (augmentRoles(pi, playerRoles, match, new boolean[ROLES.size()])) matched++;
-        return matched == team.size();
+        if (matched != team.size() && !complete) return null;
+        Map<UUID, String> result = new LinkedHashMap<>();
+        for (int ri = 0; ri < ROLES.size(); ri++) if (match[ri] != -1) result.put(team.get(match[ri]), ROLES.get(ri));
+        for (UUID uid : team) {
+            if (result.containsKey(uid)) continue;
+            for (String r : ROLES) if (!result.containsValue(r)) { result.put(uid, r); break; }
+        }
+        return result;
     }
 
     private boolean augmentRoles(int pi, List<List<String>> playerRoles, int[] match, boolean[] visited) {
