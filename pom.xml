@@ -16,7 +16,7 @@
         <btlp.version>2.7.0</btlp.version>
     </properties>
 
-    <!-- Pins transitifs de paper-api (CVE-2025-67030, CVE-2025-48924) -->
+    <!-- Pins transitifs de paper-api (CVE-2025-67030, CVE-2025-48924, CVE-2026-49844) -->
     <dependencyManagement>
         <dependencies>
             <dependency>
@@ -28,6 +28,11 @@
                 <groupId>org.apache.commons</groupId>
                 <artifactId>commons-lang3</artifactId>
                 <version>3.18.0</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.logging.log4j</groupId>
+                <artifactId>log4j-api</artifactId>
+                <version>2.26.1</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
