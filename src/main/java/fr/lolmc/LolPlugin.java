@@ -115,6 +115,7 @@ public class LolPlugin extends JavaPlugin {
     public void onEnable() {
         instance = this;
         getServer().getPluginManager().registerEvents(new fr.lolmc.listener.OrphanPurgeListener(), this);
+        getServer().getPluginManager().registerEvents(new fr.lolmc.listener.FreezeListener(), this);
         getServer().getScheduler().runTaskLater(this, fr.lolmc.game.MinionManager::purgeAllWorlds, 100L);
         saveDefaultConfig();
         mergeMissingConfigKeys();
@@ -124,6 +125,10 @@ public class LolPlugin extends JavaPlugin {
 
         initManagersAndListeners();
         registerCommands();
+        if (getServer().getPluginManager().isPluginEnabled("BungeeTabListPlus")) {
+            try { fr.lolmc.hook.BtlpHook.register(this); }
+            catch (Throwable t) { getLogger().warning("[BTLP] Hook impossible : " + t); }
+        }
 
         this.abilityPreview   = new fr.lolmc.ability.AbilityPreview();
         this.instanceManager  = new fr.lolmc.instance.InstanceManager(this);

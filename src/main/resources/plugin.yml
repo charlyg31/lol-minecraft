@@ -226,4 +226,4 @@ permissions:
   lolmc.skin.missfortune.bullet_angel: {description: "Miss Fortune - Ange Armée",     default: false}
 
 bungeecord: true
-soft-depend: [Multiverse-Core]
+soft-depend: [Multiverse-Core, BungeeTabListPlus]

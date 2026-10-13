@@ -24,6 +24,17 @@ public class TabScoreboardManager {
     private BukkitTask updateTask;
     private org.bukkit.scoreboard.Scoreboard board;
     private Objective objective;
+    private final java.util.function.Supplier<java.util.Collection<Player>> source;
+
+    /** Tab global (mode sans instance) : tous les joueurs en monde de jeu. */
+    public TabScoreboardManager() {
+        this(fr.lolmc.util.WorldContext::getGamePlayers);
+    }
+
+    /** Tab propre à une partie : seuls les joueurs fournis par la source. */
+    public TabScoreboardManager(java.util.function.Supplier<java.util.Collection<Player>> source) {
+        this.source = source;
+    }
 
     public void start() {
         var sm = Bukkit.getScoreboardManager();
@@ -35,10 +46,7 @@ public class TabScoreboardManager {
         objective.setDisplaySlot(DisplaySlot.PLAYER_LIST);
 
         // Assigner le scoreboard à tous les joueurs en partie
-        for (Player p : Bukkit.getOnlinePlayers()) {
-            if (fr.lolmc.util.WorldContext.isInGameWorld(p))
-                p.setScoreboard(board);
-        }
+        for (Player p : source.get()) p.setScoreboard(board);
 
         updateTask = new BukkitRunnable() {
             @Override public void run() { update(); }
@@ -49,7 +57,7 @@ public class TabScoreboardManager {
         if (updateTask != null) { updateTask.cancel(); updateTask = null; }
         // Remettre le scoreboard par défaut
         var def = Bukkit.getScoreboardManager().getMainScoreboard();
-        for (Player p : Bukkit.getOnlinePlayers()) p.setScoreboard(def);
+        for (Player p : source.get()) if (p.getScoreboard() == board) p.setScoreboard(def);
     }
 
     private void update() {
@@ -60,8 +68,7 @@ public class TabScoreboardManager {
         var gm  = LolPlugin.getInstance().getGoldManager();
         if (msb == null) return;
 
-        for (Player p : Bukkit.getOnlinePlayers()) {
-            if (!fr.lolmc.util.WorldContext.isInGameWorld(p)) continue;
+        for (Player p : source.get()) {
             p.setScoreboard(board);
 
             var stats = msb.getStats().get(p.getUniqueId());

@@ -163,6 +163,36 @@ public class GameManager {
     }
 
     private void stopRespawnTask() { if (respawnTask != null) { respawnTask.cancel(); respawnTask = null; } }
+
+    // ── Isolation entre parties ─────────────────────────────────────────
+
+    /** Joueurs de CETTE partie (monde de l'instance), sinon ceux du monde de jeu configuré. */
+    private TabScoreboardManager tab;
+    private TabScoreboardManager tab() {
+        if (gameInstance == null) return LolPlugin.getInstance().getTabScoreboard();
+        if (tab == null) tab = new TabScoreboardManager(this::players);
+        return tab;
+    }
+
+    private java.util.Collection<Player> players() {
+        return gameInstance != null ? gameInstance.getOnlinePlayers() : WorldContext.getGamePlayers();
+    }
+
+    /** Vrai si une AUTRE partie (globale ou instance) est en cours : les états partagés ne doivent pas être touchés. */
+    private boolean otherGameRunning() {
+        var lp = LolPlugin.getInstance();
+        var g = lp.getGameManager();
+        if (g != null && g != this && g.isRunning()) return true;
+        var im = lp.getInstanceManager();
+        if (im != null) {
+            for (var inst : im.getAllInstances()) {
+                var gm = inst.getGameManager();
+                if (gm != null && gm != this && gm.isRunning()) return true;
+            }
+        }
+        return false;
+    }
+
     public void startGame() {
         gameRunning = true;
         gameStartTime = System.currentTimeMillis();
@@ -173,54 +203,55 @@ public class GameManager {
         captureParticipants();
         timerBar = BossBar.bossBar(Component.text("Partie — 00:00"),
                 1.0f, BossBar.Color.WHITE, BossBar.Overlay.PROGRESS);
-        for (Player p : WorldContext.getGamePlayers()) {
+        for (Player p : players()) {
             p.showBossBar(timerBar);
         }
 
         // Donner la minimap en main secondaire à chaque participant
         var mm = LolPlugin.getInstance().getMinimapManager();
-        for (Player p : WorldContext.getGamePlayers()) {
+        for (Player p : players()) {
             mm.giveMinimap(p);
         }
         // Tab scoreboard
-        LolPlugin.getInstance().getTabScoreboard().start();
+        tab().start();
         // Marqueurs de cible (rouge visee / vert verrouillee)
         LolPlugin.getInstance().getAutoAttackManager().startVisuals();
         // FF + death recap reset
-        LolPlugin.getInstance().getForfeitManager().reset();
+        if (!otherGameRunning()) LolPlugin.getInstance().getForfeitManager().reset();
     }
 
     public void stopGame() {
         gameRunning = false;
         stopSystems();
         // États statiques champions
-        fr.lolmc.util.ChampionStateReset.resetAll();
+        final boolean last = !otherGameRunning();
+        if (last) fr.lolmc.util.ChampionStateReset.resetAll();
         // Annonces (kill spree, first blood, multi-kills)
         siblingAnnouncementManager().reset();
         // Feats of Strength
         siblingFeatManager().reset();
         // Tab scoreboard
-        LolPlugin.getInstance().getTabScoreboard().stop();
-        LolPlugin.getInstance().getAutoAttackManager().stopVisuals();
+        if (gameInstance != null || last) tab().stop();
+        if (last) LolPlugin.getInstance().getAutoAttackManager().stopVisuals();
         // Réinitialiser les skins
-        LolPlugin.getInstance().getSkinManager().resetAll();
+        if (last) LolPlugin.getInstance().getSkinManager().resetAll();
         // FF reset
-        LolPlugin.getInstance().getForfeitManager().reset();
+        if (last) LolPlugin.getInstance().getForfeitManager().reset();
         // Passifs d'objets : arrêt des tâches et remise à zéro de l'état par joueur
         var passives = LolPlugin.getInstance().getPassiveManager();
-        if (passives != null) { passives.stopTasks(); passives.cleanupAll(); }
+        if (passives != null && last) { passives.stopTasks(); passives.cleanupAll(); }
         // Consommables (charges de fiole, potions en cours)
         var consumables = LolPlugin.getInstance().getConsumableManager();
-        if (consumables != null) consumables.reset();
+        if (consumables != null && last) consumables.reset();
         // Inhibiteurs en attente de respawn
         inhibitorRespawnAt.clear();
         respawnTotalSecondsMap.clear();
         if (timerBar != null) {
-            for (Player p : WorldContext.getGamePlayers()) p.hideBossBar(timerBar);
+            for (Player p : players()) p.hideBossBar(timerBar);
         }
         respawnAt.clear();
         for (BossBar bar : respawnBars.values()) {
-            for (Player p : WorldContext.getGamePlayers()) p.hideBossBar(bar);
+            for (Player p : players()) p.hideBossBar(bar);
         }
         respawnBars.clear();
         participants.clear();
@@ -228,7 +259,7 @@ public class GameManager {
         goldAccumulator.clear();
         playerSnapshots.clear();
         // Remettre les joueurs dans un état normal (SURVIVAL, etc.)
-        for (org.bukkit.entity.Player p : fr.lolmc.util.WorldContext.getGamePlayers()) {
+        for (org.bukkit.entity.Player p : players()) {
             if (p.getGameMode() == org.bukkit.GameMode.SPECTATOR)
                 p.setGameMode(org.bukkit.GameMode.SURVIVAL);
         }
@@ -240,7 +271,7 @@ public class GameManager {
         // Renvoyer les joueurs vers le lobby (BungeeCord), si configuré
         var bridge = LolPlugin.getInstance().getBridgeManager();
         if (bridge != null && bridge.isEnabled()) {
-            for (org.bukkit.entity.Player p : fr.lolmc.util.WorldContext.getGamePlayers()) {
+            for (org.bukkit.entity.Player p : players()) {
                 bridge.sendPlayerToLobby(p);
             }
         }
@@ -252,7 +283,7 @@ public class GameManager {
         participantTeam.clear();
         var cm = LolPlugin.getInstance().getChampionManager();
         var tm = LolPlugin.getInstance().getTeamManager();
-        for (Player p : WorldContext.getGamePlayers()) {
+        for (Player p : players()) {
             if (cm.hasChampion(p)) {
                 participants.add(p.getUniqueId());
                 if (tm.hasTeam(p)) participantTeam.put(p.getUniqueId(), tm.getTeam(p));
@@ -296,7 +327,7 @@ public class GameManager {
                 // BossBar (temps + chrono épiques) pour chaque joueur ; le détail or/CS/PV/mana est
                 // affiché en continu par HUDManager sur la barre d'action, pour éviter que les deux
                 // systèmes ne se disputent le même emplacement d'affichage (clignotement).
-                for (Player p : WorldContext.getGamePlayers()) {
+                for (Player p : players()) {
                     p.showBossBar(timerBar);
                 }
             }
@@ -318,7 +349,7 @@ public class GameManager {
                 if (getElapsedSeconds() < PASSIVE_GOLD_START_SECONDS) return;
                 var goldManager = LolPlugin.getInstance().getGoldManager();
                 var cm = LolPlugin.getInstance().getChampionManager();
-                for (Player p : WorldContext.getGamePlayers()) {
+                for (Player p : players()) {
                     if (cm.hasChampion(p) && !isDead(p)) {
                         // Accumuler l'or fractionnaire (1.02/demi-sec) et verser les entiers
                         double acc = goldAccumulator.getOrDefault(p.getUniqueId(), 0.0)

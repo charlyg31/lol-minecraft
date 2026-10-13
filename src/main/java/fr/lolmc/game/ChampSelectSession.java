@@ -1,0 +1,382 @@
+package fr.lolmc.game;
+
+import fr.lolmc.LolPlugin;
+import fr.lolmc.rune.RunePage;
+import net.kyori.adventure.bossbar.BossBar;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
+import org.bukkit.Bukkit;
+import org.bukkit.entity.Player;
+import org.bukkit.scheduler.BukkitRunnable;
+
+import fr.lolmc.game.ChampSelectManager.Phase;
+
+import java.util.*;
+
+/**
+ * Gère la phase de sélection avant une partie (Champion Select de LoL) :
+ *  - Un lobby attend les joueurs
+ *  - Une phase de sélection avec timer où chacun choisit champion, runes, sorts
+ *  - Au bout du timer (ou quand tout le monde a verrouillé), la partie démarre
+ *
+ * Les choix sont stockés ici puis appliqués au lancement.
+ */
+public class ChampSelectSession {
+
+
+    private Phase phase = Phase.IDLE;
+
+    // Joueurs dans la sélection
+    private final Set<UUID> participants = new HashSet<>();
+    // Choix de chaque joueur
+    private final Map<UUID, String> chosenChampion = new HashMap<>();
+    private final Map<UUID, RunePage> chosenRunes = new HashMap<>();
+    private final Map<UUID, String> chosenSkin = new HashMap<>();
+    private final Map<UUID, String[]> chosenSpells = new HashMap<>(); // [spell1, spell2]
+    private final Set<UUID> locked = new HashSet<>(); // joueurs ayant verrouillé
+
+    private int timeLeft = 0;
+    private BossBar selectBar;
+    private BukkitRunnable timerTask;
+
+    private static final int SELECT_DURATION = 60; // 60s de sélection
+    private static final int BAN_DURATION    = 30; // 30s de ban (classé)
+
+    private final java.util.Set<String> bannedChampions = new java.util.LinkedHashSet<>();
+    private final java.util.Set<UUID> hasBanned = new java.util.HashSet<>(); // 1 ban par joueur
+    private int banTimeLeft = 0;
+    private BukkitRunnable banTask;
+
+    // ══════════════════════════════════════════════════════════════
+    // DÉMARRAGE DE LA SÉLECTION
+    // ══════════════════════════════════════════════════════════════
+
+    /** Alias utilisé par MatchmakingManager et PreGameGUI — lance la sélection.
+     *  Reste sur le GameManager global : sans joueur de référence, il n'y a pas de
+     *  moyen fiable de choisir une instance précise parmi plusieurs en cours. */
+    public void startBanPhase() {
+        var gm = LolPlugin.getInstance().getGameManager();
+        if (gm != null) startSelection(gm.getParticipants());
+    }
+
+
+    /** Surcharge avec mode ranked (pick+ban) ou normal (pick seul). */
+    public void startSelection(Collection<UUID> players, boolean ranked) {
+        this.ranked = ranked;
+        prepareTeamsAndPlace(players);
+        this.bannedChampions.clear();
+        this.hasBanned.clear();
+        if (ranked) {
+            startBanPhaseInternal(players);
+        } else {
+            startPickPhase(players);
+        }
+    }
+
+    private boolean ranked = false;
+
+
+    /**
+     * Mode partie unique : place chaque joueur dans une équipe (alternées, BLEU d'abord) et
+     * le téléporte à son point de départ dans le monde de jeu. Sans ça, un joueur arrivé du
+     * proxy reste dans le monde par défaut : pas d'équipe, donc ni HUD, ni chrono, ni sorts.
+     */
+    private void prepareTeamsAndPlace(Collection<UUID> players) {
+        var plugin = LolPlugin.getInstance();
+        var im = plugin.getInstanceManager();
+        var tm = plugin.getTeamManager();
+        var map = plugin.getMapManager();
+        int i = 0;
+        for (UUID id : players) {
+            Player p = Bukkit.getPlayer(id);
+            if (p == null) continue;
+            if (im != null && im.getInstanceOf(p) != null) continue; // instance : déjà placé
+            fr.lolmc.team.TeamManager.Team team = tm.hasTeam(p) ? tm.getTeam(p)
+                    : (i % 2 == 0 ? fr.lolmc.team.TeamManager.Team.BLUE : fr.lolmc.team.TeamManager.Team.RED);
+            if (!tm.hasTeam(p)) tm.setTeam(p, team);
+            i++;
+            var spawn = map.getSpawn(team, 0);
+            if (spawn == null) spawn = map.getSpawn(team, 1);
+            if (spawn != null) p.teleport(spawn);
+            var gw = fr.lolmc.util.WorldContext.getGameWorld();
+            if (gw == null || !gw.equals(p.getWorld())) {
+                String msg = "⚠ Monde de jeu ≠ monde du joueur : config world.name=\""
+                        + fr.lolmc.util.WorldContext.getGameWorldName() + "\", tu es dans \""
+                        + p.getWorld().getName() + "\". Chrono/HUD/tab inactifs.";
+                p.sendMessage(Component.text(msg, NamedTextColor.RED));
+                LolPlugin.getInstance().getLogger().warning(msg);
+            }
+            plugin.getMinimapManager().giveMinimap(p);
+        }
+    }
+
+    public void startSelection(Collection<UUID> players) {
+        startSelection(players, false);
+    }
+
+    // ── Phase de BAN (classé uniquement) ──────────────────────────────
+
+    private void startBanPhaseInternal(Collection<UUID> players) {
+        if (phase != Phase.IDLE && phase != Phase.LOBBY) return;
+        phase = Phase.SELECTING;
+        participants.clear();
+        participants.addAll(players);
+        banTimeLeft = BAN_DURATION;
+
+        selectBar = BossBar.bossBar(
+                Component.text("⛔ Phase de BAN — " + BAN_DURATION + "s", NamedTextColor.RED),
+                1.0f, BossBar.Color.RED, BossBar.Overlay.PROGRESS);
+
+        for (UUID id : participants) {
+            Player p = Bukkit.getPlayer(id);
+            if (p == null) continue;
+            p.showBossBar(selectBar);
+            p.sendMessage(Component.text("═══ PHASE DE BAN — CLASSÉ ═══", NamedTextColor.RED));
+            p.sendMessage(Component.text("Clique sur un champion pour le bannir!", NamedTextColor.YELLOW));
+            LolPlugin.getInstance().getChampSelectGUI().openBanMenu(p);
+        }
+
+        banTask = new BukkitRunnable() {
+            @Override public void run() {
+                banTimeLeft--;
+                if (selectBar != null) {
+                    selectBar.name(Component.text("⛔ Phase de BAN — " + banTimeLeft + "s | Bannis: " + bannedChampions.size(), NamedTextColor.RED));
+                    selectBar.progress(Math.max(0f, (float) banTimeLeft / BAN_DURATION));
+                }
+                if (banTimeLeft <= 0) {
+                    cancel();
+                    // Fermer les menus de ban et passer au pick
+                    for (UUID id : participants) {
+                        Player p = Bukkit.getPlayer(id);
+                        if (p != null) p.closeInventory();
+                    }
+                    if (selectBar != null) for (UUID id : participants) {
+                        Player p = Bukkit.getPlayer(id);
+                        if (p != null) p.hideBossBar(selectBar);
+                    }
+                    startPickPhase(participants);
+                }
+            }
+        };
+        banTask.runTaskTimer(LolPlugin.getInstance(), 20L, 20L);
+    }
+
+    /** Appelé depuis ChampSelectGUI quand un joueur bannit un champion. */
+    public void onBanClick(Player player, String championId) {
+        if (phase != Phase.SELECTING || bannedChampions.contains(championId)) return;
+        if (!participants.contains(player.getUniqueId())) return;
+        if (!hasBanned.add(player.getUniqueId())) {
+            player.sendMessage(Component.text("❌ Tu as déjà utilisé ton ban.", NamedTextColor.RED));
+            return;
+        }
+        bannedChampions.add(championId);
+        ChampSelectGUI.banChampion(championId);
+        for (UUID id : participants) {
+            Player p = Bukkit.getPlayer(id);
+            if (p != null) p.sendMessage(Component.text(
+                    "⛔ " + player.getName() + " a banni " + championId + "!", NamedTextColor.RED));
+        }
+        // 6 bans total (3 par équipe) → passer au pick
+        if (bannedChampions.size() >= 6) {
+            if (banTask != null) banTask.cancel();
+            if (selectBar != null) for (UUID id : participants) {
+                Player p = Bukkit.getPlayer(id);
+                if (p != null) { p.hideBossBar(selectBar); p.closeInventory(); }
+            }
+            startPickPhase(participants);
+        }
+    }
+
+    public java.util.Set<String> getBannedChampions() { return bannedChampions; }
+
+    // ── Phase de PICK ──────────────────────────────────────────────────
+
+    private void startPickPhase(Collection<UUID> players) {
+        if (phase != Phase.IDLE && phase != Phase.LOBBY && phase != Phase.SELECTING) return;
+        phase = Phase.SELECTING;
+        participants.clear();
+        participants.addAll(players);
+        chosenChampion.clear();
+        chosenRunes.clear();
+        chosenSpells.clear();
+        chosenSkin.clear();
+        locked.clear();
+        timeLeft = SELECT_DURATION;
+
+        selectBar = BossBar.bossBar(Component.text("Sélection — choisis ton champion!"),
+                1.0f, BossBar.Color.PURPLE, BossBar.Overlay.PROGRESS);
+
+        for (UUID id : participants) {
+            Player p = Bukkit.getPlayer(id);
+            if (p == null) continue;
+            p.showBossBar(selectBar);
+            p.sendMessage(Component.text("═══ SÉLECTION DE CHAMPION ═══", NamedTextColor.LIGHT_PURPLE));
+            p.sendMessage(Component.text("Menu de sélection ouvert — /pick pour le rouvrir.",
+                    NamedTextColor.AQUA));
+            p.sendMessage(Component.text("Clique un champion puis « Verrouiller ». Tu as " + SELECT_DURATION + "s.",
+                    NamedTextColor.GRAY));
+            // Ouvrir le menu après un court délai (le joueur vient d'arriver / de se téléporter),
+            // puis une 2e fois si une téléportation l'a fermé entre-temps.
+            final UUID pid = id;
+            for (long delay : new long[]{20L, 60L}) {
+                Bukkit.getScheduler().runTaskLater(LolPlugin.getInstance(), () -> {
+                    Player q = Bukkit.getPlayer(pid);
+                    if (q == null || phase != Phase.SELECTING || locked.contains(pid)) return;
+                    if (q.getOpenInventory().getType() == org.bukkit.event.inventory.InventoryType.CRAFTING) {
+                        LolPlugin.getInstance().getChampSelectGUI().openChampionMenu(q);
+                    }
+                }, delay);
+            }
+        }
+
+        startTimer();
+    }
+
+    private void startTimer() {
+        timerTask = new BukkitRunnable() {
+            @Override public void run() {
+                timeLeft--;
+                if (selectBar != null) {
+                    selectBar.name(Component.text("⏱ Sélection — " + timeLeft + "s ("
+                                    + locked.size() + "/" + participants.size() + " prêts)",
+                            NamedTextColor.LIGHT_PURPLE));
+                    selectBar.progress(Math.max(0f, (float) timeLeft / SELECT_DURATION));
+                }
+                // Fin si temps écoulé ou tout le monde verrouillé
+                if (timeLeft <= 0 || (locked.size() >= participants.size() && !participants.isEmpty())) {
+                    cancel();
+                    finishSelection();
+                }
+            }
+        };
+        timerTask.runTaskTimer(LolPlugin.getInstance(), 20L, 20L);
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // CHOIX DES JOUEURS
+    // ══════════════════════════════════════════════════════════════
+
+    public boolean isSelecting() { return phase == Phase.SELECTING; }
+    public boolean isParticipant(UUID uuid) { return participants.contains(uuid); }
+
+    public void chooseChampion(Player player, String championId) {
+        if (!isParticipant(player.getUniqueId())) return;
+        if (locked.contains(player.getUniqueId())) {
+            player.sendActionBar(Component.text("Tu as déjà verrouillé!", NamedTextColor.RED));
+            return;
+        }
+        if (!player.hasPermission("lolmc.champion." + championId.toLowerCase())) {
+            player.sendActionBar(Component.text("❌ Tu n'as pas accès à ce champion.", NamedTextColor.RED));
+            return;
+        }
+        chosenChampion.put(player.getUniqueId(), championId);
+        player.sendActionBar(Component.text("✔ Champion: " + championId, NamedTextColor.GREEN));
+    }
+
+    public void chooseRunes(Player player, RunePage page) {
+        if (!isParticipant(player.getUniqueId())) return;
+        chosenRunes.put(player.getUniqueId(), page);
+        player.sendActionBar(Component.text("✔ Runes enregistrées", NamedTextColor.GREEN));
+    }
+
+    public void chooseSpells(Player player, String spell1, String spell2) {
+        if (!isParticipant(player.getUniqueId())) return;
+        chosenSpells.put(player.getUniqueId(), new String[]{spell1, spell2});
+        player.sendActionBar(Component.text("✔ Sorts: " + spell1 + ", " + spell2, NamedTextColor.GREEN));
+    }
+
+    public void lock(Player player) {
+        if (!isParticipant(player.getUniqueId())) return;
+        if (!chosenChampion.containsKey(player.getUniqueId())) {
+            player.sendActionBar(Component.text("Choisis d'abord un champion!", NamedTextColor.RED));
+            return;
+        }
+        locked.add(player.getUniqueId());
+        player.sendActionBar(Component.text("🔒 Verrouillé! En attente des autres...", NamedTextColor.GOLD));
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // FIN DE SÉLECTION → LANCEMENT
+    // ══════════════════════════════════════════════════════════════
+
+    private void finishSelection() {
+        phase = Phase.STARTING;
+
+        // Masquer la bossbar
+        if (selectBar != null) {
+            for (UUID id : participants) {
+                Player p = Bukkit.getPlayer(id);
+                if (p != null) p.hideBossBar(selectBar);
+            }
+        }
+
+        var cm = LolPlugin.getInstance().getChampionManager();
+        var rm = LolPlugin.getInstance().getRuneManager();
+        var ssm = LolPlugin.getInstance().getSummonerSpellManager();
+
+        // Appliquer les choix de chaque joueur
+        for (UUID id : participants) {
+            Player p = Bukkit.getPlayer(id);
+            if (p == null) continue;
+
+            // Champion (par défaut Garen si rien choisi)
+            String champ = chosenChampion.getOrDefault(id, "garen");
+            cm.assignChampion(p, champ);
+
+            // Runes (page par défaut si rien)
+            RunePage page = chosenRunes.getOrDefault(id, RunePage.defaultPage());
+            rm.setPage(id, page);
+            rm.applyRuneStats(p);
+
+            // Sorts d'invocateur
+            String[] spells = chosenSpells.getOrDefault(id, new String[]{"FLASH", "IGNITE"});
+            if (ssm != null) ssm.setSpells(p, spells[0], spells[1]);
+
+            // Skin choisi
+            var champObj = cm.getChampion(p);
+            if (champObj != null) LolPlugin.getInstance().getHotbarManager().renderPage(p, champObj);
+            String skinId = chosenSkin.getOrDefault(id, "base");
+            LolPlugin.getInstance().getSkinManager().applySkin(p, champ, skinId);
+
+            p.sendMessage(Component.text("⚔ Partie lancée avec " + champ
+                    + " | Skin: " + skinId + " | Sorts: " + spells[0] + " + " + spells[1] + "!", NamedTextColor.GOLD));
+        }
+
+        // Lancer la partie physique : si les joueurs appartiennent à une GameInstance isolée
+        // (mode multi-instances), démarrer CETTE instance plutôt que les managers globaux —
+        // sinon (mode partie unique, le défaut) garder le chemin global existant.
+        var instMgr = LolPlugin.getInstance().getInstanceManager();
+        var instance = instMgr != null && !participants.isEmpty()
+                ? instMgr.getInstanceOf(participants.iterator().next()) : null;
+        if (instance != null) {
+            instance.start();
+        } else {
+            var plugin = LolPlugin.getInstance();
+            plugin.getMapManager().resetAllStructures();
+            plugin.getPlantManager().spawnAll();
+            plugin.getMatchScoreboard().startMatch(ranked);
+            plugin.getGameManager().startGame();
+            plugin.getMinionManager().startWaves();
+            LolPlugin.getInstance().getJungleManager().startJungle();
+        }
+
+        phase = Phase.IDLE;
+        LolPlugin.getInstance().getChampSelectManager().sessionEnded(this, participants);
+    }
+
+    public void cancel() {
+        phase = Phase.IDLE;
+        LolPlugin.getInstance().getChampSelectManager().sessionEnded(this, participants);
+        if (timerTask != null) timerTask.cancel();
+        if (selectBar != null) {
+            for (UUID id : participants) {
+                Player p = Bukkit.getPlayer(id);
+                if (p != null) p.hideBossBar(selectBar);
+            }
+        }
+        participants.clear();
+    }
+
+    public Phase getPhase() { return phase; }
+    public void onSkinChosen(Player p, String champId, String skinId) { chosenSkin.put(p.getUniqueId(), skinId); }
+}
