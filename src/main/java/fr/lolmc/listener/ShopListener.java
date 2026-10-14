@@ -85,6 +85,13 @@ public class ShopListener implements Listener {
                 .plainText().serialize(e.message()).trim();
         Player p = e.getPlayer();
         org.bukkit.Bukkit.getScheduler().runTask(LolPlugin.getInstance(), () -> {
+            if (!p.isOnline()) return;
+            // Même règle que l'ouverture : le joueur a pu quitter la base en tapant sa recherche
+            if (!canShopHere(p)) {
+                shopGUI.cleanup(p);
+                p.sendMessage(Component.text("🏪 La boutique n'est accessible qu'a la base !", NamedTextColor.RED));
+                return;
+            }
             if (msg.equalsIgnoreCase("annuler")) shopGUI.open(p);
             else shopGUI.setSearch(p, msg);
         });
@@ -103,6 +110,7 @@ public class ShopListener implements Listener {
 
     public void cleanup(java.util.UUID uuid) {
         inventoryManagers.remove(uuid);
+        awaitingSearch.remove(uuid);
     }
 
     public void cleanupAll() {
@@ -131,19 +139,19 @@ public class ShopListener implements Listener {
                             "🏪 La boutique n'est accessible qu'a la base !", NamedTextColor.RED));
                     return;
                 }
-                handleShopClick(player, raw);
+                handleShopClick(player, raw, event.isRightClick());
             }
             return;
         }
 
-        // ── INVENTAIRE JOUEUR — protéger slots sorts (0-4) et items (5,6,7,8,18,19) ──
+        // ── INVENTAIRE JOUEUR — protéger la hotbar (0-8) et les objets (9-14) ──
         if (!championManager.hasChampion(player)) return;
         // Guard : ne traiter que les clics dans l'inventaire du joueur (pas conteneur ouvert)
         if (event.getClickedInventory() == null) return;
         if (!event.getClickedInventory().equals(player.getInventory())) return;
 
         int slot = event.getSlot();
-        boolean isSortSlot = slot >= 0 && slot <= 4;
+        boolean isSortSlot = slot >= 0 && slot <= 8;
         boolean isItemSlot = isLolItemSlot(slot);
 
         if (isSortSlot || isItemSlot) {
@@ -170,7 +178,7 @@ public class ShopListener implements Listener {
         }
     }
 
-    private void handleShopClick(Player player, int slot) {
+    private void handleShopClick(Player player, int slot, boolean rightClick) {
         if (!championManager.hasChampion(player)) {
             player.sendMessage(Component.text("❌ Choisis un champion d'abord!", NamedTextColor.RED));
             return;
@@ -196,6 +204,8 @@ public class ShopListener implements Listener {
         // ── Vue PARCOURS ──
         // D'abord vérifier si c'est un bouton de pagination
         if (shopGUI.handlePaginationClick(player, slot)) return;
+        // Boussole de recherche (jamais routée avant : le clic ne faisait rien)
+        if (shopGUI.handleSearchClick(player, slot, rightClick)) return;
 
         LolItem.ItemCategory cat = shopGUI.getClickedCategory(slot);
         if (cat != null) { shopGUI.open(player, cat); return; }
@@ -256,6 +266,11 @@ public class ShopListener implements Listener {
             int max = switch (item.getId()) { case "health_potion" -> 5; case "control_ward" -> 2; default -> 99; };
             if (java.util.Collections.frequency(hb.getConsumables(player), item.getId()) >= max) {
                 player.sendActionBar(Component.text("❌ Maximum " + max + " × " + item.getDisplayName() + ".", NamedTextColor.RED));
+                return false;
+            }
+            if (!hb.hasConsumableRoom(player)) {
+                player.sendActionBar(Component.text("❌ Plus de place pour les consommables (page 2 pleine).",
+                        NamedTextColor.RED));
                 return false;
             }
             int gold = goldManager.getGold(player.getUniqueId());
@@ -403,6 +418,8 @@ public class ShopListener implements Listener {
         // CORRECTION : Attendre 1 tick pour s'assurer qu'on ne change pas juste d'onglet/vue dans la boutique
         org.bukkit.Bukkit.getScheduler().runTask(LolPlugin.getInstance(), () -> {
             if (!p.isOnline()) return;
+            // Fermée pour taper une recherche : garder l'onglet, la boutique va se rouvrir
+            if (awaitingSearch.contains(p.getUniqueId())) return;
 
             // Si le nouvel inventaire ouvert par le joueur n'est plus la boutique LoL, on clean
             if (!ShopGUI.isShopInventory(p.getOpenInventory().title())) {
@@ -416,10 +433,8 @@ public class ShopListener implements Listener {
     public void onDrop(PlayerDropItemEvent event) {
         Player p = event.getPlayer();
         if (!championManager.hasChampion(p)) return;
-        int slot = p.getInventory().getHeldItemSlot();
-        if (isLolItemSlot(slot) || slot <= 4) {
-            event.setCancelled(true);
-        }
+        // La main tient toujours un slot de la hotbar (0-8), entièrement gérée par le plugin
+        event.setCancelled(true);
     }
 
     // ── Consommables ───────────────────────────────────────────────
@@ -468,11 +483,9 @@ public class ShopListener implements Listener {
 
     // ── Helpers ───────────────────────────────────────────────────
 
-    /** Vrai si le slot correspond à un emplacement d'item LoL (hotbar ou inventaire). */
+    /** Vrai si le slot correspond à un emplacement d'item LoL de l'inventaire (9-14). */
     private boolean isLolItemSlot(int slot) {
-        for (int s : PlayerInventoryManager.ITEM_SLOTS) if (s == slot) return true;
-        for (int s : fr.lolmc.item.HotbarManager.INV_ITEM_SLOTS) if (s == slot) return true;
-        return false;
+        return PlayerInventoryManager.getLolSlotIndex(slot) >= 0;
     }
 
     public GoldManager getGoldManager() { return goldManager; }

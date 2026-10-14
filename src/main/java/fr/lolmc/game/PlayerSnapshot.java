@@ -40,11 +40,11 @@ public class PlayerSnapshot {
         this.skillPoints   = champ != null ? champ.getLevelSystem().getSkillPoints() : 0;
         this.gold          = LolPlugin.getInstance().getGoldManager().getGold(uuid);
 
-        // Items équipés
+        // Items équipés, par emplacement (null = slot vide) : la position est conservée
         var inv = LolPlugin.getInstance().getShopListener().getOrCreate(player);
         this.itemIds = new ArrayList<>();
         for (LolItem item : inv.getEquippedItems()) {
-            if (item != null) itemIds.add(item.getId());
+            itemIds.add(item != null ? item.getId() : null);
         }
 
         // Sorts
@@ -84,9 +84,10 @@ public class PlayerSnapshot {
         var shopListener = LolPlugin.getInstance().getShopListener();
         var inv = shopListener.getOrCreate(player);
         inv.clear();
-        for (String itemId : itemIds) {
-            var item = fr.lolmc.item.ItemRegistry.get(itemId);
-            if (item != null) inv.equipItem(player, champ, item);
+        for (int slot = 0; slot < itemIds.size(); slot++) {
+            String itemId = itemIds.get(slot);
+            var item = itemId != null ? fr.lolmc.item.ItemRegistry.get(itemId) : null;
+            if (item != null) inv.equipItemAt(champ, slot, item);
         }
 
         // Sorts

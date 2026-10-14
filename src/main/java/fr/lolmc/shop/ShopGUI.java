@@ -69,7 +69,9 @@ public class ShopGUI {
         open(player, getCurrentCategory(player), getPage(player));
     }
 
+    /** Clic sur un onglet : affiche la catégorie, sans le filtre de recherche. */
     public void open(Player player, LolItem.ItemCategory cat) {
+        currentSearch.remove(player.getUniqueId());
         open(player, cat, 0);
     }
 
@@ -77,24 +79,20 @@ public class ShopGUI {
         detailItem.remove(player.getUniqueId());
         currentCategory.put(player.getUniqueId(), cat);
 
-        String search = currentSearch.getOrDefault(player.getUniqueId(), "").toLowerCase().trim();
-        List<LolItem> items = ItemRegistry.byCategory(cat).stream()
-            .filter(it -> search.isEmpty()
-                || it.getDisplayName().toLowerCase().contains(search)
-                || it.getId().toLowerCase().contains(search))
-            .toList();
+        List<LolItem> items = visibleItems(player, cat);
         int totalPages = Math.max(1, (items.size() + ITEMS_PER_PAGE - 1) / ITEMS_PER_PAGE);
         page = Math.max(0, Math.min(page, totalPages - 1));
         currentPage.put(player.getUniqueId(), page);
 
-        String title = BROWSE_PREFIX + getCategoryLabel(cat)
+        String search = currentSearch.getOrDefault(player.getUniqueId(), "");
+        String title = BROWSE_PREFIX + (search.isEmpty() ? getCategoryLabel(cat) : "🔍 " + search)
                 + (totalPages > 1 ? " [" + (page+1) + "/" + totalPages + "]" : "");
         Inventory inv = Bukkit.createInventory(null, 54, Component.text(title, NamedTextColor.GOLD));
 
         // ── Rangée 0 : onglets + or + fermer ──
         LolItem.ItemCategory[] cats = LolItem.ItemCategory.values();
         for (int i = 0; i < Math.min(cats.length, TAB_SLOTS.length); i++)
-            inv.setItem(TAB_SLOTS[i], tabButton(cats[i], cats[i] == cat));
+            inv.setItem(TAB_SLOTS[i], tabButton(cats[i], search.isEmpty() && cats[i] == cat));
         inv.setItem(GOLD_SLOT, goldDisplay(player));
         inv.setItem(CLOSE_SLOT, navButton(Material.BARRIER, "✖ Fermer", NamedTextColor.RED));
 
@@ -131,10 +129,25 @@ public class ShopGUI {
         }
 
         // Slot 53 : filtre texte actuel
-        inv.setItem(53, searchButton(currentSearch.getOrDefault(player.getUniqueId(), "")));
+        inv.setItem(SEARCH_SLOT, searchButton(search));
         // Remplir les vides
         for (int i = 0; i < 54; i++) if (inv.getItem(i) == null) inv.setItem(i, filler);
         player.openInventory(inv);
+    }
+
+    /**
+     * Objets affichés : ceux de l'onglet, ou, avec un filtre, ceux de toute la boutique qui y
+     * correspondent (avant, la recherche restait limitée à l'onglet ouvert).
+     */
+    private List<LolItem> visibleItems(Player player, LolItem.ItemCategory cat) {
+        String search = currentSearch.getOrDefault(player.getUniqueId(), "");
+        if (search.isEmpty()) return ItemRegistry.byCategory(cat);
+        return ItemRegistry.all().stream()
+            .filter(LolItem::isPurchasable)
+            .filter(it -> it.getDisplayName().toLowerCase().contains(search)
+                || it.getId().toLowerCase().contains(search))
+            .sorted(Comparator.comparing(LolItem::getDisplayName))
+            .toList();
     }
 
     private ItemStack pageInfo(int page, int total, int from, int to, int totalItems) {
@@ -271,13 +284,7 @@ public class ShopGUI {
     public boolean handlePaginationClick(Player player, int slot) {
         LolItem.ItemCategory cat = getCurrentCategory(player);
         int page = getPage(player);
-        String search = currentSearch.getOrDefault(player.getUniqueId(), "").toLowerCase().trim();
-        List<LolItem> items = ItemRegistry.byCategory(cat).stream()
-            .filter(it -> search.isEmpty()
-                || it.getDisplayName().toLowerCase().contains(search)
-                || it.getId().toLowerCase().contains(search))
-            .toList();
-        int totalPages = Math.max(1, (items.size() + ITEMS_PER_PAGE - 1) / ITEMS_PER_PAGE);
+        int totalPages = Math.max(1, (visibleItems(player, cat).size() + ITEMS_PER_PAGE - 1) / ITEMS_PER_PAGE);
 
         if (slot == NAV_PREV  && page > 0)               { open(player, cat, page - 1); return true; }
         if (slot == NAV_NEXT  && page < totalPages - 1)  { open(player, cat, page + 1); return true; }

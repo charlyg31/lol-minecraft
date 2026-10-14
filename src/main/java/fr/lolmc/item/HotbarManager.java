@@ -174,8 +174,7 @@ public class HotbarManager {
         // Items actifs qui n'ont pas trouvé de place en page 1 + consommables
         List<String> activeItems = getActiveItems(player);
         List<ItemStack> page2Content = new ArrayList<>();
-        int summonersOnSlots67 = summonerSpells(player).size() - (hasFlash(player) ? 0 : 1);
-        int onPage1 = Math.max(0, PAGE1_ACTIVE_SLOTS.length - Math.max(0, summonersOnSlots67));
+        int onPage1 = activesOnPage1(player);
 
         for (int i = onPage1; i < activeItems.size(); i++) {
             page2Content.add(buildActiveItem(activeItems.get(i)));
@@ -201,6 +200,21 @@ public class HotbarManager {
         inv.setItem(7, buildRecallItem());
         // Slot 8 : retour page 1
         inv.setItem(PAGE_BUTTON_SLOT, buildPageButton(1));
+    }
+
+    /** Nombre d'items actifs qui tiennent en page 1 (slots 6-7 laissés libres par les sorts d'invocateur). */
+    private int activesOnPage1(Player player) {
+        int summonersOnSlots67 = summonerSpells(player).size() - (hasFlash(player) ? 0 : 1);
+        return Math.max(0, PAGE1_ACTIVE_SLOTS.length - Math.max(0, summonersOnSlots67));
+    }
+
+    /**
+     * Vrai s'il reste un emplacement en page 2 pour un consommable de plus. Au-delà de 7, le
+     * consommable était payé mais jamais affiché, donc inutilisable.
+     */
+    public boolean hasConsumableRoom(Player player) {
+        int overflowActives = Math.max(0, getActiveItems(player).size() - activesOnPage1(player));
+        return overflowActives + getConsumables(player).size() < PAGE2_SLOTS.length;
     }
 
     /** Construit l'item de Recall (retour à la base). */
@@ -483,19 +497,18 @@ public class HotbarManager {
      */
     public void renderInventoryItems(Player player) {
         var inv = player.getInventory();
-        List<String> owned = getOwnedItems(player);
+        var sl = LolPlugin.getInstance().getShopListener();
+        // Slot i = objet d'index i (pas la liste compactée) : sinon, après une vente au milieu,
+        // l'icône affichée ne correspondait plus à l'objet vendu / activé par le clic
+        LolItem[] equipped = sl != null ? sl.getOrCreate(player).getEquippedItems() : new LolItem[0];
         for (int i = 0; i < INV_ITEM_SLOTS.length; i++) {
             int mcSlot = INV_ITEM_SLOTS[i];
-            if (i < owned.size()) {
-                LolItem item = ItemRegistry.get(owned.get(i));
-                if (item != null) {
-                    ItemStack stack = item.buildItemStack();
-                    // Marquer PDC pour bloquer le déplacement
-                    tag(stack, "inv_item", item.getId(), i);
-                    inv.setItem(mcSlot, stack);
-                } else {
-                    inv.setItem(mcSlot, emptyInvSlot(i + 1));
-                }
+            LolItem item = i < equipped.length ? equipped[i] : null;
+            if (item != null) {
+                ItemStack stack = item.buildItemStack();
+                // Marquer PDC pour bloquer le déplacement
+                tag(stack, "inv_item", item.getId(), i);
+                inv.setItem(mcSlot, stack);
             } else {
                 inv.setItem(mcSlot, emptyInvSlot(i + 1));
             }

@@ -580,6 +580,8 @@ public class ChampSelectSession {
             // (0 à la première partie, puis l'or restant de la partie précédente)
             LolPlugin.getInstance().getShopListener().getOrCreate(p).clear();
             LolPlugin.getInstance().getShopListener().initPlayer(p);
+            // Consommables (potions, balises…) : sinon gardés d'une partie à l'autre
+            LolPlugin.getInstance().getHotbarManager().cleanup(p.getUniqueId());
 
             // Position de départ selon le rôle (fontaine : positions 1-5 configurées par /lola position)
             var role = LolPlugin.getInstance().getRoleQueueManager().getAssignedRole(id);

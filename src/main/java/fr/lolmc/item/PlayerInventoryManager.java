@@ -11,22 +11,14 @@ import org.bukkit.persistence.PersistentDataType;
 /**
  * Gère les 6 slots d'items LoL pour un joueur.
  *
- * Disposition dans l'inventaire Minecraft (slots 0-35 + armure):
- *   Slots 0-4  = sorts (AA, Q, W, E, R) — PROTÉGÉS
- *   Slots 5    = boots (slot 5 de la hotbar)
- *   Slots 6-11 = 5 items + 1 boot (hotbar étendue = slots 9-11 + row2)
- *
- * On utilise les slots suivants pour les items LoL :
- *   Slot 5  = Item 1 (boots souvent)
- *   Slot 6  = Item 2
- *   Slot 7  = Item 3
- *   Slot 8  = Item 4 (dernier slot hotbar)
- *   Slot 18 = Item 5 (2ème rangée)
- *   Slot 19 = Item 6 (2ème rangée)
+ * L'objet d'index i est affiché au slot Minecraft {@code ITEM_SLOTS[i]} (slots 9-14, première
+ * rangée de l'inventaire, rendus par HotbarManager). La hotbar (0-8) contient les sorts et boutons.
  */
 public class PlayerInventoryManager {
 
-    public static final int[] ITEM_SLOTS = {5, 6, 7, 8, 18, 19};
+    // Avant : {5, 6, 7, 8, 18, 19}, alors que les objets sont affichés en 9-14 : la vente visait
+    // les boutons de la hotbar (Flash, page…) et était impossible depuis les icônes d'objets
+    public static final int[] ITEM_SLOTS = HotbarManager.INV_ITEM_SLOTS;
 
     /** Tous les ids d'objets de la catégorie "bottes" (aucune catégorie dédiée dans ItemCategory). */
     public static final java.util.Set<String> BOOT_IDS = java.util.Set.of(
@@ -87,6 +79,17 @@ public class PlayerInventoryManager {
             return false;
         }
         equippedItems[freeSlot] = item;
+        item.applyStats(champ.getStats(), champ.getHPSystem(), champ.getResourceSystem());
+        return true;
+    }
+
+    /**
+     * Équipe un item à un emplacement précis (restauration après reconnexion).
+     * @return false si l'emplacement est invalide ou déjà occupé
+     */
+    public boolean equipItemAt(BaseChampion champ, int slotIndex, LolItem item) {
+        if (slotIndex < 0 || slotIndex >= 6 || equippedItems[slotIndex] != null) return false;
+        equippedItems[slotIndex] = item;
         item.applyStats(champ.getStats(), champ.getHPSystem(), champ.getResourceSystem());
         return true;
     }
