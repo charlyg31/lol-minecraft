@@ -180,8 +180,15 @@ public class ChampSelectGUI implements Listener {
         if (meta != null) {
             meta.displayName(Component.text((selected ? "✔ " : "") + spellName(spell),
                     selected ? NamedTextColor.GREEN : NamedTextColor.YELLOW).decoration(TextDecoration.ITALIC, false));
-            meta.lore(List.of(Component.text("Sort " + position + (selected ? " (actuel)" : " — clique pour choisir"),
-                    NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false)));
+            var lore = new java.util.ArrayList<Component>();
+            var sp = "FLASH".equals(spell) ? null : fr.lolmc.game.SummonerSpellManager.Spell.valueOf(spell);
+            lore.add(Component.text(sp != null ? sp.description : "Vous téléporte sur une courte distance.",
+                    NamedTextColor.WHITE).decoration(TextDecoration.ITALIC, false));
+            lore.add(Component.text("Délai : " + (sp != null ? sp.cooldownSeconds : 300) + " s",
+                    NamedTextColor.DARK_AQUA).decoration(TextDecoration.ITALIC, false));
+            lore.add(Component.text("Sort " + position + (selected ? " (actuel)" : " — clique pour choisir"),
+                    NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+            meta.lore(lore);
             if (selected) {
                 meta.addEnchant(org.bukkit.enchantments.Enchantment.UNBREAKING, 1, true);
                 meta.addItemFlags(org.bukkit.inventory.ItemFlag.HIDE_ENCHANTS);
@@ -192,7 +199,7 @@ public class ChampSelectGUI implements Listener {
     }
 
     private static String spellName(String spell) {
-        if ("FLASH".equals(spell)) return "Flash";
+        if ("FLASH".equals(spell)) return "Saut éclair";
         try {
             return fr.lolmc.game.SummonerSpellManager.Spell.valueOf(spell).displayName;
         } catch (IllegalArgumentException e) {
@@ -318,6 +325,8 @@ public class ChampSelectGUI implements Listener {
         var csm = LolPlugin.getInstance().getChampSelectManager();
 
         if (title.equals(CHAMP_TITLE)) {
+            // Clic dans l'inventaire du joueur (en bas) : ignoré (avant, il choisissait un champion)
+            if (e.getClickedInventory() == null || !e.getClickedInventory().equals(e.getView().getTopInventory())) return;
             int slot = e.getSlot();
             if (slot < CHAMPIONS.length) {
                 // Skin seulement si le choix est accepté (pas banni, pas pris, bon tour)

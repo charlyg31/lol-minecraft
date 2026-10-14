@@ -10,57 +10,83 @@ import org.bukkit.Material;
 import org.bukkit.Location;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
-import org.bukkit.potion.PotionEffect;
-import org.bukkit.potion.PotionEffectType;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
 /**
- * Gère les sorts d'invocateur de LoL (hors Flash, déjà géré par FlashManager).
+ * Gère les sorts d'invocateur de LoL (hors Flash, géré par FlashManager).
  *
- * Sorts implémentés avec leurs cooldowns officiels :
- *   - Ignite (Embrasement) : dégâts bruts sur la durée + soins réduits — CD 180s
- *   - Heal (Soin) : soigne et donne un boost de vitesse — CD 240s
- *   - Barrier (Bouclier) : bouclier temporaire — CD 180s
- *   - Exhaust (Épuisement) : ralentit et affaiblit un ennemi — CD 210s
- *   - Teleport (Téléportation) : TP à une structure alliée — CD 360s→240s
- *   - Smite (Châtiment) : dégâts bruts aux monstres — CD 15s (charges)
- *   - Cleanse (Purification) : retire les CC — CD 210s
- *   - Ghost (Fantôme) : boost de vitesse traversant — CD 210s
+ * Délais : Data Dragon 16.20.1. Valeurs : wiki officiel LoL (wiki.leagueoflegends.com, patch 26),
+ * du niveau 1 au niveau 18 :
+ *   - Embrasement : 70-475 dégâts bruts sur 5 s + 40 % de blessures graves — 180 s
+ *   - Soins : 80-318 PV au lanceur et à un allié (900 u.), +30 % vitesse 1 s — 240 s
+ *   - Barrière : bouclier de 100-460 pendant 2,5 s — 180 s
+ *   - Fatigue : ralentit de 40 % et réduit les dégâts de 35 % pendant 3 s — 240 s
+ *   - Téléportation : canalisation de 3 s vers une tourelle, un sbire ou une balise alliés — 300 s ;
+ *     déchaînée à 10 min : 330-240 s et +50 % vitesse 3 s à l'arrivée
+ *   - Châtiment : 600 dégâts bruts, 2 charges (1 au départ, recharge de 90 s dès 0:48) — 15 s
+ *   - Purge : retire les contrôles et les effets de sorts d'invocateur, +75 % ténacité 3 s — 240 s
+ *   - Fantôme : +24-48 % vitesse de déplacement pendant 10 s — 240 s
  */
 public class SummonerSpellManager {
 
     public enum Spell {
-        IGNITE("Embrasement", 180),
-        HEAL("Soin", 240),
-        BARRIER("Bouclier", 180),
-        EXHAUST("Épuisement", 210),
-        TELEPORT("Téléportation", 360),
-        SMITE("Châtiment", 15),
-        CLEANSE("Purification", 210),
-        GHOST("Fantôme", 210);
+        IGNITE("Embrasement", 180, "70-475 dégâts bruts en 5 s et 40% de blessures graves."),
+        HEAL("Soins", 240, "Rend 80-318 PV à vous et à un allié, +30% de vitesse 1 s."),
+        BARRIER("Barrière", 180, "Bouclier de 100-460 pendant 2,5 s."),
+        EXHAUST("Fatigue", 240, "Ralentit un ennemi de 40% et réduit ses dégâts de 35% pendant 3 s."),
+        TELEPORT("Téléportation", 300, "Après 3 s, vous rejoignez une tourelle, un sbire ou une balise alliés."),
+        SMITE("Châtiment", 15, "600 dégâts bruts à un monstre ou un sbire. 2 charges (recharge 90 s)."),
+        CLEANSE("Purge", 240, "Retire les contrôles et +75% de ténacité pendant 3 s."),
+        GHOST("Fantôme", 240, "+24-48% de vitesse de déplacement pendant 10 s.");
 
         public final String displayName;
         public final int cooldownSeconds;
-        Spell(String displayName, int cd) { this.displayName = displayName; this.cooldownSeconds = cd; }
+        public final String description;
+        Spell(String displayName, int cd, String description) {
+            this.displayName = displayName; this.cooldownSeconds = cd; this.description = description;
+        }
     }
+
+    /** Châtiment : 2 charges, chacune rechargée en 90 s (le délai de 15 s sépare deux lancers). */
+    private static final int SMITE_CHARGES = 2;
+    private static final long SMITE_RECHARGE_MS = 90_000L;
+    /** Soins reçus de nouveau dans les 35 s : moitié moins efficaces. */
+    private static final long HEAL_REDUCED_MS = 35_000L;
 
     // Cooldowns par joueur et par sort : "uuid:SPELL" → timestamp de fin
     private final Map<String, Long> cooldowns = new HashMap<>();
     private final Map<java.util.UUID, Spell[]> playerSpells = new java.util.HashMap<>();
+    /** Fins de recharge des charges de Châtiment utilisées, par joueur. */
+    private final Map<UUID, java.util.List<Long>> smiteRecharges = new HashMap<>();
+    /** Dernier Soins reçu, par joueur. */
+    private final Map<UUID, Long> healedAt = new HashMap<>();
+    /** Embrasements en cours sur chaque cible (annulés par Purge). */
+    private final Map<UUID, java.util.List<org.bukkit.scheduler.BukkitTask>> ignites = new HashMap<>();
+
     public Spell[] getSpells(Player player) { return playerSpells.get(player.getUniqueId()); }
 
     public boolean isOnCooldown(Player player, Spell spell) {
-        Long until = cooldowns.get(player.getUniqueId() + ":" + spell.name());
-        return until != null && System.currentTimeMillis() < until;
+        return getRemainingCooldown(player, spell) > 0;
     }
 
     public double getRemainingCooldown(Player player, Spell spell) {
+        long now = System.currentTimeMillis();
         Long until = cooldowns.get(player.getUniqueId() + ":" + spell.name());
-        if (until == null) return 0;
-        return Math.max(0, (until - System.currentTimeMillis()) / 1000.0);
+        long end = until != null ? until : 0;
+        if (spell == Spell.SMITE && smiteCharges(player.getUniqueId(), now) == 0)
+            end = Math.max(end, smiteRecharges.get(player.getUniqueId()).getFirst());
+        return Math.max(0, (end - now) / 1000.0);
+    }
+
+    /** Charges de Châtiment disponibles (les recharges terminées sont retirées). */
+    private int smiteCharges(UUID id, long now) {
+        var l = smiteRecharges.get(id);
+        if (l == null) return SMITE_CHARGES;
+        l.removeIf(t -> t <= now);
+        return SMITE_CHARGES - l.size();
     }
 
     /** Annule le cooldown d'un sort (remboursement TP interrompu). */
@@ -70,30 +96,54 @@ public class SummonerSpellManager {
 
     private void triggerCooldown(Player player, Spell spell) {
         var rm = LolPlugin.getInstance().getRuneManager();
-        long cd = rm != null ? rm.summonerCooldownMs(player, spell.cooldownSeconds * 1000L) : spell.cooldownSeconds * 1000L;
-        cooldowns.put(player.getUniqueId() + ":" + spell.name(), System.currentTimeMillis() + cd);
+        long now = System.currentTimeMillis();
+        if (spell == Spell.SMITE) {
+            // Une charge consommée : rechargée 90 s après la fin de la charge précédente
+            var l = smiteRecharges.computeIfAbsent(player.getUniqueId(), _ -> new java.util.ArrayList<>());
+            long from = l.isEmpty() ? now : Math.max(now, l.getLast());
+            l.add(from + SMITE_RECHARGE_MS);
+        }
+        long base = spell == Spell.TELEPORT && isUnleashedTeleport(player)
+                ? (long) (byLevel(player, 330, 240) * 1000) : spell.cooldownSeconds * 1000L;
+        long cd = rm != null ? rm.summonerCooldownMs(player, base) : base;
+        cooldowns.put(player.getUniqueId() + ":" + spell.name(), now + cd);
         // Icône de la barre d'action remise en couleur à la fin de la recharge
+        long ready = (long) (getRemainingCooldown(player, spell) * 1000);
         org.bukkit.Bukkit.getScheduler().runTaskLater(LolPlugin.getInstance(), () -> {
             var champ = LolPlugin.getInstance().getChampionManager().getChampion(player);
             if (player.isOnline() && champ != null && !isOnCooldown(player, spell))
                 LolPlugin.getInstance().getHotbarManager().renderPage(player, champ);
-        }, cd / 50L + 1L);
+        }, ready / 50L + 1L);
+    }
+
+    /** Téléportation déchaînée : à partir de 10 min de partie (330-240 s de délai). */
+    private static boolean isUnleashedTeleport(Player p) {
+        var gm = fr.lolmc.instance.InstanceHelper.gameManager(p);
+        return gm != null && gm.isGameRunning() && gm.getElapsedSeconds() >= 600;
     }
 
     /**
      * Lance un sort d'invocateur. La cible est optionnelle (selon le sort).
      */
     public boolean cast(Player caster, Spell spell, Player target) {
+        if (caster.getGameMode() == org.bukkit.GameMode.SPECTATOR) return false; // mort
         if (isOnCooldown(caster, spell)) {
             caster.sendActionBar(Component.text(
-                    "⏳ " + spell.displayName + " en recharge (" 
-                    + (int) getRemainingCooldown(caster, spell) + "s)", NamedTextColor.RED));
+                    "⏳ " + spell.displayName + " en recharge ("
+                    + (int) Math.ceil(getRemainingCooldown(caster, spell)) + "s)", NamedTextColor.RED));
+            return false;
+        }
+        // Étourdi ou projeté : aucun sort d'invocateur, sauf Purge (LoL)
+        var cc = LolPlugin.getInstance().getCCManager();
+        if (spell != Spell.CLEANSE && cc != null
+                && (cc.isStunned(caster.getUniqueId()) || cc.isAirborne(caster.getUniqueId()))) {
+            caster.sendActionBar(Component.text("❌ Impossible sous contrôle", NamedTextColor.RED));
             return false;
         }
 
         boolean success = switch (spell) {
             case IGNITE -> castIgnite(caster, target);
-            case HEAL -> castHeal(caster);
+            case HEAL -> castHeal(caster, target);
             case BARRIER -> castBarrier(caster);
             case EXHAUST -> castExhaust(caster, target);
             case TELEPORT -> castTeleport(caster);
@@ -111,7 +161,17 @@ public class SummonerSpellManager {
         return success;
     }
 
-    // ── Embrasement : dégâts vrais sur 5s (valeurs LoL: 70-410 selon niveau) ──
+    private static int level(Player p) {
+        var cm = LolPlugin.getInstance().getChampionManager();
+        return cm.hasChampion(p) ? cm.getChampion(p).getLevelSystem().getLevel() : 1;
+    }
+
+    /** Valeur selon le niveau du lanceur, de {@code at1} (niveau 1) à {@code at18} (niveau 18). */
+    private static double byLevel(Player p, double at1, double at18) {
+        return at1 + (at18 - at1) * (level(p) - 1) / 17.0;
+    }
+
+    // ── Embrasement : 70-410 dégâts bruts sur 5 s, 40 % de blessures graves ──
 
     private boolean castIgnite(Player caster, Player target) {
         if (target == null) {
@@ -126,87 +186,117 @@ public class SummonerSpellManager {
         var cm = LolPlugin.getInstance().getChampionManager();
         if (!cm.hasChampion(target)) return false;
 
-        int casterLevel = cm.hasChampion(caster)
-                ? cm.getChampion(caster).getLevelSystem().getLevel()
-                : 1;
-        // Dégâts LoL : 70 + 20 par niveau (70 au niv 1 → 410 au niv 18), sur 5s
-        double totalDamage = 50 + 20 * casterLevel;
-        double perTick = totalDamage / 5.0;
-
-        // Ignite applique GW60 (60% réduction de soin) pendant 5s
-        var cmGW = LolPlugin.getInstance().getChampionManager();
-        if (cmGW.hasChampion(target)) cmGW.getChampion(target).getStats().applyGrievousWounds(0.60, 5000L);
-        new org.bukkit.scheduler.BukkitRunnable() {
+        // 70 au niveau 1, +20 par niveau jusqu'au 5, puis +25 : 475 au niveau 18 (patch 25.09)
+        int lvl = level(caster);
+        double perTick = (lvl <= 5 ? 50 + 20 * lvl : 150 + 25 * (lvl - 5)) / 5.0;
+        // Blessures graves : 40 % (avant : 60 %)
+        cm.getChampion(target).getStats().applyGrievousWounds(0.40, 5000L);
+        var task = new org.bukkit.scheduler.BukkitRunnable() {
             int ticks = 0;
             @Override public void run() {
-                if (ticks >= 5 || target.isDead() || !target.isOnline()) { cancel(); return; }
+                if (ticks >= 5 || !target.isOnline() || target.getGameMode() == org.bukkit.GameMode.SPECTATOR) {
+                    cancel();
+                    return;
+                }
                 DamageUtil.damage(caster, target, perTick, true, DamageUtil.Type.TRUE);
                 fr.lolmc.util.VisualEffectUtil.impact(target.getWorld(),
                         target.getLocation().add(0,1,0), Material.ORANGE_STAINED_GLASS, 0.22f, 4L);
                 ticks++;
             }
-        }.runTaskTimer(LolPlugin.getInstance(), 0L, 20L);
+        }.runTaskTimer(LolPlugin.getInstance(), 20L, 20L);
+        var list = ignites.computeIfAbsent(target.getUniqueId(), _ -> new java.util.ArrayList<>());
+        list.removeIf(org.bukkit.scheduler.BukkitTask::isCancelled);
+        list.add(task);
 
-        // Embrasement applique aussi Grievous Wounds (soins réduits) — marqué via effet
         caster.sendActionBar(Component.text("🔥 Embrasement sur " + target.getName() + "!", NamedTextColor.GOLD));
         return true;
     }
 
-    // ── Soin : rend des PV + vitesse (LoL: 90-345 PV selon niveau) ──
+    // ── Soins : 80-318 PV + 30 % de vitesse au lanceur et à un allié ──
 
-    private boolean castHeal(Player caster) {
+    private boolean castHeal(Player caster, Player target) {
         var cm = LolPlugin.getInstance().getChampionManager();
         if (!cm.hasChampion(caster)) return false;
-        BaseChampion champ = cm.getChampion(caster);
-        int level = champ.getLevelSystem().getLevel();
-        double healAmount = 75 + 15 * level; // approximation LoL
-        champ.getHPSystem().heal(healAmount);
-        caster.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 20, 1, false, true));
-        fr.lolmc.util.VisualEffectUtil.impactBurst(caster.getWorld(),
-                caster.getLocation().add(0,1,0), Material.PINK_STAINED_GLASS, 0.25f, 0.5, 6, 6L);
-        caster.sendActionBar(Component.text("💚 Soin! +" + (int) healAmount + " PV", NamedTextColor.GREEN));
-        var hud = LolPlugin.getInstance().getHUDManager();
-        if (hud != null) hud.updateHUD(caster, champ);
+        double amount = byLevel(caster, 80, 318);
+        healWithSpell(caster, amount);
+        // Allié : celui visé s'il est allié, sinon le plus blessé à portée (900 unités)
+        Player ally = null;
+        var tm = LolPlugin.getInstance().getTeamManager();
+        if (target != null && tm.areAllies(caster, target) && !target.equals(caster)) ally = target;
+        if (ally == null) {
+            double lowest = 1.0, range = LolUnits.toBlocks(900);
+            for (Player p : caster.getWorld().getPlayers()) {
+                if (p.equals(caster) || !cm.hasChampion(p) || !tm.areAllies(caster, p)) continue;
+                if (p.getGameMode() == org.bukkit.GameMode.SPECTATOR) continue;
+                if (p.getLocation().distance(caster.getLocation()) > range) continue;
+                double r = cm.getChampion(p).getHPSystem().getHPRatio();
+                if (r < lowest) { lowest = r; ally = p; }
+            }
+        }
+        if (ally != null) {
+            healWithSpell(ally, amount);
+            ally.sendActionBar(Component.text("💚 Soins de " + caster.getName(), NamedTextColor.GREEN));
+        }
+        caster.sendActionBar(Component.text("💚 Soins ! +" + (int) amount + " PV", NamedTextColor.GREEN));
         return true;
     }
 
-    // ── Bouclier : absorbe des dégâts temporairement (LoL: 115-455) ──
+    private void healWithSpell(Player p, double amount) {
+        var cm = LolPlugin.getInstance().getChampionManager();
+        if (!cm.hasChampion(p)) return;
+        BaseChampion champ = cm.getChampion(p);
+        long now = System.currentTimeMillis();
+        Long last = healedAt.put(p.getUniqueId(), now);
+        if (last != null && now - last < HEAL_REDUCED_MS) amount *= 0.5; // déjà soigné récemment
+        champ.getHPSystem().heal(amount);
+        var cc = LolPlugin.getInstance().getCCManager();
+        if (cc != null) cc.speedDecaying(p, 0.30, 20); // +30 % décroissant sur 1 s
+        fr.lolmc.util.VisualEffectUtil.impactBurst(p.getWorld(),
+                p.getLocation().add(0,1,0), Material.PINK_STAINED_GLASS, 0.25f, 0.5, 6, 6L);
+        var hud = LolPlugin.getInstance().getHUDManager();
+        if (hud != null) hud.updateHUD(p, champ);
+    }
+
+    // ── Barrière : bouclier de 100-460 pendant 2,5 s ──
 
     private boolean castBarrier(Player caster) {
         var cm = LolPlugin.getInstance().getChampionManager();
         if (!cm.hasChampion(caster)) return false;
         BaseChampion champ = cm.getChampion(caster);
-        int level = champ.getLevelSystem().getLevel();
-        double shield = 100 + 20 * level;
+        double shield = byLevel(caster, 100, 100 + 21.176 * 17); // 100 → 502 au niveau 20
         champ.getStats().addShield(shield);
         fr.lolmc.util.VisualEffectUtil.impactBurst(caster.getWorld(),
                 caster.getLocation().add(0,1,0), Material.YELLOW_STAINED_GLASS, 0.3f, 0.6, 8, 8L);
-        caster.sendActionBar(Component.text("🛡 Bouclier! +" + (int) shield, NamedTextColor.YELLOW));
-        // Le bouclier disparaît après 2s (comme LoL) — seulement celui-ci, pas les autres boucliers
+        caster.sendActionBar(Component.text("🛡 Barrière ! +" + (int) shield, NamedTextColor.YELLOW));
+        // Le bouclier disparaît après 2,5 s — seulement celui-ci, pas les autres boucliers
         new org.bukkit.scheduler.BukkitRunnable() {
             @Override public void run() { champ.getStats().addShield(-shield); }
-        }.runTaskLater(LolPlugin.getInstance(), 40L);
+        }.runTaskLater(LolPlugin.getInstance(), 50L);
         return true;
     }
 
-    // ── Épuisement : ralentit fortement + réduit dégâts d'un ennemi ──
+    // ── Fatigue : ralentit de 40 % et réduit les dégâts infligés de 35 % pendant 3 s ──
 
     private boolean castExhaust(Player caster, Player target) {
         if (target == null) {
-            caster.sendActionBar(Component.text("Épuisement nécessite une cible", NamedTextColor.GRAY));
+            caster.sendActionBar(Component.text("Fatigue nécessite une cible", NamedTextColor.GRAY));
             return false;
         }
-        // Portée Exhaust : 650 unités = 6.5 blocs
-        if (caster.getLocation().distance(target.getLocation()) > LolUnits.toBlocks(650)) return false;
-        target.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 50, 2, false, true)); // ~2.5s
-        target.addPotionEffect(new PotionEffect(PotionEffectType.WEAKNESS, 50, 1, false, true));
-        exhaustedUntil.put(target.getUniqueId(), System.currentTimeMillis() + 2500L);
-        target.sendActionBar(Component.text("😵 Épuisé par " + caster.getName() + "!", NamedTextColor.GRAY));
-        caster.sendActionBar(Component.text("Épuisement lancé!", NamedTextColor.AQUA));
+        // Portée : 650 unités = 6,5 blocs
+        if (caster.getLocation().distance(target.getLocation()) > LolUnits.toBlocks(650)) {
+            caster.sendActionBar(Component.text("Cible hors de portée", NamedTextColor.GRAY));
+            return false;
+        }
+        // Ralentissement en % (avant : potion Lenteur III, et Faiblesse vanilla sans effet LoL)
+        var cc = LolPlugin.getInstance().getCCManager();
+        if (cc != null) cc.slowPct(target, 0.40, 60);
+        exhaust(target, 3000L);
+        target.sendActionBar(Component.text("😵 Fatigué par " + caster.getName() + "!", NamedTextColor.GRAY));
+        caster.sendActionBar(Component.text("Fatigue lancée !", NamedTextColor.AQUA));
         return true;
     }
 
-    // ── Téléportation : retour à la base (simplifié) ──
+    // ── Téléportation : vers une tourelle, un sbire ou une balise alliés ──
 
     // UUID → tâche de TP en cours (canalisation interruptible)
     private final java.util.Map<java.util.UUID, org.bukkit.scheduler.BukkitTask> channeling
@@ -225,8 +315,8 @@ public class SummonerSpellManager {
                 "❌ Téléportation interrompue!", net.kyori.adventure.text.format.NamedTextColor.RED));
             caster.getWorld().playSound(caster.getLocation(),
                 org.bukkit.Sound.BLOCK_FIRE_EXTINGUISH, 1f, 0.8f);
-            // Rendre le CD (LoL rembourse partiellement) : reset le cooldown du TP
-            resetCooldown(caster, Spell.TELEPORT);
+            // LoL : une canalisation interrompue par un ennemi ne rembourse pas le délai
+            // (avant : délai entièrement rendu, TP relançable aussitôt)
         }
     }
 
@@ -257,7 +347,7 @@ public class SummonerSpellManager {
     }
 
     /**
-     * Canalise 4s avec particules, puis exécute l'action si non interrompu.
+     * Canalise 3 s avec particules, puis exécute l'action si non interrompu.
      * Interruptible via interruptTeleport().
      */
     private void channelTeleport(Player caster, Runnable onComplete) {
@@ -269,7 +359,7 @@ public class SummonerSpellManager {
             int ticks = 0;
             @Override public void run() {
                 if (!caster.isOnline()) { channeling.remove(caster.getUniqueId()); removeChannelDisplay(caster); cancel(); return; }
-                if (ticks >= 80) { // 4s écoulées → TP
+                if (ticks >= 60) { // 3 s écoulées → TP
                     channeling.remove(caster.getUniqueId());
                     removeChannelDisplay(caster);
                     cancel();
@@ -277,7 +367,7 @@ public class SummonerSpellManager {
                     return;
                 }
                 // Cercle de canalisation violet autour du caster (point qui monte en spirale)
-                double progress = ticks / 80.0;
+                double progress = ticks / 60.0;
                 double angle = ticks * 0.3;
                 var loc = caster.getLocation();
                 var display = channelDisplays.computeIfAbsent(caster.getUniqueId(),
@@ -289,142 +379,116 @@ public class SummonerSpellManager {
         channeling.put(caster.getUniqueId(), task);
     }
 
-    private boolean castTeleport(Player caster) {
-        // LoL : TP vers une tourelle alliee, un sbire allié ou la base
-        // On cherche la cible la plus proche dans la direction du regard
-        var cm = LolPlugin.getInstance().getChampionManager();
-        var tm = LolPlugin.getInstance().getTeamManager();
-        var team = tm.getTeam(caster);
-
-        // 1. Chercher une tourelle alliee proche du curseur (via MapManager)
-        var mapMgr = fr.lolmc.instance.InstanceHelper.mapManager(caster);
-        if (mapMgr != null && team != null) {
-            var structures = mapMgr.getStructuresForTeam(team);
-            if (structures != null && !structures.isEmpty()) {
-                // Trouver la structure la plus proche du regard (dans 500 blocs)
-                var eye = caster.getEyeLocation();
-                var dir = eye.getDirection().normalize();
-                fr.lolmc.game.GameStructure best = null; double bestDot = 0.8;
-                for (var s : structures) {
-                    if (s.isDestroyed()) continue;
-                    var toS = s.getCenter().toVector().subtract(eye.toVector());
-                    double dist = toS.length();
-                    if (dist > 500 || dist < 1) continue;
-                    double dot = toS.normalize().dot(dir);
-                    if (dot > bestDot) { bestDot = dot; best = s; }
-                }
-                if (best != null) {
-                    final var target = best;
-                    caster.sendActionBar(net.kyori.adventure.text.Component.text(
-                        "\uD83C\uDF00 Teleportation vers " + target.getType().name() + " dans 4s...",
-                        net.kyori.adventure.text.format.NamedTextColor.AQUA));
-                    channelTeleport(caster, () -> {
-                        if (caster.isOnline()) {
-                            caster.teleport(target.getCenter());
-                            caster.playSound(target.getCenter(), org.bukkit.Sound.ENTITY_ENDERMAN_TELEPORT, 1f, 1f);
-                        }
-                    });
-                    return true;
-                }
-            }
-        }
-
-        // 2. Chercher un sbire allié visé (dans la direction du regard, portée 50 blocs)
-        if (team != null) {
-            var eye = caster.getEyeLocation();
-            var dir = eye.getDirection().normalize();
-            org.bukkit.entity.LivingEntity minionTarget = null;
-            double bestDot = 0.85;
-            for (var e : caster.getNearbyEntities(50, 50, 50)) {
-                if (!(e instanceof org.bukkit.entity.LivingEntity le)) continue;
-                if (!fr.lolmc.game.MinionManager.isMinion(le)) continue;
-                if (fr.lolmc.game.MinionManager.getMinionTeam(le) != team) continue;
-                var toE = e.getLocation().add(0,1,0).toVector().subtract(eye.toVector()).normalize();
-                double dot = dir.dot(toE);
-                if (dot > bestDot) { bestDot = dot; minionTarget = le; }
-            }
-            if (minionTarget != null) {
-                final var ft = minionTarget;
-                caster.sendActionBar(Component.text("🌀 Téléportation → sbire allié dans 4s...", NamedTextColor.AQUA));
-                channelTeleport(caster, () -> {
-                    if (caster.isOnline() && ft.isValid())
-                        caster.teleportAsync(ft.getLocation().add(0,0.1,0));
-                });
-                return true;
-            }
-        }
-
-        // 3. Fallback : TP vers la base de l'equipe
-        var base = mapMgr != null && team != null ? mapMgr.getBaseSpawn(team) : null;
-        if (base != null && caster.isOnline()) {
-            caster.sendActionBar(net.kyori.adventure.text.Component.text(
-                "\uD83C\uDF00 Retour a la base dans 4s...", net.kyori.adventure.text.format.NamedTextColor.AQUA));
-            channelTeleport(caster, () -> {
-                if (caster.isOnline()) {
-                    caster.teleport(base);
-                    caster.playSound(base, org.bukkit.Sound.ENTITY_ENDERMAN_TELEPORT, 1f, 1f);
-                }
-            });
-            return true;
-        }
-        return false;
+    private void startTeleport(Player caster, Location dest, String label) {
+        caster.sendActionBar(Component.text("🌀 Téléportation → " + label + " dans 3s...", NamedTextColor.AQUA));
+        channelTeleport(caster, () -> {
+            if (!caster.isOnline()) return;
+            caster.teleport(dest);
+            caster.playSound(dest, org.bukkit.Sound.ENTITY_ENDERMAN_TELEPORT, 1f, 1f);
+            // LoL : le délai démarre à l'arrivée, pas au lancement
+            triggerCooldown(caster, Spell.TELEPORT);
+            // Téléportation déchaînée (10 min) : +50 % de vitesse pendant 3 s à l'arrivée
+            var cc = LolPlugin.getInstance().getCCManager();
+            if (isUnleashedTeleport(caster) && cc != null) cc.speedPct(caster, 0.50, 60);
+        });
     }
 
-    // ── Châtiment : dégâts bruts à un monstre proche (LoL: 600 vrais) ──
+    private boolean castTeleport(Player caster) {
+        // LoL : TP vers une tourelle, un sbire ou une balise alliés, visés au curseur.
+        // (Avant : sans cible visée, retour gratuit à la base — un deuxième Rappel instantané.)
+        var tm = LolPlugin.getInstance().getTeamManager();
+        var team = tm.getTeam(caster);
+        if (team == null) return false;
+        var eye = caster.getEyeLocation();
+        var dir = eye.getDirection().normalize();
+
+        Location best = null;
+        String label = null;
+        double bestDot = 0.85;
+
+        // 1. Tourelles alliées debout (les inhibiteurs et le Nexus ne sont pas des cibles de TP)
+        var mapMgr = fr.lolmc.instance.InstanceHelper.mapManager(caster);
+        if (mapMgr != null) {
+            for (var s : mapMgr.getStructuresForTeam(team)) {
+                if (s.isDestroyed() || s.getType() != fr.lolmc.game.GameStructure.Type.TURRET) continue;
+                var toS = s.getCenter().toVector().subtract(eye.toVector());
+                double dist = toS.length();
+                if (dist > 500 || dist < 1) continue;
+                double dot = toS.normalize().dot(dir);
+                if (dot > bestDot) { bestDot = dot; best = s.getCenter(); label = "tourelle"; }
+            }
+        }
+        // 2. Sbires alliés (portée 50 blocs)
+        for (var e : caster.getNearbyEntities(50, 50, 50)) {
+            if (!(e instanceof LivingEntity le) || !MinionManager.isMinion(le)) continue;
+            if (MinionManager.getMinionTeam(le) != team) continue;
+            var toE = e.getLocation().add(0, 1, 0).toVector().subtract(eye.toVector());
+            double dot = toE.normalize().dot(dir);
+            if (dot > bestDot) { bestDot = dot; best = le.getLocation().add(0, 0.1, 0); label = "sbire allié"; }
+        }
+        // 3. Balises alliées
+        var wm = LolPlugin.getInstance().getWardManager();
+        if (wm != null) {
+            for (var w : wm.getAllWards()) {
+                if (w.team != team || w.entityId == null || !w.location.getWorld().equals(caster.getWorld())) continue;
+                var toW = w.location.toVector().subtract(eye.toVector());
+                double dist = toW.length();
+                if (dist > 500 || dist < 1) continue;
+                double dot = toW.normalize().dot(dir);
+                if (dot > bestDot) { bestDot = dot; best = w.location.clone(); label = "balise alliée"; }
+            }
+        }
+        if (best == null) {
+            caster.sendActionBar(Component.text("🌀 Vise une tourelle, un sbire ou une balise alliés",
+                    NamedTextColor.GRAY));
+            return false;
+        }
+        startTeleport(caster, best, label);
+        return true;
+    }
+
+    // ── Châtiment : 600 dégâts bruts à un monstre ou à un sbire ennemi ──
 
     private boolean castSmite(Player caster) {
         double range = LolUnits.toBlocks(500);
-        // Smite upgradé : vérifier l'item jungle équipé
         var inv = LolPlugin.getInstance().getShopListener().getOrCreate(caster);
-        // Ids réels du registre : Mosstomper = pickaxe_jungle, Gustwalker = smite_stalker, Scorchclaw = blue_smite
-        boolean hasMosstomper = inv.hasItem("pickaxe_jungle");
+        // Objets de jungle (ids du registre : Mosstomper = pickaxe_jungle, Gustwalker = smite_stalker,
+        // Scorchclaw = blue_smite) : Châtiment déchaîné, utilisable sur les champions
         boolean hasGustwalker = inv.hasItem("smite_stalker");
-        boolean hasBluesmite  = inv.hasItem("blue_smite");
+        boolean unleashed = inv.hasItem("pickaxe_jungle") || hasGustwalker || inv.hasItem("blue_smite");
 
-        // Châtiment rouge (Mosstomper/Bluesmite) → peut cibler les joueurs ennemis
-        if ((hasMosstomper || hasBluesmite)) {
-            // Chercher d'abord un ennemi joueur dans la portée
-            Player enemyTarget = null;
-            double closestEnemy = range;
-            var tm = LolPlugin.getInstance().getTeamManager();
-            for (Player p : caster.getWorld().getPlayers()) {
-                if (!tm.areEnemies(caster, p)) continue;
-                double d = p.getLocation().distance(caster.getLocation());
-                if (d < closestEnemy) { closestEnemy = d; enemyTarget = p; }
-            }
-            if (enemyTarget != null && LolPlugin.getInstance().getChampionManager().hasChampion(enemyTarget)) {
-                var ec = LolPlugin.getInstance().getChampionManager().getChampion(enemyTarget);
-                double dmg = 600;
-                ec.getHPSystem().takeDamage(dmg);
-                enemyTarget.sendActionBar(Component.text("💀 Châtiment ennemi! -600", NamedTextColor.RED));
-                caster.sendActionBar(Component.text("⚔ Châtiment → " + enemyTarget.getName() + "!", NamedTextColor.RED));
-                fr.lolmc.util.VisualEffectUtil.impactBurst(caster.getWorld(),
-                        enemyTarget.getLocation().add(0,1,0), Material.RED_STAINED_GLASS, 0.3f, 0.4, 8, 6L);
-                return true;
-            }
-        }
-
-        // Châtiment normal : cibler un monstre de jungle
-        LivingEntity target = null;
-        double closest = Double.MAX_VALUE;
-        for (var e : caster.getNearbyEntities(range, range, range)) {
-            if (e instanceof LivingEntity le && JungleManager.isJungleMonster(le)) {
-                double d = le.getLocation().distance(caster.getLocation());
-                if (d < closest) { closest = d; target = le; }
-            }
-        }
+        // Cible : l'unité visée, sinon le monstre puis le sbire ennemi le plus proche.
+        // (Avant : un champion ennemi à portée passait AVANT le monstre, même en visant le dragon.)
+        LivingEntity target = fr.lolmc.util.TargetingUtil.getTargetedEnemy(caster, range);
+        if (target instanceof Player && !unleashed) target = null;
+        if (target == null) target = nearest(caster, range, true);
+        if (target == null) target = nearest(caster, range, false);
         if (target == null) {
-            caster.sendActionBar(Component.text("⚔ Aucun monstre à châtier", NamedTextColor.GRAY));
+            caster.sendActionBar(Component.text("⚔ Aucune cible à châtier", NamedTextColor.GRAY));
             return false;
         }
+
+        if (target instanceof Player enemy) {
+            // Châtiment déchaîné sur un champion : 40 dégâts bruts + 20 % de ralentissement 2 s (avant : 600)
+            double dmg = 40;
+            DamageUtil.damage(caster, enemy, dmg, true, DamageUtil.Type.TRUE);
+            var cc = LolPlugin.getInstance().getCCManager();
+            if (cc != null) cc.slowPct(enemy, 0.20, 40);
+            caster.sendActionBar(Component.text("⚔ Châtiment → " + enemy.getName() + " (" + (int) dmg + ")",
+                    NamedTextColor.RED));
+            fr.lolmc.util.VisualEffectUtil.impactBurst(caster.getWorld(),
+                    enemy.getLocation().add(0,1,0), Material.RED_STAINED_GLASS, 0.3f, 0.4, 8, 6L);
+            return true;
+        }
+
         double smiteDamage = 600;
-        // Gustwalker : +20% MS après smite
+        // Gustwalker : +20 vitesse 2 s après un châtiment
         if (hasGustwalker) {
             var sc = LolPlugin.getInstance().getChampionManager().getChampion(caster);
             if (sc != null) {
                 sc.getStats().addBonusMoveSpeed(20);
                 new org.bukkit.scheduler.BukkitRunnable(){@Override public void run(){
-                    if(sc.getStats()!=null) sc.getStats().addBonusMoveSpeed(-20);
+                    sc.getStats().addBonusMoveSpeed(-20);
                 }}.runTaskLater(LolPlugin.getInstance(), 40L);
             }
         }
@@ -452,27 +516,60 @@ public class SummonerSpellManager {
         return true;
     }
 
-    // ── Purification : retire les effets de contrôle ──
+    /** Monstre de jungle (ou sbire ennemi) le plus proche à portée de Châtiment. */
+    private LivingEntity nearest(Player caster, double range, boolean monster) {
+        var team = LolPlugin.getInstance().getTeamManager().getTeam(caster);
+        LivingEntity best = null;
+        double closest = Double.MAX_VALUE;
+        for (var e : caster.getNearbyEntities(range, range, range)) {
+            if (!(e instanceof LivingEntity le) || le.isDead()) continue;
+            boolean ok = monster ? JungleManager.isJungleMonster(le)
+                    : MinionManager.isMinion(le) && MinionManager.getMinionTeam(le) != team;
+            if (!ok) continue;
+            double d = le.getLocation().distance(caster.getLocation());
+            if (d <= range && d < closest) { closest = d; best = le; }
+        }
+        return best;
+    }
+
+    // ── Purge : retire les contrôles et les effets de sorts d'invocateur, +75 % ténacité 3 s ──
 
     private boolean castCleanse(Player caster) {
-        caster.removePotionEffect(PotionEffectType.SLOWNESS);
-        caster.removePotionEffect(PotionEffectType.WEAKNESS);
-        caster.removePotionEffect(PotionEffectType.BLINDNESS);
-        // Réduit aussi la durée des CC futurs (non modélisé en détail)
+        // Avant : retirait seulement les potions (Lenteur, Faiblesse, Cécité), pas les vrais
+        // étourdissements / immobilisations / silences du CCManager
+        var cc = LolPlugin.getInstance().getCCManager();
+        if (cc != null) {
+            cc.cleanse(caster);
+            cc.clearSlows(caster.getUniqueId());
+        }
+        exhaustedUntil.remove(caster.getUniqueId());
+        var burning = ignites.remove(caster.getUniqueId());
+        if (burning != null) burning.forEach(org.bukkit.scheduler.BukkitTask::cancel);
+        var cm = LolPlugin.getInstance().getChampionManager();
+        if (cm.hasChampion(caster)) {
+            var stats = cm.getChampion(caster).getStats();
+            stats.addTenacity(0.75);
+            new org.bukkit.scheduler.BukkitRunnable() {
+                @Override public void run() { stats.addTenacity(-0.75); }
+            }.runTaskLater(LolPlugin.getInstance(), 60L);
+        }
         fr.lolmc.util.VisualEffectUtil.impactBurst(caster.getWorld(),
                 caster.getLocation().add(0,1,0), Material.LIGHT_BLUE_STAINED_GLASS, 0.3f, 0.5, 8, 8L);
-        caster.sendActionBar(Component.text("✨ Purification!", NamedTextColor.AQUA));
+        caster.sendActionBar(Component.text("✨ Purge !", NamedTextColor.AQUA));
         return true;
     }
 
-    // ── Fantôme : boost de vitesse prolongé ──
+    // ── Fantôme : +24-48 % de vitesse de déplacement pendant 10 s ──
 
     private boolean castGhost(Player caster) {
-        // Ghost dure ~10s avec boost de vitesse croissant
-        caster.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 200, 1, false, true));
+        // Avant : potion Vitesse II, qui s'ajoutait au système de vitesse LoL sans en tenir compte
+        double pct = byLevel(caster, 0.24, 0.48);
+        var cc = LolPlugin.getInstance().getCCManager();
+        if (cc != null) cc.speedPct(caster, pct, 200);
         fr.lolmc.util.VisualEffectUtil.impactBurst(caster.getWorld(),
                 caster.getLocation(), Material.WHITE_STAINED_GLASS, 0.3f, 0.5, 6, 8L);
-        caster.sendActionBar(Component.text("👻 Fantôme! Vitesse accrue (10s)", NamedTextColor.WHITE));
+        caster.sendActionBar(Component.text("👻 Fantôme ! +" + Math.round(pct * 100) + "% vitesse (10s)",
+                NamedTextColor.WHITE));
         return true;
     }
 
@@ -480,6 +577,10 @@ public class SummonerSpellManager {
         cooldowns.entrySet().removeIf(e -> e.getKey().startsWith(uuid.toString()));
         exhaustedUntil.remove(uuid);
         flashChosen.remove(uuid);
+        smiteRecharges.remove(uuid);
+        healedAt.remove(uuid);
+        var burning = ignites.remove(uuid);
+        if (burning != null) burning.forEach(org.bukkit.scheduler.BukkitTask::cancel);
     }
 
 
@@ -497,16 +598,21 @@ public class SummonerSpellManager {
             if (sp != null && !chosen.contains(sp)) chosen.add(sp);
         }
         playerSpells.put(player.getUniqueId(), chosen.toArray(new Spell[0]));
+        // Châtiment : 1 charge au départ ; la recharge démarre à 0:48 (2e charge à 2:18, patch 26.01)
+        smiteRecharges.remove(player.getUniqueId());
+        if (chosen.contains(Spell.SMITE))
+            smiteRecharges.put(player.getUniqueId(), new java.util.ArrayList<>(
+                    java.util.List.of(System.currentTimeMillis() + 48_000L + SMITE_RECHARGE_MS)));
     }
 
     /** Le joueur a-t-il pris Flash ? (vrai par défaut si aucun choix n'a été fait) */
     private final Map<UUID, Boolean> flashChosen = new java.util.concurrent.ConcurrentHashMap<>();
     public boolean hasFlash(Player player) { return flashChosen.getOrDefault(player.getUniqueId(), true); }
 
-    // ── Épuisement : -35 % de dégâts infligés pendant 2,5 s ──
+    // ── Fatigue : -35 % de dégâts infligés ──
     private final Map<UUID, Long> exhaustedUntil = new java.util.concurrent.ConcurrentHashMap<>();
 
-    /** Épuise {@code target} : -35 % de dégâts infligés pendant {@code durationMs}. */
+    /** Fatigue {@code target} : -35 % de dégâts infligés pendant {@code durationMs}. */
     public void exhaust(Player target, long durationMs) {
         exhaustedUntil.merge(target.getUniqueId(), System.currentTimeMillis() + durationMs, Math::max);
     }

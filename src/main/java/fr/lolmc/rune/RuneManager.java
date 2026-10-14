@@ -295,10 +295,10 @@ public class RuneManager {
             case "adaptive"       -> adaptive(want, id, champ, key, 5.4, 9);
             case "attack_speed"   -> put(want, key, Stat.AS, 0.10);
             case "ability_haste"  -> put(want, key, Stat.AH, 8);
-            case "move_speed"     -> put(want, key, Stat.MS_PCT, 0.02);
+            case "move_speed"     -> put(want, key, Stat.MS_PCT, 0.025);
             case "health_scaling" -> put(want, key, Stat.HP, 10 + 170 * t);
             case "health"         -> put(want, key, Stat.HP, 65);
-            case "tenacity"       -> { put(want, key, Stat.TENACITY, 0.10); put(want, key, Stat.SLOW_RESIST, 0.10); }
+            case "tenacity"       -> { put(want, key, Stat.TENACITY, 0.15); put(want, key, Stat.SLOW_RESIST, 0.15); }
             default -> {}
         }
     }

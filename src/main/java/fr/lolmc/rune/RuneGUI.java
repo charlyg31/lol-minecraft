@@ -128,16 +128,16 @@ public class RuneGUI implements Listener {
         player.openInventory(inv);
     }
 
-    /** Libellé d'un fragment (valeurs LoL du patch 26). */
+    /** Libellé d'un fragment (valeurs du wiki officiel LoL, patch 26). */
     public static String shardName(String s) {
         return switch (s) {
             case "adaptive" -> "+9 force adaptative";
             case "attack_speed" -> "+10% vitesse d'attaque";
             case "ability_haste" -> "+8 accélération de compétence";
-            case "move_speed" -> "+2% vitesse de déplacement";
+            case "move_speed" -> "+2,5% vitesse de déplacement";
             case "health_scaling" -> "+10 à 180 PV (selon le niveau)";
             case "health" -> "+65 PV";
-            case "tenacity" -> "+10% ténacité et résistance aux ralentissements";
+            case "tenacity" -> "+15% ténacité et résistance aux ralentissements";
             default -> s;
         };
     }

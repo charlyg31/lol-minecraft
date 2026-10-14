@@ -31,6 +31,14 @@ public class FlashManager {
     public boolean useFlash(Player player) {
         var ssmFlash = LolPlugin.getInstance().getSummonerSpellManager();
         if (ssmFlash != null && !ssmFlash.hasFlash(player)) return false; // Flash non choisi en sélection
+        if (player.getGameMode() == org.bukkit.GameMode.SPECTATOR) return false; // mort
+        // Étourdi, immobilisé ou projeté : pas de Saut éclair (LoL)
+        var cc = LolPlugin.getInstance().getCCManager();
+        if (cc != null && (cc.isStunned(player.getUniqueId()) || cc.isRooted(player.getUniqueId())
+                || cc.isAirborne(player.getUniqueId()))) {
+            player.sendActionBar(Component.text("❌ Impossible sous contrôle", NamedTextColor.RED));
+            return false;
+        }
         if (isOnCooldown(player)) {
             player.sendActionBar(Component.text(
                     String.format("✦ Flash en recharge — %.0fs", getRemaining(player)),
