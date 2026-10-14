@@ -3,13 +3,14 @@ package fr.lolmc.rune;
 import java.util.*;
 
 /**
- * Registre de toutes les runes de League of Legends (système Runes Reforged).
+ * Registre de toutes les runes de League of Legends (Runes Reforged, patch 26.20).
  *
  * 5 voies : PRECISION, DOMINATION, SORCERY, RESOLVE, INSPIRATION.
  * Chaque voie a : 3-4 keystones (slot 0) + 3 slots mineurs de 3 runes chacun.
+ * Noms et descriptions : Data Dragon 16.20.1 (fr_FR).
  *
- * Les runes sont définies ici en données ; leurs effets sont appliqués
- * par RuneEffects selon le moment (on-hit, on-kill, passif, etc.).
+ * Les runes sont définies ici en données ; leurs effets sont appliqués par RuneManager
+ * (et PassiveManager pour certaines) selon le moment (on-hit, takedown, passif, etc.).
  */
 public class RuneRegistry {
 
@@ -17,7 +18,7 @@ public class RuneRegistry {
         PRECISION("Précision", "§e"),
         DOMINATION("Domination", "§c"),
         SORCERY("Sorcellerie", "§9"),
-        RESOLVE("Détermination", "§a"),
+        RESOLVE("Volonté", "§a"),
         INSPIRATION("Inspiration", "§b");
 
         public final String displayName;
@@ -35,107 +36,125 @@ public class RuneRegistry {
 
     static {
         // ═══════════════ PRÉCISION ═══════════════
-        // Keystones (slot 0)
-        add("press_attack", "Frappe Foudroyante", Path.PRECISION, 0,
-            "3 attaques consécutives infligent des dégâts bonus et exposent la cible (+dégâts subis).");
-        add("lethal_tempo", "Tempo Mortel", Path.PRECISION, 0,
-            "Attaquer un champion donne de la vitesse d'attaque, jusqu'à 6 stacks.");
-        add("fleet_footwork", "Jeu de Jambes", Path.PRECISION, 0,
-            "Attaquer et bouger accumule de l'énergie ; à 100, l'attaque soigne et donne de la vitesse.");
+        add("press_attack", "Attaque soutenue", Path.PRECISION, 0,
+            "Toucher un champion ennemi 3 fois de suite lui inflige des dégâts bonus et augmente vos dégâts contre lui.");
+        add("lethal_tempo", "Tempo mortel", Path.PRECISION, 0,
+            "Attaquer un champion ennemi vous octroie de la vitesse d'attaque (6 effets cumulés max).");
+        add("fleet_footwork", "Jeu de jambes", Path.PRECISION, 0,
+            "Attaquer et se déplacer génère de l'énergie. À 100, votre prochaine attaque vous soigne et augmente votre vitesse.");
         add("conqueror", "Conquérant", Path.PRECISION, 0,
-            "Attaquer des champions donne de la force adaptative ; à 12 stacks, soigne une partie des dégâts.");
-        // Slot 1
-        add("absorb_life", "Absorption", Path.PRECISION, 1, "Tuer une cible soigne.");
-        add("triumph", "Triomphe", Path.PRECISION, 1, "Les takedowns soignent 12% PV manquants + or bonus.");
-        add("presence_mind", "Présence d'Esprit", Path.PRECISION, 1, "Les takedowns restaurent la ressource.");
-        // Slot 2
-        add("legend_alacrity", "Légende: Vivacité", Path.PRECISION, 2, "Gagne de la vitesse d'attaque par stacks.");
-        add("legend_haste", "Légende: Hâte", Path.PRECISION, 2, "Gagne de la hâte de compétence par stacks.");
-        add("legend_bloodline", "Légende: Lignée", Path.PRECISION, 2, "Gagne du vol de vie par stacks.");
-        // Slot 3
-        add("coup_grace", "Coup de Grâce", Path.PRECISION, 3, "Plus de dégâts aux champions à bas PV (<40%).");
-        add("cut_down", "Abattage", Path.PRECISION, 3, "Plus de dégâts aux champions avec plus de PV max que toi.");
-        add("last_stand", "Dernier Rempart", Path.PRECISION, 3, "Plus de dégâts quand tu es à bas PV.");
+            "Attaquer des champions vous fait gagner de la force adaptative cumulable. À 12 effets, vous récupérez des PV selon vos dégâts.");
+        add("absorb_life", "Absorption vitale", Path.PRECISION, 1, "Tuer une cible vous rend des PV.");
+        add("triumph", "Triomphe", Path.PRECISION, 1,
+            "Participer à l'élimination d'un champion vous rend 5% de vos PV manquants, 2,5% de vos PV max et 20 PO.");
+        add("presence_mind", "Présence d'esprit", Path.PRECISION, 1,
+            "Blesser un champion vous rend du mana. Participer à son élimination vous rend 15% de votre mana max.");
+        add("legend_alacrity", "Légende : alacrité", Path.PRECISION, 2,
+            "+3% vitesse d'attaque, +1,5% par effet Légende (10 max). Les éliminations donnent des effets.");
+        add("legend_haste", "Légende : accélération", Path.PRECISION, 2,
+            "+1,5 accélération de compétence par effet Légende (10 max). Les éliminations donnent des effets.");
+        add("legend_bloodline", "Légende : sangsue", Path.PRECISION, 2,
+            "+0,45% vol de vie par effet Légende (15 max). Au maximum : +85 PV max.");
+        add("coup_grace", "Coup de grâce", Path.PRECISION, 3, "+8% de dégâts contre les champions sous 40% de PV.");
+        add("cut_down", "Abattage", Path.PRECISION, 3, "+8% de dégâts contre les champions au-dessus de 60% de PV.");
+        add("last_stand", "Baroud d'honneur", Path.PRECISION, 3,
+            "+5 à 11% de dégâts contre les champions quand vous êtes sous 60% de PV (max à 30%).");
 
         // ═══════════════ DOMINATION ═══════════════
         add("electrocute", "Électrocution", Path.DOMINATION, 0,
-            "3 attaques/sorts distincts sur un champion infligent des dégâts adaptatifs.");
-        add("dark_harvest", "Moisson Noire", Path.DOMINATION, 0,
-            "Frapper un champion <50% PV inflige des dégâts adaptatifs et accumule des âmes.");
-        add("hail_blades", "Grêle de Lames", Path.DOMINATION, 0,
-            "Après avoir attaqué un champion, vitesse d'attaque fortement accrue 3s.");
-        // Slot 1
-        add("cheap_shot", "Coup Bas", Path.DOMINATION, 1, "Dégâts vrais bonus aux ennemis sous contrôle.");
-        add("taste_blood", "Goût du Sang", Path.DOMINATION, 1, "Soigne en blessant un champion ennemi.");
-        add("sudden_impact", "Impact Soudain", Path.DOMINATION, 1, "Après un dash/Flash, gagne pénétration.");
-        // Slot 2
-        add("eyeball_collection", "Collection d'Yeux", Path.DOMINATION, 2, "Les takedowns donnent de la force adaptative.");
-        add("ghost_poro", "Poro Fantôme", Path.DOMINATION, 2, "Place des poros dans les bushes pour la vision et l'AdF.");
-        add("zombie_ward", "Ward Zombie", Path.DOMINATION, 2, "Détruire une ward ennemie en crée une amie.");
-        // Slot 3
-        add("ravenous_hunter", "Chasseur Vorace", Path.DOMINATION, 3, "Omnivampirisme par takedowns uniques.");
-        add("relentless_hunter", "Chasseur Implacable", Path.DOMINATION, 3, "Vitesse hors combat par takedowns uniques.");
-        add("ultimate_hunter", "Chasseur Ultime", Path.DOMINATION, 3, "Hâte de l'ultime par takedowns uniques.");
+            "Toucher un champion avec 3 attaques ou compétences en moins de 3 s inflige des dégâts adaptatifs.");
+        add("dark_harvest", "Moisson noire", Path.DOMINATION, 0,
+            "Blesser un champion à qui il reste peu de PV lui inflige des dégâts adaptatifs et siphonne son âme.");
+        add("hail_blades", "Déluge de lames", Path.DOMINATION, 0,
+            "Vos 3 premières attaques contre un champion gagnent beaucoup de vitesse d'attaque et des dégâts bruts.");
+        add("cheap_shot", "Coup bas", Path.DOMINATION, 1, "Dégâts bruts bonus contre les champions sous contrôle.");
+        add("taste_blood", "Goût du sang", Path.DOMINATION, 1, "Vous récupérez des PV quand vous blessez un champion ennemi.");
+        add("sudden_impact", "Ruée offensive", Path.DOMINATION, 1,
+            "Après une ruée, un bond ou une téléportation, vos dégâts aux champions sont augmentés de dégâts bruts.");
+        add("sixth_sense", "Sixième sens", Path.DOMINATION, 2,
+            "Repère automatiquement une balise ennemie proche (250 s). Niveau 11 : la révèle pendant 10 s.");
+        add("grisly_mementos", "Souvenirs épouvantables", Path.DOMINATION, 2,
+            "1 souvenir par élimination de champion (18 max). Chaque souvenir : +3 accélération de sort d'invocateur.");
+        add("deep_ward", "Balise de profondeur", Path.DOMINATION, 2,
+            "Vos balises dans la jungle ennemie durent plus longtemps. Niveau 9 : aussi dans la rivière.");
+        add("treasure_hunter", "Chasseur de trésors", Path.DOMINATION, 3,
+            "Participer à l'élimination d'un champion unique vous octroie 50 PO (+20 par effet, 130 max).");
+        add("relentless_hunter", "Chasseur acharné", Path.DOMINATION, 3,
+            "Chaque champion unique éliminé augmente votre vitesse hors combat.");
+        add("ultimate_hunter", "Chasseur ultime", Path.DOMINATION, 3,
+            "Chaque champion unique éliminé réduit le délai de récupération de votre ultime.");
 
         // ═══════════════ SORCELLERIE ═══════════════
         add("summon_aery", "Invocation d'Aery", Path.SORCERY, 0,
-            "Tes sorts/attaques envoient Aery qui blesse les ennemis ou protège les alliés.");
-        add("arcane_comet", "Comète Arcanique", Path.SORCERY, 0,
-            "Toucher un champion avec un sort lance une comète infligeant des dégâts.");
-        add("phase_rush", "Ruée de Phase", Path.SORCERY, 0,
-            "3 attaques/sorts sur un champion donnent une forte vitesse de déplacement.");
-        // Slot 1
-        add("nullifying_orb", "Orbe Annihilatrice", Path.SORCERY, 1, "Bouclier anti-magie à bas PV.");
-        add("manaflow_band", "Bande de Flux", Path.SORCERY, 1, "Toucher un champion augmente le mana max.");
-        add("nimbus_cloak", "Cape de Nimbus", Path.SORCERY, 1, "Après un sort d'invocateur, gagne de la vitesse.");
-        // Slot 2
-        add("transcendence", "Transcendance", Path.SORCERY, 2, "Hâte de compétence bonus par niveau.");
-        add("celerity", "Célérité", Path.SORCERY, 2, "Les bonus de vitesse sont plus efficaces.");
-        add("absolute_focus", "Concentration Absolue", Path.SORCERY, 2, "Force adaptative bonus quand PV élevés.");
-        // Slot 3
-        add("scorch", "Brûlure", Path.SORCERY, 3, "Premier sort touchant inflige des dégâts bonus (10s CD).");
-        add("waterwalking", "Marche Aquatique", Path.SORCERY, 3, "Vitesse + AdF dans la rivière.");
-        add("gathering_storm", "Tempête Montante", Path.SORCERY, 3, "Force adaptative croissante avec le temps.");
+            "Vos attaques et compétences envoient Aery vers une cible, blessant les ennemis.");
+        add("arcane_comet", "Comète arcanique", Path.SORCERY, 0,
+            "Blesser un champion avec une compétence fait tomber une comète sur sa position.");
+        add("phase_rush", "Assaut du maraudeur", Path.SORCERY, 0,
+            "Infliger 25% des PV max d'un champion en 4 s vous octroie une forte vitesse de déplacement.");
+        add("deathfire_touch", "Toucher de feu mortel", Path.SORCERY, 0,
+            "Blesser un champion avec une compétence le brûle (dégâts magiques par seconde, +75% après 3 s).");
+        add("axiom_arcanist", "Arcaniste axiomatique", Path.SORCERY, 1,
+            "+12% de dégâts de votre ultime. Une élimination réduit son délai de récupération actuel de 7%.");
+        add("manaflow_band", "Ruban de mana", Path.SORCERY, 1,
+            "Toucher un champion avec une compétence : +25 mana max (250 max). Ensuite, 1% du mana manquant / 5 s.");
+        add("nimbus_cloak", "Manteau nuageux", Path.SORCERY, 1,
+            "Après un sort d'invocateur, vous gagnez un bref bonus de vitesse de déplacement.");
+        add("transcendence", "Transcendance", Path.SORCERY, 2,
+            "Niveau 5 et 8 : +5 accélération de compétence. Niveau 11 : une élimination réduit vos délais de 20%.");
+        add("celerity", "Célérité", Path.SORCERY, 2, "+1% de vitesse de déplacement.");
+        add("absolute_focus", "Concentration absolue", Path.SORCERY, 2,
+            "Au-dessus de 70% de PV : jusqu'à +18 AD ou +30 AP (adaptatif, selon le niveau).");
+        add("scorch", "Brûlure", Path.SORCERY, 3, "Toutes les 10 s, votre prochaine compétence brûle le champion touché.");
+        add("waterwalking", "Marche sur l'eau", Path.SORCERY, 3, "Dans la rivière, vous gagnez de la vitesse de déplacement.");
+        add("gathering_storm", "Tempête menaçante", Path.SORCERY, 3,
+            "Toutes les 10 min, vous gagnez des dégâts d'attaque ou de la puissance (adaptatif).");
 
-        // ═══════════════ DÉTERMINATION ═══════════════
-        add("grasp_undying", "Poigne de l'Immortel", Path.RESOLVE, 0,
-            "En combat, ton attaque inflige des dégâts %PV max, soigne et donne des PV permanents.");
-        add("aftershock", "Réplique", Path.RESOLVE, 0,
-            "Après avoir immobilisé un ennemi, gagne des résistances puis explose en dégâts.");
+        // ═══════════════ VOLONTÉ ═══════════════
+        add("grasp_undying", "Poigne de l'immortel", Path.RESOLVE, 0,
+            "Toutes les 4 s en combat, votre attaque inflige des dégâts selon vos PV max, vous soigne et vous donne des PV.");
+        add("aftershock", "Après-coup", Path.RESOLVE, 0,
+            "Après avoir immobilisé un champion, vous augmentez vos défenses, puis infligez des dégâts autour de vous.");
         add("guardian", "Gardien", Path.RESOLVE, 0,
-            "Protège un allié proche avec un bouclier si lui ou toi subit des dégâts.");
-        // Slot 1
-        add("demolish", "Démolition", Path.RESOLVE, 1, "Charge une attaque puissante contre les tourelles.");
-        add("font_life", "Source de Vie", Path.RESOLVE, 1, "Marque les ennemis blessés, les alliés les soignent.");
-        add("shield_bash", "Coup de Bouclier", Path.RESOLVE, 1, "Quand tu as un bouclier, ton attaque inflige + dégâts.");
-        // Slot 2
-        add("conditioning", "Conditionnement", Path.RESOLVE, 2, "Après 12min, +armure/RM et +% résistances.");
-        add("second_wind", "Second Souffle", Path.RESOLVE, 2, "Soin régénératif après avoir subi des dégâts.");
-        add("bone_plating", "Plaques Osseuses", Path.RESOLVE, 2, "Réduit les dégâts des prochaines attaques après en avoir subi.");
-        // Slot 3
-        add("overgrowth", "Prolifération", Path.RESOLVE, 3, "PV max bonus selon les monstres/sbires morts près de toi.");
-        add("revitalize", "Revitalisation", Path.RESOLVE, 3, "Soins et boucliers renforcés.");
-        add("unflinching", "Inébranlable", Path.RESOLVE, 3, "Tenacité et résistance aux ralentissements.");
+            "Protège un allié proche : si lui ou vous subissez des dégâts, vous recevez tous les deux un bouclier.");
+        add("demolish", "Démolition", Path.RESOLVE, 1, "Votre troisième attaque contre une tourelle inflige des dégâts bonus.");
+        add("font_life", "Fontaine de vie", Path.RESOLVE, 1, "Restreindre un champion ennemi soigne les alliés proches.");
+        add("shield_bash", "Coup de bouclier", Path.RESOLVE, 1,
+            "Avec un bouclier, votre prochaine attaque contre un champion inflige des dégâts adaptatifs.");
+        add("conditioning", "Conditionnement", Path.RESOLVE, 2,
+            "Après 12 min : +8 armure et +8 résistance magique, puis +3% d'armure et de résistance magique.");
+        add("second_wind", "Second souffle", Path.RESOLVE, 2,
+            "Après avoir subi des dégâts d'un champion, vous récupérez une partie de vos PV manquants.");
+        add("bone_plating", "Plaque d'os", Path.RESOLVE, 2,
+            "Après des dégâts d'un champion, ses 3 prochaines attaques vous infligent 30-60 dégâts de moins (55 s).");
+        add("overgrowth", "Surcroissance", Path.RESOLVE, 3,
+            "+3 PV max tous les 8 sbires ou monstres morts près de vous. À 120 : +3,5% PV max.");
+        add("revitalize", "Revitalisation", Path.RESOLVE, 3, "+5% d'efficacité des soins et boucliers.");
+        add("unflinching", "Inébranlable", Path.RESOLVE, 3, "Vous gagnez de la ténacité et de la résistance aux ralentissements.");
 
         // ═══════════════ INSPIRATION ═══════════════
-        add("glacial_augment", "Augmentation Glaciale", Path.INSPIRATION, 0,
-            "Tes attaques ralentissent ; depuis un objet actif, crée un champ de givre.");
-        add("first_strike", "Première Frappe", Path.INSPIRATION, 0,
-            "Initier le combat inflige des dégâts bonus et génère de l'or.");
-        add("unsealed_spellbook", "Grimoire Descellé", Path.INSPIRATION, 0,
-            "Change tes sorts d'invocateur en cours de partie.");
-        // Slot 1
-        add("hextech_flashtraption", "Flashtraption", Path.INSPIRATION, 1, "Hexéclair: Flash canalisé hors combat.");
-        add("magical_footwear", "Chaussures Magiques", Path.INSPIRATION, 1, "Bottes gratuites après un délai.");
-        add("triple_tonic", "Triple Tonique", Path.INSPIRATION, 1, "Potions multiples et élixir.");
-        // Slot 2
-        add("future_market", "Marché à Terme", Path.INSPIRATION, 2, "Permet d'acheter en dette d'or.");
-        add("minion_dematerializer", "Démolécularisateur", Path.INSPIRATION, 2, "Détruit des sbires pour bonus de dégâts.");
-        add("biscuit_delivery", "Livraison de Biscuits", Path.INSPIRATION, 2, "Biscuits restaurant PV/mana.");
-        // Slot 3
-        add("cosmic_insight", "Perspicacité Cosmique", Path.INSPIRATION, 3, "+Hâte d'invocateur et d'objets.");
-        add("approach_velocity", "Vélocité d'Approche", Path.INSPIRATION, 3, "Vitesse vers les alliés/ennemis affectés.");
-        add("time_warp_tonic", "Tonique Temporel", Path.INSPIRATION, 3, "Effets de potion instantanés + vitesse.");
+        add("glacial_augment", "Optimisation glaciale", Path.INSPIRATION, 0,
+            "Vos attaques ralentissent les champions ennemis (par cible, 7 s de récupération).");
+        add("unsealed_spellbook", "Grimoire déchaîné", Path.INSPIRATION, 0,
+            "Changez vos sorts d'invocateur en dehors des combats.");
+        add("first_strike", "Premier coup", Path.INSPIRATION, 0,
+            "En engageant un champion : +7% de dégâts pendant 3 s et des PO selon les dégâts infligés.");
+        add("hextech_flashtraption", "Canaliportation Hextech", Path.INSPIRATION, 1,
+            "Quand Saut éclair est en récupération, il est remplacé par un saut canalisé.");
+        add("magical_footwear", "Chaussures magiques", Path.INSPIRATION, 1,
+            "Bottes gratuites après 12 min (45 s plus tôt par élimination).");
+        add("cash_back", "Remise immédiate", Path.INSPIRATION, 1, "Vous récupérez 7,5% des PO dépensées en objets légendaires.");
+        add("triple_tonic", "Triple tonique", Path.INSPIRATION, 2,
+            "Niveau 3 : élixir d'avidité. Niveau 6 : élixir de force. Niveau 9 : élixir de compétence.");
+        add("time_warp_tonic", "Philtre de chronodistorsion", Path.INSPIRATION, 2,
+            "Les potions vous rendent immédiatement une partie des PV prévus.");
+        add("biscuit_delivery", "Livraison de biscuits", Path.INSPIRATION, 2,
+            "Un biscuit gratuit toutes les 2 min, jusqu'à 6 min de jeu.");
+        add("cosmic_insight", "Savoir cosmique", Path.INSPIRATION, 3,
+            "+18 accélération de sort d'invocateur, +10 accélération d'objet.");
+        add("approach_velocity", "Vitesse d'approche", Path.INSPIRATION, 3,
+            "Votre vitesse augmente vers les champions ennemis proches dont les déplacements sont restreints.");
+        add("jack_of_all_trades", "Polyvalence", Path.INSPIRATION, 3,
+            "+1 accélération de compétence par stat différente de vos objets. +8 / +20 adaptatif à 5 / 10 stats.");
     }
 
     private static void add(String id, String name, Path path, int slot, String desc) {

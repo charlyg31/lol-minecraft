@@ -23,8 +23,9 @@ import java.util.*;
  * Le joueur construit sa page en plusieurs étapes dans un seul inventaire :
  * - Ligne 0 : choix de la voie primaire (5 voies)
  * - Ligne 1 : keystone de la voie primaire
- * - Lignes 2-4 : les 3 slots de runes mineures primaires
- * - Ligne 5 : voie secondaire + ses 2 runes + fragments de stats
+ * - Lignes 2-4, colonnes 0-2 : les 3 rangées de runes mineures primaires
+ * - Lignes 2-4, colonnes 6-8 : les rangées de la voie secondaire (2 runes, rangées différentes)
+ * - Ligne 5 : voie secondaire (45-48), fragments de stats (50-52), valider (53)
  *
  * L'état en cours d'édition est gardé par joueur jusqu'à validation.
  */
@@ -37,10 +38,17 @@ public class RuneGUI implements Listener {
     // Page en cours d'édition par joueur
     private final Map<UUID, RunePage> editing = new HashMap<>();
 
+    // Disposition
+    private static final int SECONDARY_COL = 6;          // colonnes 6-8 des lignes 2-4
+    private static final int SECONDARY_PATH_START = 45;  // 45-48
+    private static final int[] SHARD_SLOTS = {50, 51, 52};
+    private static final int VALIDATE_SLOT = 53;
+
     public void open(Player player) {
         // Repartir de la page sauvegardée du joueur
         RunePage current = LolPlugin.getInstance().getRuneManager().getPage(player.getUniqueId());
         RunePage copy = clonePage(current);
+        copy.sanitize();
         editing.put(player.getUniqueId(), copy);
         render(player);
     }
@@ -89,39 +97,67 @@ public class RuneGUI implements Listener {
             }
         }
 
-        // ── Ligne 5 : voie secondaire (slots 45-49) ──
-        i = 45;
+        // ── Lignes 2-4, colonnes 6-8 : runes de la voie secondaire (avant : jamais affichées,
+        //    les 2 runes étaient choisies d'office, et dans la même rangée) ──
+        if (page.secondaryPath != null) {
+            for (int slot = 1; slot <= 3; slot++) {
+                List<Rune> runes = RuneRegistry.getByPathAndSlot(page.secondaryPath, slot);
+                int row = 1 + slot;
+                for (int col = 0; col < runes.size() && col < 3; col++) {
+                    Rune r = runes.get(col);
+                    inv.setItem(row * 9 + SECONDARY_COL + col, runeIcon(r, page.secondaryRunes.contains(r.id())));
+                }
+            }
+        }
+
+        // ── Ligne 5 : voie secondaire (slots 45-48) ──
+        i = SECONDARY_PATH_START;
         for (Path path : Path.values()) {
             if (path == page.primaryPath) continue; // pas la même que primaire
             boolean selected = page.secondaryPath == path;
             inv.setItem(i, pathIcon(path, selected, "SECONDAIRE"));
             i++;
-            if (i > 49) break;
         }
 
-        // ── Boutons : fragments de stats + valider ──
-        // CORRECTION : Passage d'un Component propre (YELLOW remplace §e)
-        inv.setItem(51, button(Material.NETHER_STAR, Component.text("Fragments: " + shardSummary(page), NamedTextColor.YELLOW),
-                "Clique pour changer les fragments"));
-        inv.setItem(53, validateButton(page));
+        // ── Fragments de stats (un bouton par rangée) + valider ──
+        inv.setItem(SHARD_SLOTS[0], shardButton("Fragment offensif", RunePage.SHARDS_1, page.statShard1));
+        inv.setItem(SHARD_SLOTS[1], shardButton("Fragment flexible", RunePage.SHARDS_2, page.statShard2));
+        inv.setItem(SHARD_SLOTS[2], shardButton("Fragment défensif", RunePage.SHARDS_3, page.statShard3));
+        inv.setItem(VALIDATE_SLOT, validateButton(page));
 
         player.openInventory(inv);
     }
 
-    private String shardSummary(RunePage page) {
-        return shardName(page.statShard1) + "/" + shardName(page.statShard2) + "/" + shardName(page.statShard3);
-    }
-
-    private String shardName(String s) {
+    /** Libellé d'un fragment (valeurs LoL du patch 26). */
+    public static String shardName(String s) {
         return switch (s) {
-            case "adaptive" -> "AdF";
-            case "attack_speed" -> "AS";
-            case "ability_haste" -> "Hâte";
-            case "armor" -> "Arm";
-            case "mr" -> "RM";
-            case "health" -> "PV";
+            case "adaptive" -> "+9 force adaptative";
+            case "attack_speed" -> "+10% vitesse d'attaque";
+            case "ability_haste" -> "+8 accélération de compétence";
+            case "move_speed" -> "+2% vitesse de déplacement";
+            case "health_scaling" -> "+10 à 180 PV (selon le niveau)";
+            case "health" -> "+65 PV";
+            case "tenacity" -> "+10% ténacité et résistance aux ralentissements";
             default -> s;
         };
+    }
+
+    private ItemStack shardButton(String title, List<String> options, String current) {
+        ItemStack item = new ItemStack(Material.AMETHYST_SHARD);
+        var meta = item.getItemMeta();
+        if (meta != null) {
+            meta.displayName(Component.text(title + " : " + shardName(current), NamedTextColor.YELLOW)
+                    .decoration(TextDecoration.ITALIC, false));
+            List<Component> lore = new ArrayList<>();
+            for (String o : options)
+                lore.add(Component.text((o.equals(current) ? "▶ " : "  ") + shardName(o),
+                        o.equals(current) ? NamedTextColor.GREEN : NamedTextColor.GRAY)
+                        .decoration(TextDecoration.ITALIC, false));
+            lore.add(Component.text("Clic pour changer", NamedTextColor.DARK_GRAY).decoration(TextDecoration.ITALIC, false));
+            meta.lore(lore);
+            item.setItemMeta(meta);
+        }
+        return item;
     }
 
     // ══════════════════════════════════════════════════════════════
@@ -155,7 +191,9 @@ public class RuneGUI implements Listener {
 
         RunePage page = editing.get(player.getUniqueId());
         if (page == null) return;
-        int slot = e.getSlot();
+        // Slot brut : avant, getSlot() faisait aussi réagir l'inventaire du joueur (en bas)
+        int slot = e.getRawSlot();
+        if (slot < 0 || slot >= e.getView().getTopInventory().getSize()) return;
 
         // Ligne 0 : voie primaire
         if (slot >= 0 && slot <= 4) {
@@ -164,7 +202,7 @@ public class RuneGUI implements Listener {
                 page.primaryPath = chosen;
                 page.keystone = null;          // reset keystone
                 page.primaryRunes.clear();     // reset runes primaires
-                if (page.secondaryPath == chosen) page.secondaryPath = null;
+                if (page.secondaryPath == chosen) { page.secondaryPath = null; page.secondaryRunes.clear(); }
             }
             render(player);
             return;
@@ -181,29 +219,36 @@ public class RuneGUI implements Listener {
             return;
         }
 
-        // Lignes 2-4 : runes mineures primaires
-        if (slot >= 18 && slot <= 44 && page.primaryPath != null) {
+        // Lignes 2-4 : runes mineures (colonnes 0-2 : primaires, 6-8 : secondaires)
+        if (slot >= 18 && slot <= 44) {
             int row = slot / 9;       // 2, 3 ou 4
             int col = slot % 9;
-            int runeSlot = row - 1;   // slot 1, 2 ou 3
-            List<Rune> runes = RuneRegistry.getByPathAndSlot(page.primaryPath, runeSlot);
-            if (col < runes.size()) {
-                String runeId = runes.get(col).id();
-                // Un seul choix par slot : retirer les autres runes du même slot
-                for (Rune r : runes) page.primaryRunes.remove(r.id());
-                page.primaryRunes.add(runeId);
-                render(player);
+            int runeSlot = row - 1;   // rangée 1, 2 ou 3
+            if (col < 3 && page.primaryPath != null) {
+                List<Rune> runes = RuneRegistry.getByPathAndSlot(page.primaryPath, runeSlot);
+                if (col < runes.size()) {
+                    // Un seul choix par rangée : retirer les autres runes de la même rangée
+                    for (Rune r : runes) page.primaryRunes.remove(r.id());
+                    page.primaryRunes.add(runes.get(col).id());
+                    render(player);
+                }
+            } else if (col >= SECONDARY_COL && page.secondaryPath != null) {
+                List<Rune> runes = RuneRegistry.getByPathAndSlot(page.secondaryPath, runeSlot);
+                int idx = col - SECONDARY_COL;
+                if (idx < runes.size()) {
+                    selectSecondary(page, runes, runes.get(idx).id());
+                    render(player);
+                }
             }
             return;
         }
 
-        // Ligne 5 : voie secondaire (slots 45-49)
-        if (slot >= 45 && slot <= 49) {
-            // Recalculer quelle voie est à ce slot
+        // Ligne 5 : voie secondaire (slots 45-48)
+        if (slot >= SECONDARY_PATH_START && slot < SECONDARY_PATH_START + 4) {
             List<Path> secondaryOptions = new ArrayList<>();
             for (Path p : Path.values()) if (p != page.primaryPath) secondaryOptions.add(p);
-            int idx = slot - 45;
-            if (idx < secondaryOptions.size()) {
+            int idx = slot - SECONDARY_PATH_START;
+            if (idx < secondaryOptions.size() && page.secondaryPath != secondaryOptions.get(idx)) {
                 page.secondaryPath = secondaryOptions.get(idx);
                 page.secondaryRunes.clear();
                 render(player);
@@ -211,56 +256,52 @@ public class RuneGUI implements Listener {
             return;
         }
 
-        // Bouton fragments (cycle entre les options)
-        if (slot == 51) {
-            cycleShards(page);
-            render(player);
-            return;
-        }
+        // Fragments : chaque bouton fait défiler les options de sa rangée
+        if (slot == SHARD_SLOTS[0]) { page.statShard1 = next(RunePage.SHARDS_1, page.statShard1); render(player); return; }
+        if (slot == SHARD_SLOTS[1]) { page.statShard2 = next(RunePage.SHARDS_2, page.statShard2); render(player); return; }
+        if (slot == SHARD_SLOTS[2]) { page.statShard3 = next(RunePage.SHARDS_3, page.statShard3); render(player); return; }
 
-        // Bouton valider
-        if (slot == 53) {
+        if (slot == VALIDATE_SLOT) {
             validateAndSave(player, page);
         }
     }
 
-    private void cycleShards(RunePage page) {
-        // Cycle simple : adaptive → attack_speed → ability_haste pour shard1
-        String[] offensive = {"adaptive", "attack_speed", "ability_haste"};
-        String[] defensive = {"health", "armor", "mr"};
-        page.statShard1 = next(offensive, page.statShard1);
-        page.statShard2 = next(offensive, page.statShard2);
-        page.statShard3 = next(defensive, page.statShard3);
+    /**
+     * Rune secondaire (règle LoL) : 2 runes de rangées différentes. Même rangée → remplace ;
+     * une 3e rangée → remplace la rune choisie le plus anciennement.
+     */
+    private void selectSecondary(RunePage page, List<Rune> sameRow, String runeId) {
+        for (Rune r : sameRow) page.secondaryRunes.remove(r.id());
+        if (page.secondaryRunes.size() >= 2) page.secondaryRunes.remove(page.secondaryRunes.iterator().next());
+        page.secondaryRunes.add(runeId);
     }
 
-    private String next(String[] arr, String current) {
-        for (int i = 0; i < arr.length; i++) {
-            if (arr[i].equals(current)) return arr[(i + 1) % arr.length];
-        }
-        return arr[0];
+    private String next(List<String> options, String current) {
+        int i = options.indexOf(current);
+        return options.get((i + 1) % options.size()); // inconnu (-1) → première option
     }
 
     private void validateAndSave(Player player, RunePage page) {
+        page.sanitize();
         // Compléter automatiquement si incomplet (pour éviter de bloquer)
-        if (page.primaryPath != null && page.keystone == null) {
-            page.keystone = RuneRegistry.getKeystones(page.primaryPath).get(0).id();
+        if (page.primaryPath == null) page.primaryPath = Path.PRECISION;
+        if (page.keystone == null) {
+            page.keystone = RuneRegistry.getKeystones(page.primaryPath).getFirst().id();
         }
         // Compléter les runes primaires manquantes
-        if (page.primaryPath != null) {
-            for (int s = 1; s <= 3; s++) {
-                List<Rune> runes = RuneRegistry.getByPathAndSlot(page.primaryPath, s);
-                boolean hasOne = runes.stream().anyMatch(r -> page.primaryRunes.contains(r.id()));
-                if (!hasOne && !runes.isEmpty()) page.primaryRunes.add(runes.get(0).id());
-            }
+        for (int s = 1; s <= 3; s++) {
+            List<Rune> runes = RuneRegistry.getByPathAndSlot(page.primaryPath, s);
+            boolean hasOne = runes.stream().anyMatch(r -> page.primaryRunes.contains(r.id()));
+            if (!hasOne && !runes.isEmpty()) page.primaryRunes.add(runes.getFirst().id());
         }
-        // Compléter les runes secondaires
-        if (page.secondaryPath != null && page.secondaryRunes.size() < 2) {
-            List<Rune> all = new ArrayList<>();
-            for (int s = 1; s <= 3; s++) all.addAll(RuneRegistry.getByPathAndSlot(page.secondaryPath, s));
-            for (Rune r : all) {
-                if (page.secondaryRunes.size() >= 2) break;
-                page.secondaryRunes.add(r.id());
-            }
+        // Compléter les runes secondaires, une par rangée encore libre
+        if (page.secondaryPath == null) {
+            for (Path p : Path.values()) if (p != page.primaryPath) { page.secondaryPath = p; break; }
+        }
+        for (int s = 1; s <= 3 && page.secondaryRunes.size() < 2; s++) {
+            List<Rune> runes = RuneRegistry.getByPathAndSlot(page.secondaryPath, s);
+            boolean hasOne = runes.stream().anyMatch(r -> page.secondaryRunes.contains(r.id()));
+            if (!hasOne && !runes.isEmpty()) page.secondaryRunes.add(runes.getFirst().id());
         }
 
         LolPlugin.getInstance().getRuneManager().setPage(player.getUniqueId(), page);
@@ -318,25 +359,15 @@ public class RuneGUI implements Listener {
     }
 
     private ItemStack validateButton(RunePage page) {
-        boolean ready = page.primaryPath != null && page.secondaryPath != null;
+        boolean ready = page.isValid();
         ItemStack item = new ItemStack(ready ? Material.LIME_DYE : Material.GRAY_DYE);
         var meta = item.getItemMeta();
         if (meta != null) {
             meta.displayName(Component.text("✔ Valider la page", NamedTextColor.GREEN)
                     .decoration(TextDecoration.ITALIC, false));
-            item.setItemMeta(meta);
-        }
-        return item;
-    }
-
-    // CORRECTION : Modification de la signature pour accepter directement un Component
-    private ItemStack button(Material mat, Component modernName, String lore) {
-        ItemStack item = new ItemStack(mat);
-        var meta = item.getItemMeta();
-        if (meta != null) {
-            meta.displayName(modernName.decoration(TextDecoration.ITALIC, false));
-            meta.lore(List.of(Component.text(lore, NamedTextColor.GRAY)
-                    .decoration(TextDecoration.ITALIC, false)));
+            if (!ready)
+                meta.lore(List.of(Component.text("Les choix manquants seront complétés automatiquement",
+                        NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false)));
             item.setItemMeta(meta);
         }
         return item;

@@ -361,6 +361,10 @@ public class ShopListener implements Listener {
             return false;
         }
 
+        // Rune Remise immédiate : 7,5 % du prix des objets légendaires rendus
+        var rm = LolPlugin.getInstance().getRuneManager();
+        if (rm != null && item.getTier() == LolItem.Tier.LEGENDARY) rm.onLegendaryPurchase(player, item.getGoldCost());
+
         // 7. Finalisation visuelle et sonore
         hb.addItem(player, item.getId());
         hb.renderPage(player, champ);

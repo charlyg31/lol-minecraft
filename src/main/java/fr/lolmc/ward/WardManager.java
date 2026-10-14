@@ -109,6 +109,9 @@ public class WardManager {
             removeWardEntity(oldest);
             wards.remove(oldest);
         }
+        // Rune Balise de profondeur : durée bonus pour les balises posées côté ennemi
+        var rm = LolPlugin.getInstance().getRuneManager();
+        if (rm != null && durationSeconds > 0) durationSeconds += rm.deepWardBonusSeconds(owner, location);
         Ward ward = new Ward(location.clone(), team, owner.getUniqueId(), durationSeconds, entityId, type, true);
         wards.add(ward);
         if (entityId != null) applyWardVisibility(ward, type != WardType.STEALTH);
@@ -229,13 +232,8 @@ public class WardManager {
             removeWardEntity(w);
             it.remove();
             LolPlugin.getInstance().getGoldManager().addGold(attacker.getUniqueId(), w.type.goldBounty);
-            // Rune Zombie Ward : la destruction crée une ward amie au même endroit
-            var rm = fr.lolmc.LolPlugin.getInstance().getRuneManager();
-            boolean zombieWard = rm != null && rm.getPage(attacker.getUniqueId()).has("zombie_ward");
-            if (zombieWard) placeWard(attacker, w.location, 90);
             attacker.sendActionBar(Component.text(
-                    (zombieWard ? "💥 Ward détruite ! 🧟 Ward Zombie posée!" : "💥 Ward ennemie détruite!")
-                    + " +" + w.type.goldBounty + " or", NamedTextColor.GREEN));
+                    "💥 Ward ennemie détruite! +" + w.type.goldBounty + " or", NamedTextColor.GREEN));
             attacker.getWorld().playSound(attacker.getLocation(), Sound.ENTITY_ITEM_BREAK, 1f, 1.5f);
             // Tracker dans le scoreboard
             var msb = fr.lolmc.LolPlugin.getInstance().getMatchScoreboard();

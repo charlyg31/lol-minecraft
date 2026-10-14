@@ -263,6 +263,13 @@ public final class ChampionStats {
         return 100.0 / (100.0 + getFinalAbilityHaste());
     }
 
+    /** Accélération propre à l'ultime (rune Chasseur ultime), cumulée avec l'accélération de compétence. */
+    private double ultimateHaste;
+    public void addUltimateHaste(double v) { ultimateHaste += v; }
+    public double getUltimateCooldownMultiplier() {
+        return 100.0 / (100.0 + getFinalAbilityHaste() + ultimateHaste);
+    }
+
     public void applyVamp(double damageDealt, boolean isAbility) {
         double heal = 0;
         if (!isAbility) heal = damageDealt * getFinalLifeSteal();
@@ -371,7 +378,7 @@ public final class ChampionStats {
         bonusMaxHP=bonusAttackDamage=bonusAbilityPower=bonusArmor=0;
         bonusMagicResist=bonusAttackSpeed=bonusCritChance=bonusCritDamage=0;
         bonusMovementSpeed=bonusRange=bonusHPRegen=bonusLethality=0;
-        bonusLifeSteal=bonusOmnivamp=bonusAbilityHaste=0;
+        bonusLifeSteal=bonusOmnivamp=bonusAbilityHaste=ultimateHaste=0;
         bonusArmorPenPercent=bonusFlatMagicPen=bonusMagicPenPercent=0;
         flatDamageReduction=percentDamageReduction=aaPercentReduction=tenacity=0;
         multAttackDamage=multAbilityPower=multMovementSpeed=multAttackSpeed=multMaxHP=1.0;

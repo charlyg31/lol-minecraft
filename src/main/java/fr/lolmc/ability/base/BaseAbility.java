@@ -214,7 +214,7 @@ public abstract class BaseAbility {
         if (cdArr == null) cdArr = baseCooldown;
         double base = cdArr[Math.min(level - 1, cdArr.length - 1)];
         if (stats == null) return base;
-        return base * stats.getCooldownMultiplier();
+        return base * (slot == AbilitySlot.R ? stats.getUltimateCooldownMultiplier() : stats.getCooldownMultiplier());
     }
 
     /** Permet de modifier le cooldown de l'AA dynamiquement selon la vitesse d'attaque. */

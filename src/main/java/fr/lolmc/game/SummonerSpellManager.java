@@ -69,14 +69,15 @@ public class SummonerSpellManager {
     }
 
     private void triggerCooldown(Player player, Spell spell) {
-        cooldowns.put(player.getUniqueId() + ":" + spell.name(),
-                System.currentTimeMillis() + spell.cooldownSeconds * 1000L);
+        var rm = LolPlugin.getInstance().getRuneManager();
+        long cd = rm != null ? rm.summonerCooldownMs(player, spell.cooldownSeconds * 1000L) : spell.cooldownSeconds * 1000L;
+        cooldowns.put(player.getUniqueId() + ":" + spell.name(), System.currentTimeMillis() + cd);
         // Icône de la barre d'action remise en couleur à la fin de la recharge
         org.bukkit.Bukkit.getScheduler().runTaskLater(LolPlugin.getInstance(), () -> {
             var champ = LolPlugin.getInstance().getChampionManager().getChampion(player);
             if (player.isOnline() && champ != null && !isOnCooldown(player, spell))
                 LolPlugin.getInstance().getHotbarManager().renderPage(player, champ);
-        }, spell.cooldownSeconds * 20L + 1L);
+        }, cd / 50L + 1L);
     }
 
     /**

@@ -338,6 +338,29 @@ public class LolItem {
         return this;
     }
     public java.util.List<String> getBuildsFrom() { return buildsFrom; }
+
+    /** Ajoute à {@code into} les stats différentes apportées par l'objet (rune Polyvalence). */
+    public void collectStatKinds(java.util.Set<String> into) {
+        if (bonusAD > 0) into.add("ad");
+        if (bonusAP > 0) into.add("ap");
+        if (bonusHP > 0) into.add("hp");
+        if (bonusArmor > 0) into.add("armor");
+        if (bonusMR > 0) into.add("mr");
+        if (bonusAttackSpeed > 0) into.add("as");
+        if (bonusCritChance > 0) into.add("crit");
+        if (bonusMoveSpeed > 0 || moveSpeedPct > 0) into.add("ms");
+        if (bonusLethality > 0) into.add("lethality");
+        if (bonusArmorPenPercent > 0) into.add("armor_pen");
+        if (bonusMagicPen > 0 || bonusFlatMagicPen > 0) into.add("magic_pen");
+        if (bonusTenacity > 0) into.add("tenacity");
+        if (bonusLifeSteal > 0) into.add("life_steal");
+        if (bonusOmnivamp > 0) into.add("omnivamp");
+        if (bonusAbilityHaste > 0) into.add("ah");
+        if (bonusMana > 0) into.add("mana");
+        if (bonusHPRegen > 0 || hpRegenPct > 0) into.add("hp_regen");
+        if (bonusManaRegen > 0 || manaRegenPct > 0) into.add("mana_regen");
+        if (healShieldPower > 0) into.add("heal_shield");
+    }
     public boolean hasActive() { return hasActive; }
 
     // ── Getters ───────────────────────────────────────────────────

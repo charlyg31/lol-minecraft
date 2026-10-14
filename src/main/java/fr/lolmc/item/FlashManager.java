@@ -61,15 +61,17 @@ public class FlashManager {
                 dest.clone().add(0, 1, 0), Material.LIGHT_BLUE_STAINED_GLASS, 0.28f, 0.4, 8, 6L);
         player.playSound(dest, Sound.ENTITY_ENDERMAN_TELEPORT, 1f, 1.2f);
 
-        cooldowns.put(player.getUniqueId(), System.currentTimeMillis());
+        var rm = LolPlugin.getInstance().getRuneManager();
+        // Fin de recharge stockée (l'accélération de sort d'invocateur des runes la raccourcit)
+        long cd = rm != null ? rm.summonerCooldownMs(player, FLASH_COOLDOWN_MS) : FLASH_COOLDOWN_MS;
+        cooldowns.put(player.getUniqueId(), System.currentTimeMillis() + cd);
         player.sendActionBar(Component.text("✦ Flash!", NamedTextColor.AQUA));
         fr.lolmc.instance.InstanceHelper.baseManager(player).onAction(player);
         // Icône grisée pendant la recharge, puis remise en couleur à la fin
         setFlashReady(player);
         org.bukkit.Bukkit.getScheduler().runTaskLater(LolPlugin.getInstance(), () -> {
             if (!isOnCooldown(player)) setFlashReady(player);
-        }, FLASH_COOLDOWN_MS / 50L + 1L);
-        var rm = LolPlugin.getInstance().getRuneManager();
+        }, cd / 50L + 1L);
         if (rm != null) rm.applyNimbusCloak(player);
         return true;
     }
@@ -81,16 +83,14 @@ public class FlashManager {
     }
 
     public boolean isOnCooldown(Player player) {
-        Long last = cooldowns.get(player.getUniqueId());
-        if (last == null) return false;
-        return (System.currentTimeMillis() - last) < FLASH_COOLDOWN_MS;
+        Long end = cooldowns.get(player.getUniqueId());
+        return end != null && System.currentTimeMillis() < end;
     }
 
     public double getRemaining(Player player) {
-        Long last = cooldowns.get(player.getUniqueId());
-        if (last == null) return 0;
-        double rem = (FLASH_COOLDOWN_MS - (System.currentTimeMillis() - last)) / 1000.0;
-        return Math.max(0, rem);
+        Long end = cooldowns.get(player.getUniqueId());
+        if (end == null) return 0;
+        return Math.max(0, (end - System.currentTimeMillis()) / 1000.0);
     }
 
     public void reset(Player player) {

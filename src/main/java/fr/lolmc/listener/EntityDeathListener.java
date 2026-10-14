@@ -83,6 +83,10 @@ public class EntityDeathListener implements Listener {
         if (JungleManager.isJungleMonster(dead)) {
             e.getDrops().clear();
             e.setDroppedExp(0);
+            var type = JungleManager.getMonsterType(dead);
+            boolean epic = type != null && (type.name().startsWith("DRAGON_") || type == JungleManager.MonsterType.VOIDGRUB
+                    || type == JungleManager.MonsterType.HERALD || type == JungleManager.MonsterType.BARON);
+            LolPlugin.getInstance().getRuneManager().onUnitDeath(dead, killer, true, epic);
             fr.lolmc.instance.InstanceHelper.jungleManager(dead).onMonsterDeath(dead.getUniqueId(), killer);
             return;
         }
@@ -92,6 +96,8 @@ public class EntityDeathListener implements Listener {
             e.getDrops().clear();
             e.setDroppedExp(0);
             fr.lolmc.instance.InstanceHelper.minionManager(dead).onMinionDeath(dead.getUniqueId());
+            // Runes : Légende, Absorption vitale, Surcroissance
+            LolPlugin.getInstance().getRuneManager().onUnitDeath(dead, killer, false, false);
             // XP de proximité des autres champions : gérée par onMinionDeath
             if (killer != null && championManager.hasChampion(killer)) {
                 // Or/XP (et CS) selon le type de sbire

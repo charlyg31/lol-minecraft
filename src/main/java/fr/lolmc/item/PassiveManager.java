@@ -678,26 +678,6 @@ public class PassiveManager {
                 PotionEffectType.SLOWNESS, 40, 1, false, false));
         }
         // ── Gustwalker Smite : bonus vitesse après tuer un monstre (géré dans onJungleKill) ──
-
-        // ── Rune Minion Dematerializer : exécute un sbire (3 charges), +6%/+3%/+3% dégât
-        //    permanent contre les sbires (simplifié : universel, pas différencié par type) ──
-        if (fr.lolmc.game.MinionManager.isMinion(victim) && !victim.isDead()) {
-            var rm = LolPlugin.getInstance().getRuneManager();
-            if (rm != null && rm.getPage(attacker.getUniqueId()).has("minion_dematerializer")) {
-                var state = getState(attacker);
-                if (state.dematerializerCharges > 0) {
-                    state.dematerializerCharges--;
-                    double bonus = state.dematerializerCharges == 2 ? 0.06 : 0.03; // 6% la 1ère charge, +3% les suivantes
-                    state.dematerializerBonus = Math.min(0.12, state.dematerializerBonus + bonus);
-                    var champStats = championManager.getChampion(attacker).getStats();
-                    champStats.setMinionDamageBonus(state.dematerializerBonus);
-                    fr.lolmc.util.VirtualHP.kill(victim, attacker);
-                    attacker.sendActionBar(Component.text(
-                            "💨 Sbire dématérialisé ! (+" + (int) (state.dematerializerBonus * 100) + "% dégâts sbires)",
-                            NamedTextColor.LIGHT_PURPLE));
-                }
-            }
-        }
     }
 
     // ════════════════════════════════════════════════════════
@@ -969,18 +949,12 @@ public class PassiveManager {
     // ÉVÉNEMENT: KILL / ASSIST
     // ════════════════════════════════════════════════════════
     public void onKill(Player killer) {
-        // ── Ravenous Hunter : omnivamp croissant par takedown ──
         if (LolPlugin.getInstance().getRuneManager() != null) {
             var page = LolPlugin.getInstance().getRuneManager().getPage(killer.getUniqueId());
-            if (page.has("ravenous_hunter") && championManager.hasChampion(killer)
-                    && getState(killer).ravenousStacks < 10) {
-                getState(killer).ravenousStacks++;  // plafonné (avant : +3 % par takedown, sans limite)
-                championManager.getChampion(killer).getStats().addBonusOmnivamp(0.03);
-            }
-            // ── Presence of Mind : restaure la ressource sur takedown ──
+            // ── Présence d'esprit : 15 % de la ressource max sur takedown (patch 26) ──
             if (page.has("presence_mind") && championManager.hasChampion(killer)) {
                 var res = championManager.getChampion(killer).getResourceSystem();
-                res.addCurrent(res.getMax() * 0.20);
+                res.addCurrent(res.getMax() * 0.15);
                 killer.sendActionBar(Component.text("✨ Présence d'Esprit", NamedTextColor.AQUA));
             }
             // ── Magical Footwear : -45s sur le délai des bottes gratuites ──
@@ -1641,20 +1615,7 @@ public class PassiveManager {
             hp.tickRegenForced(hp.getMaxHP() * 0.05);
         }
 
-        // ── Rune Ghost Poro: pose une ward furtive en entrant dans un bush (90s CD) ──
         var rmGhostPoro = LolPlugin.getInstance().getRuneManager();
-        if (rmGhostPoro != null && !state.isOnCooldown(state.ghostPoroLastUse, 90000L)) {
-            var page = rmGhostPoro.getPage(p.getUniqueId());
-            var bushMgr2 = LolPlugin.getInstance().getBushManager();
-            if (page.has("ghost_poro") && bushMgr2 != null && bushMgr2.isInBush(p)) {
-                state.ghostPoroLastUse = System.currentTimeMillis();
-                var wardMgr = LolPlugin.getInstance().getWardManager();
-                if (wardMgr != null) {
-                    wardMgr.placeWard(p, p.getLocation(), 90);
-                    p.sendActionBar(Component.text("👻 Poro Fantôme placé !", NamedTextColor.LIGHT_PURPLE));
-                }
-            }
-        }
 
         // ── Rune Waterwalking: +25 vitesse de mouvement dans l'eau (rivière) ──
         if (rmGhostPoro != null) {

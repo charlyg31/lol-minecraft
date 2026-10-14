@@ -130,15 +130,11 @@ public class DamageUtil {
             rawAmount *= as.getZekeDamageMultiplier();
         }
 
-        // Rune Cut Down : +8% dégâts (hors vrais dégâts) contre une cible au-dessus de 60% de son HP max
-        if (as != null && type != Type.TRUE) {
+        // Runes : Coup de grâce, Abattage, Baroud d'honneur, Attaque soutenue, Premier coup
+        // (avant : seul Abattage était appliqué, getDamageMultiplier n'était jamais appelé)
+        if (as != null) {
             var rm = LolPlugin.getInstance().getRuneManager();
-            if (rm != null) {
-                var atkPage = rm.getPage(attacker.getUniqueId());
-                if (atkPage != null && atkPage.has("cut_down") && vc.getHPSystem().getHPRatio() > 0.60) {
-                    rawAmount *= 1.08;
-                }
-            }
+            if (rm != null) rawAmount *= rm.getDamageMultiplier(attacker, victim);
         }
 
         // 1. Résistance (armure/MR avec pénétration de l'attaquant)
