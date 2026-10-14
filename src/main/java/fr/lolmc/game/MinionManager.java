@@ -346,6 +346,7 @@ public class MinionManager {
                 Team team = getMinionTeam(z);
                 if (team == null) continue;
                 String lane = getMinionLane(z);
+                baronAura(z);
 
                 // Distance au chemin le plus proche
                 Location roadPoint = closestRoadPoint(lane, z.getLocation());
@@ -400,6 +401,29 @@ public class MinionManager {
         }
     }
 
+    private static NamespacedKey BARON_MS;
+
+    /**
+     * Main du Baron (wiki) : sbires de mêlée et super-sbires renforcés +50 % de vitesse de
+     * déplacement (super-sbires : +25 % de vitesse d'attaque en plus). Retiré hors de l'aura.
+     */
+    private static void baronAura(LivingEntity m) {
+        var attr = m.getAttribute(Compat.movementSpeed());
+        if (attr == null) return;
+        if (BARON_MS == null) BARON_MS = new NamespacedKey(LolPlugin.getInstance(), "baron_aura_ms");
+        String t = getMinionTypeTag(m);
+        boolean emp = ("melee".equals(t) || "super".equals(t)) && JungleBuffs.isEmpowered(m);
+        var cur = attr.getModifier(BARON_MS);
+        if (emp && cur == null) {
+            attr.addTransientModifier(new org.bukkit.attribute.AttributeModifier(BARON_MS, 0.5,
+                    org.bukkit.attribute.AttributeModifier.Operation.ADD_SCALAR));
+            if ("super".equals(t)) fr.lolmc.util.MobCombat.setAttackSpeedMult(m, 1.25);
+        } else if (!emp && cur != null) {
+            attr.removeModifier(BARON_MS);
+            if ("super".equals(t)) fr.lolmc.util.MobCombat.setAttackSpeedMult(m, 1.0);
+        }
+    }
+
     // Prochain tir et cible d'aggro (champion qui a frappé un allié) des sbires à distance
     private final Map<UUID, Long> nextShot = new HashMap<>();
     private final Map<UUID, UUID> aggroFoe = new HashMap<>();
@@ -427,7 +451,9 @@ public class MinionManager {
      */
     private void rangedAttack(Zombie z, Team team, LivingEntity foe) {
         boolean cannon = "cannon".equals(getMinionTypeTag(z));
-        double range = cannon ? 4.3 : 6.8;
+        // Main du Baron : portée et AD bonus des sbires à distance renforcés (mage +100 / +20, canon +750 / +50)
+        double[] empower = JungleBuffs.rangedMinionBonus(z);
+        double range = (cannon ? 4.3 : 6.8) + empower[1];
         z.setTarget(null);
         Location from = z.getLocation(), to = foe.getLocation();
         if (from.distanceSquared(to) > range * range) { z.getPathfinder().moveTo(to, 1.0); return; }
@@ -439,7 +465,7 @@ public class MinionManager {
         nextShot.put(z.getUniqueId(), now + (long) (1000 / Math.max(0.1, fr.lolmc.util.MobCombat.getAttackSpeed(z))));
         MobAnimator.triggerAttack(z.getUniqueId());
         Material glass = team == Team.BLUE ? Material.LIGHT_BLUE_STAINED_GLASS : Material.ORANGE_STAINED_GLASS;
-        double ad = fr.lolmc.util.MobCombat.getAD(z), onHit = getOnHitPct(z);
+        double ad = fr.lolmc.util.MobCombat.getAD(z) + empower[0], onHit = getOnHitPct(z);
         fr.lolmc.util.TargetingUtil.launchHoming(null, from.clone().add(0, cannon ? 0.6 : 0.9, 0), foe,
                 cannon ? 12.0 : 6.5, new org.bukkit.inventory.ItemStack(cannon ? Material.FIRE_CHARGE : glass),
                 cannon ? 0.5f : 0.4f, glass, false, () -> minionShotHit(foe, ad, onHit));
@@ -784,6 +810,41 @@ public class MinionManager {
         pdc.set(KEY_LANE,   org.bukkit.persistence.PersistentDataType.STRING, "mid");
         applyMinionModel(e, type, team, type == MinionType.CASTER ? 0.7f : 1.0f);
         applyStats(e, type, team == Team.BLUE ? "🔵 Sbire" : "🔴 Sbire");
+    }
+
+    /**
+     * Voidmite allié (Faim du Néant, wiki) : sbire de mêlée sans armure ni RM, 40 % de sa vitesse
+     * d'attaque, 150 % de sa vitesse de déplacement, sur la voie la plus proche. Contre une tourelle
+     * extérieure ou intérieure, il perd 100 PV toutes les 5 s.
+     */
+    public void spawnVoidmite(Location loc, Team team) {
+        String lane = "mid"; double best = Double.MAX_VALUE;
+        for (String l : new String[]{"top", "mid", "bot"}) {
+            Location rp = closestRoadPoint(l, loc);
+            if (rp == null || !rp.getWorld().equals(loc.getWorld())) continue;
+            double d = rp.distanceSquared(loc);
+            if (d < best) { best = d; lane = l; }
+        }
+        var e = loc.getWorld().spawn(loc, org.bukkit.entity.Zombie.class);
+        var pdc = e.getPersistentDataContainer();
+        pdc.set(KEY_MINION, PersistentDataType.BYTE, (byte) 1);
+        pdc.set(KEY_TEAM, PersistentDataType.STRING, team.name());
+        pdc.set(KEY_LANE, PersistentDataType.STRING, lane);
+        applyMinionModel(e, MinionType.MELEE, team, 0.7f);
+        applyStats(e, MinionType.MELEE, "🐛 Voidmite");
+        fr.lolmc.util.MobCombat.setStats(e, fr.lolmc.util.MobCombat.getAD(e), fr.lolmc.util.MobCombat.getAttackSpeed(e) * 0.40,
+                0, 0, 0, 0);
+        var ms = e.getAttribute(fr.lolmc.util.Compat.movementSpeed());
+        if (ms != null) ms.setBaseValue(MINION_SPEED * 1.5);
+        LIVE.add(e.getUniqueId());
+        new org.bukkit.scheduler.BukkitRunnable() {
+            @Override public void run() {
+                if (!e.isValid() || e.isDead()) { cancel(); return; }
+                var s = findNearbyEnemyStructure(e, team);
+                if (s != null && s.getType() == GameStructure.Type.TURRET && s.getIndex() <= 2)
+                    fr.lolmc.util.VirtualHP.damage(e, 100, null);
+            }
+        }.runTaskTimer(LolPlugin.getInstance(), 100L, 100L);
     }
 
     /** Force le spawn immédiat d'une vague (admin /lol wave). */

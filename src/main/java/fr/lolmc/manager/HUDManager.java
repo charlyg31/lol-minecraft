@@ -260,6 +260,8 @@ public class HUDManager {
             if (p != null && p.isOnline() && !p.equals(victim) && championManager.hasChampion(p)
                     && tm.getTeam(p) != tm.getTeam(victim)) killer = p;
         }
+        // Crêtes de braises / d'intuition : transférées au champion qui tue le porteur (wiki)
+        fr.lolmc.game.JungleBuffs.transferOnKill(victim, killer);
         var deaths = plugin.getEntityDeathListener();
         if (deaths != null) deaths.handleChampionDeath(victim, killer);
         // Respawn : timer de la partie (table LoL + BossBar), sinon timer simple (hors partie)

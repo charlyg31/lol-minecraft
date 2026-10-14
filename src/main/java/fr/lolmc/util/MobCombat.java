@@ -38,7 +38,11 @@ public final class MobCombat {
     }
 
     public static double getAD(LivingEntity e)          { return getDouble(e, "mob_ad", 0); }
-    public static double getAttackSpeed(LivingEntity e) { return getDouble(e, "mob_as", 1.0); }
+    public static double getAttackSpeed(LivingEntity e) { return getDouble(e, "mob_as", 1.0) * getDouble(e, "mob_as_mult", 1.0); }
+    /** Multiplicateur temporaire de vitesse d'attaque (super-sbires renforcés par le Baron). */
+    public static void setAttackSpeedMult(LivingEntity e, double m) {
+        e.getPersistentDataContainer().set(key("mob_as_mult"), PersistentDataType.DOUBLE, m);
+    }
     public static double getArmor(LivingEntity e)       { return getDouble(e, "mob_armor", 0); }
     public static double getMR(LivingEntity e)          { return getDouble(e, "mob_mr", 0); }
     public static double getXP(LivingEntity e, double def) { return getDouble(e, "mob_xp", def); }
@@ -71,6 +75,11 @@ public final class MobCombat {
         if (bush != null && stats != null) bush.revealOnAttack(attacker);
         if (stats != null && fr.lolmc.game.MinionManager.isMinion(target))
             amount *= 1.0 + stats.getMinionDamageBonus();
+        // Rancune ancestrale des dragons, sbires renforcés par le Baron, Regard du Baron
+        amount *= fr.lolmc.game.JungleBuffs.dragonDamageMultiplier(target, attacker);
+        amount *= fr.lolmc.game.JungleBuffs.minionDamageMultiplier(target, attacker);
+        amount *= fr.lolmc.game.MonsterAbilities.incomingMultiplier(target, attacker);
+        if (attacker != null) fr.lolmc.game.JungleBuffs.onDamageDealtUnit(attacker); // âme Océanique (30 %)
         if (type == DamageUtil.Type.PHYSICAL) {
             amount = stats != null ? stats.calcPhysicalDamageVs(amount, getArmor(target))
                                    : amount * resistMultiplier(getArmor(target));

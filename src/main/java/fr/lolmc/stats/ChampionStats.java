@@ -103,9 +103,9 @@ public final class ChampionStats {
     public double getFinalMaxHP()        { return (baseMaxHP + growthBonus(growthHP) + bonusMaxHP) * multMaxHP; }
     public double getFinalAD()           { return (baseAttackDamage + growthBonus(growthAD) + bonusAttackDamage) * multAttackDamage; }
     public double getFinalAP()           { return (baseAbilityPower + bonusAbilityPower) * multAbilityPower; }
-    public double getFinalArmor()        { return baseArmor + growthBonus(growthArmor) + bonusArmor; }
+    public double getFinalArmor()        { return (baseArmor + growthBonus(growthArmor) + bonusArmor) * armorMrMult; }
     public double getFinalMagicResist()  {
-        double base = baseMagicResist + growthBonus(growthMR) + bonusMagicResist;
+        double base = (baseMagicResist + growthBonus(growthMR) + bonusMagicResist) * armorMrMult;
         return base * (1.0 - getVileDecayReduction());
     }
 
@@ -267,6 +267,10 @@ public final class ChampionStats {
     public double getCooldownMultiplier() {
         return 100.0 / (100.0 + getFinalAbilityHaste());
     }
+
+    /** Multiplicateur d'armure et de RM (Vigueur montagneuse : +5 % par effet). */
+    private double armorMrMult = 1.0;
+    public void multiplyArmorMR(double m) { armorMrMult *= m; }
 
     /** Réduction fixe des dégâts PHYSIQUES reçus (Caprice d'Amumu), plafonnée à 50 % de chaque coup. */
     private double flatPhysicalReduction;

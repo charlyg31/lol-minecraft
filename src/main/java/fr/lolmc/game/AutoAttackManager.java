@@ -317,6 +317,7 @@ public class AutoAttackManager {
             fr.lolmc.champion.impl.mid.Annie.onShieldedAttacked(target, attacker);
             var pm = LolPlugin.getInstance().getPassiveManager();
             if (pm != null) pm.onAutoAttack(attacker, target);
+            JungleBuffs.onBasicAttack(attacker, target); // Crête de braises
         };
         fireBasicAttack(attacker, champ, target, type, crit, hit);
         return true;
@@ -376,6 +377,8 @@ public class AutoAttackManager {
                 baa.applyOnHit(attacker, champ.getStats(), target, dmg);
             var pm = LolPlugin.getInstance().getPassiveManager();
             if (pm != null) pm.onAutoAttackEntity(attacker, target);
+            MonsterAbilities.onChampionBasicAttack(attacker, target); // œil du Héraut
+            JungleBuffs.onBasicAttack(attacker, target); // Crête de braises
         };
         fireBasicAttack(attacker, champ, target, type, crit, hit);
         return true;

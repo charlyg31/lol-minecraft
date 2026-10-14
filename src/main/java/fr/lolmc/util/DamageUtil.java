@@ -179,7 +179,9 @@ public class DamageUtil {
         if (attacker != null) {
             var ssmEx = LolPlugin.getInstance().getSummonerSpellManager();
             if (ssmEx != null) finalDmg *= ssmEx.outgoingDamageMultiplier(attacker);
+            finalDmg *= fr.lolmc.game.JungleBuffs.outgoingMultiplier(attacker); // âme Chimtech
         }
+        finalDmg *= fr.lolmc.game.JungleBuffs.incomingMultiplier(victim); // âme Chimtech
         double afterShield = vs.absorbWithShield(finalDmg, type == Type.MAGICAL);
 
         // 3. HP
@@ -225,6 +227,7 @@ public class DamageUtil {
                 rm.onConquerorHeal(attacker, afterShield);
                 rm.onHitEffects(attacker, victim, afterShield, isAbility);
             }
+            fr.lolmc.game.JungleBuffs.onDamageDealt(attacker, victim); // âmes Infernale, Océanique, Hextech
         }
 
         // 4. Vol de vie / omnivamp pour l'attaquant

@@ -25,13 +25,12 @@ import java.util.*;
  * dans sa portée et déclenche des capacités selon des cooldowns. Les dégâts
  * passent par le HPSystem des joueurs (DamageUtil).
  *
- * Mécaniques implémentées :
+ * Mécaniques (wiki officiel, patch 26) :
  *  - Crabe : fuit l'attaquant
- *  - Buff Rouge : brûlure + ralentissement sur qui le frappe (passif)
- *  - Buff Bleu : tir de mana-burn à distance
- *  - Dragons : souffle de feu (cône), attaque de zone selon l'élément
- *  - Baron : nuke de zone + tir qui repousse + debuff
- *  - Héraut : charge qui repousse
+ *  - Dragons : Souffle du dragon sur les attaques, Prise d'envol, chaîne du Hextech
+ *  - Baron : Corrosion et Corruption du Néant, Regard du Baron, une capacité toutes les 6 attaques
+ *    (Bassin d'acide → Attraction → Jet d'acide → Tentacules)
+ *  - Héraut : Force colossale, Charge, Balayage à 66 % et 33 % des PV, œil vulnérable dans le dos
  *
  * Combat de base (LoL) : un monstre ne fait rien tant qu'on ne l'a pas frappé. Frappé, tout
  * son camp se réveille et attaque le champion à sa vitesse d'attaque (mêlée, ou projectile pour
@@ -75,10 +74,22 @@ public class MonsterAbilities {
     }
 
     private static void engage(LivingEntity mob, MonsterType type, Player attacker, long now) {
-        AGGRO.putIfAbsent(mob.getUniqueId(), attacker.getUniqueId());
+        if (AGGRO.putIfAbsent(mob.getUniqueId(), attacker.getUniqueId()) == null && type.isDragon()) takingFlight(mob);
         LAST_HURT.put(mob.getUniqueId(), now);
         RETURNING.remove(mob.getUniqueId());
         if (mob instanceof org.bukkit.entity.Mob m && chases(type)) m.setAware(true);
+    }
+
+    /** Prise d'envol (wiki) : en début de combat, le dragon repousse les ennemis à moins de 550 unités. */
+    private static void takingFlight(LivingEntity dragon) {
+        for (Entity e : dragon.getNearbyEntities(5.5, 3, 5.5)) {
+            if (!(e instanceof Player p) || !LolPlugin.getInstance().getChampionManager().hasChampion(p)) continue;
+            Vector push = p.getLocation().toVector().subtract(dragon.getLocation().toVector()).setY(0);
+            if (push.lengthSquared() < 1e-6) continue;
+            push.normalize().multiply(1.1).setY(0.35);
+            p.setVelocity(push);
+        }
+        dragon.getWorld().playSound(dragon.getLocation(), Sound.ENTITY_ENDER_DRAGON_FLAP, 1.2f, 0.8f);
     }
 
     /** Baron et dragons restent dans leur fosse ; les autres poursuivent leur cible. */
@@ -87,15 +98,14 @@ public class MonsterAbilities {
     }
 
     private static boolean isRanged(MonsterType type) {
-        return type == MonsterType.GROMP || type == MonsterType.BARON || type.isDragon();
+        return type == MonsterType.BARON || type.isDragon();
     }
 
     /** Portée d'attaque (blocs, du centre du monstre au champion, hors largeur du monstre). */
     private static double attackRange(MonsterType type) {
         if (type.isDragon()) return 5.3;       // 500 unités
         return switch (type) {
-            case GROMP -> 2.8;                 // 250
-            case BARON -> 3.0;
+            case BARON -> 9.5;                 // 955
             case HERALD -> 2.6;
             default -> 2.0;                    // mêlée (~175)
         };
@@ -155,23 +165,356 @@ public class MonsterAbilities {
     private static void basicAttack(LivingEntity mob, MonsterType type, Player t) {
         double ad = fr.lolmc.util.MobCombat.getAD(mob);
         if (ad <= 0) return;
+        if (type == MonsterType.BARON) { baronAttack(mob, t, ad); return; }
         fr.lolmc.util.MobAnimator.triggerAttack(mob.getUniqueId());
         if (isRanged(type)) {
             Material shot = type == MonsterType.GROMP ? Material.SLIME_BALL
                     : type == MonsterType.BARON ? Material.PURPLE_STAINED_GLASS : dragonShot(type);
             Material burst = type == MonsterType.GROMP ? Material.LIME_STAINED_GLASS
                     : type == MonsterType.BARON ? Material.PURPLE_STAINED_GLASS : dragonGlass(type);
+            final boolean hexChain = type == MonsterType.DRAGON_HEXTECH
+                    && ATTACK_COUNT.merge(mob.getUniqueId(), 1, Integer::sum) % 4 == 0;
             fr.lolmc.util.TargetingUtil.launchHoming(null, mob.getLocation().add(0, mob.getHeight() * 0.7, 0), t,
                     type == MonsterType.GROMP ? 10.0 : 14.0, new org.bukkit.inventory.ItemStack(shot),
-                    type == MonsterType.GROMP ? 0.6f : 0.9f, burst, false, () -> basicHit(t, ad));
+                    type == MonsterType.GROMP ? 0.6f : 0.9f, burst, false, () -> {
+                        basicHit(t, ad + dragonBreath(type, t));
+                        if (hexChain) hextechChain(mob, t, ad);
+                    });
             mob.getWorld().playSound(mob.getLocation(),
                     type == MonsterType.GROMP ? Sound.ENTITY_SLIME_SQUISH : Sound.ENTITY_BLAZE_SHOOT, 0.8f, 0.7f);
         } else {
             fr.lolmc.util.VisualEffectUtil.impact(t.getWorld(), t.getLocation().add(0, 1, 0),
                     Material.WHITE_STAINED_GLASS, 0.3f, 3L);
             mob.getWorld().playSound(t.getLocation(), Sound.ENTITY_PLAYER_ATTACK_STRONG, 0.7f, 0.6f);
-            basicHit(t, ad);
+            // Héraut, Force colossale : +20 % des PV actuels de la cible en dégâts physiques
+            double bonus = 0;
+            if (type == MonsterType.HERALD && LolPlugin.getInstance().getChampionManager().hasChampion(t))
+                bonus = LolPlugin.getInstance().getChampionManager().getChampion(t).getHPSystem().getCurrentHP() * 0.20;
+            basicHit(t, ad + bonus);
         }
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // BARON NASHOR (wiki)
+    // ══════════════════════════════════════════════════════════════
+
+    /** Corruption du Néant : effets cumulés par champion {nombre, fin, armure/RM retirées}. */
+    private static final Map<UUID, double[]> VOID_CORRUPTION = new java.util.concurrent.ConcurrentHashMap<>();
+    /** Regard du Baron : dernier champion frappé par une attaque de base, et fin de l'effet. */
+    private static final Map<UUID, UUID> GAZE_TARGET = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final Map<UUID, Long> GAZE_UNTIL = new java.util.concurrent.ConcurrentHashMap<>();
+    /** Rotation des capacités du Baron (indice de la prochaine). */
+    private static final Map<UUID, Integer> BARON_ROTATION = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /**
+     * Attaque du Baron : projectile (100 % AD physique, 2 effets de Corruption) et Corrosion
+     * (+35 % AD magique, 1 effet). Toutes les 6 attaques, une capacité : la 1re est tirée au hasard,
+     * puis l'ordre est fixe (Bassin d'acide → Attraction → Jet d'acide → Tentacules).
+     */
+    private static void baronAttack(LivingEntity baron, Player t, double ad) {
+        int n = ATTACK_COUNT.merge(baron.getUniqueId(), 1, Integer::sum);
+        if (n % 6 == 0) {
+            int idx = BARON_ROTATION.computeIfAbsent(baron.getUniqueId(), _ -> new Random().nextInt(4));
+            BARON_ROTATION.put(baron.getUniqueId(), (idx + 1) % 4);
+            // Plus d'unités derrière lui que devant : pics arrière (50 % AD, étourdit 0.5 s)
+            if (behindCount(baron) > frontCount(baron)) { rearSpikes(baron, ad); return; }
+            switch (idx) {
+                case 0 -> acidPool(baron, t, ad);
+                case 1 -> formAbility(baron, t, ad);
+                case 2 -> acidShot(baron, t, ad);
+                default -> tentacleKnockup(baron, t, ad);
+            }
+            return;
+        }
+        boolean behind = isBehind(baron, t);
+        // Cible devant à moins de 250 unités : de temps en temps, frappe au corps à corps
+        // (100 % AD à la cible, 50 % autour) ; cible derrière : pic arrière (100 % AD à l'arrivée)
+        if (!behind && baron.getLocation().distance(t.getLocation()) <= 2.5 + baron.getWidth() / 2
+                && new Random().nextInt(3) == 0) {
+            GAZE_TARGET.put(baron.getUniqueId(), t.getUniqueId());
+            GAZE_UNTIL.put(baron.getUniqueId(), System.currentTimeMillis() + 8000L);
+            basicHit(t, ad);
+            for (Player p : championsNear(t.getLocation(), 2.5)) if (!p.equals(t)) basicHit(p, ad * 0.5);
+            baron.getWorld().playSound(baron.getLocation(), Sound.ENTITY_WARDEN_ATTACK_IMPACT, 1.2f, 0.6f);
+            return;
+        }
+        if (behind) {
+            Location at = t.getLocation().clone();
+            fr.lolmc.util.VisualEffectUtil.impact(at.getWorld(), at.clone().add(0, 0.3, 0), Material.PURPLE_STAINED_GLASS, 0.5f, 10L);
+            later(10, () -> { if (t.getLocation().distanceSquared(at) <= 2.25) basicHit(t, ad); });
+            return;
+        }
+        GAZE_TARGET.put(baron.getUniqueId(), t.getUniqueId());
+        GAZE_UNTIL.put(baron.getUniqueId(), System.currentTimeMillis() + 8000L);
+        fr.lolmc.util.TargetingUtil.launchHoming(null, baron.getLocation().add(0, baron.getHeight() * 0.7, 0), t, 14.0,
+                new org.bukkit.inventory.ItemStack(Material.PURPLE_STAINED_GLASS), 0.9f, Material.PURPLE_STAINED_GLASS, false, () -> {
+                    basicHit(t, ad);
+                    addVoidCorruption(t, 2);
+                    if (t.getGameMode() != org.bukkit.GameMode.SPECTATOR && LolPlugin.getInstance().getChampionManager().hasChampion(t)) {
+                        DamageUtil.damage(null, t, ad * 0.35, false, DamageUtil.Type.MAGICAL); // Corrosion
+                        addVoidCorruption(t, 1);
+                    }
+                });
+        baron.getWorld().playSound(baron.getLocation(), Sound.ENTITY_WARDEN_ATTACK_IMPACT, 1f, 0.8f);
+    }
+
+    /** Corruption du Néant : -0.5 armure et RM par effet (100 max), 8 s, rafraîchie à chaque coup. */
+    private static void addVoidCorruption(Player p, int stacks) {
+        var cm = LolPlugin.getInstance().getChampionManager();
+        if (!cm.hasChampion(p)) return;
+        var st = cm.getChampion(p).getStats();
+        double[] v = VOID_CORRUPTION.computeIfAbsent(p.getUniqueId(), _ -> new double[3]);
+        v[0] = Math.min(100, v[0] + stacks);
+        v[1] = System.currentTimeMillis() + 8000L;
+        double want = v[0] * 0.5;
+        st.addBonusArmor(-(want - v[2]));
+        st.addBonusMR(-(want - v[2]));
+        v[2] = want;
+    }
+
+    /** Fin de la Corruption du Néant (8 s sans coup du Baron). */
+    private static void tickVoidCorruption() {
+        long now = System.currentTimeMillis();
+        var cm = LolPlugin.getInstance().getChampionManager();
+        for (var it = VOID_CORRUPTION.entrySet().iterator(); it.hasNext(); ) {
+            var en = it.next();
+            if (en.getValue()[1] > now) continue;
+            Player p = org.bukkit.Bukkit.getPlayer(en.getKey());
+            if (p != null && cm.hasChampion(p)) {
+                cm.getChampion(p).getStats().addBonusArmor(en.getValue()[2]);
+                cm.getChampion(p).getStats().addBonusMR(en.getValue()[2]);
+            }
+            it.remove();
+        }
+    }
+
+    /**
+     * Dégâts subis par un monstre : Regard du Baron, -50 % de la part du dernier champion qu'il a
+     * frappé d'une attaque de base (8 s).
+     */
+    public static double incomingMultiplier(LivingEntity target, Player attacker) {
+        if (attacker == null || JungleManager.getMonsterType(target) != MonsterType.BARON) return 1.0;
+        UUID gaze = GAZE_TARGET.get(target.getUniqueId());
+        return attacker.getUniqueId().equals(gaze) && GAZE_UNTIL.getOrDefault(target.getUniqueId(), 0L) > System.currentTimeMillis()
+                ? 0.5 : 1.0;
+    }
+
+    private static List<Player> championsNear(Location c, double r) {
+        List<Player> out = new ArrayList<>();
+        var cm = LolPlugin.getInstance().getChampionManager();
+        for (Player p : c.getWorld().getPlayers())
+            if (cm.hasChampion(p) && p.getGameMode() != org.bukkit.GameMode.SPECTATOR
+                    && p.getLocation().distanceSquared(c) <= r * r) out.add(p);
+        return out;
+    }
+
+    private static Vector flatDir(Location from, Location to) {
+        Vector v = to.toVector().subtract(from.toVector()).setY(0);
+        return v.lengthSquared() < 1e-6 ? new Vector(1, 0, 0) : v.normalize();
+    }
+
+    /** Bassin d'acide : après 2 s, 3 flaques en cône (100 % AD magique), puis 60 % de ralentissement 2.5 s. */
+    private static void acidPool(LivingEntity baron, Player t, double ad) {
+        Location o = baron.getLocation();
+        Vector dir = flatDir(o, t.getLocation());
+        later(40, () -> {
+            for (int i = -1; i <= 1; i++) {
+                Location pool = o.clone().add(dir.clone().rotateAroundY(Math.toRadians(25 * i)).multiply(6));
+                fr.lolmc.util.VisualEffectUtil.groundRing(pool.getWorld(), pool, 2.0, Material.LIME_STAINED_GLASS, 14, 0.3f, 0.1f, 50L);
+                for (Player p : championsNear(pool, 2.0)) DamageUtil.damage(null, p, ad, true, DamageUtil.Type.MAGICAL);
+                for (int k = 0; k < 5; k++) later(10L * k, () -> {
+                    for (Player p : championsNear(pool, 2.0)) LolPlugin.getInstance().getCCManager().slowPct(p, 0.60, 12);
+                });
+            }
+        });
+    }
+
+    /** Jet d'acide : après 2 s, une ligne d'acide (100 % AD magique). */
+    private static void acidShot(LivingEntity baron, Player t, double ad) {
+        Location o = baron.getLocation();
+        Vector dir = flatDir(o, t.getLocation());
+        later(40, () -> {
+            var hit = new HashSet<UUID>();
+            for (double d = 1; d <= 12; d += 0.5) {
+                Location pt = o.clone().add(dir.clone().multiply(d));
+                fr.lolmc.util.VisualEffectUtil.impact(pt.getWorld(), pt.clone().add(0, 0.5, 0), Material.LIME_STAINED_GLASS, 0.25f, 6L);
+                for (Player p : championsNear(pt, 1.3))
+                    if (hit.add(p.getUniqueId())) DamageUtil.damage(null, p, ad, true, DamageUtil.Type.MAGICAL);
+            }
+        });
+    }
+
+    /** Tentacules : sous la cible, éruption après 1.25 s (100 % AD magique, projeté 1.25 s). */
+    private static void tentacleKnockup(LivingEntity baron, Player t, double ad) {
+        Location at = t.getLocation().clone();
+        fr.lolmc.util.VisualEffectUtil.groundRing(at.getWorld(), at, 2.5, Material.PURPLE_STAINED_GLASS, 16, 0.3f, 0.1f, 25L);
+        later(25, () -> {
+            for (Player p : championsNear(at, 2.5)) {
+                DamageUtil.damage(null, p, ad, true, DamageUtil.Type.MAGICAL);
+                LolPlugin.getInstance().getCCManager().setAirborne(p, 25);
+            }
+        });
+    }
+
+    private static boolean isBehind(LivingEntity baron, Player p) {
+        Vector facing = baron.getLocation().getDirection().setY(0);
+        if (facing.lengthSquared() < 1e-6) return false;
+        return facing.angle(flatDir(baron.getLocation(), p.getLocation())) > Math.toRadians(90);
+    }
+    private static int behindCount(LivingEntity baron) {
+        int n = 0; for (Player p : championsNear(baron.getLocation(), 9.5)) if (isBehind(baron, p)) n++; return n;
+    }
+    private static int frontCount(LivingEntity baron) {
+        int n = 0; for (Player p : championsNear(baron.getLocation(), 9.5)) if (!isBehind(baron, p)) n++; return n;
+    }
+
+    /** Pics arrière (wiki) : 50 % AD physique et 0.5 s d'étourdissement aux unités derrière le Baron. */
+    private static void rearSpikes(LivingEntity baron, double ad) {
+        for (Player p : championsNear(baron.getLocation(), 6)) {
+            if (!isBehind(baron, p)) continue;
+            DamageUtil.damage(null, p, ad * 0.5, false, DamageUtil.Type.PHYSICAL);
+            LolPlugin.getInstance().getCCManager().stun(p, 10);
+        }
+        baron.getWorld().playSound(baron.getLocation(), Sound.BLOCK_POINTED_DRIPSTONE_LAND, 1.5f, 0.6f);
+    }
+
+    /** Capacité de forme, selon la forme tirée pour la partie. */
+    private static void formAbility(LivingEntity baron, Player t, double ad) {
+        Integer form = baron.getPersistentDataContainer().get(JungleManager.KEY_BARON_FORM,
+                org.bukkit.persistence.PersistentDataType.INTEGER);
+        switch (form != null ? form : 1) {
+            case 0 -> huntingLightning(baron);
+            case 2 -> allSeeingRifts(baron);
+            default -> territorialPull(baron, t, ad);
+        }
+    }
+
+    /**
+     * Forme Chasseur : la foudre frappe les champions (1re après 0.7 s, puis toutes les 0.1 s), 20 %
+     * de leurs PV actuels en dégâts magiques, divisés par deux à chaque frappe suivante.
+     */
+    private static void huntingLightning(LivingEntity baron) {
+        var targets = championsNear(baron.getLocation(), 20);
+        var cm = LolPlugin.getInstance().getChampionManager();
+        for (int i = 0; i < targets.size(); i++) {
+            Player p = targets.get(i);
+            double pct = 0.20 / Math.pow(2, i);
+            later(14 + 2L * i, () -> {
+                if (!cm.hasChampion(p) || p.getGameMode() == org.bukkit.GameMode.SPECTATOR) return;
+                p.getWorld().strikeLightningEffect(p.getLocation());
+                DamageUtil.damage(null, p, cm.getChampion(p).getHPSystem().getCurrentHP() * pct, false, DamageUtil.Type.MAGICAL);
+            });
+        }
+    }
+
+    /**
+     * Forme Omniscient : faille du Néant sous les deux champions visibles les plus éloignés (22 blocs),
+     * 3 s : 150 dégâts magiques puis 50 toutes les 0.166 s (1000 au total).
+     */
+    private static void allSeeingRifts(LivingEntity baron) {
+        var targets = championsNear(baron.getLocation(), 22);
+        targets.sort((a, b) -> Double.compare(b.getLocation().distanceSquared(baron.getLocation()),
+                a.getLocation().distanceSquared(baron.getLocation())));
+        for (int i = 0; i < Math.min(2, targets.size()); i++) {
+            Location at = targets.get(i).getLocation().clone();
+            fr.lolmc.util.VisualEffectUtil.groundRing(at.getWorld(), at, 2.0, Material.PURPLE_STAINED_GLASS, 16, 0.3f, 0.1f, 60L);
+            for (int tick = 0; tick <= 18; tick++) {
+                final double dmg = tick == 0 ? 150 : 50;
+                later(Math.round(tick * 3.33), () -> {
+                    for (Player p : championsNear(at, 2.0)) DamageUtil.damage(null, p, dmg, false, DamageUtil.Type.MAGICAL);
+                });
+            }
+        }
+    }
+
+    /** Forme Territorial : après 1.5 s, attire les unités d'un cône de 3 blocs (140 % AD magique). */
+    private static void territorialPull(LivingEntity baron, Player t, double ad) {
+        Location o = baron.getLocation();
+        Vector dir = flatDir(o, t.getLocation());
+        later(30, () -> {
+            for (Player p : championsNear(o, 10)) {
+                Vector to = flatDir(o, p.getLocation());
+                if (to.angle(dir) > Math.toRadians(35)) continue;
+                DamageUtil.damage(null, p, ad * 1.40, true, DamageUtil.Type.MAGICAL);
+                p.setVelocity(to.clone().multiply(-1.0).setY(0.2));
+            }
+        });
+    }
+
+    private static void later(long ticks, Runnable r) {
+        org.bukkit.Bukkit.getScheduler().runTaskLater(LolPlugin.getInstance(), r, ticks);
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // HÉRAUT DE LA FAILLE (wiki)
+    // ══════════════════════════════════════════════════════════════
+
+    /** Œil du Héraut : fermé jusqu'à, et dernière ouverture. */
+    private static final Map<UUID, Long> EYE_CLOSED_UNTIL = new java.util.concurrent.ConcurrentHashMap<>();
+    /** Seuils de Balayage déjà déclenchés (66 % puis 33 %). */
+    private static final Map<UUID, Integer> SWIPES_DONE = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /**
+     * Attaque de base d'un champion sur le Héraut : dans son dos, l'œil subit 12 % de ses PV max en
+     * dégâts bruts, puis se ferme 6 s (pas d'ouverture sous 15 % de PV).
+     */
+    public static void onChampionBasicAttack(Player attacker, LivingEntity mob) {
+        if (JungleManager.getMonsterType(mob) != MonsterType.HERALD) return;
+        long now = System.currentTimeMillis();
+        if (EYE_CLOSED_UNTIL.getOrDefault(mob.getUniqueId(), 0L) > now) return;
+        double max = fr.lolmc.util.VirtualHP.getMax(mob);
+        if (fr.lolmc.util.VirtualHP.getCurrent(mob) < max * 0.15) return;
+        Vector facing = mob.getLocation().getDirection().setY(0);
+        Vector toAttacker = attacker.getLocation().toVector().subtract(mob.getLocation().toVector()).setY(0);
+        if (facing.lengthSquared() < 1e-6 || toAttacker.lengthSquared() < 1e-6) return;
+        if (facing.angle(toAttacker) < Math.toRadians(120)) return; // pas dans le dos
+        EYE_CLOSED_UNTIL.put(mob.getUniqueId(), now + 6000L);
+        fr.lolmc.util.MobCombat.damage(attacker, mob, max * 0.12, DamageUtil.Type.TRUE);
+        attacker.sendActionBar(Component.text("👁 Œil du Héraut touché !", NamedTextColor.LIGHT_PURPLE));
+    }
+
+    /** Balayage : à 65.75 % et 32.75 % des PV, après 1.5 s, cône de 125 % AD physique. */
+    private static void heraldSwipeCheck(LivingEntity mob, Player target) {
+        double ratio = fr.lolmc.util.VirtualHP.getCurrent(mob) / Math.max(1, fr.lolmc.util.VirtualHP.getMax(mob));
+        int done = SWIPES_DONE.getOrDefault(mob.getUniqueId(), 0);
+        int due = ratio <= 0.3275 ? 2 : ratio <= 0.6575 ? 1 : 0;
+        if (due <= done) return;
+        SWIPES_DONE.put(mob.getUniqueId(), due);
+        double ad = fr.lolmc.util.MobCombat.getAD(mob);
+        Location o = mob.getLocation();
+        Vector dir = flatDir(o, target.getLocation());
+        later(30, () -> {
+            for (Player p : championsNear(o, 4.5)) {
+                if (flatDir(o, p.getLocation()).angle(dir) > Math.toRadians(60)) continue;
+                DamageUtil.damage(null, p, ad * 1.25, false, DamageUtil.Type.PHYSICAL);
+            }
+            mob.getWorld().playSound(o, Sound.ENTITY_RAVAGER_ATTACK, 1f, 0.7f);
+        });
+    }
+
+    private static final Map<UUID, Integer> ATTACK_COUNT = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** Souffle du dragon (wiki) : +5 % des PV actuels de la cible (4 % pour le Chimtech). */
+    private static double dragonBreath(MonsterType type, Player t) {
+        if (!type.isDragon()) return 0;
+        var cm = LolPlugin.getInstance().getChampionManager();
+        if (!cm.hasChampion(t)) return 0;
+        return cm.getChampion(t).getHPSystem().getCurrentHP() * (type == MonsterType.DRAGON_CHEMTECH ? 0.04 : 0.05);
+    }
+
+    /** Dragon Hextech : une attaque sur 4 rebondit sur 3 ennemis proches et les ralentit de 40 % (2 s). */
+    private static void hextechChain(LivingEntity dragon, Player first, double ad) {
+        var cc = LolPlugin.getInstance().getCCManager();
+        int n = 0;
+        for (Entity e : first.getNearbyEntities(4, 3, 4)) {
+            if (n >= 3) break;
+            if (!(e instanceof Player p) || p.equals(first) || !LolPlugin.getInstance().getChampionManager().hasChampion(p)
+                    || p.getGameMode() == org.bukkit.GameMode.SPECTATOR) continue;
+            n++;
+            basicHit(p, ad);
+            if (cc != null) cc.slowDecaying(p, 0.40, 40);
+        }
+        if (cc != null) cc.slowDecaying(first, 0.40, 40);
     }
 
     private static void basicHit(Player t, double ad) {
@@ -187,6 +530,7 @@ public class MonsterAbilities {
             case DRAGON_MOUNTAIN -> Material.COBBLESTONE;
             case DRAGON_CLOUD -> Material.FEATHER;
             case DRAGON_CHEMTECH -> Material.SLIME_BALL;
+            case DRAGON_HEXTECH -> Material.COPPER_INGOT;
             default -> Material.AMETHYST_SHARD; // Ancien
         };
     }
@@ -197,6 +541,7 @@ public class MonsterAbilities {
             case DRAGON_MOUNTAIN -> Material.BROWN_STAINED_GLASS;
             case DRAGON_CLOUD -> Material.WHITE_STAINED_GLASS;
             case DRAGON_CHEMTECH -> Material.LIME_STAINED_GLASS;
+            case DRAGON_HEXTECH -> Material.CYAN_STAINED_GLASS;
             case DRAGON_ELDER -> Material.PURPLE_STAINED_GLASS;
             default -> Material.ORANGE_STAINED_GLASS;
         };
@@ -215,7 +560,7 @@ public class MonsterAbilities {
     }
 
     private static void forget(UUID id) {
-        LAST_HURT.remove(id); NEXT_ATTACK.remove(id); RETURNING.remove(id);
+        LAST_HURT.remove(id); NEXT_ATTACK.remove(id); RETURNING.remove(id); ATTACK_COUNT.remove(id);
     }
 
     /** Cible actuelle du monstre (champion qui l'a réveillé), ou null s'il dort. */
@@ -227,6 +572,7 @@ public class MonsterAbilities {
     private void startAbilityLoop() {
         new BukkitRunnable() {
             @Override public void run() {
+                tickVoidCorruption();
                 for (var world : LolPlugin.getInstance().getServer().getWorlds()) {
                     for (Entity e : world.getEntities()) {
                         if (!JungleManager.isJungleMonster(e)) continue;
@@ -280,15 +626,8 @@ public class MonsterAbilities {
 
         switch (type) {
             case SCUTTLE_CRAB -> { return crabFlee(mob, nearest); }
-            case RED_BUFF -> { return redSmash(mob, targets); }
-            case BLUE_BUFF -> { return blueManaBurn(mob, nearest); }
-            case BARON -> { return baronNuke(mob, targets); }
-            case HERALD -> { return heraldCharge(mob, nearest); }
-            case DRAGON_INFERNAL, DRAGON_OCEAN, DRAGON_MOUNTAIN,
-                 DRAGON_CLOUD, DRAGON_CHEMTECH, DRAGON_ELDER -> {
-                return dragonBreath(mob, type, targets, nearest);
-            }
-            // Camps neutres : pas de capacité, seulement leurs attaques de base
+            case HERALD -> { heraldSwipeCheck(mob, nearest); return heraldCharge(mob, nearest); }
+            // Buffs, dragons et camps : pas de capacité, seulement leurs attaques de base (LoL)
             default -> { return false; }
         }
     }
@@ -305,171 +644,39 @@ public class MonsterAbilities {
         return false; // pas de cooldown (fuite continue)
     }
 
-    // ── Buff Rouge : coup au sol qui brûle et ralentit ────────────
-
-    private boolean redSmash(LivingEntity mob, List<Player> targets) {
-        Location c = mob.getLocation();
-        fr.lolmc.util.VisualEffectUtil.impactBurst(c.getWorld(),
-                c, Material.MAGMA_BLOCK, 0.3f, 1.5, 7, 10L);
-        c.getWorld().playSound(c, Sound.ENTITY_BLAZE_SHOOT, 1f, 0.8f);
-        for (Player p : targets) {
-            if (p.getLocation().distance(c) <= 4) {
-                DamageUtil.damage(null, p, 40, true, DamageUtil.Type.MAGICAL);
-                applyRedBuffDebuff(p); // brûlure + ralentissement
-            }
-        }
-        return true;
-    }
-
-    /** Applique la brûlure + ralentissement du buff Rouge (utilisé aussi en passif). */
-    public static void applyRedBuffDebuff(Player victim) {
-        victim.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 40, 1, false, true));
-        // Brûlure : dégâts sur la durée (3s)
-        new BukkitRunnable() {
-            int ticks = 0;
-            @Override public void run() {
-                if (ticks >= 3 || victim.isDead() || !victim.isOnline()) { cancel(); return; }
-                DamageUtil.damage(null, victim, 12, true, DamageUtil.Type.TRUE);
-                fr.lolmc.util.VisualEffectUtil.impact(victim.getWorld(),
-                        victim.getLocation().add(0,1,0), Material.ORANGE_STAINED_GLASS, 0.22f, 4L);
-                ticks++;
-            }
-        }.runTaskTimer(LolPlugin.getInstance(), 0L, 20L);
-    }
-
-    // ── Buff Bleu : tir de mana-burn ──────────────────────────────
-
-    private boolean blueManaBurn(LivingEntity mob, Player target) {
-        fr.lolmc.util.TargetingUtil.launchHoming(null, mob.getEyeLocation(), target, 12.0,
-                new org.bukkit.inventory.ItemStack(Material.LIGHT_BLUE_STAINED_GLASS), 0.7f,
-                Material.LIGHT_BLUE_STAINED_GLASS, false, () -> {
-            if (!LolPlugin.getInstance().getChampionManager().hasChampion(target)) return;
-            DamageUtil.damage(null, target, 35, true, DamageUtil.Type.MAGICAL);
-            // Brûle la ressource (mana/énergie)
-            var champ = LolPlugin.getInstance().getChampionManager().getChampion(target);
-            champ.getResourceSystem().consume(30);
-            target.sendActionBar(Component.text("🔵 Mana brûlé!", NamedTextColor.BLUE));
-        });
-        return true;
-    }
-
-    // ── Baron : nuke de zone + repousse + debuff ──────────────────
-
-    private boolean baronNuke(LivingEntity mob, List<Player> targets) {
-        Location c = mob.getLocation();
-        fr.lolmc.util.VisualEffectUtil.impact(c.getWorld(),
-                c.clone().add(0,1,0), Material.PURPLE_STAINED_GLASS, 0.8f, 8L);
-        c.getWorld().playSound(c, Sound.ENTITY_WARDEN_SONIC_BOOM, 1f, 1f);
-        for (Player p : targets) {
-            double dist = p.getLocation().distance(c);
-            if (dist <= 7) {
-                DamageUtil.damage(null, p, 120, true, DamageUtil.Type.MAGICAL);
-                // Repousse
-                Vector push = p.getLocation().toVector().subtract(c.toVector()).normalize().multiply(1.2);
-                push.setY(0.5);
-                p.setVelocity(push);
-                // Debuff : faiblesse (réduction de dégâts infligés)
-                p.addPotionEffect(new PotionEffect(PotionEffectType.WEAKNESS, 60, 0, false, true));
-                // Effet réel (la Faiblesse vanilla n'agit pas sur les dégâts LoL) : -35 % de dégâts 3 s
-                fr.lolmc.LolPlugin.getInstance().getSummonerSpellManager().exhaust(p, 3000L);
-            }
-        }
-        return true;
-    }
-
     // ── Héraut : charge qui repousse ──────────────────────────────
 
+    /**
+     * Charge (wiki) : après 2.5 s, le Héraut bondit vers la position de sa cible et inflige 200 % AD
+     * physique aux champions sur sa trajectoire en les écartant.
+     */
     private boolean heraldCharge(LivingEntity mob, Player target) {
-        Vector dir = target.getLocation().toVector()
-                .subtract(mob.getLocation().toVector()).normalize().multiply(1.5);
-        dir.setY(0.2);
-        mob.setVelocity(dir);
-        mob.getWorld().playSound(mob.getLocation(), Sound.ENTITY_RAVAGER_ROAR, 1f, 1f);
-        // Dégâts + repousse si proche
-        if (target.getLocation().distance(mob.getLocation()) <= 3) {
-            DamageUtil.damage(null, target, 60, true, DamageUtil.Type.PHYSICAL);
-            Vector push = dir.clone().multiply(1.5); push.setY(0.6);
-            target.setVelocity(push);
-        }
-        return true;
-    }
-
-    // ── Dragons : souffle de feu en cône + effet d'élément ────────
-
-    private boolean dragonBreath(LivingEntity dragon, MonsterType type, List<Player> targets, Player aim) {
-        Location origin = dragon.getEyeLocation();
-        // Souffle orienté vers la cible (avant : la direction du regard, arbitraire pour un mob immobile)
-        Vector facing = aim.getLocation().add(0, 1, 0).toVector().subtract(origin.toVector());
-        facing = facing.lengthSquared() > 1e-6 ? facing.normalize() : origin.getDirection();
-        Sound sound = Sound.ENTITY_ENDER_DRAGON_SHOOT;
-        Material breathBlock = dragonBlockColor(type);
-
-        // Tracer le cône de souffle
-        for (double d = 1; d <= 8; d += 0.5) {
-            Location point = origin.clone().add(facing.clone().multiply(d));
-            fr.lolmc.util.VisualEffectUtil.impact(point.getWorld(), point, breathBlock, 0.3f, 3L);
-        }
-        origin.getWorld().playSound(origin, sound, 1f, 1f);
-
-        // Toucher les joueurs dans le cône (angle < 45°)
-        for (Player p : targets) {
-            Vector toPlayer = p.getLocation().toVector().subtract(origin.toVector());
-            if (toPlayer.length() > 8) continue;
-            double angle = facing.angle(toPlayer.normalize());
-            if (angle < Math.toRadians(45)) {
-                double dmg = type == MonsterType.DRAGON_ELDER ? 90 : 60;
-                DamageUtil.damage(null, p, dmg, true, DamageUtil.Type.MAGICAL);
-                applyDragonElementEffect(type, p);
-            }
-        }
-        return true;
-    }
-
-    private void applyDragonElementEffect(MonsterType type, Player p) {
-        switch (type) {
-            case DRAGON_INFERNAL -> // brûlure
-                new BukkitRunnable() {
-                    int t = 0;
-                    @Override public void run() {
-                        if (t >= 3 || p.isDead() || !p.isOnline()) { cancel(); return; }
-                        DamageUtil.damage(null, p, 10, true, DamageUtil.Type.MAGICAL);
-                        t++;
-                    }
-                }.runTaskTimer(LolPlugin.getInstance(), 0L, 20L);
-            case DRAGON_OCEAN -> // ralentit fortement
-                p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 60, 2, false, true));
-            case DRAGON_MOUNTAIN -> // étourdit (lenteur extrême brève)
-                p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 30, 5, false, true));
-            case DRAGON_CLOUD -> // le dragon devient plus rapide (déjà mobile)
-                p.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 40, 1, false, true));
-            case DRAGON_CHEMTECH -> // poison
-                p.addPotionEffect(new PotionEffect(PotionEffectType.POISON, 60, 0, false, true));
-            case DRAGON_ELDER -> { // exécution : dégâts bonus si bas
-                if (LolPlugin.getInstance().getChampionManager().hasChampion(p)) {
-                    var hp = LolPlugin.getInstance().getChampionManager().getChampion(p).getHPSystem();
-                    if (hp.getCurrentHP() / hp.getMaxHP() < 0.2) {
-                        DamageUtil.damage(null, p, 9999, true, DamageUtil.Type.TRUE); // exécute
-                    }
+        Location from = mob.getLocation().clone();
+        Location to = target.getLocation().clone();
+        mob.getWorld().playSound(from, Sound.ENTITY_RAVAGER_ROAR, 1f, 1f);
+        double ad = fr.lolmc.util.MobCombat.getAD(mob);
+        later(50, () -> {
+            if (!mob.isValid() || mob.isDead()) return;
+            Vector dir = flatDir(from, to);
+            double len = Math.min(8, from.distance(to));
+            var hit = new HashSet<UUID>();
+            for (double d = 0; d <= len; d += 0.5) {
+                Location pt = from.clone().add(dir.clone().multiply(d));
+                for (Player p : championsNear(pt, 1.5)) {
+                    if (!hit.add(p.getUniqueId())) continue;
+                    DamageUtil.damage(null, p, ad * 2.0, false, DamageUtil.Type.PHYSICAL);
+                    Vector side = new Vector(-dir.getZ(), 0.4, dir.getX());
+                    p.setVelocity(side.multiply(0.8));
                 }
             }
-            default -> {}
-        }
+            mob.setVelocity(dir.clone().multiply(1.6).setY(0.2));
+        });
+        return true;
     }
 
     // ══════════════════════════════════════════════════════════════
     // HELPERS
     // ══════════════════════════════════════════════════════════════
-
-    private Material dragonBlockColor(MonsterType type) {
-        return switch (type) {
-            case DRAGON_OCEAN -> Material.LIGHT_BLUE_STAINED_GLASS;
-            case DRAGON_MOUNTAIN -> Material.BROWN_STAINED_GLASS;
-            case DRAGON_CLOUD -> Material.WHITE_STAINED_GLASS;
-            case DRAGON_CHEMTECH -> Material.LIME_STAINED_GLASS;
-            case DRAGON_ELDER -> Material.PURPLE_STAINED_GLASS;
-            default -> Material.ORANGE_STAINED_GLASS; // DRAGON_INFERNAL, et repli pour tout autre monstre
-        };
-    }
 
     private double abilityRange(MonsterType type) {
         if (type.isEpic()) return 10;
@@ -480,9 +687,7 @@ public class MonsterAbilities {
     private long abilityCooldown(MonsterType type) {
         return switch (type) {
             case BARON, DRAGON_ELDER -> 5000L;
-            case DRAGON_INFERNAL, DRAGON_OCEAN, DRAGON_MOUNTAIN,
-                 DRAGON_CLOUD, DRAGON_CHEMTECH, HERALD -> 4000L;
-            case RED_BUFF, BLUE_BUFF -> 3000L;
+            case HERALD -> 8000L; // charge : fenêtre de 2.5 s puis bond
             default -> 2500L;
         };
     }
@@ -500,6 +705,8 @@ public class MonsterAbilities {
     public void cleanup(UUID entityId) {
         abilityCooldowns.remove(entityId);
         AGGRO.remove(entityId);
+        GAZE_TARGET.remove(entityId); GAZE_UNTIL.remove(entityId); BARON_ROTATION.remove(entityId);
+        EYE_CLOSED_UNTIL.remove(entityId); SWIPES_DONE.remove(entityId);
         forget(entityId);
     }
 }

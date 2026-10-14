@@ -61,11 +61,7 @@ public class StructureDamageListener implements Listener {
         BaseChampion champ = championManager.getChampion(player);
         double damage = champ.getStats().getFinalAD();
 
-        // Bonus voidgrubs (3 grubs: +6%, 6 grubs: +14%)
-        var jm = fr.lolmc.instance.InstanceHelper.jungleManager(player);
-        if (jm != null && structure.getType() == Type.TURRET) {
-            damage *= jm.getVoidgrubDamageBonus(playerTeam);
-        }
+        voidgrubEffects(player, structure, playerTeam, champ.getAutoAttackRange() <= 3.0);
 
         var tm = fr.lolmc.instance.InstanceHelper.turretManager(player);
         if (structure.getType() != Type.TURRET) {
@@ -155,6 +151,43 @@ public class StructureDamageListener implements Listener {
                 "%s : %.0f/%.0f HP (%.0f%%)",
                 structureName(structure), structure.getCurrentHP(),
                 structure.getMaxHP(), structure.getHealthPercent()), NamedTextColor.YELLOW));
+        }
+    }
+
+    /** Brûlures du Toucher du Néant en cours, par structure et par joueur. */
+    private final java.util.Map<String, Long> voidBurnUntil = new java.util.HashMap<>();
+    private final java.util.Map<java.util.UUID, Long> voidmiteReady = new java.util.HashMap<>();
+
+    /**
+     * Larves du Néant (wiki, patch 26.11) : Toucher du Néant, chaque attaque brûle la structure
+     * 4 s (8 ticks) pour 4/12/16 bruts par tick en mêlée, 2/6/8 à distance (1/2/3 larves) ; Faim du
+     * Néant (3 larves) : 1 Voidmite allié toutes les 15 s en combat contre une structure.
+     * Avant : +6 % / +14 % de dégâts aux tourelles.
+     */
+    private void voidgrubEffects(Player player, GameStructure structure, Team team, boolean melee) {
+        var jm = fr.lolmc.instance.InstanceHelper.jungleManager(player);
+        int grubs = jm != null ? Math.min(3, jm.getVoidgrubKills(team)) : 0;
+        if (grubs <= 0) return;
+        double perTick = melee ? new double[]{4, 12, 16}[grubs - 1] : new double[]{2, 6, 8}[grubs - 1];
+        String key = player.getUniqueId() + ":" + structure.getId();
+        boolean running = voidBurnUntil.getOrDefault(key, 0L) > System.currentTimeMillis();
+        voidBurnUntil.put(key, System.currentTimeMillis() + 4000L); // rafraîchie à chaque attaque
+        if (!running) new org.bukkit.scheduler.BukkitRunnable() {
+            @Override public void run() {
+                if (structure.isDestroyed() || voidBurnUntil.getOrDefault(key, 0L) <= System.currentTimeMillis()) {
+                    voidBurnUntil.remove(key); cancel(); return;
+                }
+                boolean phase = structure.takeDamage(perTick);
+                if (structure.isDestroyed()) {
+                    if (player.isOnline()) onStructureDestroyed(structure, player);
+                    else onStructureDestroyedByMinions(structure, structure.getCenter().getWorld());
+                } else if (phase && player.isOnline()) map(player).updateStructurePhase(structure);
+            }
+        }.runTaskTimer(LolPlugin.getInstance(), 10L, 10L);
+        if (grubs >= 3 && voidmiteReady.getOrDefault(player.getUniqueId(), 0L) <= System.currentTimeMillis()) {
+            voidmiteReady.put(player.getUniqueId(), System.currentTimeMillis() + 15000L);
+            var mm = fr.lolmc.instance.InstanceHelper.minionManager(player);
+            if (mm != null) mm.spawnVoidmite(player.getLocation(), team);
         }
     }
 

@@ -135,6 +135,7 @@ public final class GameInstance {
             fr.lolmc.util.ChampionStateReset.resetPlayer(uid);
             lp.getCCManager().clear(uid);
             lp.getDeathRecapManager().cleanup(uid);
+            fr.lolmc.game.JungleBuffs.cleanup(uid);
             if (lp.getConsumableManager() != null) lp.getConsumableManager().cleanup(uid);
         }
         participants.clear();

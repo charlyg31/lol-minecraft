@@ -87,6 +87,8 @@ public final class BaseManager {
         recallStartLoc.put(player.getUniqueId(), player.getLocation().clone());
         final var recallHp = cm.getChampion(player).getHPSystem();
         final double[] lastHp = {recallHp.getCurrentHP()};
+        // Main du Baron : rappel accéléré, durée de canalisation divisée par deux
+        final int recallSeconds = JungleBuffs.hasBaron(player) ? RECALL_SECONDS / 2 : RECALL_SECONDS;
 
         BukkitRunnable task = new BukkitRunnable() {
             int ticks = 0;
@@ -106,12 +108,12 @@ public final class BaseManager {
                     return;
                 }
                 ticks++;
-                int secsLeft = RECALL_SECONDS - ticks / 20;
+                int secsLeft = recallSeconds - ticks / 20;
                 player.sendActionBar(Component.text("🌀 Recall... " + secsLeft + "s", NamedTextColor.AQUA));
 
                 // ── Recall visuel façon LoL : cercle rotatif + pilier ──
                 Location center = player.getLocation();
-                double progress = ticks / (double)(RECALL_SECONDS * 20); // 0 → 1
+                double progress = ticks / (double)(recallSeconds * 20); // 0 → 1
 
                 var displays = recallDisplays.computeIfAbsent(player.getUniqueId(),
                         k -> initRecallDisplays(player));
@@ -153,7 +155,7 @@ public final class BaseManager {
                         1.0f + (float) progress * 0.5f);
                 }
 
-                if (ticks >= RECALL_SECONDS * 20) {
+                if (ticks >= recallSeconds * 20) {
                     completeRecall(player);
                     cancel();
                     activeRecalls.remove(player.getUniqueId());

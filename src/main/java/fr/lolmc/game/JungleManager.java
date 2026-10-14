@@ -62,12 +62,16 @@ public class JungleManager {
     // ── Rotation des dragons (LoL) : 3 premiers élémentaires DIFFÉRENTS,
     //    le 3e fige l'élément de la Faille ; après une âme → Elder ──
     private final List<MonsterType> spawnedDragonElements = new ArrayList<>();
+    /** Forme du Baron, tirée au hasard une fois par partie (wiki) : 0 Chasseur, 1 Territorial, 2 Omniscient. */
+    private int baronForm = -1;
+    private static final String[] BARON_FORMS = {"Chasseur", "Territorial", "Omniscient"};
+    public static NamespacedKey KEY_BARON_FORM;
     private MonsterType lockedDragonElement = null;
 
     private static final MonsterType[] DRAGON_POOL = {
         MonsterType.DRAGON_INFERNAL, MonsterType.DRAGON_OCEAN,
         MonsterType.DRAGON_MOUNTAIN, MonsterType.DRAGON_CLOUD,
-        MonsterType.DRAGON_CHEMTECH
+        MonsterType.DRAGON_CHEMTECH, MonsterType.DRAGON_HEXTECH // Hextech : 6e élément (manquait)
     };
 
     /** Prochain dragon à faire apparaître dans la fosse (règles LoL S15). */
@@ -137,6 +141,7 @@ public class JungleManager {
         DRAGON_MOUNTAIN (EntityType.RAVAGER,   5106,  75, 160, 300, "drake_mountain", 1, "⛰ Dragon Montagne"),
         DRAGON_CLOUD    (EntityType.RAVAGER,   5106,  75, 160, 300, "drake_cloud",    1, "☁ Dragon Foudre"),
         DRAGON_CHEMTECH (EntityType.RAVAGER,   5106,  75, 160, 300, "drake_chemtech", 1, "☣ Dragon Chimtech"),
+        DRAGON_HEXTECH  (EntityType.RAVAGER,   5106,  75, 160, 300, "drake_hextech",  1, "⚡ Dragon Hextech"),
         DRAGON_ELDER    (EntityType.RAVAGER,  17796, 150, 650, 360, "drake_elder",    1, "🐲 Dragon Ancien"),
         // ── Épiques de la fosse ──
         VOIDGRUB     (EntityType.SILVERFISH,   2269,  30, 65,  0, "voidgrub", 3, "🐛 Nuée du Néant"),
@@ -199,13 +204,22 @@ public class JungleManager {
             };
             case RED_BUFF, BLUE_BUFF -> flat(2300, 6210, 66, 198, 42, 90, 95, 142.5);
             case SCUTTLE_CRAB -> new MStats(1550, 5270, 0, 0, 42, 42, 42, 42, 55, 121, 100, 150, 1);
-            case DRAGON_INFERNAL, DRAGON_OCEAN, DRAGON_MOUNTAIN, DRAGON_CLOUD, DRAGON_CHEMTECH ->
-                    new MStats(5106.25, 10000, 70, 70, 65.6, 170, 47.8, 100, 75, 75, 160, 400, 1);
+            // Dragons élémentaires : niveau de départ 6 (wiki ; avant : 1). AD propre à chaque élément,
+            // Montagne +15 % de PV (données du jeu)
+            case DRAGON_INFERNAL, DRAGON_OCEAN -> drake(70, 1.0);
+            case DRAGON_MOUNTAIN -> drake(105, 1.15);
+            case DRAGON_CLOUD -> drake(35, 1.0);
+            case DRAGON_CHEMTECH, DRAGON_HEXTECH -> drake(47, 1.0);
             case DRAGON_ELDER -> new MStats(17796.25, 21275, 105, 105, 121.6, 170, 75.8, 100, 150, 150, 650, 650, 13);
             case VOIDGRUB -> new MStats(2269, 4700, 21.69, 46, 72.76, 170, 51.38, 100, 30, 30, 65, 65, 7);
-            case HERALD -> new MStats(11718, 18900, 99.5, 250, 87.92, 170, 58.96, 100, 100, 100, 240, 240, 1);
-            case BARON -> new MStats(17791.75, 19190, 350.5, 515, 104.2, 170, 67.1, 100, 150, 150, 650, 650, 1);
+            // Niveaux de départ 9 et 11 (wiki ; avant : 1, donc des PV et des dégâts trop faibles)
+            case HERALD -> new MStats(11718, 18900, 99.5, 250, 87.92, 170, 58.96, 100, 100, 100, 240, 240, 9);
+            case BARON -> new MStats(17791.75, 19190, 350.5, 515, 104.2, 170, 67.1, 100, 150, 150, 650, 650, 11);
         };
+    }
+
+    private static MStats drake(double ad, double hpMult) {
+        return new MStats(5106.25 * hpMult, 10000 * hpMult, ad, ad, 65.6, 170, 47.8, 100, 75, 75, 160, 400, 6);
     }
 
     /** Vitesse d'attaque LoL du monstre (wiki). */
@@ -216,7 +230,10 @@ public class JungleManager {
             case RAPTOR -> size == Size.LARGE ? 0.667 : 1.0;
             case KRUG -> 0.613;
             case RED_BUFF, BLUE_BUFF -> 0.493;
-            case DRAGON_INFERNAL, DRAGON_OCEAN, DRAGON_MOUNTAIN, DRAGON_CLOUD, DRAGON_CHEMTECH, DRAGON_ELDER -> 0.5;
+            case DRAGON_INFERNAL, DRAGON_OCEAN, DRAGON_CHEMTECH, DRAGON_ELDER -> 0.5;
+            case DRAGON_MOUNTAIN -> 0.25;
+            case DRAGON_CLOUD -> 1.0;
+            case DRAGON_HEXTECH -> 0.75;
             case VOIDGRUB -> 0.5;
             case HERALD -> 0.4;
             case BARON -> 0.625;
@@ -283,6 +300,7 @@ public class JungleManager {
         KEY_MONSTER = new NamespacedKey(LolPlugin.getInstance(), "jungle_monster");
         KEY_BUFF = new NamespacedKey(LolPlugin.getInstance(), "jungle_buff");
         KEY_GOLD = new NamespacedKey(LolPlugin.getInstance(), "jungle_gold");
+        KEY_BARON_FORM = new NamespacedKey(LolPlugin.getInstance(), "baron_form");
         this.jungleFile = new File(LolPlugin.getInstance().getDataFolder(), "jungle.yml");
         if (!jungleFile.exists()) {
             try {
@@ -363,7 +381,7 @@ public class JungleManager {
         return switch (type) {
             case SCUTTLE_CRAB -> 175;   // 2:55
             case DRAGON_INFERNAL, DRAGON_OCEAN, DRAGON_MOUNTAIN,
-                 DRAGON_CLOUD, DRAGON_CHEMTECH, DRAGON_ELDER -> 300; // 5:00
+                 DRAGON_CLOUD, DRAGON_CHEMTECH, DRAGON_HEXTECH, DRAGON_ELDER -> 300; // 5:00
             case VOIDGRUB     -> 480;   // 8:00
             case HERALD       -> 900;   // 15:00
             case BARON        -> 1200;  // 20:00
@@ -399,6 +417,7 @@ public class JungleManager {
         epicRespawnAt.clear();
         spawnedDragonElements.clear();
         lockedDragonElement = null;
+        baronForm = -1;
         dragonsKilled.clear();
         dragonSoulType.clear();
         clearAllMonsters();
@@ -462,6 +481,14 @@ public class JungleManager {
             }
 
             mob.getPersistentDataContainer().set(KEY_MONSTER, PersistentDataType.STRING, type.name());
+            if (type == MonsterType.BARON) {
+                if (baronForm < 0) {
+                    baronForm = new Random().nextInt(3);
+                    announce(Component.text("🪱 Le Baron Nashor prend sa forme « " + BARON_FORMS[baronForm] + " »",
+                            NamedTextColor.DARK_PURPLE));
+                }
+                mob.getPersistentDataContainer().set(KEY_BARON_FORM, PersistentDataType.INTEGER, baronForm);
+            }
             mob.getPersistentDataContainer().set(KEY_BUFF, PersistentDataType.STRING, type.buff);
 
             // ── APPARENCE CUSTOM : modèle composite + mob de base invisible ──
@@ -514,7 +541,7 @@ public class JungleManager {
      */
     private void spawnScuttleShrine(Player killer, Location loc) {
         var wm = LolPlugin.getInstance().getWardManager();
-        if (wm != null) wm.placeWard(killer, loc.clone().add(0, 0.5, 0), 60);
+        if (wm != null) wm.placeWard(killer, loc.clone().add(0, 0.5, 0), 90); // 90 s (wiki ; avant : 60)
         var team = LolPlugin.getInstance().getTeamManager().getTeam(killer);
         var shrineDisplays = new ArrayList<BlockDisplay>(3);
         for (int i = 0; i < 3; i++) {
@@ -535,7 +562,7 @@ public class JungleManager {
         new BukkitRunnable() {
             int ticks = 0;
             @Override public void run() {
-                if (ticks >= 60 * 20) {
+                if (ticks >= 90 * 20) {
                     for (var d : shrineDisplays) if (!d.isDead()) d.remove();
                     cancel(); return;
                 }
@@ -551,8 +578,7 @@ public class JungleManager {
                     for (Player p : loc.getWorld().getPlayers()) {
                         if (LolPlugin.getInstance().getTeamManager().getTeam(p) != team) continue;
                         if (p.getLocation().distanceSquared(loc) <= 2.5 * 2.5)
-                            p.addPotionEffect(new PotionEffect(
-                                PotionEffectType.SPEED, 40, 0, false, false));
+                            LolPlugin.getInstance().getCCManager().speedPct(p, 0.30, 30); // +30 % 1.5 s (wiki)
                     }
                 }
                 ticks += 4;
@@ -607,8 +633,9 @@ public class JungleManager {
         }
 
         if (camp != null && camp.liveEntities.isEmpty()) {
-            // Tout le camp est nettoyé → programmer le respawn
-            camp.respawnAt = System.currentTimeMillis() + type.respawnSeconds * 1000L;
+            // Tout le camp est nettoyé → programmer le respawn. Larves et Héraut n'apparaissent
+            // qu'une fois (avant : délai de 0 s, ils réapparaissaient aussitôt, à l'infini)
+            camp.respawnAt = type.respawnSeconds > 0 ? System.currentTimeMillis() + type.respawnSeconds * 1000L : 0;
         }
 
         // Récompenses (or individuel du mob, lu depuis le PDC si dispo)
@@ -620,10 +647,10 @@ public class JungleManager {
             var rewards = siblingRewardManager();
             switch (type) {
                 // Dragons : or au tueur, XP partagée entre les alliés proches
-                case DRAGON_INFERNAL, DRAGON_OCEAN, DRAGON_MOUNTAIN, DRAGON_CLOUD, DRAGON_CHEMTECH ->
+                case DRAGON_INFERNAL, DRAGON_OCEAN, DRAGON_MOUNTAIN, DRAGON_CLOUD, DRAGON_CHEMTECH, DRAGON_HEXTECH ->
                         rewards.onEpicKill(killer, deathLoc, gold, 0, xp, 0);
-                // Ancien : or et XP à toute l'équipe
-                case DRAGON_ELDER -> rewards.onEpicKill(killer, deathLoc, 0, gold, 0, xp);
+                // Ancien : 150 or et 650 XP à toute l'équipe, +100 or au tueur (données du jeu)
+                case DRAGON_ELDER -> rewards.onEpicKill(killer, deathLoc, 100, gold, 0, xp);
                 // Baron : 150 or et 650 XP à toute l'équipe, +100 or au tueur
                 case BARON -> rewards.onEpicKill(killer, deathLoc, 100, gold, 0, xp);
                 // Héraut : or au tueur, XP partagée entre les proches
@@ -640,7 +667,7 @@ public class JungleManager {
                 if (type.isEpic()) {
                     // Héraut : donner l'Œil du Héraut au tueur
                     if (type == MonsterType.HERALD) {
-                        giveHeraldEye(killer);
+                        dropHeraldEye(killer, deathLoc != null ? deathLoc : killer.getLocation());
                     }
                     applyTeamBuff(killer, epicBuffId(type));
                     // Bounty d'objectif (comeback) sur les épiques
@@ -687,13 +714,12 @@ public class JungleManager {
                 var kteam = LolPlugin.getInstance().getTeamManager().getTeam(killer);
                 if (kteam != null) {
                     int grubs = voidgrubKills.merge(kteam, 1, Integer::sum);
-                    if (grubs == 3 || grubs == 6) {
-                        for (UUID mid : LolPlugin.getInstance().getTeamManager().getTeamMembers(kteam, killer.getWorld())) {
-                            Player mp = Bukkit.getPlayer(mid);
-                            if (mp != null) mp.sendMessage(Component.text(
-                                "🐛 " + grubs + " Nuées du Néant — +" + (grubs == 3 ? "6" : "14")
-                                + "% dégâts aux structures!", NamedTextColor.DARK_PURPLE));
-                        }
+                    for (UUID mid : LolPlugin.getInstance().getTeamManager().getTeamMembers(kteam, killer.getWorld())) {
+                        Player mp = Bukkit.getPlayer(mid);
+                        if (mp != null) mp.sendMessage(Component.text(grubs >= 3
+                                ? "🐛 Faim du Néant : tes attaques sur les structures invoquent des Voidmites"
+                                : "🐛 Toucher du Néant (" + grubs + ") : tes attaques brûlent les structures",
+                                NamedTextColor.DARK_PURPLE));
                     }
                 }
             }
@@ -727,6 +753,7 @@ public class JungleManager {
             @Override public void run() {
                 if (!active) return;
                 long now = System.currentTimeMillis();
+                despawnExpired();
                 for (CampSpawn camp : camps.values()) {
                     if (!camp.isAlive() && camp.respawnAt > 0) {
                         long secLeft = Math.max(0, (camp.respawnAt - now) / 1000L);
@@ -742,6 +769,28 @@ public class JungleManager {
                 }
             }
         }.runTaskTimer(LolPlugin.getInstance(), 20L, 20L);
+    }
+
+    /** Larves du Néant à 14:45 et Héraut à 19:45 (wiki) : retirés sans récompense, ne reviennent pas. */
+    private void despawnExpired() {
+        var gm = gameInstance != null ? gameInstance.getGameManager() : LolPlugin.getInstance().getGameManager();
+        if (gm == null || !gm.isGameRunning()) return;
+        long t = gm.getElapsedSeconds();
+        for (CampSpawn camp : camps.values()) {
+            long limit = camp.type == MonsterType.VOIDGRUB ? 885 : camp.type == MonsterType.HERALD ? 1185 : -1;
+            if (limit < 0 || t < limit || camp.liveEntities.isEmpty()) continue;
+            for (UUID id : new ArrayList<>(camp.liveEntities)) {
+                liveMonsters.remove(id);
+                List<UUID> parts = monsterDeco.remove(id);
+                if (parts != null) for (UUID pid : parts) { Entity d = Bukkit.getEntity(pid); if (d != null) d.remove(); }
+                MobAnimator.unregister(id);
+                Entity e = Bukkit.getEntity(id);
+                if (e != null) e.remove();
+            }
+            camp.liveEntities.clear();
+            camp.respawnAt = 0;
+            announce(Component.text("⌛ " + camp.type.displayName + " a quitté la fosse.", NamedTextColor.GRAY));
+        }
     }
 
     // ══════════════════════════════════════════════════════════════
@@ -781,63 +830,25 @@ public class JungleManager {
         BaseChampion champ = LolPlugin.getInstance().getChampionManager().getChampion(player);
 
         switch (buff) {
-            case "red" -> {
-                // Buff Rouge : dégâts bonus + ralentissement sur les attaques (120s)
-                champ.getStats().addBonusAD(15);
-                player.sendActionBar(Component.text(
-                        "🔴 Buff Rouge! +dégâts et ralentissement sur tes attaques (90s)",
-                        NamedTextColor.RED));
-                scheduleBuffRemoval(player, () -> champ.getStats().addBonusAD(-15), 90);
-            }
-            case "blue" -> {
-                // Buff Bleu : régén mana + réduction des cooldowns (120s)
-                champ.getStats().addBonusAbilityHaste(20);
-                player.sendActionBar(Component.text(
-                        "🔵 Buff Bleu! +20 hâte de compétence et régén ressource (90s)",
-                        NamedTextColor.BLUE));
-                scheduleBuffRemoval(player, () -> champ.getStats().addBonusAbilityHaste(-20), 90);
-            }
-            case "drake_infernal" -> {
-                champ.getStats().addBonusAD(8);
-                champ.getStats().addBonusAP(12);
-                player.sendActionBar(Component.text("🔥 Dragon Infernal: +dégâts!", NamedTextColor.RED));
-            }
-            case "drake_ocean" -> {
-                champ.getHPSystem().setHpRegen(champ.getHPSystem().getHpRegenPer5s() + 5);
-                player.sendActionBar(Component.text("🌊 Dragon Océan: +régénération!", NamedTextColor.AQUA));
-            }
-            case "drake_mountain" -> {
-                champ.getStats().addBonusArmor(10);
-                champ.getStats().addBonusMR(10);
-                player.sendActionBar(Component.text("⛰ Dragon Montagne: +résistances!", NamedTextColor.GOLD));
-            }
-            case "drake_cloud" -> {
-                // +2 % de vitesse (avant : +0,02 en valeur absolue, sans effet)
-                champ.getStats().addBonusMoveSpeed(champ.getStats().getFinalMovementSpeed() * 0.02);
-                player.sendActionBar(Component.text("☁ Dragon Foudre: +vitesse!", NamedTextColor.WHITE));
-            }
-            case "drake_chemtech" -> {
-                champ.getStats().multiplyHP(1.06);
-                player.sendActionBar(Component.text("☣ Dragon Chimtech: +6% PV!", NamedTextColor.GREEN));
+            case "red" -> JungleBuffs.grantRed(player);    // 120 s, brûlure + ralentissement (wiki)
+            case "blue" -> JungleBuffs.grantBlue(player);  // 120 s, 10-20 accélération + mana (wiki)
+            // Pourfendeur de dragons : un effet par drake (avant : bonus fixes inventés)
+            case "drake_infernal", "drake_ocean", "drake_mountain", "drake_cloud", "drake_chemtech", "drake_hextech" -> {
+                String el = buff.substring("drake_".length());
+                JungleBuffs.addDrakeStack(player, el);
+                player.sendActionBar(Component.text("🐉 Pourfendeur de dragons : " + el, NamedTextColor.LIGHT_PURPLE));
             }
             case "drake_elder" -> {
-                champ.getStats().addBonusAD(20);
-                champ.getStats().addBonusAP(30);
+                // Aspect du dragon : 150 s, brûlure et exécution sous 20 % (DamageUtil.elderEffects).
+                // Avant : +20 AD +30 AP et vitesse, absents du jeu
                 elderUntil.put(player.getUniqueId(), System.currentTimeMillis() + 150_000L);
-                player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 150*20, 0, false, true));
-                player.sendActionBar(Component.text("🐲 Dragon Ancien: bénédiction puissante!", NamedTextColor.LIGHT_PURPLE));
-                scheduleBuffRemoval(player, () -> {
-                    champ.getStats().addBonusAD(-20);
-                    champ.getStats().addBonusAP(-30);
-                }, 150);
+                player.sendActionBar(Component.text("🐲 Aspect du dragon (2 min 30) : brûlure et exécution sous 20 %",
+                        NamedTextColor.LIGHT_PURPLE));
             }
             case "baron" -> {
-                // Buff Baron : AD/AP bonus + renforce les sbires (180s)
-                champ.getStats().addBonusAD(24);
-                champ.getStats().addBonusAP(40);
-                player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 180 * 20, 0, false, true));
-                player.sendActionBar(Component.text(
-                        "🪱 Buff du Baron! +24 AD +40 AP (3min)", NamedTextColor.LIGHT_PURPLE));
+                // Main du Baron : 180 s, 12-48 AD / 20-80 AP selon la minute, rappel accéléré, perdue
+                // à la mort (avant : +24 AD +40 AP fixes, potion de vitesse, gardée en mourant)
+                JungleBuffs.grantBaron(player);
                 // Marqueur violet autour du joueur pendant 180s (visible par tous, comme en LoL)
                 var baronDisplay = player.getWorld().spawn(player.getLocation().add(0,1,0),
                         BlockDisplay.class, disp -> {
@@ -856,7 +867,7 @@ public class JungleManager {
                 new BukkitRunnable() {
                     int ticks = 0;
                     @Override public void run() {
-                        if (ticks >= 180*20/10 || !player.isOnline()) {
+                        if (ticks >= 180*20/10 || !player.isOnline() || !JungleBuffs.hasBaron(player)) {
                             if (!baronDisplay.isDead()) baronDisplay.remove();
                             cancel(); return;
                         }
@@ -864,45 +875,13 @@ public class JungleManager {
                         ticks++;
                     }
                 }.runTaskTimer(LolPlugin.getInstance(), 0L, 10L);
-                scheduleBuffRemoval(player, () -> {
-                    champ.getStats().addBonusAD(-24);
-                    champ.getStats().addBonusAP(-40);
-                }, 180);
             }
-            // ── Âmes du Dragon (permanentes, distinctes par élément) ──
-            case "dragon_soul_infernal" -> {
-                // Infernal : burst AoE — +AD/AP forts
-                champ.getStats().addBonusAD(30);
-                champ.getStats().addBonusAP(45);
-                player.sendActionBar(Component.text(
-                    "🔥 ÂME INFERNALE! +30 AD +45 AP permanents", NamedTextColor.RED));
-            }
-            case "dragon_soul_ocean" -> {
-                // Océan : régénération puissante
-                champ.getStats().addBonusAD(10);
-                champ.getStats().multiplyHP(1.05);
-                // Régénération LoL (la potion vanilla était écrasée par la synchro des PV)
-                champ.getHPSystem().setHpRegen(champ.getHPSystem().getHpRegenPer5s()
-                        + champ.getHPSystem().getMaxHP() * 0.05);
-                player.sendActionBar(Component.text(
-                    "🌊 ÂME OCÉANIQUE! Régénération permanente +5% PV", NamedTextColor.AQUA));
-            }
-            case "dragon_soul_mountain" -> {
-                // Montagne : bouclier + résistances
-                champ.getStats().addBonusArmor(25);
-                champ.getStats().addBonusMR(25);
-                champ.getStats().multiplyHP(1.10);
-                player.sendActionBar(Component.text(
-                    "⛰ ÂME MONTAGNEUSE! +25 Armure +25 RM +10% PV", NamedTextColor.GOLD));
-            }
-            case "dragon_soul_cloud", "dragon_soul_chemtech" -> {
-                // Nuage : vitesse de déplacement massive
-                champ.getStats().addBonusAD(15);
-                champ.getStats().addBonusAP(20);
-                player.addPotionEffect(new PotionEffect(
-                    PotionEffectType.SPEED, Integer.MAX_VALUE, 1, false, false));
-                player.sendActionBar(Component.text(
-                    "☁ ÂME DES NUAGES! +Vitesse permanente +15 AD +20 AP", NamedTextColor.WHITE));
+            // ── Âmes du Dragon (permanentes) : effets du wiki gérés par JungleBuffs ──
+            case "dragon_soul_infernal", "dragon_soul_ocean", "dragon_soul_mountain",
+                 "dragon_soul_cloud", "dragon_soul_chemtech", "dragon_soul_hextech" -> {
+                String el = buff.substring("dragon_soul_".length());
+                JungleBuffs.setSoul(player, el);
+                player.sendActionBar(Component.text("🐉 ÂME DU DRAGON : " + el.toUpperCase(), NamedTextColor.LIGHT_PURPLE));
             }
         }
         var hud = LolPlugin.getInstance().getHUDManager();
@@ -928,8 +907,27 @@ public class JungleManager {
     // HELPERS
     // ══════════════════════════════════════════════════════════════
 
-    /** Donne l'Œil du Héraut : clic droit → invoque un Héraut qui charge la tour. */
-    private void giveHeraldEye(Player killer) {
+    public static final String HERALD_EYE_TEAM = "herald_eye_team";
+
+    /**
+     * Œil du Héraut (wiki) : posé au sol à la mort du Héraut pendant 20 s ; un membre de l'équipe
+     * du tueur peut le ramasser (avant : donné directement au tueur).
+     */
+    private void dropHeraldEye(Player killer, Location at) {
+        var team = LolPlugin.getInstance().getTeamManager().getTeam(killer);
+        var eye = heraldEyeItem();
+        var item = at.getWorld().dropItem(at.clone().add(0, 0.5, 0), eye);
+        item.setUnlimitedLifetime(true);
+        item.setGlowing(true);
+        if (team != null) item.getPersistentDataContainer().set(
+                new NamespacedKey(LolPlugin.getInstance(), HERALD_EYE_TEAM), PersistentDataType.STRING, team.name());
+        new BukkitRunnable() { @Override public void run() { if (item.isValid()) item.remove(); } }
+                .runTaskLater(LolPlugin.getInstance(), 20 * 20L);
+        announce(Component.text("👁 L'Œil du Héraut est tombé (20 s pour le ramasser)", NamedTextColor.LIGHT_PURPLE));
+    }
+
+    /** Objet Œil du Héraut : clic droit près d'une tour ennemie → invoque un Héraut qui la charge. */
+    private static org.bukkit.inventory.ItemStack heraldEyeItem() {
         var eye = new org.bukkit.inventory.ItemStack(Material.ENDER_EYE);
         var meta = eye.getItemMeta();
         meta.displayName(Component.text(
@@ -941,15 +939,16 @@ public class JungleManager {
             new NamespacedKey(LolPlugin.getInstance(), "herald_eye"),
             PersistentDataType.BYTE, (byte) 1);
         eye.setItemMeta(meta);
-        killer.getInventory().addItem(eye);
-        killer.sendMessage(Component.text(
-            "👁 Tu as reçu l'Œil du Héraut! Clic droit près d'une tour ennemie.",
-            NamedTextColor.LIGHT_PURPLE));
+        return eye;
     }
 
     /**
-     * Invoque un Héraut allié qui charge la tour ennemie la plus proche.
-     * Le Héraut inflige 400 dégâts à la structure puis meurt (comme LoL).
+     * Héraut invoqué (wiki, patch 26) : niveau moyen des champions, 4320-7090 PV et 80-200 AD. Il
+     * avance vers la structure ennemie la plus proche en frappant les sbires (AD + 1.75 % de ses PV
+     * actuels, les repousse). Au contact d'une structure, après 2.5 s, il bondit : 3000 dégâts à la
+     * structure (puis 66.67 %, 44.44 %… pour les charges suivantes), 200 % AD aux champions ennemis
+     * proches qu'il repousse, et il perd 66 % de ses PV actuels. Attaquable par les ennemis (or : 25).
+     * Avant : 2000 PV, une seule charge à 1500 dégâts, puis il mourait.
      */
     public boolean summonHerald(Player summoner) {
         var tm = LolPlugin.getInstance().getTeamManager();
@@ -957,86 +956,139 @@ public class JungleManager {
         if (team == null) return false;
         var mm = siblingMapManager();
         if (mm == null) return false;
-
-        // Tour ennemie la plus proche (max 30 blocs)
-        GameStructure target = null;
-        double best = 30 * 30;
-        for (var s : mm.getStructures()) {
-            if (s.isDestroyed() || s.getTeam() == team) continue;
-            if (s.getType() != GameStructure.Type.TURRET) continue;
-            double d = s.getCenter().distanceSquared(summoner.getLocation());
-            if (d < best) { best = d; target = s; }
-        }
-        if (target == null) {
-            summoner.sendActionBar(Component.text(
-                "❌ Aucune tour ennemie à proximité (30 blocs)",
-                NamedTextColor.RED));
+        if (nearestEnemyTurret(mm, team, summoner.getLocation(), 60) == null) {
+            summoner.sendActionBar(Component.text("❌ Aucune tour ennemie à proximité (60 blocs)", NamedTextColor.RED));
             return false;
         }
 
-        // Spawn du Héraut allié
-        var spawn = summoner.getLocation().clone().add(1, 0, 1);
-        var herald = (Ravager) spawn.getWorld()
-            .spawnEntity(spawn, EntityType.RAVAGER);
-        herald.customName(Component.text(
-            "👁 Héraut de la Faille", NamedTextColor.LIGHT_PURPLE));
-        herald.setCustomNameVisible(true);
-        var maxHpAttr = herald.getAttribute(Compat.maxHealth());
-        if (maxHpAttr != null) { maxHpAttr.setBaseValue(1024); herald.setHealth(1024); }
-        fr.lolmc.util.VirtualHP.init(herald, 2000); // HP LoL du Heraut invoque
+        double lvl = averageChampionLevel();
+        double f = Math.max(0, Math.min(1, (lvl - 1) / 17.0));
+        double maxHp = 4319.8 + (7090 - 4319.8) * f;
+        double ad = 80 + 120 * f;
 
-        final var ft = target;
-        // Le Héraut charge : avance vers la tour, puis frappe pour 1500
+        var spawn = summoner.getLocation().clone().add(1, 0, 1);
+        var herald = (Ravager) spawn.getWorld().spawnEntity(spawn, EntityType.RAVAGER);
+        herald.customName(Component.text("👁 Héraut de la Faille", NamedTextColor.LIGHT_PURPLE));
+        herald.setCustomNameVisible(true);
+        fr.lolmc.util.VirtualHP.init(herald, maxHp);
+        fr.lolmc.util.MobCombat.setStats(herald, ad, 0.75, 0, 0, 25, 0);
+        // Unité alliée de l'équipe : ciblable par les ennemis et les tourelles comme un sbire
+        var pdc = herald.getPersistentDataContainer();
+        pdc.set(MinionManager.KEY_MINION, PersistentDataType.BYTE, (byte) 1);
+        pdc.set(MinionManager.KEY_TEAM, PersistentDataType.STRING, team.name());
+        pdc.set(MinionManager.KEY_TYPE, PersistentDataType.STRING, "herald");
+        MinionManager.LIVE.add(herald.getUniqueId());
+
         new BukkitRunnable() {
             int ticks = 0;
+            double leapMult = 1.0;
+            long nextHit = 0, leapAt = 0;
+            GameStructure leapTarget = null;
             @Override public void run() {
-                if (!herald.isValid() || ft.isDestroyed()) { 
+                ticks += 5;
+                if (!herald.isValid() || herald.isDead() || ticks > 240 * 20) {
                     if (herald.isValid()) herald.remove();
-                    cancel(); return; 
+                    MinionManager.LIVE.remove(herald.getUniqueId());
+                    cancel(); return;
                 }
-                ticks++;
-                if (ticks > 20 * 15) { herald.remove(); cancel(); return; } // timeout 15s
-                double dist = herald.getLocation().distance(ft.getCenter());
-                if (dist > 3.5) {
-                    herald.getPathfinder().moveTo(ft.getCenter(), 1.6);
-                } else {
-                    // CHARGE ! 400 dégâts à la structure puis mort du Héraut
-                    boolean ftWasDestroyed = ft.isDestroyed();
-                    boolean phaseChanged = ft.takeDamage(1500);
-                    fr.lolmc.util.VisualEffectUtil.impactBurst(ft.getCenter().getWorld(),
-                        ft.getCenter().clone().add(0,1,0), Material.GRAY_STAINED_GLASS, 0.4f, 1.0, 10, 8L);
-                    ft.getCenter().getWorld().playSound(ft.getCenter(),
-                        org.bukkit.Sound.ENTITY_GENERIC_EXPLODE, 1.5f, 0.7f);
-                    if (phaseChanged) mm.updateStructurePhase(ft);
-                    if (!ftWasDestroyed && ft.isDestroyed()) {
-                        // Détruire proprement via le flux normal (or d'équipe, super-sbires…)
-                        announce(
-                            Component.text(
-                                "👁 Le Héraut a détruit une tourelle!",
-                                NamedTextColor.LIGHT_PURPLE));
-                        var sdl = LolPlugin.getInstance().getStructureDamageListener();
-                        if (sdl != null) sdl.onStructureDestroyedByMinions(ft, ft.getCenter().getWorld());
+                herald.setTarget(null); // pas d'IA vanilla : il ne vise que sbires et structures
+                long now = System.currentTimeMillis();
+                // Bond en préparation (2.5 s)
+                if (leapTarget != null) {
+                    if (now < leapAt) return;
+                    leap(herald, leapTarget, team, ad, leapMult);
+                    leapMult *= 2.0 / 3.0;
+                    leapTarget = null;
+                    return;
+                }
+                GameStructure target = nearestEnemyTurret(mm, team, herald.getLocation(), 60);
+                if (target == null) target = nearestEnemyStructure(mm, team, herald.getLocation(), 60);
+                if (target != null && herald.getLocation().distance(target.getCenter()) <= 4.0) {
+                    herald.getPathfinder().stopPathfinding();
+                    leapTarget = target;
+                    leapAt = now + 2500L;
+                    herald.getWorld().playSound(herald.getLocation(), org.bukkit.Sound.ENTITY_RAVAGER_ROAR, 1.5f, 0.7f);
+                    return;
+                }
+                // Sbire ennemi à portée : le frapper (et le repousser)
+                LivingEntity minion = null;
+                for (var e : herald.getNearbyEntities(3, 2, 3))
+                    if (e instanceof LivingEntity le && MinionManager.isMinion(le) && MinionManager.getMinionTeam(le) != team) { minion = le; break; }
+                if (minion != null) {
+                    herald.getPathfinder().stopPathfinding();
+                    if (now >= nextHit) {
+                        nextHit = now + (long) (1000 / 0.75);
+                        fr.lolmc.util.MobCombat.damage(null, minion,
+                                ad + fr.lolmc.util.VirtualHP.getCurrent(herald) * 0.0175, fr.lolmc.util.DamageUtil.Type.PHYSICAL);
+                        org.bukkit.util.Vector push = minion.getLocation().toVector().subtract(herald.getLocation().toVector()).setY(0);
+                        if (push.lengthSquared() > 1e-6) minion.setVelocity(push.normalize().multiply(0.8).setY(0.3));
                     }
-                    herald.setHealth(0.01);
-                    herald.damage(1000); // mort du Héraut après la charge
-                    cancel();
+                    return;
                 }
+                if (target != null) herald.getPathfinder().moveTo(target.getCenter(), 1.4);
             }
         }.runTaskTimer(LolPlugin.getInstance(), 0L, 5L);
 
-        summoner.sendActionBar(Component.text(
-            "👁 Héraut invoqué — il charge la tour!",
-            NamedTextColor.LIGHT_PURPLE));
+        summoner.sendActionBar(Component.text("👁 Héraut invoqué — il pousse vers les structures ennemies!",
+                NamedTextColor.LIGHT_PURPLE));
         return true;
+    }
+
+    /** Bond du Héraut invoqué sur une structure. */
+    private void leap(Ravager herald, GameStructure ft, Team team, double ad, double mult) {
+        var mm = siblingMapManager();
+        if (ft.isDestroyed() || (mm != null && mm.isInvulnerable(ft))) return;
+        boolean wasDestroyed = ft.isDestroyed();
+        boolean phaseChanged = ft.takeDamage(3000 * mult);
+        fr.lolmc.util.VisualEffectUtil.impactBurst(ft.getCenter().getWorld(),
+            ft.getCenter().clone().add(0, 1, 0), Material.GRAY_STAINED_GLASS, 0.4f, 1.0, 10, 8L);
+        ft.getCenter().getWorld().playSound(ft.getCenter(), org.bukkit.Sound.ENTITY_GENERIC_EXPLODE, 1.5f, 0.7f);
+        // Champions ennemis proches : 200 % AD et repoussés
+        var tm = LolPlugin.getInstance().getTeamManager();
+        for (Player p : herald.getWorld().getPlayers()) {
+            if (tm.getTeam(p) == team || !LolPlugin.getInstance().getChampionManager().hasChampion(p)) continue;
+            if (p.getLocation().distanceSquared(herald.getLocation()) > 9) continue;
+            fr.lolmc.util.DamageUtil.damage(null, p, ad * 2.0, false, fr.lolmc.util.DamageUtil.Type.PHYSICAL);
+            org.bukkit.util.Vector push = p.getLocation().toVector().subtract(herald.getLocation().toVector()).setY(0);
+            if (push.lengthSquared() > 1e-6) p.setVelocity(push.normalize().multiply(1.2).setY(0.4));
+        }
+        if (phaseChanged && mm != null) mm.updateStructurePhase(ft);
+        if (!wasDestroyed && ft.isDestroyed()) {
+            announce(Component.text("👁 Le Héraut a détruit une structure!", NamedTextColor.LIGHT_PURPLE));
+            var sdl = LolPlugin.getInstance().getStructureDamageListener();
+            if (sdl != null) sdl.onStructureDestroyedByMinions(ft, ft.getCenter().getWorld());
+        }
+        // Il perd 66 % de ses PV actuels
+        double cur = fr.lolmc.util.VirtualHP.getCurrent(herald);
+        fr.lolmc.util.VirtualHP.damage(herald, cur * 0.66, null);
+    }
+
+    private static GameStructure nearestEnemyTurret(MapManager mm, Team team, Location from, double max) {
+        GameStructure best = null; double bestD = max * max;
+        for (var s : mm.getStructures()) {
+            if (s.isDestroyed() || s.getTeam() == team || s.getType() != GameStructure.Type.TURRET || mm.isInvulnerable(s)) continue;
+            if (!s.getCenter().getWorld().equals(from.getWorld())) continue;
+            double d = s.getCenter().distanceSquared(from);
+            if (d < bestD) { bestD = d; best = s; }
+        }
+        return best;
+    }
+
+    private static GameStructure nearestEnemyStructure(MapManager mm, Team team, Location from, double max) {
+        GameStructure best = null; double bestD = max * max;
+        for (var s : mm.getStructures()) {
+            if (s.isDestroyed() || s.getTeam() == team || mm.isInvulnerable(s)) continue;
+            if (!s.getCenter().getWorld().equals(from.getWorld())) continue;
+            double d = s.getCenter().distanceSquared(from);
+            if (d < bestD) { bestD = d; best = s; }
+        }
+        return best;
     }
 
     public int getVoidgrubKills(Team team) {
         return voidgrubKills.getOrDefault(team, 0);
     }
-    public double getVoidgrubDamageBonus(Team team) {
-        int g = getVoidgrubKills(team);
-        if (g >= 6) return 1.14; if (g >= 3) return 1.06; return 1.0;
-    }
+
     public Map<String, Long> getEpicRespawnAt() { return epicRespawnAt; }
 
     public static boolean isJungleMonster(Entity e) {
@@ -1150,6 +1202,7 @@ public class JungleManager {
             case DRAGON_MOUNTAIN -> dragonModel(Material.DEEPSLATE,      Material.IRON_BLOCK,     Material.GRAY_TERRACOTTA);
             case DRAGON_CLOUD    -> dragonModel(Material.WHITE_CONCRETE, Material.LIGHT_BLUE_CONCRETE, Material.WHITE_TERRACOTTA);
             case DRAGON_CHEMTECH -> dragonModel(Material.LIME_CONCRETE,  Material.SLIME_BLOCK,    Material.GREEN_TERRACOTTA);
+            case DRAGON_HEXTECH  -> dragonModel(Material.LIGHT_BLUE_CONCRETE, Material.COPPER_BLOCK, Material.CYAN_TERRACOTTA);
             case DRAGON_ELDER    -> dragonModel(Material.CALCITE,        Material.AMETHYST_BLOCK, Material.PURPLE_TERRACOTTA);
         };
         // Les petits monstres de groupe (loups/raptors/krugs secondaires) sont réduits
@@ -1181,7 +1234,7 @@ public class JungleManager {
             case RED_BUFF     -> 2.0f;   // magma cube petit
             case BLUE_BUFF    -> 0.8f;   // iron golem deja grand -> reduire un peu
             case DRAGON_INFERNAL, DRAGON_OCEAN, DRAGON_MOUNTAIN,
-                 DRAGON_CLOUD, DRAGON_CHEMTECH, DRAGON_ELDER -> 0.85f; // ravager -> modele plus fin
+                 DRAGON_CLOUD, DRAGON_CHEMTECH, DRAGON_HEXTECH, DRAGON_ELDER -> 0.85f; // ravager -> modele plus fin
             case HERALD       -> 0.85f;
             case BARON        -> 0.9f;
             case VOIDGRUB     -> 0.8f;

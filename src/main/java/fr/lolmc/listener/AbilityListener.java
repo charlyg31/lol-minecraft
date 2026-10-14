@@ -672,6 +672,18 @@ public class AbilityListener implements Listener {
         if (s >= 1 && s <= 4) manager.getChampion(p).refreshSlot(p, s);
     }
 
+    /** Œil du Héraut au sol : seule l'équipe qui a tué le Héraut peut le ramasser. */
+    @EventHandler
+    public void onHeraldEyePickup(org.bukkit.event.entity.EntityPickupItemEvent e) {
+        String team = e.getItem().getPersistentDataContainer().get(
+                new org.bukkit.NamespacedKey(LolPlugin.getInstance(), fr.lolmc.game.JungleManager.HERALD_EYE_TEAM),
+                org.bukkit.persistence.PersistentDataType.STRING);
+        if (team == null) return;
+        if (!(e.getEntity() instanceof Player p) || !manager.hasChampion(p)) { e.setCancelled(true); return; }
+        var t = LolPlugin.getInstance().getTeamManager().getTeam(p);
+        if (t == null || !t.name().equals(team)) e.setCancelled(true);
+    }
+
     // ── Bloquer toute manipulation de la hotbar LoL ──
     @EventHandler
     public void onInventoryClick(InventoryClickEvent e) {
@@ -847,6 +859,7 @@ public class AbilityListener implements Listener {
         LolPlugin.getInstance().getBushManager().cleanup(p.getUniqueId());
         LolPlugin.getInstance().getRoleQueueManager().cleanup(p.getUniqueId());
         LolPlugin.getInstance().getRuneManager().cleanup(p.getUniqueId());
+        fr.lolmc.game.JungleBuffs.cleanup(p.getUniqueId());
         var consumables = LolPlugin.getInstance().getConsumableManager();
         if (consumables != null) consumables.cleanup(p.getUniqueId());
     }
