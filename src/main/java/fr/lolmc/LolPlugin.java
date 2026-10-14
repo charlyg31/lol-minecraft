@@ -120,7 +120,7 @@ public class LolPlugin extends JavaPlugin {
         getServer().getScheduler().runTaskLater(this, fr.lolmc.game.MinionManager::purgeAllWorlds, 100L);
         saveDefaultConfig();
         mergeMissingConfigKeys();
-        saveResource("champions.yml", false);
+        updateChampionsYml();
         fr.lolmc.util.Balance.load();
         fr.lolmc.util.DebugLogger.init();
 
@@ -297,6 +297,31 @@ public class LolPlugin extends JavaPlugin {
             getLogger().info("config.yml : " + added + " clé(s) manquante(s) ajoutée(s) avec la valeur par défaut.");
         } catch (Exception e) {
             getLogger().warning("Fusion de config.yml impossible : " + e.getMessage());
+        }
+    }
+
+    /**
+     * Installe champions.yml, ou le remplace si celui du serveur est d'une version plus ancienne
+     * que celui du plugin (l'ancien est sauvegardé). Avant, saveResource(..., false) ne
+     * remplaçait jamais un fichier existant : les valeurs corrigées n'arrivaient pas en jeu.
+     */
+    private void updateChampionsYml() {
+        java.io.File file = new java.io.File(getDataFolder(), "champions.yml");
+        if (!file.exists()) { saveResource("champions.yml", false); return; }
+        try (var in = getResource("champions.yml")) {
+            if (in == null) return;
+            var bundled = org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(
+                    new java.io.InputStreamReader(in, java.nio.charset.StandardCharsets.UTF_8));
+            int jarVersion = bundled.getInt("version", 0);
+            int current = org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(file).getInt("version", 0);
+            if (current >= jarVersion) return;
+            java.io.File backup = new java.io.File(getDataFolder(), "champions.yml.v" + current + ".bak");
+            java.nio.file.Files.copy(file.toPath(), backup.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            saveResource("champions.yml", true);
+            getLogger().warning("champions.yml mis à jour (version " + current + " → " + jarVersion
+                    + "). Ancien fichier sauvegardé : " + backup.getName());
+        } catch (Exception e) {
+            getLogger().warning("Mise à jour de champions.yml impossible : " + e.getMessage());
         }
     }
 

@@ -30,12 +30,34 @@ public final class LeeSin extends BaseChampion implements fr.lolmc.champion.base
         initSystems(7.5, ResourceSystem.ResourceType.ENERGY, 200, 0, 50, 0);
     }
 
-    // Passif Flurry : après chaque sort, les 2 prochaines AA restituent 15 énergie
+    // Passif Rafale : après chaque sort, les 2 prochaines attaques (3 s) gagnent +40 % de vitesse
+    // d'attaque et rendent de l'énergie. Avant : énergie seulement, sans la vitesse d'attaque.
     private static final java.util.Map<java.util.UUID, Integer> flurryCharges
         = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final java.util.Map<java.util.UUID, Long> flurryUntil = new java.util.concurrent.ConcurrentHashMap<>();
+    /** Stats sur lesquelles le bonus de vitesse d'attaque est appliqué (pour le retirer). */
+    private static final java.util.Map<java.util.UUID, ChampionStats> flurryAS = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final double FLURRY_AS = 0.40;
 
     public static void onSpellCast(java.util.UUID id) {
-        flurryCharges.put(id, 2); // 2 charges d'énergie
+        flurryCharges.put(id, 2); // 2 attaques renforcées
+        flurryUntil.put(id, System.currentTimeMillis() + 3000L);
+        var p = org.bukkit.Bukkit.getPlayer(id);
+        var cm = LolPlugin.getInstance().getChampionManager();
+        if (p != null && cm.hasChampion(p) && !flurryAS.containsKey(id)) {
+            var st = cm.getChampion(p).getStats();
+            st.addBonusAttackSpeed(FLURRY_AS);
+            flurryAS.put(id, st);
+        }
+        org.bukkit.Bukkit.getScheduler().runTaskLater(LolPlugin.getInstance(), () -> {
+            if (System.currentTimeMillis() >= flurryUntil.getOrDefault(id, 0L)) endFlurry(id);
+        }, 61L);
+    }
+
+    private static void endFlurry(java.util.UUID id) {
+        flurryCharges.remove(id);
+        var st = flurryAS.remove(id);
+        if (st != null) st.addBonusAttackSpeed(-FLURRY_AS);
     }
 
     static class AA extends BasicAttackAbility {
@@ -44,6 +66,7 @@ public final class LeeSin extends BaseChampion implements fr.lolmc.champion.base
             int charges = flurryCharges.getOrDefault(c.getUniqueId(), 0);
             if (charges > 0) {
                 flurryCharges.put(c.getUniqueId(), charges - 1);
+                if (charges - 1 == 0) endFlurry(c.getUniqueId());
                 var cm = LolPlugin.getInstance().getChampionManager();
                 if (cm.hasChampion(c)) {
                     // Wiki : 20/30/40 énergie à la 1re attaque, 10/15/20 à la 2e (selon le niveau)
@@ -60,13 +83,16 @@ public final class LeeSin extends BaseChampion implements fr.lolmc.champion.base
     }
 
     private static final Map<UUID,UUID> sonicTarget=new java.util.concurrent.ConcurrentHashMap<>();
-    @Override public void resetState(UUID id){ sonicTarget.remove(id); flurryCharges.remove(id); }
-    @Override public void resetAllState(){ sonicTarget.clear(); flurryCharges.clear(); }
+    @Override public void resetState(UUID id){ sonicTarget.remove(id); endFlurry(id); flurryUntil.remove(id); }
+    @Override public void resetAllState(){
+        sonicTarget.clear(); flurryCharges.clear(); flurryUntil.clear();
+        flurryAS.values().forEach(st -> st.addBonusAttackSpeed(-FLURRY_AS)); flurryAS.clear();
+    }
 
     static class Q extends BaseAbility {
         // onSpellCast appelé dans cast() pour activer Flurry
         Q(){super("q_leesin","Onde Sonique",Material.ECHO_SHARD,AbilitySlot.Q,
-                new double[]{8.5,7.5,6.5,5.5,4.5},15,0,DamageType.PHYSICAL);
+                new double[]{10,9,8,7,6},15,0,DamageType.PHYSICAL);
             resourceCost = 50;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             fr.lolmc.champion.impl.jungle.LeeSin.onSpellCast(c.getUniqueId()); // Flurry
@@ -162,12 +188,14 @@ public final class LeeSin extends BaseChampion implements fr.lolmc.champion.base
 
     static class E extends BaseAbility {
         E(){super("e_leesin","Tempête de Flammes",Material.FIRE_CHARGE,AbilitySlot.E,
-                new double[]{10,9,8,7,6},5,4,DamageType.PHYSICAL);
+                new double[]{8,8,8,8,8},5,4,DamageType.PHYSICAL);
             resourceCost = 50;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             fr.lolmc.champion.impl.jungle.LeeSin.onSpellCast(c.getUniqueId()); // Flurry
 
-            double[] base=fr.lolmc.util.Balance.base("e_leesin",new double[]{35,60,85,110,135});double dmg=base[getLevel()-1]+s.getBonusAD()*fr.lolmc.util.Balance.ratio("e_leesin","ad",0.9);
+            // 90 % de l'AD total (wiki, patch 26.10) ; avant : AD bonus
+            double[] base=fr.lolmc.util.Balance.base("e_leesin",new double[]{35,60,85,110,135});
+            double dmg=base[getLevel()-1]+s.getFinalAD()*fr.lolmc.util.Balance.ratio("e_leesin","ad",0.9);
             for(var __t : TargetingUtil.enemiesAround(c, 5.0)){ // rayon 450 (wiki)
                 TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);
                 if(__t instanceof Player __p){
@@ -181,7 +209,7 @@ public final class LeeSin extends BaseChampion implements fr.lolmc.champion.base
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] base=fr.lolmc.util.Balance.base("e_leesin",new double[]{35,60,85,110,135});
-            return String.format("%.0f dégâts magiques autour (+90%%AD bonus) + ralentit (Boiterie).",base[getLevel()-1]+s.getBonusAD()*fr.lolmc.util.Balance.ratio("e_leesin","ad",0.9));
+            return String.format("%.0f dégâts magiques autour (+90%%AD) + ralentit (Boiterie).",base[getLevel()-1]+s.getFinalAD()*fr.lolmc.util.Balance.ratio("e_leesin","ad",0.9));
         }
     }
 
@@ -193,7 +221,7 @@ public final class LeeSin extends BaseChampion implements fr.lolmc.champion.base
             org.bukkit.entity.LivingEntity tgt = (t!=null && TargetingUtil.isEnemy(c,t))?t:TargetingUtil.getTargetedEnemy(c,4.4); if(tgt==null){cancelCast();c.sendActionBar(Component.text("🐉 Aucune cible visée",NamedTextColor.GRAY));return;}
             double[] base=fr.lolmc.util.Balance.base("r_leesin",new double[]{175,400,625});
             int r=Math.min(getLevel()-1,2);
-            double dmg=base[r]+s.getBonusAD()*fr.lolmc.util.Balance.ratio("r_leesin","ad",2.0);
+            double dmg=base[r]+s.getBonusAD()*fr.lolmc.util.Balance.ratio("r_leesin","ad",2);
             // Ennemis percutés : + 12/15/18 % des PV bonus de la cible projetée (wiki)
             double kickedBonusHP=0;
             var cmR=LolPlugin.getInstance().getChampionManager();
@@ -215,7 +243,7 @@ public final class LeeSin extends BaseChampion implements fr.lolmc.champion.base
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] base=fr.lolmc.util.Balance.base("r_leesin",new double[]{175,400,625});int r=Math.min(getLevel()-1,2);
-            return String.format("Kick: %.0f dégâts (+200%%AD bonus), projette la cible. Ennemis percutés: + %% PV bonus de la cible.",base[r]+s.getBonusAD()*fr.lolmc.util.Balance.ratio("r_leesin","ad",2.0));
+            return String.format("Kick: %.0f dégâts (+200%%AD bonus), projette la cible. Ennemis percutés: + %% PV bonus de la cible.",base[r]+s.getBonusAD()*fr.lolmc.util.Balance.ratio("r_leesin","ad",2));
         }
     }
 }

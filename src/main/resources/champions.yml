@@ -9,7 +9,12 @@
 #   base     : degats de base par rang (si le sort en a)
 #   ratio_ad / ratio_ap : ratios (ad = AD bonus ou total selon le sort, voir le code)
 # Cle absente => la valeur codee en dur s'applique (repli sur).
+#
+# version : augmentee a chaque mise a jour des valeurs. Au demarrage, si le fichier du
+# serveur a une version plus ancienne, il est sauvegarde (champions.yml.v<ancienne>.bak)
+# puis remplace par celui du plugin. Garde la meme version pour tes propres reglages.
 # ─────────────────────────────────────────────────────────────
+version: 2
 
 # ===== amumu =====
 q_amumu:        # Q — Lancer de Bandage
@@ -75,12 +80,12 @@ q_blitzcrank:        # Q — Grappin Fusée
   cost: 100
   base: [110, 160, 210, 260, 310]
   ratio_ap: 1.2
-w_blitzcrank:        # W — Poing de Force
-  cooldown: [7, 6.5, 6, 5.5, 5]
-  cost: 25
-e_blitzcrank:        # E — Surrégime
+w_blitzcrank:        # W — Surrégime
   cooldown: [15, 15, 15, 15, 15]
   cost: 75
+e_blitzcrank:        # E — Poing de Force
+  cooldown: [7, 6.5, 6, 5.5, 5]
+  cost: 25
 r_blitzcrank:        # R — Champ Statique
   cooldown: [60, 40, 20]
   cost: 100
@@ -109,7 +114,7 @@ q_garen:        # Q — Coup Décisif
   cooldown: [8, 8, 8, 8, 8]
   cost: 0
   base: [30, 60, 90, 120, 150]
-  ratio_ad: 0.5
+  ratio_ad: 1.5   # attaque (100 % AD) + 50 % AD en bonus = 150 % de l'AD total
 w_garen:        # W — Courage
   cooldown: [22, 19.5, 17, 14.5, 12]
   cost: 0

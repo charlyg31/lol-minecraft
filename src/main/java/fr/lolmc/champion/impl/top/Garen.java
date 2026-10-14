@@ -44,13 +44,14 @@ public final class Garen extends BaseChampion {
     // Q — Jugement Décisif
     static class Q extends BaseAbility {
         Q(){super("q_garen","Jugement Décisif",Material.GOLDEN_SWORD,AbilitySlot.Q,
-            new double[]{8,7.5,7,6.5,6},5,0,DamageType.PHYSICAL);
+            new double[]{8,8,8,8,8},5,0,DamageType.PHYSICAL);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             org.bukkit.entity.LivingEntity tgt = (t!=null && TargetingUtil.isEnemy(c,t))?t:TargetingUtil.getTargetedEnemy(c,2.5); if(tgt==null){cancelCast();c.sendActionBar(Component.text("⚔ Aucune cible à portée",NamedTextColor.GRAY));return;}
-            // LoL : 30/55/80/105/130 + 50% AD bonus, silence 1.5s, boost vitesse
-            double[] base=fr.lolmc.util.Balance.base("q_garen",new double[]{30,65,100,135,170});
-            double dmg=base[getLevel()-1]+s.getFinalAD()*fr.lolmc.util.Balance.ratio("q_garen","ad",0.5);
+            // LoL : attaque renforcée = 30/60/90/120/150 + 150 % AD (100 % de l'attaque + 50 % en bonus),
+            // silence 1.5 s, boost vitesse (avant : 50 % de l'AD seulement)
+            double[] base=fr.lolmc.util.Balance.base("q_garen",new double[]{30,60,90,120,150});
+            double dmg=base[getLevel()-1]+s.getFinalAD()*fr.lolmc.util.Balance.ratio("q_garen","ad",1.5);
             TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.PHYSICAL);
             // Silence 1.5s (30 ticks) via CCManager
             var cc = LolPlugin.getInstance().getCCManager();
@@ -67,15 +68,15 @@ public final class Garen extends BaseChampion {
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_PLAYER_ATTACK_CRIT, 1f, 1f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            double[] base=fr.lolmc.util.Balance.base("q_garen",new double[]{30,65,100,135,170});
-            return String.format("%.0f dégâts physiques (+50%%AD). Silence 1.5s + 35%% vitesse 4s.",base[getLevel()-1]+s.getFinalAD()*fr.lolmc.util.Balance.ratio("q_garen","ad",0.5));
+            double[] base=fr.lolmc.util.Balance.base("q_garen",new double[]{30,60,90,120,150});
+            return String.format("%.0f dégâts physiques (+150%%AD). Silence 1.5s + 35%% vitesse.",base[getLevel()-1]+s.getFinalAD()*fr.lolmc.util.Balance.ratio("q_garen","ad",1.5));
         }
     }
 
     // W — Courage
     static class W extends BaseAbility {
         W(){super("w_garen","Courage",Material.SHIELD,AbilitySlot.W,
-            new double[]{23,21,19,17,15},0,0,DamageType.TRUE);
+            new double[]{22,19.5,17,14.5,12},0,0,DamageType.TRUE);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // Wiki : 25-41 % de réduction de dégâts 4 s ; bouclier 65-145 (+18 % PV bonus) et
@@ -106,7 +107,7 @@ public final class Garen extends BaseChampion {
     // E — Tournoiement (Jugement) : 7 frappes sur 3s, +25% au plus proche
     static class E extends BaseAbility {
         E(){super("e_garen","Jugement",Material.COMPASS,AbilitySlot.E,
-            new double[]{9,8,7,6,5},5,4,DamageType.PHYSICAL);
+            new double[]{9,8.25,7.5,6.75,6},5,4,DamageType.PHYSICAL);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             c.sendActionBar(Component.text("⚔ Jugement!",NamedTextColor.GOLD));

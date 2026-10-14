@@ -56,7 +56,11 @@ public final class Annie extends BaseChampion implements fr.lolmc.champion.base.
     private static final Map<UUID, Long>    enrageUntil = new java.util.concurrent.ConcurrentHashMap<>();
 
     // ── Pyromanie ─────────────────────────────────────────────────
+    /** Relance de R pour diriger Tibbers : ce n'est pas un sort, pas de charge de Pyromanie. */
+    private static final java.util.Set<UUID> tibbersControlCast = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
     public static void onSpellCast(UUID id, int slot) {
+        if (slot == 4 && tibbersControlCast.remove(id)) return;
         // Le Bouclier en Fusion n'inflige pas de dégâts : il ne consomme pas l'étourdissement chargé
         if (slot == 3 && hasPyromancyStun(id)) return;
         int stacks = pyroStacks.merge(id, 1, Integer::sum);
@@ -70,6 +74,15 @@ public final class Annie extends BaseChampion implements fr.lolmc.champion.base.
     }
 
     // ── Reset ─────────────────────────────────────────────────────
+
+    // Passif de R (données du jeu) : +10/15/20 % de pénétration magique. Manquait.
+    private double appliedPen = 0;
+    @Override public void onAbilityRanksChanged() {
+        int r = getLevelSystem().getAbilityRank(4);
+        double pen = r > 0 ? 0.05 + 0.05 * r : 0;
+        getStats().addBonusMagicPenPercent(pen - appliedPen);
+        appliedPen = pen;
+    }
 
     public void resetState(UUID id) {
         var t = activeTibbers.remove(id);
@@ -101,8 +114,9 @@ public final class Annie extends BaseChampion implements fr.lolmc.champion.base.
     public static void onAnnieDeath(Player annie) {
         var t = activeTibbers.get(annie.getUniqueId());
         if (t == null || !t.isValid()) return;
-        enrageUntil.put(t.getUniqueId(), System.currentTimeMillis() + 5000L);
-        // Boost temporaire : +50% vitesse, +50% dégâts pendant 5s
+        // 10 s (données du jeu : AvengerEnrageDuration ; avant : 5 s)
+        enrageUntil.put(t.getUniqueId(), System.currentTimeMillis() + 10000L);
+        // Boost temporaire : +50% vitesse, +50% dégâts pendant 10s
         var spAttr = t.getAttribute(fr.lolmc.util.Compat.movementSpeed());
         if (spAttr != null) spAttr.setBaseValue(0.57); // 0.38 × 1.5
         var dmgAttr = t.getAttribute(fr.lolmc.util.Compat.attackDamage());
@@ -110,7 +124,7 @@ public final class Annie extends BaseChampion implements fr.lolmc.champion.base.
         fr.lolmc.util.VisualEffectUtil.impactBurst(t.getWorld(),
                 t.getLocation().add(0,1,0), Material.ORANGE_STAINED_GLASS, 0.32f, 1.0, 10, 8L);
         t.getWorld().playSound(t.getLocation(), Sound.ENTITY_POLAR_BEAR_WARNING, 2f, 0.5f);
-        // Remettre les stats normales après 5s
+        // Remettre les stats normales après 10s
         new BukkitRunnable() { @Override public void run() {
             if (!t.isValid()) { cancel(); return; }
             enrageUntil.remove(t.getUniqueId());
@@ -118,7 +132,7 @@ public final class Annie extends BaseChampion implements fr.lolmc.champion.base.
             if (sp2 != null) sp2.setBaseValue(0.38);
             var dm2 = t.getAttribute(fr.lolmc.util.Compat.attackDamage());
             if (dm2 != null) dm2.setBaseValue(dm2.getBaseValue() / 1.5);
-        }}.runTaskLater(LolPlugin.getInstance(), 100L);
+        }}.runTaskLater(LolPlugin.getInstance(), 200L);
         // Notifier les alliés
         for (Player p : annie.getWorld().getPlayers()) {
             if (!LolPlugin.getInstance().getTeamManager().areEnemies(annie, p))
@@ -160,13 +174,13 @@ public final class Annie extends BaseChampion implements fr.lolmc.champion.base.
 
     static class Q extends BaseAbility {
         Q(){super("q_annie","Brasier",Material.BLAZE_POWDER,AbilitySlot.Q,
-                new double[]{4,3.5,3,2.5,2},20,0,DamageType.MAGICAL);
+                new double[]{4,4,4,4,4},20,0,DamageType.MAGICAL);
             resourceCost = 60;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             var target = TargetingUtil.getTargetedEnemy(c, 6.9); // 625 unités
             if(target==null){cancelCast();c.sendActionBar(Component.text("Aucune cible",NamedTextColor.GRAY));return;}
             double[] base=fr.lolmc.util.Balance.base("q_annie",new double[]{80,125,170,215,260});
-            double dmg=base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("q_annie","ap",0.80);
+            double dmg=base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("q_annie","ap",0.8);
             final boolean stun=hasPyromancyStun(c.getUniqueId()); // chargé au lancer
             final double cost=getResourceCost();
             final BaseAbility q=this;
@@ -190,17 +204,17 @@ public final class Annie extends BaseChampion implements fr.lolmc.champion.base.
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] base=fr.lolmc.util.Balance.base("q_annie",new double[]{80,125,170,215,260});
-            return String.format("%.0f dégâts magiques (+80%%AP). Refund si kill.",base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("q_annie","ap",0.80));
+            return String.format("%.0f dégâts magiques (+80%%AP). Refund si kill.",base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("q_annie","ap",0.8));
         }
     }
 
     static class W extends BaseAbility {
         W(){super("w_annie","Incinération",Material.CAMPFIRE,AbilitySlot.W,
-                new double[]{8,7,6,5,4},6,4,DamageType.MAGICAL);
+                new double[]{7,7,7,7,7},6,4,DamageType.MAGICAL);
             resourceCost = 70;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             double[] base=fr.lolmc.util.Balance.base("w_annie",new double[]{70,110,150,190,230});
-            double dmg=base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("w_annie","ap",0.80);
+            double dmg=base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("w_annie","ap",0.8);
             var targets=TargetingUtil.enemiesInCone(c,6.0,50);
             if(hasPyromancyStun(c.getUniqueId())){
                 var cc=LolPlugin.getInstance().getCCManager();
@@ -216,13 +230,13 @@ public final class Annie extends BaseChampion implements fr.lolmc.champion.base.
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] base=fr.lolmc.util.Balance.base("w_annie",new double[]{70,110,150,190,230});
-            return String.format("Cône de feu: %.0f dégâts (+80%%AP).",base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("w_annie","ap",0.80));
+            return String.format("Cône de feu: %.0f dégâts (+80%%AP).",base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("w_annie","ap",0.8));
         }
     }
 
     static class E extends BaseAbility {
         E(){super("e_annie","Molten Shield",Material.ORANGE_STAINED_GLASS,AbilitySlot.E,
-                new double[]{10,9,8,7,6},0,0,DamageType.MAGICAL);
+                new double[]{10,10,10,10,10},0,0,DamageType.MAGICAL);
             resourceCost = 40;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             Player dest = (t!=null && LolPlugin.getInstance().getTeamManager().areAllies(c,t)) ? t : c; // allié visé, sinon soi
@@ -264,7 +278,7 @@ public final class Annie extends BaseChampion implements fr.lolmc.champion.base.
             // ── Re-cast : Tibbers actif → l'envoyer à la position visée ──
             if (activeTibbers.containsKey(uuid)) {
                 org.bukkit.entity.PolarBear tib = activeTibbers.get(uuid);
-                if (tib != null && tib.isValid()) { onTibbersControl(c, tib); return; }
+                if (tib != null && tib.isValid()) { tibbersControlCast.add(uuid); onTibbersControl(c, tib); return; }
                 activeTibbers.remove(uuid);
             }
 

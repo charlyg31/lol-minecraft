@@ -63,6 +63,21 @@ public final class Zed extends BaseChampion implements fr.lolmc.champion.base.St
 
     private static final Map<String, Long> contemptReady = new java.util.concurrent.ConcurrentHashMap<>();
 
+    /**
+     * Ombre vivante (données du jeu) : quand Zed et son ombre touchent le même champion avec le même
+     * sort, Zed récupère 30/35/40/45/50 d'énergie (une fois par lancer). Manquait.
+     */
+    static void restoreDoubleHitEnergy(Player c, boolean[] done) {
+        if (done[0]) return;
+        var cm = LolPlugin.getInstance().getChampionManager();
+        if (!cm.hasChampion(c)) return;
+        var champ = cm.getChampion(c);
+        int wRank = champ.getLevelSystem().getAbilityRank(2);
+        if (wRank <= 0 || champ.getResourceSystem() == null) return;
+        done[0] = true;
+        champ.getResourceSystem().addCurrent(new double[]{30,35,40,45,50}[wRank-1]);
+    }
+
     static class AA extends BasicAttackAbility {
         AA(){super("zed",Material.IRON_SWORD,2.5f,DamageType.PHYSICAL);}
         @Override protected void onHit(Player c, ChampionStats s, org.bukkit.entity.LivingEntity tgt, double dmg){
@@ -89,7 +104,7 @@ public final class Zed extends BaseChampion implements fr.lolmc.champion.base.St
 
     static class Q extends BaseAbility {
         Q(){super("q_zed","Shuriken Tranchant",Material.ARROW,AbilitySlot.Q,
-                new double[]{6,5.5,5,4.5,4},20,0,DamageType.PHYSICAL);
+                new double[]{6,6,6,6,6},20,0,DamageType.PHYSICAL);
             resourceCost = 40;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             double[] baseFirst={80,120,160,200,240};
@@ -102,14 +117,17 @@ public final class Zed extends BaseChampion implements fr.lolmc.champion.base.St
             // les suivants 60 %. L'ombre lance aussi un Shuriken dans la même direction (LoL) ; une
             // cible déjà touchée par l'autre ne prend que les dégâts réduits.
             var alreadyHit=java.util.concurrent.ConcurrentHashMap.<UUID>newKeySet();
+            final boolean[] energyDone={false};
             var dir=c.getEyeLocation().getDirection();
             java.util.function.Consumer<Location> throwFrom = from -> {
                 final boolean[] first={true};
                 TargetingUtil.launchSkillshot(c, from, dir, 9.9, 0.6, true, 17.0,
                         new org.bukkit.inventory.ItemStack(Material.NETHER_STAR), 0.7f, Material.GRAY_STAINED_GLASS,
                         __t -> {
+                            boolean wasHit = alreadyHit.contains(__t.getUniqueId());
                             boolean full = first[0] && alreadyHit.add(__t.getUniqueId());
                             if(!full) alreadyHit.add(__t.getUniqueId());
+                            if(wasHit && __t instanceof Player) restoreDoubleHitEnergy(c, energyDone);
                             first[0]=false;
                             TargetingUtil.dealDamage(c, __t, full?dmgFirst:dmgNext, TargetingUtil.DmgType.PHYSICAL);
                         }, null);
@@ -230,14 +248,17 @@ public final class Zed extends BaseChampion implements fr.lolmc.champion.base.St
 
     static class E extends BaseAbility {
         E(){super("e_zed","Taillade des Ombres",Material.IRON_SWORD,AbilitySlot.E,
-                new double[]{4,3,2,1,0.5},5,4,DamageType.PHYSICAL);
-            resourceCost = 50;}
+                new double[]{5,4.5,4,3.5,3},5,4,DamageType.PHYSICAL);
+            resourceCost = 40;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             double[] base=fr.lolmc.util.Balance.base("e_zed",new double[]{70,92.5,115,137.5,160});
             double dmg=base[getLevel()-1]+s.getBonusAD()*fr.lolmc.util.Balance.ratio("e_zed","ad",0.7); // AD bonus (wiki)
             int rank=getLevel()-1;
             int champsHit=0;
+            var slashed=new java.util.HashSet<UUID>(); // un ennemi ne subit les dégâts qu'une fois
+            final boolean[] energyDone={false};
             for(var __t : TargetingUtil.enemiesAround(c, 3.8)){ // rayon 315
+                slashed.add(__t.getUniqueId());
                 TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.PHYSICAL);
                 if(__t instanceof Player __p){
                     fr.lolmc.LolPlugin.getInstance().getCCManager().slowPct(__p, new double[]{0.20,0.25,0.30,0.35,0.40}[rank], 30); // wiki
@@ -270,9 +291,18 @@ public final class Zed extends BaseChampion implements fr.lolmc.champion.base.St
                         // Ennemis uniquement (avant : alliés, sbires alliés et Tibbers étaient touchés)
                         if (entity instanceof org.bukkit.entity.LivingEntity tgtEnnemi
                                 && TargetingUtil.isEnemy(c, tgtEnnemi)) {
-                            TargetingUtil.dealDamage(c, tgtEnnemi, dmg, TargetingUtil.DmgType.PHYSICAL);
-                            if (tgtEnnemi instanceof Player __p)
-                                fr.lolmc.LolPlugin.getInstance().getCCManager().slowPct(__p, new double[]{0.30,0.375,0.45,0.525,0.60}[rank], 30); // 2 taillades (wiki)
+                            // Déjà tranché par Zed : pas de seconds dégâts, mais ralentissement renforcé
+                            // et énergie rendue (avant : dégâts appliqués deux fois)
+                            boolean both = !slashed.add(tgtEnnemi.getUniqueId());
+                            if (both) {
+                                if (tgtEnnemi instanceof Player) restoreDoubleHitEnergy(c, energyDone);
+                            } else {
+                                TargetingUtil.dealDamage(c, tgtEnnemi, dmg, TargetingUtil.DmgType.PHYSICAL);
+                            }
+                            if (tgtEnnemi instanceof Player __p) // 2 taillades : 30-60 %, sinon 20-40 % (wiki)
+                                fr.lolmc.LolPlugin.getInstance().getCCManager().slowPct(__p, both
+                                        ? new double[]{0.30,0.375,0.45,0.525,0.60}[rank]
+                                        : new double[]{0.20,0.25,0.30,0.35,0.40}[rank], 30);
                         }
                     }
                     fr.lolmc.util.VisualEffectUtil.groundRing(shadowLoc.getWorld(),
@@ -289,7 +319,7 @@ public final class Zed extends BaseChampion implements fr.lolmc.champion.base.St
 
     static class R extends BaseAbility {
         R(){super("r_zed","Marque de Mort",Material.WITHER_ROSE,AbilitySlot.R,
-                new double[]{120,90,60},20,0,DamageType.TRUE);
+                new double[]{120,110,100},20,0,DamageType.TRUE);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             org.bukkit.entity.LivingEntity tgt = (t!=null && TargetingUtil.isEnemy(c,t))?t:TargetingUtil.getTargetedEnemy(c,6.9); if(tgt==null){cancelCast();c.sendActionBar(Component.text("💀 Aucune cible visée",NamedTextColor.GRAY));return;} // 625 unités

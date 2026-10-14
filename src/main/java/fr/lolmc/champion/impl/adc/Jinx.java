@@ -24,6 +24,14 @@ public final class Jinx extends BaseChampion implements fr.lolmc.champion.base.S
     // Passif Get Excited : kill/assist → +175% vitesse 6s (décroît après 3s)
     public static void getExcited(Player jinx) {
         fr.lolmc.LolPlugin.getInstance().getCCManager().speedDecaying(jinx, 1.75, 120); // +175 %, décroît sur 6 s (wiki)
+        // +25 % de vitesse d'attaque pendant 6 s (données du jeu ; manquait)
+        var cm = LolPlugin.getInstance().getChampionManager();
+        if (cm.hasChampion(jinx)) {
+            var st = cm.getChampion(jinx).getStats();
+            st.addBonusAttackSpeed(0.25);
+            new org.bukkit.scheduler.BukkitRunnable(){@Override public void run(){ st.addBonusAttackSpeed(-0.25); }}
+                    .runTaskLater(LolPlugin.getInstance(), 120L);
+        }
         fr.lolmc.util.VisualEffectUtil.impactBurst(jinx.getWorld(),
             jinx.getLocation().add(0,1,0), Material.RED_STAINED_GLASS, 0.28f, 0.5, 8, 8L);
         jinx.sendActionBar(net.kyori.adventure.text.Component.text(
@@ -99,7 +107,7 @@ public final class Jinx extends BaseChampion implements fr.lolmc.champion.base.S
 
     static class Q extends BaseAbility {
         Q(){super("q_jinx","Choix des Armes",Material.TNT,AbilitySlot.Q,
-                new double[]{0,0,0,0,0},25,3,DamageType.PHYSICAL);
+                new double[]{0.9,0.9,0.9,0.9,0.9},25,3,DamageType.PHYSICAL);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             boolean fish = !fishbonesMode.getOrDefault(c.getUniqueId(), false);
@@ -108,12 +116,14 @@ public final class Jinx extends BaseChampion implements fr.lolmc.champion.base.S
                 // Mode Fishbones (bazooka) : portée étendue +2 blocs, dégâts AoE
                 c.sendActionBar(Component.text("💥 Fishbones! Bazooka activé (+portée, AoE)", NamedTextColor.RED));
                 clearPow(c, s);
+                s.multiplyAS(0.90); // Fishbones : -10 % de vitesse d'attaque (données du jeu ; manquait)
                 // Augmenter la portée AA
                 var cm = LolPlugin.getInstance().getChampionManager();
                 if (cm.hasChampion(c)) cm.getChampion(c).setAutoAttackRange(BASE_RANGE + FISHBONES_BONUS[getLevel()-1]);
             } else {
                 // Mode Mini-canons : vitesse d'attaque
                 c.sendActionBar(Component.text("⚡ Mini-canon! Chaque attaque augmente la vitesse d'attaque", NamedTextColor.YELLOW));
+                s.multiplyAS(1/0.90);
                 var cm = LolPlugin.getInstance().getChampionManager();
                 if (cm.hasChampion(c)) cm.getChampion(c).setAutoAttackRange(BASE_RANGE);
             }
@@ -154,10 +164,10 @@ public final class Jinx extends BaseChampion implements fr.lolmc.champion.base.S
     static class E extends BaseAbility {
         E(){super("e_jinx","Croque-Flammes!",Material.TRIPWIRE_HOOK,AbilitySlot.E,
                 new double[]{24,20.5,17,13.5,10},25,2,DamageType.MAGICAL);
-            resourceCost = 70;}
+            resourceCost = 90;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             Location loc=TargetingUtil.getAimedGroundLocation(c, 9.0);
-            double[] base=fr.lolmc.util.Balance.base("e_jinx",new double[]{90,140,190,240,290});double dmg=base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("e_jinx","ap",1.0);
+            double[] base=fr.lolmc.util.Balance.base("e_jinx",new double[]{90,140,190,240,290});double dmg=base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("e_jinx","ap",1);
             for(var __t : TargetingUtil.entitiesInRadius(c, loc, 4.0)){
                 TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);
                 if(__t instanceof Player __p){
@@ -179,7 +189,7 @@ public final class Jinx extends BaseChampion implements fr.lolmc.champion.base.S
 
     static class R extends BaseAbility {
         R(){super("r_jinx","Super Méga Roquette de la Mort!",Material.FIREWORK_ROCKET,AbilitySlot.R,
-                new double[]{75,65,55},25,5,DamageType.PHYSICAL);
+                new double[]{85,65,45},25,5,DamageType.PHYSICAL);
             resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // Projectile réel : roquette (≈2000 unités/s) qui explose sur le 1er champion

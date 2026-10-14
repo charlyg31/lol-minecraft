@@ -232,6 +232,17 @@ public abstract class BaseChampion {
      */
     public void onAbilityRanksChanged() { }
 
+    /**
+     * Dégâts bruts d'une attaque de base (avant résistances). Par défaut, un critique multiplie
+     * par les dégâts critiques ; Ashe redéfinit ce calcul (ses critiques ne font pas de dégâts bonus).
+     */
+    public double basicAttackDamage(Player attacker, org.bukkit.entity.LivingEntity target, double ad, boolean crit) {
+        return crit ? ad * stats.getFinalCritDamage() : ad;
+    }
+
+    /** Le bouclier anti-sort du champion vient de bloquer un sort (Bouclier maléfique de Sivir). */
+    public void onSpellShieldBlock(Player self) { }
+
     /** Le champion subit une attaque de base d'un champion ennemi (ex. Caprice d'Amumu). */
     public void onBasicAttacked(Player self, Player attacker) { }
 

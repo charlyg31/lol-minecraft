@@ -24,8 +24,9 @@ public final class Blitzcrank extends BaseChampion implements fr.lolmc.champion.
     }
     @Override protected void registerAbilities() {
         setAbility(0,new AA()); setAbility(1,new Q());
-        // Ordre actuel de LoL : W = Poing de Force, E = Surrégime
-        setAbility(2,new E()); setAbility(3,new W()); setAbility(4,new R());
+        // Ordre de LoL (Data Dragon 16.20.1) : W = Surrégime, E = Poing de Force
+        // (avant : inversés, avec les délais et coûts de l'autre sort)
+        setAbility(2,new W()); setAbility(3,new E()); setAbility(4,new R());
         initSystems(7.5, ResourceSystem.ResourceType.MANA, 267, 40, 8.5, 0.8);
     }
 
@@ -58,11 +59,11 @@ public final class Blitzcrank extends BaseChampion implements fr.lolmc.champion.
 
     static class Q extends BaseAbility {
         Q(){super("q_blitzcrank","Grappin Fusée",Material.FISHING_ROD,AbilitySlot.Q,
-            new double[]{11,10.5,10,9.5,9},20,0,DamageType.MAGICAL);
+            new double[]{20,19,18,17,16},20,0,DamageType.MAGICAL);
             resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : SKILLSHOT signature. Attrape le 1er ennemi, 110-310 + 120% AP, stun + tire vers Blitz
-            double[] base=fr.lolmc.util.Balance.base("q_blitzcrank",new double[]{110,160,210,260,310});double dmg=base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("q_blitzcrank","ap",1.5);
+            double[] base=fr.lolmc.util.Balance.base("q_blitzcrank",new double[]{110,160,210,260,310});double dmg=base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("q_blitzcrank","ap",1.2);
             // Projectile réel : la main du grappin part à 1800 unités/s et ramène le 1er ennemi
             TargetingUtil.launchSkillshot(c, c.getEyeLocation(), c.getEyeLocation().getDirection(), 11.2, 0.7, false, 18.0,
                     new org.bukkit.inventory.ItemStack(Material.IRON_CHAIN), 0.9f, Material.YELLOW_STAINED_GLASS,
@@ -85,12 +86,12 @@ public final class Blitzcrank extends BaseChampion implements fr.lolmc.champion.
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] base=fr.lolmc.util.Balance.base("q_blitzcrank",new double[]{110,160,210,260,310});
-            return String.format("Skillshot: %.0f dégâts (+150%%AP), attrape et tire la cible vers toi + stun.",base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("q_blitzcrank","ap",1.5));
+            return String.format("Skillshot: %.0f dégâts (+120%%AP), attrape et tire la cible vers toi + stun.",base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("q_blitzcrank","ap",1.2));
         }
     }
 
     static class W extends BaseAbility {
-        W(){super("e_blitzcrank","Surrégime",Material.REDSTONE,AbilitySlot.E,
+        W(){super("w_blitzcrank","Surrégime",Material.REDSTONE,AbilitySlot.W,
             new double[]{15,15,15,15,15},0,0,DamageType.TRUE);
             resourceCost = 75;}
         @Override public void cast(Player c,ChampionStats s,Player t){
@@ -110,7 +111,7 @@ public final class Blitzcrank extends BaseChampion implements fr.lolmc.champion.
     }
 
     static class E extends BaseAbility {
-        E(){super("w_blitzcrank","Poing de Force",Material.LIGHTNING_ROD,AbilitySlot.W,
+        E(){super("e_blitzcrank","Poing de Force",Material.LIGHTNING_ROD,AbilitySlot.E,
             new double[]{7,6.5,6,5.5,5},5,0,DamageType.PHYSICAL);
             resourceCost = 25;}
         @Override public void cast(Player c,ChampionStats s,Player t){
@@ -131,11 +132,11 @@ public final class Blitzcrank extends BaseChampion implements fr.lolmc.champion.
 
     static class R extends BaseAbility {
         R(){super("r_blitzcrank","Champ Statique",Material.COPPER_INGOT,AbilitySlot.R,
-            new double[]{30,20,10},5,4,DamageType.MAGICAL);
+            new double[]{60,40,20},5,4,DamageType.MAGICAL);
             resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : 275/400/525 + 100% AP, silence 0.5s + détruit les boucliers, autour
-            double[] base=fr.lolmc.util.Balance.base("r_blitzcrank",new double[]{275,400,525});int r=Math.min(getLevel()-1,2);double dmg=base[r]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("r_blitzcrank","ap",1.0);
+            double[] base=fr.lolmc.util.Balance.base("r_blitzcrank",new double[]{275,400,525});int r=Math.min(getLevel()-1,2);double dmg=base[r]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("r_blitzcrank","ap",1);
             var cc=LolPlugin.getInstance().getCCManager();
             var cm=LolPlugin.getInstance().getChampionManager();
             for(var __t : TargetingUtil.enemiesAround(c, 6.0)){ // rayon 600 (wiki)
@@ -157,7 +158,7 @@ public final class Blitzcrank extends BaseChampion implements fr.lolmc.champion.
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] base=fr.lolmc.util.Balance.base("r_blitzcrank",new double[]{275,400,525});int r=Math.min(getLevel()-1,2);
-            return String.format("%.0f dégâts foudre autour (+100%%AP) + silence 0.5s + détruit boucliers.",base[r]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("r_blitzcrank","ap",1.0));
+            return String.format("%.0f dégâts foudre autour (+100%%AP) + silence 0.5s + détruit boucliers.",base[r]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("r_blitzcrank","ap",1));
         }
     }
 }

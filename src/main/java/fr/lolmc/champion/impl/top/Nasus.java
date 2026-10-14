@@ -31,7 +31,7 @@ public final class Nasus extends BaseChampion implements fr.lolmc.champion.base.
 
     // Stacks Q globaux par UUID
     public static final Map<UUID,Integer> qStacks=new java.util.concurrent.ConcurrentHashMap<>();
-    private static final int MAX_Q_STACKS = 500; // plafond anti-scaling infini
+    private static final int MAX_Q_STACKS = Integer.MAX_VALUE; // pas de plafond dans LoL (avant : 500)
     /** Réinitialise les stacks de ce joueur (fin de partie / déconnexion). */
     @Override public void resetState(UUID id){ qStacks.remove(id); }
     @Override public void resetAllState(){ qStacks.clear(); }
@@ -39,19 +39,22 @@ public final class Nasus extends BaseChampion implements fr.lolmc.champion.base.
     static class AA extends BasicAttackAbility {
         AA(){super("nasus",Material.BONE,2.5f,DamageType.PHYSICAL);}
         @Override protected void onHit(Player c, ChampionStats s, org.bukkit.entity.LivingEntity tgt, double dmg){
-            // Passif Mangeur d'Âme : vol de vie 12/18/24% selon niveau
-            var cm = LolPlugin.getInstance().getChampionManager();
-            if (cm.hasChampion(c)) {
-                int lvl = cm.getChampion(c).getLevelSystem().getLevel();
-                double vamp = lvl >= 13 ? 0.20 : (lvl >= 7 ? 0.15 : 0.10);
-                cm.getChampion(c).getHPSystem().heal(dmg * vamp);
-            }
+            soulEater(c, dmg);
         }
+    }
+
+    /** Passif Mangeur d'âmes : vol de vie de 10/15/20 % (niveaux 1/7/13), attaques et Frappe siphon. */
+    static void soulEater(Player c, double dmg) {
+        var cm = LolPlugin.getInstance().getChampionManager();
+        if (!cm.hasChampion(c)) return;
+        int lvl = cm.getChampion(c).getLevelSystem().getLevel();
+        double vamp = lvl >= 13 ? 0.20 : (lvl >= 7 ? 0.15 : 0.10);
+        cm.getChampion(c).getHPSystem().heal(dmg * vamp);
     }
 
     static class Q extends BaseAbility {
         Q(){super("q_nasus","Frappe Siphon",Material.BONE,AbilitySlot.Q,
-            new double[]{8,7,6,5,4},5,0,DamageType.PHYSICAL);
+            new double[]{7.5,6.5,5.5,4.5,3.5},5,0,DamageType.PHYSICAL);
             resourceCost = 20;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             org.bukkit.entity.LivingEntity tgt = (t!=null && TargetingUtil.isEnemy(c,t))?t:TargetingUtil.getTargetedEnemy(c,2.5); if(tgt==null){cancelCast();c.sendActionBar(Component.text("💀 Aucune cible",NamedTextColor.GRAY));return;}
@@ -60,6 +63,7 @@ public final class Nasus extends BaseChampion implements fr.lolmc.champion.base.
             int stacks=qStacks.getOrDefault(c.getUniqueId(),0);
             double dmg=s.getFinalAD()+bonus[getLevel()-1]+stacks;
             TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.PHYSICAL);
+            soulEater(c, dmg); // Frappe siphon est une attaque : le vol de vie s'applique (oublié avant)
             // Kill vérifié après les dégâts (avant : sur les dégâts bruts, sans l'armure)
             boolean kills = tgt.isDead() || TargetingUtil.getRealHealth(tgt) <= 0;
             // Stacks (wiki) : +10 sur champion, gros sbire (canon/super) ou gros monstre, +4 sinon
@@ -96,7 +100,15 @@ public final class Nasus extends BaseChampion implements fr.lolmc.champion.base.
                     // Wiki : +3/6/9/12/15 % par seconde jusqu'à 47/59/71/83/95 %
                     double[] maxSlow={0.47,0.59,0.71,0.83,0.95}; double[] perSec={0.03,0.06,0.09,0.12,0.15};
                     int r=getLevel()-1;
-                    fr.lolmc.LolPlugin.getInstance().getCCManager().slowPct(tgt, maxSlow[r]-perSec[r]*(4-sec), 25);
+                    double slow=maxSlow[r]-perSec[r]*(4-sec);
+                    fr.lolmc.LolPlugin.getInstance().getCCManager().slowPct(tgt, slow, 25);
+                    // Vitesse d'attaque réduite de 75 % du ralentissement (données du jeu ; manquait)
+                    var cmW=LolPlugin.getInstance().getChampionManager();
+                    if(tgt instanceof Player wp && cmW.hasChampion(wp)){
+                        var st=cmW.getChampion(wp).getStats(); double asMult=1.0-slow*0.75;
+                        st.multiplyAS(asMult);
+                        new BukkitRunnable(){@Override public void run(){ st.multiplyAS(1.0/asMult); }}.runTaskLater(LolPlugin.getInstance(),20L);
+                    }
                     fr.lolmc.util.VisualEffectUtil.impact(tgt.getWorld(),
                             tgt.getLocation().add(0,1,0), Material.GRAY_STAINED_GLASS, 0.26f, 8L);
                     sec++;

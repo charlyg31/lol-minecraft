@@ -27,6 +27,24 @@ public final class Ashe extends BaseChampion {
         initSystems(3.5, ResourceSystem.ResourceType.MANA, 280, 35, 7, 0.65);
     }
 
+    /**
+     * Passif Tir de Givre (données du jeu) : les critiques d'Ashe n'infligent pas de dégâts bonus
+     * mais appliquent un ralentissement renforcé (40 → 60 %) ; ses attaques contre une cible
+     * ralentie sont multipliées par 1 + chance de critique × (1 + dégâts critiques bonus).
+     * Avant : critiques classiques et aucun bonus contre les cibles ralenties.
+     */
+    private static final java.util.Map<java.util.UUID, Boolean> lastCrit = new java.util.concurrent.ConcurrentHashMap<>();
+    @Override public double basicAttackDamage(Player attacker, org.bukkit.entity.LivingEntity target, double ad, boolean crit) {
+        lastCrit.put(attacker.getUniqueId(), crit);
+        var cc = LolPlugin.getInstance().getCCManager();
+        if (cc != null && cc.isSlowed(target)) {
+            var st = getStats();
+            return ad * (1.0 + st.getFinalCritChance() * (1.0 + st.getBonusCritDamage()));
+        }
+        return ad;
+    }
+    static double empoweredFrost(int lvl) { return 0.40 + 0.20 * (lvl - 1) / 17.0; }
+
     /** Ralentissement de Tir de Givre selon le niveau (20 % → 30 %, wiki). */
     static double frostShot(int lvl) { return 0.20 + 0.10 * (lvl - 1) / 17.0; }
     static double frostShot(Player ashe) {
@@ -41,16 +59,17 @@ public final class Ashe extends BaseChampion {
             if(tgt instanceof Player __p){
                 var cm=LolPlugin.getInstance().getChampionManager();
                 int lvl=cm.hasChampion(c)?cm.getChampion(c).getLevelSystem().getLevel():1;
-                // Tir de Givre (wiki) : 20 % → 30 % selon le niveau, 2 s
-                fr.lolmc.LolPlugin.getInstance().getCCManager().slowPct(__p, frostShot(lvl), 40);
+                // Tir de Givre : 20 → 30 % selon le niveau, 40 → 60 % sur un critique, 2 s
+                boolean crit = lastCrit.getOrDefault(c.getUniqueId(), false);
+                fr.lolmc.LolPlugin.getInstance().getCCManager().slowPct(__p, crit ? empoweredFrost(lvl) : frostShot(lvl), 40);
             }
         }
     }
 
     static class Q extends BaseAbility {
         Q(){super("q_ashe","Tir Concentré",Material.SPECTRAL_ARROW,AbilitySlot.Q,
-            new double[]{15,12.5,10,7.5,5},25,0,DamageType.PHYSICAL);
-            resourceCost = 25;}
+            new double[]{6,6,6,6,6},25,0,DamageType.PHYSICAL);
+            resourceCost = 30;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // Wiki : 6 s, +20-60 % de vitesse d'attaque ; la rafale inflige 110-130 % AD par attaque
             int r=getLevel()-1;
@@ -72,7 +91,7 @@ public final class Ashe extends BaseChampion {
             resourceCost = 50;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : tire des flèches en cône. 60/95/130/165/200 + 100% AD, applique Tir de Givre (ralentit)
-            double[] base=fr.lolmc.util.Balance.base("w_ashe",new double[]{60,95,130,165,200});double dmg=base[getLevel()-1]+s.getBonusAD()*fr.lolmc.util.Balance.ratio("w_ashe","ad",1.0); // AD bonus (wiki)
+            double[] base=fr.lolmc.util.Balance.base("w_ashe",new double[]{60,95,130,165,200});double dmg=base[getLevel()-1]+s.getBonusAD()*fr.lolmc.util.Balance.ratio("w_ashe","ad",1); // AD bonus (wiki)
             // Wiki : 7/8/9/10/11 flèches en éventail (40°), 2000 unités/s, chacune s'arrête au 1er
             // ennemi ; un même ennemi n'est touché qu'une fois par volée
             int arrows=7+getLevel()-1;
@@ -158,7 +177,7 @@ public final class Ashe extends BaseChampion {
 
     static class R extends BaseAbility {
         R(){super("r_ashe","Flèche de Cristal Enchantée",Material.DIAMOND,AbilitySlot.R,
-            new double[]{100,90,80},25,2,DamageType.MAGICAL);
+            new double[]{100,80,60},25,2,DamageType.MAGICAL);
             resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : skillshot longue portée. Stun 1-3.5s selon distance parcourue. Zone autour = 50% dégâts + slow

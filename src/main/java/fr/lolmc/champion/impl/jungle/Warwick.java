@@ -23,10 +23,19 @@ public final class Warwick extends BaseChampion {
         getStats().setGrowthStats(99,2.5,4.4,2.05,0.02,0.75);
         setLolAttackRange(125); // stats LoL (wiki)
     }
-    // Passif Instinct de Chasse : révèle les ennemis sous 50% HP dans un rayon de 25 blocs
-    // Bonus de vitesse vers eux, fureur au combat contre eux
+    // Passif de W, Traque sanglante (données du jeu) : dès que W est appris, révèle les ennemis sous
+    // 50 % de PV, +35-65 % de vitesse vers eux et +70-110 % de vitesse d'attaque contre eux.
+    // Avant : actif sans W, potion Vitesse II, et sans le bonus de vitesse d'attaque.
+    private static final java.util.Map<java.util.UUID, Double> bloodHuntAS = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final java.util.Map<java.util.UUID, ChampionStats> bloodHuntStats = new java.util.concurrent.ConcurrentHashMap<>();
+
     public static void tickWarwickPassive(Player ww) {
         var tm = LolPlugin.getInstance().getTeamManager();
+        var cmW = LolPlugin.getInstance().getChampionManager();
+        if (!cmW.hasChampion(ww)) return;
+        int wRank = cmW.getChampion(ww).getLevelSystem().getAbilityRank(2);
+        boolean woundedInMelee = false;
+        if (wRank <= 0) { setBloodHuntAS(ww, 0); return; }
         for (Player nearby : ww.getWorld().getPlayers()) {
             if (nearby.equals(ww)) continue;
             if (!tm.areEnemies(ww, nearby)) continue;
@@ -39,14 +48,32 @@ public final class Warwick extends BaseChampion {
                 nearby.addPotionEffect(new org.bukkit.potion.PotionEffect(
                     org.bukkit.potion.PotionEffectType.GLOWING, 25, 0, false, false));
                 // Vitesse bonus vers la cible blessée
-                if (ww.getLocation().distance(nearby.getLocation()) < 12) {
-                    ww.addPotionEffect(new org.bukkit.potion.PotionEffect(
-                        org.bukkit.potion.PotionEffectType.SPEED, 25, 1, false, false));
+                double dist = ww.getLocation().distance(nearby.getLocation());
+                if (dist < 12) {
+                    LolPlugin.getInstance().getCCManager().speedPct(ww, new double[]{0.35,0.425,0.50,0.575,0.65}[wRank-1], 25);
                 }
+                if (dist < 4) woundedInMelee = true;
                 ww.sendActionBar(net.kyori.adventure.text.Component.text(
                     "🐺 Instinct de Chasse! " + nearby.getName() + " (" + (int)(hpRatio*100) + "% HP)",
                     net.kyori.adventure.text.format.NamedTextColor.DARK_RED));
             }
+        }
+        setBloodHuntAS(ww, woundedInMelee ? new double[]{0.70,0.80,0.90,1.00,1.10}[wRank-1] : 0);
+    }
+
+    /** Applique (ou retire) le bonus de vitesse d'attaque de Traque sanglante. */
+    private static void setBloodHuntAS(Player ww, double want) {
+        var id = ww.getUniqueId();
+        double prev = bloodHuntAS.getOrDefault(id, 0.0);
+        if (prev == want) return;
+        var cm = LolPlugin.getInstance().getChampionManager();
+        var st = bloodHuntStats.get(id);
+        if (st != null) st.addBonusAttackSpeed(-prev);
+        bloodHuntAS.remove(id); bloodHuntStats.remove(id);
+        if (want > 0 && cm.hasChampion(ww)) {
+            st = cm.getChampion(ww).getStats();
+            st.addBonusAttackSpeed(want);
+            bloodHuntAS.put(id, want); bloodHuntStats.put(id, st);
         }
     }
 
@@ -74,7 +101,7 @@ public final class Warwick extends BaseChampion {
 
     static class Q extends BaseAbility {
         Q(){super("q_warwick","Crocs de la Bête",Material.BONE,AbilitySlot.Q,
-                new double[]{6,6,6,6,6},20,0,DamageType.MAGICAL);
+                new double[]{8,7.5,7,6.5,6},20,0,DamageType.MAGICAL);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : bond + morsure, 100% AD + 6-10% PV max de la cible, soigne 100% des dégâts post-mitigation
@@ -106,19 +133,19 @@ public final class Warwick extends BaseChampion {
 
     static class W extends BaseAbility {
         W(){super("w_warwick","Meute de Prédateurs",Material.RED_WOOL,AbilitySlot.W,
-                new double[]{0,0,0,0,0},0,0,DamageType.TRUE);
-            resourceCost = 0;}
+                new double[]{80,70,60,50,40},0,0,DamageType.TRUE);
+            resourceCost = 55;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             fr.lolmc.LolPlugin.getInstance().getCCManager().speedPct(c, new double[]{0.35,0.425,0.50,0.575,0.65}[getLevel()-1], 60); // wiki
             c.sendActionBar(Component.text("🐺 Meute actif!",NamedTextColor.RED));
         }
-        @Override public String getDynamicDescription(ChampionStats s){return "Passif: +50% vitesse près d'ennemis <50% HP. Actif: boost vitesse 3s.";}
+        @Override public String getDynamicDescription(ChampionStats s){return "Passif : ennemis sous 50% PV révélés, +35-65% vitesse vers eux et +70-110% vitesse d'attaque contre eux. Actif : boost vitesse 3s.";}
     }
 
     static class E extends BaseAbility {
         E(){super("e_warwick","Hurlement Primal",Material.SPIDER_EYE,AbilitySlot.E,
-                new double[]{20,18,16,14,12},5,3,DamageType.PHYSICAL);
-            resourceCost = 0;}
+                new double[]{15,14,13,12,11},5,3,DamageType.PHYSICAL);
+            resourceCost = 40;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // Wiki : 35-55 % de réduction de dégâts pendant 2.75 s
             double[] drArr={0.35,0.40,0.45,0.50,0.55};
@@ -140,7 +167,7 @@ public final class Warwick extends BaseChampion {
                             c.getLocation().add(0,1,0), Material.GRAY_STAINED_GLASS, 0.5f, 6L);
                     c.getWorld().playSound(c.getLocation(), Sound.ENTITY_WOLF_GROWL, 1.5f, 0.6f);
                 }
-            }.runTaskLater(LolPlugin.getInstance(),30L);
+            }.runTaskLater(LolPlugin.getInstance(),55L); // hurlement à la fin des 2,75 s (avant : 1,5 s)
         }
         @Override public String getDynamicDescription(ChampionStats s){return "Réduit les dégâts reçus (35-55%) 2.5s, puis terrifie + ralentit 90% les ennemis autour 1s.";}
     }
@@ -148,7 +175,7 @@ public final class Warwick extends BaseChampion {
     static class R extends BaseAbility {
         R(){super("r_warwick","Emprise Infinie",Material.RED_WOOL,AbilitySlot.R,
                 new double[]{110,90,70},25,0,DamageType.MAGICAL);
-            resourceCost = 0;}
+            resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             org.bukkit.entity.LivingEntity tgt = (t!=null && TargetingUtil.isEnemy(c,t))?t:TargetingUtil.getTargetedEnemy(c,8.0); if(tgt==null){cancelCast();c.sendActionBar(Component.text("🐺 Aucune cible visée",NamedTextColor.GRAY));return;}
             dashTo(c, tgt, -0.8);

@@ -46,7 +46,7 @@ public final class Morgana extends BaseChampion {
 
     static class Q extends BaseAbility {
         Q(){super("q_morgana","Filet des Ombres",Material.LEAD,AbilitySlot.Q,
-                new double[]{11,10.5,10,9.5,9},20,0,DamageType.MAGICAL);
+                new double[]{10,10,10,10,10},20,0,DamageType.MAGICAL);
             resourceCost = 50;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // Wiki : skillshot de 1300 unités, enracine 2-3 s (avant : sort ciblé à 6.5 blocs, 2 s)
@@ -108,7 +108,7 @@ public final class Morgana extends BaseChampion {
 
     static class E extends BaseAbility {
         E(){super("e_morgana","Bouclier Noir",Material.BLACK_STAINED_GLASS,AbilitySlot.E,
-                new double[]{26,24,22,20,18},0,0,DamageType.TRUE);
+                new double[]{26,23.5,21,18.5,16},0,0,DamageType.TRUE);
             resourceCost = 80;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // Bouclier Noir : protège un allié (ou soi), absorbe les dégâts magiques + immunité CC tant qu'il tient
@@ -138,7 +138,7 @@ public final class Morgana extends BaseChampion {
         /** Distance de rupture des chaînes (1050 unités + rayons). */
         static final double BREAK = 11.8;
         R(){super("r_morgana","Chaînes de la Corruption",Material.IRON_NUGGET,AbilitySlot.R,
-                new double[]{110,100,90},20,5,DamageType.MAGICAL);
+                new double[]{120,110,100},20,5,DamageType.MAGICAL);
             resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // Wiki : enchaîne les champions ennemis proches (625) : 200/275/350 (+80 % AP) tout de

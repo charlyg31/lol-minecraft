@@ -47,6 +47,12 @@ public final class MasterYi extends BaseChampion implements fr.lolmc.champion.ba
                 double[] tb = {20,25,30,35,40}; // wiki
                 DamageUtil.damageEntity(c, tgt, tb[Math.min(er,5)-1] + s.getBonusAD() * 0.35, false, DamageUtil.Type.TRUE);
             }
+            // Frappe alpha : chaque attaque réduit sa recharge de 1 s (données du jeu ; manquait)
+            var cmQ = LolPlugin.getInstance().getChampionManager();
+            if (cmQ.hasChampion(c)) {
+                var q = cmQ.getChampion(c).getAbility(1);
+                if (q != null) q.reduceCooldown(c, 1.0);
+            }
             int count = aaCount.merge(c.getUniqueId(), 1, Integer::sum);
             if (count >= 4) {
                 aaCount.put(c.getUniqueId(), 0);
@@ -61,7 +67,7 @@ public final class MasterYi extends BaseChampion implements fr.lolmc.champion.ba
 
     static class Q extends BaseAbility {
         Q(){super("q_masteryi","Frappe Alpha",Material.ENDER_PEARL,AbilitySlot.Q,
-            new double[]{18,16,14,12,10},15,0,DamageType.TRUE);
+            new double[]{20,19.5,19,18.5,18},15,0,DamageType.TRUE);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             org.bukkit.entity.LivingEntity tgt = (t!=null && TargetingUtil.isEnemy(c,t))?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null){cancelCast();return;}
@@ -74,8 +80,10 @@ public final class MasterYi extends BaseChampion implements fr.lolmc.champion.ba
                 if(struck.size()>=4) break;
                 if(!e2.equals(tgt)) struck.add(e2);
             }
+            double monsterBonus=new double[]{60,85,110,135,160}[getLevel()-1]; // contre les monstres (manquait)
             for(var e2 : struck){
-                TargetingUtil.dealDamage(c, e2, dmg, TargetingUtil.DmgType.PHYSICAL);
+                double d = fr.lolmc.game.JungleManager.isJungleMonster(e2) ? dmg+monsterBonus : dmg;
+                TargetingUtil.dealDamage(c, e2, d, TargetingUtil.DmgType.PHYSICAL);
                 fr.lolmc.util.VisualEffectUtil.impactBurst(c.getWorld(),
                         e2.getLocation().add(0,1,0), Material.WHITE_STAINED_GLASS, 0.25f, 0.5, 6, 5L);
             }
@@ -88,8 +96,8 @@ public final class MasterYi extends BaseChampion implements fr.lolmc.champion.ba
 
     static class W extends BaseAbility {
         W(){super("w_masteryi","Méditation",Material.GOLDEN_APPLE,AbilitySlot.W,
-            new double[]{35,30,25,20,15},0,0,DamageType.TRUE);
-            resourceCost = 0;}
+            new double[]{10,10,10,10,10},0,0,DamageType.TRUE);
+            resourceCost = 40;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // Wiki : -70 % de dégâts la 1re demi-seconde puis -45 à -55 %, 4 s ; soin 120-440 (+100 % AP)
             double[] drArr={0.45,0.475,0.50,0.525,0.55};
@@ -105,7 +113,9 @@ public final class MasterYi extends BaseChampion implements fr.lolmc.champion.ba
                 @Override public void run(){
                     var cm=LolPlugin.getInstance().getChampionManager();
                     if(n++>=8 || !c.isOnline() || !cm.hasChampion(c)){ cancel(); return; }
-                    cm.getChampion(c).getHPSystem().heal(perTick);
+                    // Soin augmenté de 1 % par 1 % de PV manquants (jusqu'à +100 %, données du jeu)
+                    var hp=cm.getChampion(c).getHPSystem();
+                    hp.heal(perTick*(2.0-hp.getHPRatio()));
                 }}.runTaskTimer(LolPlugin.getInstance(), 10L, 10L);
             c.sendActionBar(Component.text("🧘 Méditation 4s...",NamedTextColor.AQUA));
         }
@@ -114,7 +124,7 @@ public final class MasterYi extends BaseChampion implements fr.lolmc.champion.ba
 
     static class E extends BaseAbility {
         E(){super("e_masteryi","Style Wuju",Material.BLAZE_ROD,AbilitySlot.E,
-            new double[]{18,17,16,15,14},0,0,DamageType.TRUE);
+            new double[]{14,14,14,14,14},0,0,DamageType.TRUE);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // Avant : potion de Force (aucun vrai dégât) et vol de vie retiré (ancienne version)
@@ -129,8 +139,8 @@ public final class MasterYi extends BaseChampion implements fr.lolmc.champion.ba
 
     static class R extends BaseAbility {
         R(){super("r_masteryi","Highlander",Material.FEATHER,AbilitySlot.R,
-            new double[]{85,70,55},0,0,DamageType.TRUE);
-            resourceCost = 0;}
+            new double[]{85,85,85},0,0,DamageType.TRUE);
+            resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // Wiki : 7 s, +25/45/65 % de vitesse d'attaque et +40/50/60 % de vitesse
             int r=Math.min(getLevel()-1,2);
@@ -139,8 +149,13 @@ public final class MasterYi extends BaseChampion implements fr.lolmc.champion.ba
             new org.bukkit.scheduler.BukkitRunnable(){@Override public void run(){ s.addBonusAttackSpeed(-asBonus); }}
                     .runTaskLater(LolPlugin.getInstance(), 140L);
             fr.lolmc.LolPlugin.getInstance().getCCManager().speedPct(c, new double[]{0.40,0.50,0.60}[r], 140);
-            c.removePotionEffect(PotionEffectType.SLOWNESS); // immunité aux ralentissements
-            fr.lolmc.LolPlugin.getInstance().getCCManager().clearSlows(c.getUniqueId());
+            // Insensible aux ralentissements pendant les 7 s (avant : retirés seulement au lancement)
+            new org.bukkit.scheduler.BukkitRunnable(){ int t=0;
+                @Override public void run(){
+                    if((t+=2)>140 || !c.isOnline()){ cancel(); return; }
+                    c.removePotionEffect(PotionEffectType.SLOWNESS);
+                    fr.lolmc.LolPlugin.getInstance().getCCManager().clearSlows(c.getUniqueId());
+                }}.runTaskTimer(LolPlugin.getInstance(), 0L, 2L);
             c.sendActionBar(Component.text("⚡ HIGHLANDER 7s!",NamedTextColor.GOLD));
         }
         @Override public String getDynamicDescription(ChampionStats s){return "7s: +25-65% vitesse d'attaque, +40-60% vitesse. Passif: les takedowns réduisent les sorts de 70%.";}

@@ -135,6 +135,7 @@ public final class Darius extends BaseChampion implements fr.lolmc.champion.base
                     double dist=__t.getLocation().distance(c.getLocation());
                     double dmg = dist<2.4 ? edgeDmg*0.35 : edgeDmg; // manche 35 %
                     TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.PHYSICAL);
+                    applyBleed(c, __t); // Hémorragie : appliquée par tous les sorts qui blessent (oubliée avant)
                     if(dist>=2.4 && __t instanceof Player) hitChamps++; // soin seulement au bord
                 }
                 // Soin : 17% PV manquants par champion touché au bord (max 51%)
@@ -160,8 +161,8 @@ public final class Darius extends BaseChampion implements fr.lolmc.champion.base
 
     static class W extends BaseAbility {
         W(){super("w_darius","Frappe Estropiante",Material.GOLDEN_AXE,AbilitySlot.W,
-            new double[]{9,8,7,6,5},5,0,DamageType.PHYSICAL);
-            resourceCost = 0;}
+            new double[]{5,5,5,5,5},5,0,DamageType.PHYSICAL);
+            resourceCost = 40;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : prochaine attaque renforcée, dégâts bonus + ralentit 90% 1s
             org.bukkit.entity.LivingEntity tgt = (t!=null && TargetingUtil.isEnemy(c,t))?t:TargetingUtil.getTargetedEnemy(c,2.5); if(tgt==null){cancelCast();c.sendActionBar(Component.text("🪓 Aucune cible",NamedTextColor.GRAY));return;}
@@ -200,7 +201,7 @@ public final class Darius extends BaseChampion implements fr.lolmc.champion.base
 
     static class E extends BaseAbility {
         E(){super("e_darius","Appréhension",Material.TRIPWIRE_HOOK,AbilitySlot.E,
-            new double[]{26,24,22,20,18},5,5,DamageType.PHYSICAL);
+            new double[]{26,23.5,21,18.5,16},5,5,DamageType.PHYSICAL);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : cône devant, tire les ennemis vers Darius + ralentit 40% 1s
@@ -256,12 +257,8 @@ public final class Darius extends BaseChampion implements fr.lolmc.champion.base
                         if (cm.hasChampion(pTgt)) killed = cm.getChampion(pTgt).getHPSystem().isDead();
                     }
                     if (killed) {
-                        // Réinitialiser le cooldown : dynamicCooldown à 0 le temps d'un tick puis -1
-                        thisAbility.setDynamicCooldown(0.001);
-                        thisAbility.triggerCooldown(c);
-                        new org.bukkit.scheduler.BukkitRunnable() {
-                            @Override public void run() { thisAbility.setDynamicCooldown(-1); }
-                        }.runTaskLater(LolPlugin.getInstance(), 1L);
+                        // Délai remis à zéro (Juggernaut) ; le coût est déjà payé (LoL : relance gratuite 20 s)
+                        thisAbility.reduceCooldown(c, thisAbility.getRemainingCooldown(c));
                         c.sendActionBar(Component.text("☠ JUGGERNAUT — Guillotine reset!", NamedTextColor.DARK_RED));
                     }
                 }

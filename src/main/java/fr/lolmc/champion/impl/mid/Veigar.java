@@ -28,7 +28,8 @@ public final class Veigar extends BaseChampion implements fr.lolmc.champion.base
     }
 
     public static final Map<UUID,Integer> apStacks=new java.util.concurrent.ConcurrentHashMap<>();
-    private static final int MAX_AP_STACKS = 150;
+    // Pas de plafond dans LoL (avant : 150)
+    private static final int MAX_AP_STACKS = Integer.MAX_VALUE;
     @Override public void resetState(UUID id){ apStacks.remove(id); }
     @Override public void resetAllState(){ apStacks.clear(); }
 
@@ -67,7 +68,7 @@ public final class Veigar extends BaseChampion implements fr.lolmc.champion.base
 
     static class Q extends BaseAbility {
         Q(){super("q_veigar","Frappe Baleful",Material.AMETHYST_SHARD,AbilitySlot.Q,
-                new double[]{5.5,5,4.5,4,3.5},20,0,DamageType.MAGICAL);
+                new double[]{6,5.5,5,4.5,4},20,0,DamageType.MAGICAL);
             resourceCost = 40;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             double[] base=fr.lolmc.util.Balance.base("q_veigar",new double[]{80,120,160,200,240});
@@ -104,9 +105,16 @@ public final class Veigar extends BaseChampion implements fr.lolmc.champion.base
 
     static class W extends BaseAbility {
         W(){super("w_veigar","Matière Noire",Material.OBSIDIAN,AbilitySlot.W,
-                new double[]{10,9,8,7,6},20,3,DamageType.MAGICAL);
+                new double[]{8,8,8,8,8},20,3,DamageType.MAGICAL);
             resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
+            // Passif : -10 % de recharge par tranche de 50 effets, en cumul multiplicatif (données du jeu)
+            int stacks=apStacks.getOrDefault(c.getUniqueId(),0);
+            double keep=Math.pow(0.9, stacks/50);
+            final BaseAbility w=this;
+            if(keep<1) new BukkitRunnable(){@Override public void run(){
+                w.reduceCooldown(c, w.getRemainingCooldown(c)*(1-keep));
+            }}.runTaskLater(LolPlugin.getInstance(),1L);
             Location loc=TargetingUtil.getAimedGroundLocation(c, 9.5);
             fr.lolmc.util.VisualEffectUtil.groundRing(loc.getWorld(), loc, 3.0,
                     Material.PURPLE_STAINED_GLASS, 18, 0.35f, 0.1f, 25L);
@@ -136,7 +144,7 @@ public final class Veigar extends BaseChampion implements fr.lolmc.champion.base
 
     static class E extends BaseAbility {
         E(){super("e_veigar","Cage Événementielle",Material.DARK_OAK_FENCE,AbilitySlot.E,
-                new double[]{23,21.5,20,18.5,17},0,4,DamageType.TRUE);
+                new double[]{20,18.5,17,15.5,14},0,4,DamageType.TRUE);
             resourceCost = 80;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             Location center=TargetingUtil.getAimedGroundLocation(c, 7.0);

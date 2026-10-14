@@ -63,7 +63,7 @@ public final class ChampionStats {
                          double attackSpeed, double crit, double moveSpeed, double range, double hpRegen) {
         this.baseMaxHP = maxHP; this.baseAttackDamage = ad; this.baseAbilityPower = ap;
         this.baseArmor = armor; this.baseMagicResist = mr; this.baseAttackSpeed = attackSpeed;
-        this.baseCritChance = crit; this.baseCritDamage = 1.75;
+        this.baseCritChance = crit; this.baseCritDamage = 2.0; // 200 % depuis le patch 26.01 (175 % avant)
         this.baseMovementSpeed = moveSpeed; this.baseRange = range; this.baseHPRegen = hpRegen;
         this.currentHP = getFinalMaxHP();
     }
@@ -152,7 +152,12 @@ public final class ChampionStats {
     /** Multiplicateur des chances de critique des objets (Yasuo : x2, Voie du Vagabond). */
     private double critChanceMultiplier = 1.0;
     public void setCritChanceMultiplier(double m) { critChanceMultiplier = m; }
-    public double getFinalCritDamage()   { return baseCritDamage + bonusCritDamage; }
+    public double getFinalCritDamage()   { return (baseCritDamage + bonusCritDamage) * critDamageScale; }
+    /** Bonus de dégâts critiques des objets (Lame d'infini…), hors base de 200 %. */
+    public double getBonusCritDamage()   { return bonusCritDamage; }
+    /** Échelle propre au champion (Yasuo : 95 %). */
+    private double critDamageScale = 1.0;
+    public void setCritDamageScale(double v) { critDamageScale = v; }
     public double getFinalMovementSpeed(){ return (baseMovementSpeed + bonusMovementSpeed) * multMovementSpeed; }
     public double getFinalRange()        { return baseRange + bonusRange; }
     public double getFinalHPRegen()      { return baseHPRegen + growthBonus(growthHPRegen) + bonusHPRegen; }
@@ -261,6 +266,13 @@ public final class ChampionStats {
 
     public double getCooldownMultiplier() {
         return 100.0 / (100.0 + getFinalAbilityHaste());
+    }
+
+    /** Réduction fixe des dégâts PHYSIQUES reçus (Caprice d'Amumu), plafonnée à 50 % de chaque coup. */
+    private double flatPhysicalReduction;
+    public void addFlatPhysicalReduction(double v) { flatPhysicalReduction += v; }
+    public double reducePhysical(double dmg) {
+        return dmg - Math.min(flatPhysicalReduction, dmg * 0.5);
     }
 
     /** Accélération propre à l'ultime (rune Chasseur ultime), cumulée avec l'accélération de compétence. */

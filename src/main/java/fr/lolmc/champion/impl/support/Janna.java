@@ -41,6 +41,22 @@ public final class Janna extends BaseChampion {
             if (p.getLocation().distanceSquared(janna.getLocation()) > 12 * 12) continue;
             cc.speedPct(p, 0.06, 20);
         }
+        // Passif de Zéphyr (données du jeu) : +6-10 % (+2 % par 100 AP) de vitesse pour Janna
+        // (avant : potion Vitesse II quand le sort touchait)
+        if (cm.hasChampion(janna)) {
+            var champ = cm.getChampion(janna);
+            int wr = champ.getLevelSystem().getAbilityRank(2);
+            if (wr > 0) cc.speedPct(janna, new double[]{0.06,0.07,0.08,0.09,0.10}[wr-1]
+                    + 0.0002 * champ.getStats().getFinalAP(), 20);
+        }
+    }
+
+    /** Contrôler un champion avec Bourrasque réduit de 20 % la recharge restante de l'E (données du jeu). */
+    static void eRefundOnCC(Player janna) {
+        var cm = LolPlugin.getInstance().getChampionManager();
+        if (!cm.hasChampion(janna)) return;
+        var e = cm.getChampion(janna).getAbility(3);
+        if (e != null && e.isOnCooldown(janna)) e.reduceCooldown(janna, e.getRemainingCooldown(janna) * 0.20);
     }
 
     static class AA extends BasicAttackAbility {
@@ -49,23 +65,26 @@ public final class Janna extends BaseChampion {
 
     static class Q extends BaseAbility {
         Q(){super("q_janna","Bourrasque Hurlante",Material.WHITE_DYE,AbilitySlot.Q,
-            new double[]{12,11,10,9,8},20,2,DamageType.MAGICAL);
+            new double[]{14,14,14,14,14},20,2,DamageType.MAGICAL);
             resourceCost = 60;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : skillshot tornade en ligne, 60/90/120/150/180 + 50% AP, knockup les ennemis traversés
-            double[] base=fr.lolmc.util.Balance.base("q_janna",new double[]{55,85,115,145,175});double dmg=base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("q_janna","ap",0.5);
+            double[] base=fr.lolmc.util.Balance.base("q_janna",new double[]{55,90,125,160,195});double dmg=base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("q_janna","ap",0.5);
             // Projectile réel : tornade de 1100 unités à ~900/s qui traverse
             TargetingUtil.launchSkillshot(c, c.getLocation().add(0,0.6,0), c.getEyeLocation().getDirection().setY(0), 11.0, 1.2, true, 9.0,
                     new org.bukkit.inventory.ItemStack(Material.WHITE_STAINED_GLASS), 1.5f, Material.WHITE_STAINED_GLASS,
                     __t -> {
                         TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);
                         fr.lolmc.LolPlugin.getInstance().getCCManager().setAirborne(__t, 10); // projeté 0.5 s (wiki, sans charge)
-                        if(__t instanceof Player __p)__p.sendActionBar(Component.text("🌪 Bourrasque! Knockup",NamedTextColor.WHITE));
+                        if(__t instanceof Player __p){
+                            __p.sendActionBar(Component.text("🌪 Bourrasque! Knockup",NamedTextColor.WHITE));
+                            eRefundOnCC(c);
+                        }
                     }, null);
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_PHANTOM_FLAP, 1f, 1.3f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            double[] base=fr.lolmc.util.Balance.base("q_janna",new double[]{55,85,115,145,175});
+            double[] base=fr.lolmc.util.Balance.base("q_janna",new double[]{55,90,125,160,195});
             return String.format("Skillshot tornade: %.0f dégâts (+50%%AP) + knockup les ennemis.",base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("q_janna","ap",0.5));
         }
     }
@@ -77,7 +96,7 @@ public final class Janna extends BaseChampion {
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : envoie un élémentaire qui inflige des dégâts + ralentit. 60/105/150/195/240 + 60% AP
             org.bukkit.entity.LivingEntity tgt = (t!=null && TargetingUtil.isEnemy(c,t))?t:TargetingUtil.getTargetedEnemy(c,6.2); if(tgt==null){cancelCast();c.sendActionBar(Component.text("💨 Aucune cible",NamedTextColor.GRAY));return;} // 550 unités
-            double[] base=fr.lolmc.util.Balance.base("w_janna",new double[]{55,105,155,205,255});double dmg=base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("w_janna","ap",0.6);
+            double[] base=fr.lolmc.util.Balance.base("w_janna",new double[]{55,85,115,145,175});double dmg=base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("w_janna","ap",0.5);
             // Élémentaire d'air à tête chercheuse (1600 unités/s)
             final org.bukkit.entity.LivingEntity ftgt=tgt;
             TargetingUtil.launchHoming(c, c.getEyeLocation(), tgt, 16.0,
@@ -89,20 +108,18 @@ public final class Janna extends BaseChampion {
             TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.MAGICAL);
             if(tgt instanceof Player __p)
                 fr.lolmc.LolPlugin.getInstance().getCCManager().slowPct(__p, new double[]{0.20,0.24,0.28,0.32,0.36}[getLevel()-1]+0.06*s.getFinalAP()/100.0, 40); // wiki
-            // Janna gagne aussi de la vitesse (passif Zéphyr)
-            c.addPotionEffect(new PotionEffect(PotionEffectType.SPEED,40,1,false,true));
             fr.lolmc.util.VisualEffectUtil.impactBurst(tgt.getWorld(),
                     tgt.getLocation().add(0,1,0), Material.WHITE_STAINED_GLASS, 0.28f, 0.5, 8, 6L);
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            double[] base=fr.lolmc.util.Balance.base("w_janna",new double[]{55,105,155,205,255});
-            return String.format("%.0f dégâts (+60%%AP) + ralentit 3s. Janna gagne de la vitesse.",base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("w_janna","ap",0.6));
+            double[] base=fr.lolmc.util.Balance.base("w_janna",new double[]{55,85,115,145,175});
+            return String.format("%.0f dégâts (+50%%AP) + ralentit 3s. Janna gagne de la vitesse.",base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("w_janna","ap",0.5));
         }
     }
 
     static class E extends BaseAbility {
         E(){super("e_janna","Oeil de la Tempête",Material.LIGHT_BLUE_DYE,AbilitySlot.E,
-            new double[]{15,13.5,12,10.5,9},0,0,DamageType.TRUE);
+            new double[]{16,15,14,13,12},0,0,DamageType.TRUE);
             resourceCost = 70;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : bouclier sur allié (ou soi) 75-175 + 50% AP + AD bonus 5s
@@ -132,7 +149,7 @@ public final class Janna extends BaseChampion {
 
     static class R extends BaseAbility {
         R(){super("r_janna","Mousson",Material.HEART_OF_THE_SEA,AbilitySlot.R,
-            new double[]{150,120,90},20,4,DamageType.TRUE);
+            new double[]{130,115,100},20,4,DamageType.TRUE);
             resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : repousse les ennemis autour, puis canalise 3s en soignant les alliés (100/150/200/0.5s)

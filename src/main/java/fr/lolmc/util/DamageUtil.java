@@ -103,6 +103,7 @@ public class DamageUtil {
         }
         if (isAbility && attacker != null) {
             if (vs.consumeSpellShield()) {
+                vc.onSpellShieldBlock(victim);
                 victim.sendActionBar(net.kyori.adventure.text.Component.text(
                     "Bouclier anti-sort - sort bloque!", net.kyori.adventure.text.format.NamedTextColor.AQUA));
                 attacker.sendActionBar(net.kyori.adventure.text.Component.text(
@@ -159,6 +160,11 @@ public class DamageUtil {
         double finalDmg = afterResist;
         if (type != Type.TRUE) {
             finalDmg = vs.applyDamageReductions(afterResist, !isAbility);
+            if (type == Type.PHYSICAL) finalDmg = vs.reducePhysical(finalDmg); // Caprice d'Amumu
+            // Malédiction d'Amumu : +10 % des dégâts magiques en dégâts bruts, quelle que soit la source
+            // (avant : seulement pour les sorts d'Amumu, en un second coup)
+            if (type == Type.MAGICAL && fr.lolmc.champion.impl.jungle.Amumu.isCursed(victim.getUniqueId()))
+                finalDmg += finalDmg * 0.10;
             // Anathema's Chains : le PORTEUR (victim) prend -20% des dégâts venant de son Némésis désigné
             if (attacker != null) {
                 var victimState = pmAnathema != null ? pmAnathema.getState(victim) : null;
@@ -197,8 +203,7 @@ public class DamageUtil {
                        : type == fr.lolmc.util.DamageUtil.Type.TRUE ? "true" : "physical";
             drm.record(victim.getUniqueId(), src, typ, afterShield);
         }
-        // Passif Amumu : désormais géré via Toucher Maudit (applyCurse/onMagicHit)
-        // dans Amumu.java — plus de renvoi de dégâts ici.
+        // Passif Amumu : Toucher Maudit, appliqué plus haut aux dégâts magiques
         // Dragon Elder : exécution si la cible tombe sous 20% HP
         if (attacker != null) {
             // Buff du Dragon Ancestral (avant : potion Force, donnée aussi par Ashe Q, Yi E, Janna E)

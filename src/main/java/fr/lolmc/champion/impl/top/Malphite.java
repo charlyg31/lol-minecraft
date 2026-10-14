@@ -30,34 +30,54 @@ public final class Malphite extends BaseChampion implements fr.lolmc.champion.ba
 
     // Passif Granite Shield : bouclier 10% HP max, se recharge 10s hors combat
     private static final java.util.Map<java.util.UUID, Long> shieldCooldown = new java.util.concurrent.ConcurrentHashMap<>();
-    @Override public void resetState(java.util.UUID id)    { shieldCooldown.remove(id); thunderclapUntil.remove(id); }
-    @Override public void resetAllState()                   { shieldCooldown.clear(); thunderclapUntil.clear(); }
+    @Override public void resetState(java.util.UUID id)    { shieldCooldown.remove(id); thunderclapUntil.remove(id); armorApplied.remove(id); }
+    @Override public void resetAllState()                   { shieldCooldown.clear(); thunderclapUntil.clear(); armorApplied.clear(); }
+    /** Armure bonus du passif de W actuellement appliquée (par joueur). */
+    private static final java.util.Map<java.util.UUID, Double> armorApplied = new java.util.concurrent.ConcurrentHashMap<>();
     public static void onDamageTaken(java.util.UUID id) { shieldCooldown.put(id, System.currentTimeMillis()); }
     public static void tickGraniteShield(org.bukkit.entity.Player p, fr.lolmc.champion.base.BaseChampion champ) {
         Long last = shieldCooldown.get(p.getUniqueId());
-        // Recharge après 8/7/6 s sans dégâts selon le niveau (wiki ; avant : 10 s)
+        // Recharge après 8/7/6 s sans dégâts selon le niveau (wiki ; avant : 10 s).
+        // Tous les dégâts comptent (avant : seulement ceux de l'environnement, donc en combat le
+        // bouclier se rechargeait chaque seconde)
         int lvl = champ.getLevelSystem().getLevel();
         long refresh = lvl >= 13 ? 6000L : lvl >= 7 ? 7000L : 8000L;
-        if (last == null || (System.currentTimeMillis() - last) >= refresh) {
+        boolean envOk = last == null || (System.currentTimeMillis() - last) >= refresh;
+        if (envOk && champ.getHPSystem().msSinceLastDamage() >= refresh) {
             double shield = champ.getStats().getFinalMaxHP() * 0.10;
             // Recharge jusqu'à 10 % des PV max (avant : effaçait aussi les autres boucliers)
             if (champ.getStats().getShield() < shield) {
                 champ.getStats().addShield(shield - champ.getStats().getShield());
             }
         }
+        // Passif de W (Brutalité) : +10/15/20/25/30 % d'armure, triplé tant que le bouclier tient
+        int wRank = champ.getLevelSystem().getAbilityRank(2);
+        var st = champ.getStats();
+        double prev = armorApplied.getOrDefault(p.getUniqueId(), 0.0);
+        double pct = wRank > 0 ? 0.05 + 0.05 * wRank : 0;
+        if (st.getShield() > 0) pct *= 3;
+        double want = (st.getFinalArmor() - prev) * pct;
+        if (Math.abs(want - prev) > 0.01) {
+            st.addBonusArmor(want - prev);
+            armorApplied.put(p.getUniqueId(), want);
+        }
     }
 
     static class AA extends BasicAttackAbility {
         AA(){super("malphite",Material.STONE_SWORD,2.5f,DamageType.PHYSICAL);}
         @Override protected void onHit(Player c, ChampionStats s, org.bukkit.entity.LivingEntity tgt, double dmg){
-            // Coup de Tonnerre actif : dégâts en cône 15-55 (+30 % AP) (+15 % armure) (wiki)
-            if (hasThunderclap(c.getUniqueId())) {
+            // Coup de Tonnerre : la PROCHAINE attaque (5 s) inflige 30-70 (+20 % AP) (+15 % armure)
+            // à la cible, et une onde de 15-55 (+30 % AP) (+15 % armure) aux ennemis proches.
+            // Avant : toutes les attaques pendant 6 s, sans les dégâts bonus sur la cible.
+            if (thunderclapUntil.remove(c.getUniqueId()) instanceof Long until && until > System.currentTimeMillis()) {
                 int wlvl = LolPlugin.getInstance().getChampionManager().hasChampion(c)
                     ? Math.max(1, LolPlugin.getInstance().getChampionManager().getChampion(c).getAbility(2).getLevel()) : 1;
-                double[] bonus={15,25,35,45,55};
-                double coneDmg = bonus[Math.min(wlvl-1,4)] + s.getFinalAP()*0.30 + s.getFinalArmor()*0.15;
-                for (var e : TargetingUtil.enemiesAround(c, 3.0))
-                    TargetingUtil.dealDamage(c, e, coneDmg, TargetingUtil.DmgType.PHYSICAL);
+                int wr = Math.min(wlvl-1,4);
+                double bonusDmg = new double[]{30,40,50,60,70}[wr] + s.getFinalAP()*0.20 + s.getFinalArmor()*0.15;
+                double coneDmg = new double[]{15,25,35,45,55}[wr] + s.getFinalAP()*0.30 + s.getFinalArmor()*0.15;
+                TargetingUtil.dealDamage(c, tgt, bonusDmg, TargetingUtil.DmgType.PHYSICAL);
+                for (var e : TargetingUtil.enemiesAround(c, 4.0))
+                    if (!e.equals(tgt)) TargetingUtil.dealDamage(c, e, coneDmg, TargetingUtil.DmgType.PHYSICAL);
                 fr.lolmc.util.VisualEffectUtil.impact(c.getWorld(),
                         tgt.getLocation().add(0,1,0), Material.STONE, 0.3f, 4L);
             }
@@ -66,7 +86,7 @@ public final class Malphite extends BaseChampion implements fr.lolmc.champion.ba
 
     static class Q extends BaseAbility {
         Q(){super("q_malphite","Éclat de Pierre",Material.COBBLESTONE,AbilitySlot.Q,
-            new double[]{8,7.5,7,6.5,6},20,0,DamageType.MAGICAL);
+            new double[]{8,8,8,8,8},20,0,DamageType.MAGICAL);
             resourceCost = 70;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             org.bukkit.entity.LivingEntity tgt = (t!=null && TargetingUtil.isEnemy(c,t))?t:TargetingUtil.getTargetedEnemy(c,6.9); if(tgt==null){cancelCast();c.sendActionBar(Component.text("🪨 Aucune cible",NamedTextColor.GRAY));return;}
@@ -102,25 +122,27 @@ public final class Malphite extends BaseChampion implements fr.lolmc.champion.ba
     public static boolean hasThunderclap(java.util.UUID id){ Long u=thunderclapUntil.get(id); return u!=null && u>System.currentTimeMillis(); }
     static class W extends BaseAbility {
         W(){super("w_malphite","Coup de Tonnerre",Material.IRON_CHESTPLATE,AbilitySlot.W,
-            new double[]{10,9,8,7,6},0,3,DamageType.PHYSICAL);
+            new double[]{10,9.5,9,8.5,8},0,3,DamageType.PHYSICAL);
             resourceCost = 25;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            // Active : 6s (120 ticks) d'attaques renforcées en cône
-            thunderclapUntil.put(c.getUniqueId(), System.currentTimeMillis()+6000L);
-            c.sendActionBar(Component.text("⚡ Coup de Tonnerre actif (6s)!",NamedTextColor.YELLOW));
+            // Active : la prochaine attaque dans les 5 s est renforcée (wiki)
+            thunderclapUntil.put(c.getUniqueId(), System.currentTimeMillis()+5000L);
+            c.sendActionBar(Component.text("⚡ Coup de Tonnerre : prochaine attaque renforcée (5s)",NamedTextColor.YELLOW));
             fr.lolmc.util.VisualEffectUtil.impact(c.getWorld(),
                     c.getLocation().add(0,0.5,0), Material.STONE, 0.4f, 5L);
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_LIGHTNING_BOLT_THUNDER, 0.6f, 1.5f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            double[] bonus={15,25,35,45,55};int r=getLevel()-1;
-            return String.format("6s : tes attaques frappent en cône (%.0f, +30%%AP +15%%armure).",bonus[r]+s.getFinalAP()*0.30+s.getFinalArmor()*0.15);
+            int r=getLevel()-1;
+            return String.format("Passif : +%.0f%% d'armure (x3 avec le bouclier). Prochaine attaque : +%.0f dégâts et onde de %.0f autour.",
+                    (0.05+0.05*(r+1))*100, new double[]{30,40,50,60,70}[r]+s.getFinalAP()*0.20+s.getFinalArmor()*0.15,
+                    new double[]{15,25,35,45,55}[r]+s.getFinalAP()*0.30+s.getFinalArmor()*0.15);
         }
     }
 
     static class E extends BaseAbility {
         E(){super("e_malphite","Sol Fracturé",Material.CRACKED_STONE_BRICKS,AbilitySlot.E,
-            new double[]{10,9,8,7,6},5,4,DamageType.MAGICAL);
+            new double[]{7,7,7,7,7},5,4,DamageType.MAGICAL);
             resourceCost = 50;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : 60/95/130/165/200 + 60% AP + 40% armure, slow AS 30-50% sur 3s
@@ -150,7 +172,7 @@ public final class Malphite extends BaseChampion implements fr.lolmc.champion.ba
 
     static class R extends BaseAbility {
         R(){super("r_malphite","Assaut Implacable",Material.ANVIL,AbilitySlot.R,
-            new double[]{130,105,80},6.5,4,DamageType.MAGICAL);
+            new double[]{130,115,100},6.5,4,DamageType.MAGICAL);
             resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             org.bukkit.entity.LivingEntity tgt = (t!=null && TargetingUtil.isEnemy(c,t))?t:TargetingUtil.getTargetedEnemy(c,10.0); if(tgt==null){cancelCast();return;} // 1000 unités

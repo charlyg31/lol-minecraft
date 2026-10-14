@@ -30,6 +30,8 @@ public final class Yasuo extends BaseChampion implements fr.lolmc.champion.base.
         initSystems(6.5, ResourceSystem.ResourceType.FLOW, 100, 0, 0, 0);
         // Passif Voie du Vagabond : double la chance de critique des objets (plafonnée à 100 %)
         getStats().setCritChanceMultiplier(2.0);
+        // Ses critiques font 95 % des dégâts critiques normaux (190 % au lieu de 200 %, wiki)
+        getStats().setCritDamageScale(0.95);
     }
 
     public static final Map<UUID,Integer> qCasts=new java.util.concurrent.ConcurrentHashMap<>();
@@ -82,7 +84,8 @@ public final class Yasuo extends BaseChampion implements fr.lolmc.champion.base.
                 && res.getCurrent() >= res.getMax()
                 && champ.getStats().getShield() <= 0) {
             int lvl = champ.getLevelSystem().getLevel();
-            double shield = 125 + (674.46 - 125) * (lvl - 1) / 17.0; // wiki
+            // 125 → 600 du niveau 1 au 18 (données du jeu ; 674 est la valeur du niveau 20)
+            double shield = 125 + (600 - 125) * (lvl - 1) / 17.0;
             champ.getStats().addShield(shield);
             res.setCurrent(0);
             p.sendActionBar(net.kyori.adventure.text.Component.text(
@@ -96,7 +99,7 @@ public final class Yasuo extends BaseChampion implements fr.lolmc.champion.base.
 
     static class Q extends BaseAbility {
         Q(){super("q_yasuo","Tempête d'Acier",Material.BLAZE_POWDER,AbilitySlot.Q,
-            new double[]{4,3.5,3,2.5,2},20,6,DamageType.PHYSICAL);
+            new double[]{4,4,4,4,4},20,6,DamageType.PHYSICAL);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // 2 coups touchés → le 3e Q est une tornade (avant : chaque lancer, même raté, comptait)
@@ -171,7 +174,7 @@ public final class Yasuo extends BaseChampion implements fr.lolmc.champion.base.
 
     static class E extends BaseAbility {
         E(){super("e_yasuo","Lame Déferlante",Material.FEATHER,AbilitySlot.E,
-            new double[]{0.5,0.5,0.5,0.5,0.5},5,0,DamageType.MAGICAL);
+            new double[]{0.5,0.4,0.3,0.2,0.1},5,0,DamageType.MAGICAL);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : dash à travers la cible, dégâts magiques + 25% par stack (max 4 = +100%)

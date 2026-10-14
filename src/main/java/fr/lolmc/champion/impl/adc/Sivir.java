@@ -36,9 +36,39 @@ public final class Sivir extends BaseChampion implements fr.lolmc.champion.base.
     @Override public void resetAllState()               { ricochetActive.clear(); huntUntil.clear(); }
     public static void setRicochet(java.util.UUID id, boolean v) { ricochetActive.put(id, v); }
 
+    // Passif Pied léger (données du jeu) : attaquer un champion donne 55-75 de vitesse pendant 1.5 s.
+    // Manquait.
+    private static final java.util.Map<java.util.UUID, Long> fleetUntil = new java.util.concurrent.ConcurrentHashMap<>();
+    static void fleetOfFoot(Player c, ChampionStats s) {
+        var cm = LolPlugin.getInstance().getChampionManager();
+        int lvl = cm.hasChampion(c) ? cm.getChampion(c).getLevelSystem().getLevel() : 1;
+        double ms = lvl >= 16 ? 75 : lvl >= 11 ? 70 : lvl >= 6 ? 65 : 55;
+        long until = System.currentTimeMillis() + 1500L;
+        boolean active = fleetUntil.getOrDefault(c.getUniqueId(), 0L) > System.currentTimeMillis();
+        fleetUntil.put(c.getUniqueId(), until);
+        if (active) return; // rafraîchi, pas cumulé
+        s.addBonusMoveSpeed(ms);
+        new BukkitRunnable() { @Override public void run() {
+            // Rafraîchi par chaque attaque : retiré seulement 1.5 s après la dernière
+            if (fleetUntil.getOrDefault(c.getUniqueId(), 0L) > System.currentTimeMillis()) return;
+            s.addBonusMoveSpeed(-ms);
+            cancel();
+        }}.runTaskTimer(LolPlugin.getInstance(), 30L, 5L);
+    }
+
+    // Bouclier maléfique (données du jeu) : bloquer un sort soigne de 60-80 % AD (+50 % AP). Manquait.
+    @Override public void onSpellShieldBlock(Player self) {
+        var s = getStats();
+        int r = Math.max(1, getLevelSystem().getAbilityRank(3));
+        double heal = new double[]{0.60,0.65,0.70,0.75,0.80}[r-1] * s.getFinalAD() + 0.50 * s.getFinalAP();
+        getHPSystem().heal(heal);
+        self.sendActionBar(Component.text("🛡 Sort bloqué ! +" + (int) heal + " PV", NamedTextColor.GREEN));
+    }
+
     static class AA extends BasicAttackAbility {
         AA(){super("sivir",Material.CROSSBOW,5.5f,DamageType.PHYSICAL);}
         @Override protected void onHit(Player c, ChampionStats s, org.bukkit.entity.LivingEntity tgt, double dmg) {
+            if (tgt instanceof Player) fleetOfFoot(c, s);
             // À la Chasse : chaque attaque réduit les recharges de Q, W et E de 0.5 s
             if (huntUntil.getOrDefault(c.getUniqueId(), 0L) > System.currentTimeMillis()) {
                 var cmH = LolPlugin.getInstance().getChampionManager();
@@ -83,7 +113,7 @@ public final class Sivir extends BaseChampion implements fr.lolmc.champion.base.
 
     static class Q extends BaseAbility {
         Q(){super("q_sivir","Lame Boomerang",Material.IRON_AXE,AbilitySlot.Q,
-            new double[]{14,13,12,11,10},25,0,DamageType.PHYSICAL);
+            new double[]{10,9.5,9,8.5,8},25,0,DamageType.PHYSICAL);
             resourceCost = 70;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // Wiki : lame lancée en ligne (1250 unités) qui revient : 60-160 (+70 % AD bonus
@@ -114,8 +144,8 @@ public final class Sivir extends BaseChampion implements fr.lolmc.champion.base.
 
     static class W extends BaseAbility {
         W(){super("w_sivir","Ricochets",Material.MUSIC_DISC_13,AbilitySlot.W,
-            new double[]{7,7,7,7,7},0,0,DamageType.PHYSICAL);
-            resourceCost = 22;}
+            new double[]{12,12,12,12,12},0,0,DamageType.PHYSICAL);
+            resourceCost = 60;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // W Ricochet : active le rebond des AA pendant 6s
             // Wiki : 4 s, +20-40 % de vitesse d'attaque
@@ -130,19 +160,19 @@ public final class Sivir extends BaseChampion implements fr.lolmc.champion.base.
 
     static class E extends BaseAbility {
         E(){super("e_sivir","Bouclier Maléfique",Material.SHIELD,AbilitySlot.E,
-            new double[]{22,20,18,16,14},0,0,DamageType.TRUE);
+            new double[]{24,22.5,21,19.5,18},0,0,DamageType.TRUE);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // Bouclier anti-sort : bloque le prochain sort ennemi pendant 1,5 s
             s.grantSpellShield(1500L);
             c.sendActionBar(Component.text("🛡 Bouclier Maléfique!",NamedTextColor.GREEN));
         }
-        @Override public String getDynamicDescription(ChampionStats s){return "Bloque un sort ennemi. Annule le CC.";}
+        @Override public String getDynamicDescription(ChampionStats s){return "1.5s : bloque le prochain sort ennemi et te soigne (60-80% AD +50% AP).";}
     }
 
     static class R extends BaseAbility {
         R(){super("r_sivir","Appel des Flèches",Material.GOLDEN_AXE,AbilitySlot.R,
-            new double[]{120,90,60},0,0,DamageType.TRUE);
+            new double[]{120,100,80},0,0,DamageType.TRUE);
             resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // Wiki : 8/10/12 s, +20/25/30 % de vitesse pour Sivir et ses alliés proches ; chaque

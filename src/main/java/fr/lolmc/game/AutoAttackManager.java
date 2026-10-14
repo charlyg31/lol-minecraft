@@ -299,9 +299,8 @@ public class AutoAttackManager {
         }
         if (!checkRangeAndCooldown(attacker, champ)) return false;
 
-        double rawDamage = champ.getStats().getFinalAD();
         boolean crit = Math.random() < champ.getStats().getFinalCritChance();
-        if (crit) rawDamage *= champ.getStats().getFinalCritDamage();
+        double rawDamage = champ.basicAttackDamage(attacker, target, champ.getStats().getFinalAD(), crit);
 
         AAType type = getAAType(champ);
         final double dmg = rawDamage;
@@ -363,9 +362,8 @@ public class AutoAttackManager {
         }
         if (!checkRangeAndCooldown(attacker, champ)) return false;
 
-        double rawDamage = champ.getStats().getFinalAD();
         boolean crit = Math.random() < champ.getStats().getFinalCritChance();
-        if (crit) rawDamage *= champ.getStats().getFinalCritDamage();
+        double rawDamage = champ.basicAttackDamage(attacker, target, champ.getStats().getFinalAD(), crit);
 
         AAType type = getAAType(champ);
         final double dmg = rawDamage;

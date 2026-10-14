@@ -311,6 +311,11 @@ public class CCManager {
 
     // ── État ──
 
+    /** Cible actuellement ralentie (ralentissement en % ou potion de lenteur). */
+    public boolean isSlowed(LivingEntity e) {
+        return strongestSlow(e.getUniqueId(), now()) > 0 || e.hasPotionEffect(PotionEffectType.SLOWNESS);
+    }
+
     public boolean isStunned(UUID id)  { return now() < stunUntil.getOrDefault(id, 0L); }
     public boolean isRooted(UUID id)   { return now() < rootUntil.getOrDefault(id, 0L); }
     public boolean isSilenced(UUID id) { return now() < silenceUntil.getOrDefault(id, 0L); }

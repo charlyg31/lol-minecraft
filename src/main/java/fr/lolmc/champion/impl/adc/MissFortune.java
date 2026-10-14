@@ -49,6 +49,11 @@ public final class MissFortune extends BaseChampion implements fr.lolmc.champion
                 fr.lolmc.util.VisualEffectUtil.impact(c.getWorld(),
                         tgt.getLocation().add(0,1.5,0), Material.PINK_STAINED_GLASS, 0.25f, 5L);
                 lastTarget.put(c.getUniqueId(), tgt.getUniqueId());
+                // Love Tap réduit la recharge de Fanfaronnade (W) de 2 s (données du jeu ; manquait)
+                if (cm0.hasChampion(c)) {
+                    var w = cm0.getChampion(c).getAbility(2);
+                    if (w != null) w.reduceCooldown(c, 2.0);
+                }
             }
         }
     }
@@ -56,7 +61,7 @@ public final class MissFortune extends BaseChampion implements fr.lolmc.champion
     static class Q extends BaseAbility {
         Q(){super("q_missfortune","Doublé",Material.FLINT_AND_STEEL,AbilitySlot.Q,
             new double[]{7,6,5,4,3},25,0,DamageType.PHYSICAL);
-            resourceCost = 43;}
+            resourceCost = 40;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : tir sur 1 cible qui ricoche sur celle derrière. 1ère: 20-100+100%AD. 2ème: 20-80+85%AD +crit
             org.bukkit.entity.LivingEntity tgt = (t!=null && TargetingUtil.isEnemy(c,t))?t:TargetingUtil.getTargetedEnemy(c,6.2); if(tgt==null){cancelCast();c.sendActionBar(Component.text("🔫 Aucune cible",NamedTextColor.GRAY));return;}
@@ -99,8 +104,8 @@ public final class MissFortune extends BaseChampion implements fr.lolmc.champion
 
     static class W extends BaseAbility {
         W(){super("w_missfortune","Strut",Material.LEATHER_BOOTS,AbilitySlot.W,
-            new double[]{19,17,15,13,11},0,0,DamageType.TRUE);
-            resourceCost = 30;}
+            new double[]{12,12,12,12,12},0,0,DamageType.TRUE);
+            resourceCost = 45;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // Wiki : +40-100 % de vitesse d'attaque pendant 4 s (+ vitesse de déplacement)
             double asBonus=new double[]{0.40,0.55,0.70,0.85,1.00}[getLevel()-1];
@@ -114,7 +119,7 @@ public final class MissFortune extends BaseChampion implements fr.lolmc.champion
 
     static class E extends BaseAbility {
         E(){super("e_missfortune","Pluie de Balles",Material.GUNPOWDER,AbilitySlot.E,
-            new double[]{14.5,13,11.5,10,8.5},25,3,DamageType.MAGICAL);
+            new double[]{18,17,16,15,14},25,3,DamageType.MAGICAL);
             resourceCost = 80;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : zone au sol visée, dégâts magiques toutes les 0.25s sur 2s + ralentit 40-60%
@@ -148,7 +153,7 @@ public final class MissFortune extends BaseChampion implements fr.lolmc.champion
 
     static class R extends BaseAbility {
         R(){super("r_missfortune","Déluge de Balles",Material.NETHERITE_HOE,AbilitySlot.R,
-            new double[]{100,90,80},25,8,DamageType.PHYSICAL);
+            new double[]{120,110,100},25,8,DamageType.PHYSICAL);
             resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : canalise 3s, ~8 vagues de balles en CÔNE devant. Chaque vague = 75% AD + 35% AP (peut critiquer)
@@ -181,7 +186,8 @@ public final class MissFortune extends BaseChampion implements fr.lolmc.champion
                     for(var __t : targets){
                         double dmg=perWave;
                         // Chaque vague peut critiquer
-                        if(Math.random()<s.getFinalCritChance()) dmg*=1.3;
+                        // Critique : +30 % des dégâts critiques au-delà de 100 % (×1.3 avec 200 %)
+                        if(Math.random()<s.getFinalCritChance()) dmg*=1.0+0.3*(s.getFinalCritDamage()-1.0);
                         TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.PHYSICAL);
                     }
                     // Balles qui partent dans le cône (purement visuelles : la vague touche toute la zone)

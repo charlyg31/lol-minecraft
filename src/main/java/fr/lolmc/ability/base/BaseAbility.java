@@ -219,7 +219,9 @@ public abstract class BaseAbility {
 
     /** Permet de modifier le cooldown de l'AA dynamiquement selon la vitesse d'attaque. */
     public void setDynamicCooldown(double seconds) {
-        this.dynamicCooldownOverride = Math.max(0.1, seconds);
+        // ≤ 0 : retour au délai normal. Avant : Math.max(0.1, -1) gardait 0.1 s pour toujours
+        // (R de Darius après un reset, Q de Nasus après son R : délai bloqué à 0.1 s)
+        this.dynamicCooldownOverride = seconds <= 0 ? -1 : Math.max(0.1, seconds);
     }
 
     // ─── Affichage portée (le rendu réel se fait dans AbilityListener,
@@ -291,8 +293,10 @@ public abstract class BaseAbility {
         lore.add(stat("Cooldown", String.format("%.1fs", getCurrentCooldown(stats))));
         if (range > 0)     lore.add(stat("Portée",         String.format("%.0f blocs", range)));
         if (aoeRadius > 0) lore.add(stat("Zone d'effet",   String.format("%.0f blocs", aoeRadius)));
-        if (resourceCost > 0) {
-            lore.add(stat("Coût", String.format("%.0f", resourceCost)));
+        // Coût réel du rang (champions.yml), pas la valeur de repli du code
+        double cost = getResourceCost();
+        if (cost > 0) {
+            lore.add(stat("Coût", String.format("%.0f", cost)));
         }
         lore.add(stat("Dégâts", switch (damageType) {
             case PHYSICAL -> "§cPhysiques";
