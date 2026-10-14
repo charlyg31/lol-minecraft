@@ -56,7 +56,7 @@ public final class JungleBuffs {
                 NamedTextColor.RED));
     }
 
-    /** Crête d'intuition : 120 s, 10/15/20 accélération de compétence + régénération de mana. */
+    /** Crête d'intuition : 120 s, 10/15/20 accélération de compétence (niveaux 1/6/11, wiki) + régénération de mana. */
     public static void grantBlue(Player p) {
         var cm = LolPlugin.getInstance().getChampionManager();
         if (!cm.hasChampion(p)) return;
@@ -80,15 +80,18 @@ public final class JungleBuffs {
         blueUntil.remove(id);
     }
 
-    /** Main du Baron : 180 s, 12-48 AD et 20-80 AP selon la minute de la prise (fixés). */
+    /**
+     * Main du Baron : 180 s, AD et AP fixés à la minute de la prise. Wiki (V9.2) : 12/26/48 AD et
+     * 20/43/80 AP aux minutes 20/30/40, progression accélérée : parabole passant par ces 3 points.
+     */
     public static void grantBaron(Player p) {
         var cm = LolPlugin.getInstance().getChampionManager();
         if (!cm.hasChampion(p)) return;
         removeBaron(p.getUniqueId());
         var gm = fr.lolmc.instance.InstanceHelper.gameManager(p);
         double minutes = gm != null ? gm.getElapsedSeconds() / 60.0 : 20;
-        double t = Math.max(0, Math.min(1, (minutes - 20) / 20.0)); // 20 min → 40 min
-        double ad = 12 + 36 * t, ap = 20 + 60 * t;
+        double t = baronMinutes(minutes);
+        double ad = 12 + t + 0.04 * t * t, ap = 20 + 1.6 * t + 0.07 * t * t;
         var champ = cm.getChampion(p);
         champ.getStats().addBonusAD(ad);
         champ.getStats().addBonusAP(ap);
@@ -105,6 +108,11 @@ public final class JungleBuffs {
         var champ = buffChamp.get(id);
         if (a != null && champ != null) { champ.getStats().addBonusAD(-a[0]); champ.getStats().addBonusAP(-a[1]); }
         baronUntil.remove(id);
+    }
+
+    /** Minutes écoulées depuis 20:00, bornées à [0, 20] (la Main du Baron cesse de progresser à 40:00). */
+    private static double baronMinutes(double minutes) {
+        return Math.max(0, Math.min(20, minutes - 20));
     }
 
     public static boolean hasBaron(Player p) { return isActive(baronUntil, p.getUniqueId()); }
@@ -159,6 +167,7 @@ public final class JungleBuffs {
             }, 20L * i);
         }
         boolean r = ranged(cm.getChampion(attacker));
+        // Niveaux 1/6/11 (patch 26.1) ; 25 % / 12.5 % au niveau 11 (relevé après le 26.1, wiki)
         int tier = lvl >= 11 ? 2 : lvl >= 6 ? 1 : 0;
         double slow = r ? new double[]{0.05, 0.075, 0.125}[tier] : new double[]{0.10, 0.15, 0.25}[tier];
         var cc = LolPlugin.getInstance().getCCManager();
@@ -265,7 +274,7 @@ public final class JungleBuffs {
     }
 
     /**
-     * Dégâts reçus par un sbire renforcé (wiki) : -50 → -70 % (selon la minute) contre les champions,
+     * Dégâts reçus par un sbire renforcé (wiki) : -50/-58/-70 % aux minutes 20/30/40 contre les champions,
      * -85 % contre les sbires pour les sbires de mêlée.
      */
     public static double minionDamageMultiplier(LivingEntity target, Player attacker) {
@@ -274,7 +283,8 @@ public final class JungleBuffs {
         if (attacker == null) return "melee".equals(t) ? 0.15 : 1.0;
         var gm = fr.lolmc.instance.InstanceHelper.gameManager(attacker);
         double minutes = gm != null ? gm.getElapsedSeconds() / 60.0 : 20;
-        double reduction = 0.50 + 0.20 * Math.max(0, Math.min(1, (minutes - 20) / 20.0));
+        double m = baronMinutes(minutes);
+        double reduction = 0.50 + 0.006 * m + 0.0002 * m * m;
         return ("melee".equals(t) || "caster".equals(t)) ? 1.0 - reduction : 1.0;
     }
 
@@ -353,9 +363,10 @@ public final class JungleBuffs {
             var champ = cm.getChampion(p);
             var hp = champ.getHPSystem();
             int lvl = champ.getLevelSystem().getLevel();
-            // Crête de braises : régénération hors combat 0.5/1/1.5/3 % des PV max / 5 s
+            // Crête de braises : régénération hors combat 0.5/1/1.5/3 % des PV max / 5 s aux niveaux
+            // 1/4/6/11 (patch 26.1 ; avant : 1/6/11/16)
             if (isActive(redUntil, id) && !hp.isInCombat()) {
-                double pct = lvl >= 16 ? 0.03 : lvl >= 11 ? 0.015 : lvl >= 6 ? 0.01 : 0.005;
+                double pct = lvl >= 11 ? 0.03 : lvl >= 6 ? 0.015 : lvl >= 4 ? 0.01 : 0.005;
                 hp.heal(hp.getMaxHP() * pct / 5);
             }
             // Crête d'intuition : 1 % du mana max + 5 par seconde

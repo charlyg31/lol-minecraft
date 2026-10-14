@@ -321,7 +321,7 @@ public class CCManager {
     public boolean isSilenced(UUID id) { return now() < silenceUntil.getOrDefault(id, 0L); }
 
     /** Peut lancer un sort ? (bloqué par stun ou silence) */
-    public boolean canCastAbility(UUID id) { return !isStunned(id) && !isSilenced(id); }
+    public boolean canCastAbility(UUID id) { return !isStunned(id) && !isSilenced(id) && !HeraldRodeo.isRiding(id); }
 
     /** Retire tous les CC sur une entité (QSS, Purification, Mercurial). */
     public void cleanse(LivingEntity target) {
@@ -335,7 +335,7 @@ public class CCManager {
         }
     }
     /** Peut auto-attaquer ? (bloqué par stun seulement ; le silence n'empêche pas l'AA) */
-    public boolean canAutoAttack(UUID id) { return !isStunned(id); }
+    public boolean canAutoAttack(UUID id) { return !isStunned(id) && !HeraldRodeo.isRiding(id); }
 
     public void clear(UUID id) {
         ccImmuneUntil.remove(id);

@@ -239,6 +239,11 @@ public class StructureDamageListener implements Listener {
         }
     }
 
+    /** Structure abattue par un champion hors attaque de base (charge du Héraut monté). */
+    public void onStructureDestroyedBy(GameStructure structure, Player destroyer) {
+        onStructureDestroyed(structure, destroyer);
+    }
+
     private void onStructureDestroyed(GameStructure structure, Player destroyer) {
         String name = structureName(structure);
         Team enemyTeam = structure.getTeam();

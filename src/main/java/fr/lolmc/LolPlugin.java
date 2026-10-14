@@ -211,6 +211,7 @@ public class LolPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(preGameGUI, this);
         matchScoreboard = new MatchScoreboard();
         getServer().getPluginManager().registerEvents(new fr.lolmc.listener.MonsterPassiveListener(), this);
+        getServer().getPluginManager().registerEvents(new fr.lolmc.game.HeraldRodeo(), this);
         getServer().getPluginManager().registerEvents(bushManager, this);
         // ── Shop/Passifs (dépend de goldManager + championManager) ────
         hudManager = new HUDManager(championManager);

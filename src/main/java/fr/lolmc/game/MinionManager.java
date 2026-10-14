@@ -401,27 +401,41 @@ public class MinionManager {
         }
     }
 
-    private static NamespacedKey BARON_MS;
+    private static NamespacedKey BARON_MS, BARON_SCALE;
 
     /**
      * Main du Baron (wiki) : sbires de mêlée et super-sbires renforcés +50 % de vitesse de
-     * déplacement (super-sbires : +25 % de vitesse d'attaque en plus). Retiré hors de l'aura.
+     * déplacement (super-sbires : +25 % de vitesse d'attaque en plus). Taille : mêlée et canon
+     * +30 %, super-sbire +15 %, mage inchangé (hitbox et modèle). Retiré hors de l'aura.
      */
     private static void baronAura(LivingEntity m) {
-        var attr = m.getAttribute(Compat.movementSpeed());
-        if (attr == null) return;
-        if (BARON_MS == null) BARON_MS = new NamespacedKey(LolPlugin.getInstance(), "baron_aura_ms");
-        String t = getMinionTypeTag(m);
-        boolean emp = ("melee".equals(t) || "super".equals(t)) && JungleBuffs.isEmpowered(m);
-        var cur = attr.getModifier(BARON_MS);
-        if (emp && cur == null) {
-            attr.addTransientModifier(new org.bukkit.attribute.AttributeModifier(BARON_MS, 0.5,
-                    org.bukkit.attribute.AttributeModifier.Operation.ADD_SCALAR));
-            if ("super".equals(t)) fr.lolmc.util.MobCombat.setAttackSpeedMult(m, 1.25);
-        } else if (!emp && cur != null) {
-            attr.removeModifier(BARON_MS);
-            if ("super".equals(t)) fr.lolmc.util.MobCombat.setAttackSpeedMult(m, 1.0);
+        if (BARON_MS == null) {
+            BARON_MS = new NamespacedKey(LolPlugin.getInstance(), "baron_aura_ms");
+            BARON_SCALE = new NamespacedKey(LolPlugin.getInstance(), "baron_aura_scale");
         }
+        String t = getMinionTypeTag(m);
+        boolean emp = JungleBuffs.isEmpowered(m);
+        var attr = m.getAttribute(Compat.movementSpeed());
+        if (attr != null && ("melee".equals(t) || "super".equals(t))) {
+            var cur = attr.getModifier(BARON_MS);
+            if (emp && cur == null) {
+                attr.addTransientModifier(new org.bukkit.attribute.AttributeModifier(BARON_MS, 0.5,
+                        org.bukkit.attribute.AttributeModifier.Operation.ADD_SCALAR));
+                if ("super".equals(t)) fr.lolmc.util.MobCombat.setAttackSpeedMult(m, 1.25);
+            } else if (!emp && cur != null) {
+                attr.removeModifier(BARON_MS);
+                if ("super".equals(t)) fr.lolmc.util.MobCombat.setAttackSpeedMult(m, 1.0);
+            }
+        }
+        double grow = switch (t) { case "melee", "cannon" -> 0.30; case "super" -> 0.15; default -> 0; };
+        var sc = m.getAttribute(Compat.scale());
+        if (sc == null || grow == 0) return;
+        boolean grown = sc.getModifier(BARON_SCALE) != null;
+        if (emp == grown) return;
+        if (emp) sc.addTransientModifier(new org.bukkit.attribute.AttributeModifier(BARON_SCALE, grow,
+                org.bukkit.attribute.AttributeModifier.Operation.ADD_SCALAR));
+        else sc.removeModifier(BARON_SCALE);
+        fr.lolmc.util.MobAnimator.setScale(m.getUniqueId(), emp ? (float) (1 + grow) : 1f);
     }
 
     // Prochain tir et cible d'aggro (champion qui a frappé un allié) des sbires à distance

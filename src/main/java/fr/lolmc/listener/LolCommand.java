@@ -116,7 +116,7 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
         // Permission fine par sous-commande : lolmc.admin donne tout (enfants), sinon
         // lolmc.admin.config (carte) ou lolmc.admin.test (tests) séparément.
         String requiredPerm = switch (args[0].toLowerCase()) {
-            case "set", "position", "center", "lane", "schem", "road", "jungle", "shopnpc", "mode",
+            case "set", "position", "center", "lane", "schem", "road", "jungle", "baronpit", "shopnpc", "mode",
                  "pos1", "pos2", "save" -> "lolmc.admin.config";
             case "solo", "give", "level", "gold", "team", "testgame", "debug", "spawn", "buff",
                  "resetcd", "hp", "wave" -> "lolmc.admin.test";
@@ -147,6 +147,7 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
             case "schem" -> handleSchem(player, args);
             case "road" -> handleRoad(player, args);
             case "jungle" -> handleJungle(player, args);
+            case "baronpit" -> handleBaronPit(player, args);
             case "shopnpc" -> handleShopNpc(player, args);
             case "mode" -> handleMode(player, args);
             case "solo" -> handleSolo(player, args);
@@ -613,6 +614,67 @@ private void handleSolo(Player player, String[] args) {
         player.sendMessage(Component.text(String.format("👉 Clique au sol pour placer %s%s.", type.displayName, team != null ? " (" + team.name() + ")" : " (neutre)"), NamedTextColor.AQUA));
     }
 
+    /**
+     * /lola baronpit <territorial|omniscient> <start|save|preview|clear>, /lola baronpit reset :
+     * enregistre le terrain de la fosse propre à une forme du Baron (sélection de /lola schem).
+     */
+    private void handleBaronPit(Player player, String[] args) {
+        var jm = LolPlugin.getInstance().getJungleManager();
+        var pit = jm.getBaronPit();
+        if (args.length == 2 && args[1].equalsIgnoreCase("reset")) {
+            pit.preview(null, player.getWorld());
+            player.sendMessage(Component.text("✔ Terrain normal de la fosse remis en place.", NamedTextColor.GREEN));
+            return;
+        }
+        if (args.length < 3 || !(args[1].equalsIgnoreCase("territorial") || args[1].equalsIgnoreCase("omniscient"))) {
+            player.sendMessage("§cUsage: /lola baronpit <territorial|omniscient> <start|save|preview|clear> | /lola baronpit reset");
+            return;
+        }
+        String form = args[1].toLowerCase();
+        switch (args[2].toLowerCase()) {
+            case "start" -> {
+                Location[] sel = schematicSelections.get(player.getUniqueId());
+                if (sel == null || sel[0] == null || sel[1] == null || !sel[0].getWorld().equals(sel[1].getWorld())) {
+                    player.sendMessage(Component.text("❌ Définis d'abord la zone avec /lola schem pos1 et pos2.", NamedTextColor.RED));
+                    return;
+                }
+                long volume = (long) (Math.abs(sel[0].getBlockX() - sel[1].getBlockX()) + 1)
+                        * (Math.abs(sel[0].getBlockY() - sel[1].getBlockY()) + 1)
+                        * (Math.abs(sel[0].getBlockZ() - sel[1].getBlockZ()) + 1);
+                if (volume > 200_000) {
+                    player.sendMessage(Component.text("❌ Zone trop grande (" + volume + " blocs, 200 000 max).", NamedTextColor.RED));
+                    return;
+                }
+                pit.preview(null, sel[0].getWorld()); // partir du terrain normal
+                int n = pit.start(player.getUniqueId(), form, sel[0], sel[1]);
+                player.sendMessage(Component.text("✔ Terrain normal photographié (" + n + " blocs). Construis la fosse "
+                        + form + ", puis /lola baronpit " + form + " save", NamedTextColor.GREEN));
+            }
+            case "save" -> {
+                int n = pit.save(player.getUniqueId(), form, jm.getJungleConfig());
+                if (n < 0) {
+                    player.sendMessage(Component.text("❌ Lance d'abord /lola baronpit " + form + " start", NamedTextColor.RED));
+                    return;
+                }
+                jm.saveBaronPit();
+                player.sendMessage(Component.text("✔ Fosse " + form + " enregistrée (" + n + " blocs modifiés), terrain normal remis.",
+                        NamedTextColor.GREEN));
+            }
+            case "preview" -> {
+                if (!pit.has(form)) { player.sendMessage(Component.text("❌ Aucune fosse " + form + " enregistrée.", NamedTextColor.RED)); return; }
+                pit.preview(form, player.getWorld());
+                player.sendMessage(Component.text("✔ Fosse " + form + " posée. /lola baronpit reset pour l'enlever.", NamedTextColor.GREEN));
+            }
+            case "clear" -> {
+                pit.preview(null, player.getWorld());
+                pit.clear(form, jm.getJungleConfig());
+                jm.saveBaronPit();
+                player.sendMessage(Component.text("✔ Fosse " + form + " supprimée.", NamedTextColor.GREEN));
+            }
+            default -> player.sendMessage("§cAction : start, save, preview ou clear");
+        }
+    }
+
     private void handleRoad(Player player, String[] args) {
         if (args.length >= 2 && args[1].equalsIgnoreCase("end")) {
             if (!roadManager.isPainting(player.getUniqueId())) {
@@ -761,12 +823,13 @@ private void handleSolo(Player player, String[] args) {
         p.sendMessage(Component.text("/lola position <blue|red> <1-5>", NamedTextColor.AQUA));
         p.sendMessage(Component.text("/lola lane <top|mid|bot> ... /lola lane done", NamedTextColor.AQUA));
         p.sendMessage(Component.text("/lola schem <pos1|pos2|save>", NamedTextColor.YELLOW)); // AJOUT : Aide textuelle
+        p.sendMessage(Component.text("/lola baronpit <territorial|omniscient> <start|save|preview|clear>", NamedTextColor.YELLOW));
         p.sendMessage(Component.text("/lola start | /lola stop", NamedTextColor.AQUA));
     }
 
     @Override
     public List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command cmd, @NotNull String alias, @NotNull String @NotNull [] args) {
-        if (args.length == 1) return List.of("set", "position", "lane", "schem", "road", "jungle", "shopnpc", "mode", "select", "solo", "give", "level", "gold", "team", "testgame", "debug", "reload", "start", "stop", "center", "instance", "template"); // MODIFICATION : Injecté "schem"
+        if (args.length == 1) return List.of("set", "position", "lane", "schem", "road", "jungle", "baronpit", "shopnpc", "mode", "select", "solo", "give", "level", "gold", "team", "testgame", "debug", "reload", "start", "stop", "center", "instance", "template"); // MODIFICATION : Injecté "schem"
         if (args.length == 2) {
             return switch (args[0].toLowerCase()) {
                 case "template" -> List.of("save", "info");
@@ -778,6 +841,7 @@ private void handleSolo(Player player, String[] args) {
                 }
                 case "set" -> List.of("turret", "inhibitor", "nexus", "basenexus");
                 case "schem" -> List.of("pos1", "pos2", "save"); // AJOUT : Auto-complétion de l'action de schématique
+                case "baronpit" -> List.of("territorial", "omniscient", "reset");
                 case "shopnpc", "position", "lane" -> List.of("blue", "red");
                 case "mode" -> List.of("ranked", "normal");
                 case "road" -> List.of("top", "mid", "bot", "end");
@@ -785,6 +849,8 @@ private void handleSolo(Player player, String[] args) {
                 default -> List.of();
             };
         }
+        if (args.length == 3 && args[0].equalsIgnoreCase("baronpit") && !args[1].equalsIgnoreCase("reset"))
+            return List.of("start", "save", "preview", "clear");
         if (args.length == 3 && args[0].equalsIgnoreCase("set")) {
             return List.of("blue", "red");
         }
@@ -1057,6 +1123,7 @@ private void handleSolo(Player player, String[] args) {
                 {"/lola center",                  "Définir le centre de la minimap ici"},
                 {"/lola lane <top|mid|bot> | done", "Tracer une lane"},
                 {"/lola schem <pos1|pos2|save> ...", "Gérer une schématique"},
+                {"/lola baronpit <forme> <start|save|preview|clear>", "Terrain de la fosse du Baron par forme"},
                 {"/lola road <top|mid|bot|end> ...", "Tracer une route"},
                 {"/lola jungle <type> [blue|red]", "Spawner un monstre de jungle"},
                 {"/lola shopnpc <blue|red>",      "Créer un PNJ boutique ici"},

@@ -48,6 +48,7 @@ public final class MobAnimator {
         final List<Transformation> base;
         Location lastLoc;
         long attackUntil = 0L;
+        float scale = 1f;
         Anim(LivingEntity mob, List<BlockDisplay> parts, List<Transformation> base) {
             this.mob = mob; this.parts = parts; this.base = base;
         }
@@ -64,6 +65,16 @@ public final class MobAnimator {
 
     public static void clearAll() {
         ANIMS.clear();
+    }
+
+    /**
+     * Grossit ou rétrécit tout le modèle (translations comprises), à appliquer avec la même
+     * échelle sur l'attribut {@code scale} du mob : son point d'attache des passagers suit
+     * l'échelle, donc le modèle reste posé au sol.
+     */
+    public static void setScale(UUID mobId, float scale) {
+        Anim a = ANIMS.get(mobId);
+        if (a != null) a.scale = scale;
     }
 
     /** Déclenche une animation d'attaque (bref sursaut) sur un monstre. */
@@ -124,8 +135,8 @@ public final class MobAnimator {
             BlockDisplay d = a.parts.get(i);
             if (d == null || d.isDead() || !d.isValid()) continue;
             Transformation b = a.base.get(i);
-            Vector3f tr = new Vector3f(b.getTranslation()).add(0f, (float) bobY, 0f);
-            Vector3f sc = new Vector3f(b.getScale()).mul(scalePulse);
+            Vector3f tr = new Vector3f(b.getTranslation()).mul(a.scale).add(0f, (float) bobY, 0f);
+            Vector3f sc = new Vector3f(b.getScale()).mul(scalePulse * a.scale);
             if (Math.abs(d.getLocation().getYaw() - yaw) > 2f) d.setRotation(yaw, 0f);
             if (Math.abs(d.getLocation().getYaw() - yaw) > 2f) d.setRotation(yaw, 0f);
             if (Math.abs(d.getLocation().getYaw() - yaw) > 2f) d.setRotation(yaw, 0f);

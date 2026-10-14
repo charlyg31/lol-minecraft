@@ -164,7 +164,7 @@ Chaque champion a ses 4 sorts (Q/W/E/R) plus passif, avec scaling AP/AD, prévis
 - **Dégâts** : résistances, pénétration plate et en %, boucliers (physiques et magiques séparés), réduction de soins (Grievous Wounds), vrais dégâts, critiques, vol de vie et omnivamp
 - **Contrôles de foule** : étourdissement, immobilisation, silence, ralentissement, projection aérienne, avec ténacité et résistance au ralentissement séparées
 - **Sbires** : vagues toutes les 30s, mêlée/casters/canon selon le temps de jeu, super-sbires après destruction d'un inhibiteur
-- **Jungle** : camps classiques, buffs Bleu/Rouge, Héraut, Baron, dragons élémentaires avec âme au 4ᵉ et Dragon Ancien au 5ᵉ
+- **Jungle** : camps classiques, buffs Bleu/Rouge, Héraut (invoqué, puis monté par un allié qui dirige sa charge d'un clic droit), Baron (3 formes, sbires renforcés plus grands), dragons élémentaires avec âme au 4ᵉ et Dragon Ancien au 5ᵉ
 - **Tourelles et structures** : priorité d'aggro fidèle, plaques de tourelle, or au dernier coup et à l'équipe
 - **Économie** : or passif, or de sbires progressif, primes de série de kills, assistances
 - **Runes** : les 5 voies complètes (Précision, Domination, Sorcellerie, Résolution, Inspiration), keystones et runes mineures
@@ -191,9 +191,11 @@ Chaque champion a ses 4 sorts (Q/W/E/R) plus passif, avec scaling AP/AD, prévis
 
 ### Commandes admin — `/lola`
 
-`/lola <start|stop|instance|set|position|center|lane|solo|give|level|gold|hp|resetcd|buff|spawn|wave|select|reload|debug|testgame|schem|road|jungle|shopnpc|mode|team|permcheck|help>` (alias `/lolAdmin`)
+`/lola <start|stop|instance|set|position|center|lane|solo|give|level|gold|hp|resetcd|buff|spawn|wave|select|reload|debug|testgame|schem|road|jungle|baronpit|shopnpc|mode|team|permcheck|help>` (alias `/lolAdmin`)
 
-Les sous-commandes de configuration de carte (`set`, `position`, `center`, `lane`, `jungle`, `schem`, `road`, `shopnpc`, `mode`) s'appliquent au monde template, avant toute partie. `/lola template [save]` gère le monde template (voir plus bas). `/lola instance` liste les instances actives ; `/lola instance <n>` téléporte l'admin dans l'instance n, `/lola instance template` dans le monde template. Les sous-commandes de test (`solo`, `give`, `buff`, `wave`, `hp`, `gold`, `level`, `resetcd`) agissent sur la partie en cours.
+Les sous-commandes de configuration de carte (`set`, `position`, `center`, `lane`, `jungle`, `baronpit`, `schem`, `road`, `shopnpc`, `mode`) s'appliquent au monde template, avant toute partie. `/lola template [save]` gère le monde template (voir plus bas). `/lola instance` liste les instances actives ; `/lola instance <n>` téléporte l'admin dans l'instance n, `/lola instance template` dans le monde template. Les sous-commandes de test (`solo`, `give`, `buff`, `wave`, `hp`, `gold`, `level`, `resetcd`) agissent sur la partie en cours.
+
+**Fosse du Baron** : les formes Territoriale (petit mur devant la fosse) et Omnisciente (long tunnel sur le côté) modifient le terrain, qui dépend de la carte. Pour chaque forme : sélectionner la fosse avec `/lola schem pos1` et `pos2`, faire `/lola baronpit <territorial|omniscient> start`, construire la variante, puis `/lola baronpit <forme> save`. Seuls les blocs modifiés sont gardés (`jungle.yml`) et le terrain normal est remis. En partie, la variante est posée à l'apparition du Baron et retirée en fin de partie. `preview` pose une variante, `clear` la supprime, `/lola baronpit reset` remet le terrain normal.
 
 ---
 
@@ -232,7 +234,7 @@ Les permissions sont déclarées dans `plugin.yml` du serveur de jeu et fonction
 | Permission | Défaut | Rôle |
 |------------|--------|------|
 | `lolmc.admin` | op | Toutes les commandes `/lola` (donne `lolmc.admin.config` et `lolmc.admin.test`) |
-| `lolmc.admin.config` | op | Configurer la carte : `set`, `position`, `center`, `lane`, `schem`, `road`, `jungle`, `shopnpc`, `mode` |
+| `lolmc.admin.config` | op | Configurer la carte : `set`, `position`, `center`, `lane`, `schem`, `road`, `jungle`, `baronpit`, `shopnpc`, `mode` |
 | `lolmc.admin.test` | op | Commandes de test : `solo`, `give`, `level`, `gold`, `team`, `testgame`, `debug`, `spawn`, `buff`, `resetcd`, `hp`, `wave` |
 | `lolmc.player` | true | Toutes les commandes joueur (donne les 12 permissions ci-dessous) |
 | `lolmc.player.shop` | true | `/shop` |

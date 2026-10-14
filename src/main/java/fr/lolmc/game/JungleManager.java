@@ -65,6 +65,8 @@ public class JungleManager {
     /** Forme du Baron, tirée au hasard une fois par partie (wiki) : 0 Chasseur, 1 Territorial, 2 Omniscient. */
     private int baronForm = -1;
     private static final String[] BARON_FORMS = {"Chasseur", "Territorial", "Omniscient"};
+    /** Terrain de la fosse propre à chaque forme (enregistré en jeu, jungle.yml). */
+    private final BaronPitTerrain baronPit = new BaronPitTerrain();
     public static NamespacedKey KEY_BARON_FORM;
     private MonsterType lockedDragonElement = null;
 
@@ -244,7 +246,7 @@ public class JungleManager {
     /** Fin du buff du Dragon Ancien (il est perdu à la mort, LoL). */
     public static void clearElderBuff(UUID player) { elderUntil.remove(player); }
 
-    /** Niveau moyen des champions de la partie (niveau des monstres, LoL). */
+    /** Niveau d'un camp (wiki) : moyenne des niveaux des champions, arrondie à l'entier le plus proche. */
     private double averageChampionLevel() {
         var cm = LolPlugin.getInstance().getChampionManager();
         double sum = 0; int n = 0;
@@ -254,7 +256,7 @@ public class JungleManager {
             sum += cm.getChampion(p).getLevelSystem().getLevel();
             n++;
         }
-        return n > 0 ? sum / n : 1;
+        return n > 0 ? Math.round(sum / n) : 1;
     }
 
     /**
@@ -313,6 +315,7 @@ public class JungleManager {
         }
         this.config = YamlConfiguration.loadConfiguration(jungleFile);
         load();
+        baronPit.load(config);
         startRespawnTask();
     }
 
@@ -392,6 +395,7 @@ public class JungleManager {
 
     public void startJungle() {
         active = true;
+        baronPit.restore(baronPitWorld()); // partie précédente interrompue avant la fin
         for (CampSpawn camp : camps.values()) {
             int delay = initialSpawnDelay(camp.type);
             if (delay <= 0) { spawnCamp(camp); continue; }
@@ -418,6 +422,7 @@ public class JungleManager {
         spawnedDragonElements.clear();
         lockedDragonElement = null;
         baronForm = -1;
+        baronPit.restore(baronPitWorld());
         dragonsKilled.clear();
         dragonSoulType.clear();
         clearAllMonsters();
@@ -486,6 +491,7 @@ public class JungleManager {
                     baronForm = new Random().nextInt(3);
                     announce(Component.text("🪱 Le Baron Nashor prend sa forme « " + BARON_FORMS[baronForm] + " »",
                             NamedTextColor.DARK_PURPLE));
+                    baronPit.apply(BaronPitTerrain.formKey(baronForm), loc.getWorld());
                 }
                 mob.getPersistentDataContainer().set(KEY_BARON_FORM, PersistentDataType.INTEGER, baronForm);
             }
@@ -943,7 +949,10 @@ public class JungleManager {
     }
 
     /**
-     * Héraut invoqué (wiki, patch 26) : niveau moyen des champions, 4320-7090 PV et 80-200 AD. Il
+     * Héraut invoqué (wiki, patch 26) : niveau moyen des champions (9 minimum), 4320-7090 PV, 80-200 AD,
+     * 87.92-170 armure, 58.96-100 RM, 0.5 attaque/s. Données du client : PV 2500 + 270, armure 34 + 8,
+     * RM 32 + 4 par niveau, avec la courbe de croissance LoL (avant : linéaire depuis le niveau 1,
+     * sans armure ni RM, 0.75 attaque/s). Il
      * avance vers la structure ennemie la plus proche en frappant les sbires (AD + 1.75 % de ses PV
      * actuels, les repousse). Au contact d'une structure, après 2.5 s, il bondit : 3000 dégâts à la
      * structure (puis 66.67 %, 44.44 %… pour les charges suivantes), 200 % AD aux champions ennemis
@@ -961,44 +970,55 @@ public class JungleManager {
             return false;
         }
 
-        double lvl = averageChampionLevel();
-        double f = Math.max(0, Math.min(1, (lvl - 1) / 17.0));
-        double maxHp = 4319.8 + (7090 - 4319.8) * f;
-        double ad = 80 + 120 * f;
+        double lvl = Math.max(9, Math.min(18, averageChampionLevel()));
+        double g = growth(lvl);
+        double maxHp = 2500 + 270 * g;
+        double armor = 34 + 8 * g, mr = 32 + 4 * g;
+        double ad = 80 + 120 * (g - growth(9)) / (growth(18) - growth(9)); // 80 au niveau 9, 200 au 18
 
         var spawn = summoner.getLocation().clone().add(1, 0, 1);
         var herald = (Ravager) spawn.getWorld().spawnEntity(spawn, EntityType.RAVAGER);
         herald.customName(Component.text("👁 Héraut de la Faille", NamedTextColor.LIGHT_PURPLE));
         herald.setCustomNameVisible(true);
         fr.lolmc.util.VirtualHP.init(herald, maxHp);
-        fr.lolmc.util.MobCombat.setStats(herald, ad, 0.75, 0, 0, 25, 0);
+        fr.lolmc.util.MobCombat.setStats(herald, ad, 0.5, armor, mr, 25, 0);
         // Unité alliée de l'équipe : ciblable par les ennemis et les tourelles comme un sbire
         var pdc = herald.getPersistentDataContainer();
         pdc.set(MinionManager.KEY_MINION, PersistentDataType.BYTE, (byte) 1);
         pdc.set(MinionManager.KEY_TEAM, PersistentDataType.STRING, team.name());
         pdc.set(MinionManager.KEY_TYPE, PersistentDataType.STRING, "herald");
         MinionManager.LIVE.add(herald.getUniqueId());
+        var state = HeraldRodeo.register(herald, team, ad, mm);
 
         new BukkitRunnable() {
             int ticks = 0;
-            double leapMult = 1.0;
             long nextHit = 0, leapAt = 0;
             GameStructure leapTarget = null;
+            int destroyedNearby = destroyedEnemyTurretsNear(mm, team, herald.getLocation());
             @Override public void run() {
                 ticks += 5;
+                // Rodéo de nouveau possible quand le Héraut a aidé à détruire une tour ennemie (wiki ;
+                // le texte de l'Œil dit « structure ennemie proche » : tour détruite à proximité)
+                if (herald.isValid()) {
+                    int d = destroyedEnemyTurretsNear(mm, team, herald.getLocation());
+                    if (d > destroyedNearby) state.rodeoReady = true;
+                    destroyedNearby = d;
+                }
                 if (!herald.isValid() || herald.isDead() || ticks > 240 * 20) {
                     if (herald.isValid()) herald.remove();
                     MinionManager.LIVE.remove(herald.getUniqueId());
+                    HeraldRodeo.unregister(herald.getUniqueId());
                     cancel(); return;
                 }
+                if (state.ridden()) { leapTarget = null; state.leaping = false; return; } // dirigé par son cavalier
                 herald.setTarget(null); // pas d'IA vanilla : il ne vise que sbires et structures
                 long now = System.currentTimeMillis();
                 // Bond en préparation (2.5 s)
                 if (leapTarget != null) {
                     if (now < leapAt) return;
-                    leap(herald, leapTarget, team, ad, leapMult);
-                    leapMult *= 2.0 / 3.0;
+                    leap(herald, leapTarget, team, ad, state);
                     leapTarget = null;
+                    state.leaping = false;
                     return;
                 }
                 GameStructure target = nearestEnemyTurret(mm, team, herald.getLocation(), 60);
@@ -1006,6 +1026,7 @@ public class JungleManager {
                 if (target != null && herald.getLocation().distance(target.getCenter()) <= 4.0) {
                     herald.getPathfinder().stopPathfinding();
                     leapTarget = target;
+                    state.leaping = true;
                     leapAt = now + 2500L;
                     herald.getWorld().playSound(herald.getLocation(), org.bukkit.Sound.ENTITY_RAVAGER_ROAR, 1.5f, 0.7f);
                     return;
@@ -1029,17 +1050,33 @@ public class JungleManager {
             }
         }.runTaskTimer(LolPlugin.getInstance(), 0L, 5L);
 
-        summoner.sendActionBar(Component.text("👁 Héraut invoqué — il pousse vers les structures ennemies!",
+        summoner.sendActionBar(Component.text("👁 Héraut invoqué — clic droit dessus pour le monter et charger!",
                 NamedTextColor.LIGHT_PURPLE));
         return true;
     }
 
-    /** Bond du Héraut invoqué sur une structure. */
-    private void leap(Ravager herald, GameStructure ft, Team team, double ad, double mult) {
+    /** Croissance d'une statistique par niveau (formule LoL) : (n-1) × (0.7025 + 0.0175 × (n-1)). */
+    private static double growth(double level) {
+        double n = level - 1;
+        return n * (0.7025 + 0.0175 * n);
+    }
+
+    /** Tours ennemies détruites à 15 blocs ou moins (rayon de « proche » estimé, non publié). */
+    private static int destroyedEnemyTurretsNear(MapManager mm, Team team, Location at) {
+        int n = 0;
+        for (var s : mm.getStructures())
+            if (s.isDestroyed() && s.getTeam() != team && s.getType() == GameStructure.Type.TURRET && s.getCenter().getWorld().equals(at.getWorld())
+                    && s.getCenter().distanceSquared(at) <= 15 * 15) n++;
+        return n;
+    }
+
+    /** Bond du Héraut invoqué sur une structure (3000 bruts, puis 66.67 % à chaque bond suivant). */
+    private void leap(Ravager herald, GameStructure ft, Team team, double ad, HeraldRodeo.Summoned state) {
         var mm = siblingMapManager();
         if (ft.isDestroyed() || (mm != null && mm.isInvulnerable(ft))) return;
         boolean wasDestroyed = ft.isDestroyed();
-        boolean phaseChanged = ft.takeDamage(3000 * mult);
+        boolean phaseChanged = ft.takeDamage(3000 * state.leapMult);
+        state.leapMult *= 2.0 / 3.0;
         fr.lolmc.util.VisualEffectUtil.impactBurst(ft.getCenter().getWorld(),
             ft.getCenter().clone().add(0, 1, 0), Material.GRAY_STAINED_GLASS, 0.4f, 1.0, 10, 8L);
         ft.getCenter().getWorld().playSound(ft.getCenter(), org.bukkit.Sound.ENTITY_GENERIC_EXPLODE, 1.5f, 0.7f);
@@ -1074,7 +1111,7 @@ public class JungleManager {
         return best;
     }
 
-    private static GameStructure nearestEnemyStructure(MapManager mm, Team team, Location from, double max) {
+    static GameStructure nearestEnemyStructure(MapManager mm, Team team, Location from, double max) {
         GameStructure best = null; double bestD = max * max;
         for (var s : mm.getStructures()) {
             if (s.isDestroyed() || s.getTeam() == team || mm.isInvulnerable(s)) continue;
@@ -1285,6 +1322,18 @@ public class JungleManager {
     }
 
     public Map<String, CampSpawn> getCamps() { return camps; }
+
+    public BaronPitTerrain getBaronPit() { return baronPit; }
+
+    /** Sauvegarde jungle.yml après un enregistrement du terrain de la fosse. */
+    public void saveBaronPit() { save(); }
+
+    public org.bukkit.configuration.file.FileConfiguration getJungleConfig() { return config; }
+
+    private org.bukkit.World baronPitWorld() {
+        CampSpawn baron = camps.get(MonsterType.BARON.name().toLowerCase());
+        return baron != null ? baron.location.getWorld() : null;
+    }
 
 
     /** Spawn un monstre de jungle de test à la position donnée. */

@@ -71,6 +71,8 @@ public class DamageUtil {
         // Zhonya : stase, aucun dégât (setInvulnerable ne protège que des dégâts vanilla)
         var pmZhonya = LolPlugin.getInstance().getPassiveManager();
         if (pmZhonya != null && pmZhonya.getState(victim).zhonyasActive) return;
+        // Cavalier du Héraut en charge : invulnérable
+        if (fr.lolmc.game.HeraldRodeo.isRiding(victim.getUniqueId())) return;
 
         BaseChampion vc = cm.getChampion(victim);
         ChampionStats vs = vc.getStats();
