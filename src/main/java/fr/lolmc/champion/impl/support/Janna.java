@@ -163,10 +163,18 @@ public final class Janna extends BaseChampion {
             double[] healTotal={300,450,600};int r=Math.min(getLevel()-1,2); // wiki
             double healPerTick=(healTotal[r]+s.getFinalAP()*1.5)/6.0; // réparti sur 6 ticks
             var cm=LolPlugin.getInstance().getChampionManager();
+            // Canalisation (wiki) : interrompue si Janna se déplace ou est neutralisée (avant : elle
+            // pouvait marcher en soignant)
+            final Location anchor=c.getLocation().clone();
+            var ccJ=LolPlugin.getInstance().getCCManager();
             new BukkitRunnable(){
                 int ticks=0;
                 @Override public void run(){
-                    if(ticks>=6){cancel();return;} // 6 ticks de 0.5s = 3s
+                    if(ticks>=6 || !c.isOnline() || c.getGameMode()==GameMode.SPECTATOR
+                            || !c.getWorld().equals(anchor.getWorld()) || c.getLocation().distanceSquared(anchor)>1.0
+                            || (ccJ!=null && (ccJ.isStunned(c.getUniqueId()) || ccJ.isAirborne(c.getUniqueId())))){
+                        cancel();return;
+                    } // 6 ticks de 0.5s = 3s
                     // Soigne Janna et les alliés proches
                     if(cm.hasChampion(c)) cm.getChampion(c).getHPSystem().heal(healPerTick);
                     for(var ent : c.getWorld().getNearbyLivingEntities(c.getLocation(),7)){

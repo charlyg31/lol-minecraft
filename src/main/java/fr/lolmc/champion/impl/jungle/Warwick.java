@@ -157,11 +157,12 @@ public final class Warwick extends BaseChampion {
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_WOLF_GROWL, 1f, 1f);
             new BukkitRunnable(){
                 @Override public void run(){
+                    // Peur 1 s sur tous les ennemis proches, sbires et monstres compris (wiki ; avant :
+                    // champions seulement)
                     for(var __t : TargetingUtil.enemiesAround(c, 4.0)){
-                        if(__t instanceof Player __p){
-                            fr.lolmc.LolPlugin.getInstance().getCCManager().stun(__p, 20); // peur : ni déplacement ni action
+                        fr.lolmc.LolPlugin.getInstance().getCCManager().stun(__t, 20); // peur : ni déplacement ni action
+                        if(__t instanceof Player __p)
                             __p.sendActionBar(Component.text("😱 Peur! (Hurlement Primal)",NamedTextColor.DARK_RED));
-                        }
                     }
                     fr.lolmc.util.VisualEffectUtil.impact(c.getWorld(),
                             c.getLocation().add(0,1,0), Material.GRAY_STAINED_GLASS, 0.5f, 6L);
@@ -177,7 +178,26 @@ public final class Warwick extends BaseChampion {
                 new double[]{110,90,70},25,0,DamageType.MAGICAL);
             resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            org.bukkit.entity.LivingEntity tgt = (t!=null && TargetingUtil.isEnemy(c,t))?t:TargetingUtil.getTargetedEnemy(c,8.0); if(tgt==null){cancelCast();c.sendActionBar(Component.text("🐺 Aucune cible visée",NamedTextColor.GRAY));return;}
+            // Wiki : bond dans la direction visée sur 250 % de la vitesse de déplacement ; le 1er
+            // champion ennemi percuté est supprimé (avant : sort ciblé à 8 blocs)
+            double leap=Math.max(3.0, s.getFinalMovementSpeed()*2.5/100.0);
+            org.bukkit.util.Vector dir=c.getLocation().getDirection().setY(0);
+            if(dir.lengthSquared()<1e-6) dir=new org.bukkit.util.Vector(1,0,0);
+            dir.normalize();
+            org.bukkit.entity.LivingEntity tgt=null;
+            var cmL=LolPlugin.getInstance().getChampionManager();
+            for(double d=0.5; d<=leap && tgt==null; d+=0.5){
+                Location pt=c.getLocation().add(dir.clone().multiply(d));
+                for(var e : TargetingUtil.entitiesInRadius(c, pt, 1.3))
+                    if(e instanceof Player p && cmL.hasChampion(p)){ tgt=e; break; }
+            }
+            if(tgt==null){
+                Location end=safeTeleport(c.getLocation(), c.getLocation().add(dir.clone().multiply(leap)));
+                end.setYaw(c.getLocation().getYaw()); end.setPitch(c.getLocation().getPitch());
+                c.teleport(end);
+                c.sendActionBar(Component.text("🐺 Emprise Infinie : aucun champion percuté",NamedTextColor.GRAY));
+                return;
+            }
             dashTo(c, tgt, -0.8);
             double[] base=fr.lolmc.util.Balance.base("r_warwick",new double[]{175,350,525});int r=Math.min(getLevel()-1,2);
             double dmg=base[r]+s.getBonusAD()*fr.lolmc.util.Balance.ratio("r_warwick","ad",1.67); // AD bonus (wiki)
@@ -198,7 +218,7 @@ public final class Warwick extends BaseChampion {
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] base=fr.lolmc.util.Balance.base("r_warwick",new double[]{175,350,525});int r=Math.min(getLevel()-1,2);
-            return String.format("Bond: supprime la cible 1.5s, %.0f dégâts (+167%%AD bonus), soigne 100%%.",base[r]+s.getBonusAD()*fr.lolmc.util.Balance.ratio("r_warwick","ad",1.67));
+            return String.format("Bond (250%% de la vitesse) : supprime le 1er champion percuté 1.5s, %.0f dégâts (+167%%AD bonus), soigne 100%%.",base[r]+s.getBonusAD()*fr.lolmc.util.Balance.ratio("r_warwick","ad",1.67));
         }
     }
 }

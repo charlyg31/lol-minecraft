@@ -146,6 +146,8 @@ public final class ChampionStats {
 
     // LoL : vitesse = base × (1 + croissance % + bonus %) (avant : croissance et bonus ajoutés en
     // valeur absolue, donc +25 % d'objet donnaient +0.25 attaque/s au lieu de +25 % de la base)
+    /** Vitesse d'attaque bonus (croissance + objets/effets), en fraction : 0.25 = +25 %. */
+    public double getBonusAttackSpeedRatio() { return growthBonus(growthAttackSpeed) + bonusAttackSpeed; }
     public double getFinalAttackSpeed()  { return Math.min(baseAttackSpeed * (1 + growthBonus(growthAttackSpeed) + bonusAttackSpeed) * multAttackSpeed, 2.5); }
     public double getFinalCritChance()   { return Math.min(baseCritChance + bonusCritChance * critChanceMultiplier, 1.0); }
 

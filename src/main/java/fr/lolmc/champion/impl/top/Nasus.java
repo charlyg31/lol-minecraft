@@ -57,27 +57,31 @@ public final class Nasus extends BaseChampion implements fr.lolmc.champion.base.
             new double[]{7.5,6.5,5.5,4.5,3.5},5,0,DamageType.PHYSICAL);
             resourceCost = 20;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            org.bukkit.entity.LivingEntity tgt = (t!=null && TargetingUtil.isEnemy(c,t))?t:TargetingUtil.getTargetedEnemy(c,2.5); if(tgt==null){cancelCast();c.sendActionBar(Component.text("💀 Aucune cible",NamedTextColor.GRAY));return;}
-            // LoL : AD + bonus par rang (30/50/70/90/110) + stacks permanents
+            // Wiki : la prochaine attaque (10 s, remise à zéro de l'attaque) inflige AD + 30-110 +
+            // stacks. Avant : frappe immédiate de la cible visée.
             double[] bonus={30,50,70,90,110}; // wiki
-            int stacks=qStacks.getOrDefault(c.getUniqueId(),0);
-            double dmg=s.getFinalAD()+bonus[getLevel()-1]+stacks;
-            TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.PHYSICAL);
-            soulEater(c, dmg); // Frappe siphon est une attaque : le vol de vie s'applique (oublié avant)
-            // Kill vérifié après les dégâts (avant : sur les dégâts bruts, sans l'armure)
-            boolean kills = tgt.isDead() || TargetingUtil.getRealHealth(tgt) <= 0;
-            // Stacks (wiki) : +10 sur champion, gros sbire (canon/super) ou gros monstre, +4 sinon
-            if(kills){
-                String mt = fr.lolmc.game.MinionManager.getMinionTypeTag(tgt);
-                boolean big = (tgt instanceof Player) || fr.lolmc.game.JungleManager.isJungleMonster(tgt)
-                        || "cannon".equals(mt) || "super".equals(mt);
-                qStacks.merge(c.getUniqueId(), big?10:4, Integer::sum);
-                if(qStacks.get(c.getUniqueId()) > MAX_Q_STACKS) qStacks.put(c.getUniqueId(), MAX_Q_STACKS);
-                c.sendActionBar(Component.text("💀 Stacks Q: "+qStacks.get(c.getUniqueId()),NamedTextColor.GOLD));
-            }
-            fr.lolmc.util.VisualEffectUtil.impact(c.getWorld(),
-                    tgt.getLocation().add(0,1,0), Material.YELLOW_STAINED_GLASS, 0.3f, 4L);
-            c.getWorld().playSound(c.getLocation(), Sound.ENTITY_SKELETON_HURT, 1f, 0.6f);
+            final double flat=bonus[getLevel()-1];
+            fr.lolmc.champion.base.EmpoweredAttack.arm(c, 10_000L, (att, tgt, normal) -> {
+                int stacks=qStacks.getOrDefault(att.getUniqueId(),0);
+                double dmg=s.getFinalAD()+flat+stacks;
+                TargetingUtil.dealDamage(att, tgt, dmg, TargetingUtil.DmgType.PHYSICAL);
+                soulEater(att, Math.max(0, dmg-normal)); // le passif couvre déjà les dégâts normaux de l'attaque
+                boolean kills = tgt.isDead() || TargetingUtil.getRealHealth(tgt) <= 0;
+                // Stacks (wiki) : +10 sur champion, gros sbire (canon/super) ou gros monstre, +4 sinon
+                if(kills){
+                    String mt = fr.lolmc.game.MinionManager.getMinionTypeTag(tgt);
+                    boolean big = (tgt instanceof Player) || fr.lolmc.game.JungleManager.isJungleMonster(tgt)
+                            || "cannon".equals(mt) || "super".equals(mt);
+                    qStacks.merge(att.getUniqueId(), big?10:4, Integer::sum);
+                    if(qStacks.get(att.getUniqueId()) > MAX_Q_STACKS) qStacks.put(att.getUniqueId(), MAX_Q_STACKS);
+                    att.sendActionBar(Component.text("💀 Stacks Q: "+qStacks.get(att.getUniqueId()),NamedTextColor.GOLD));
+                }
+                fr.lolmc.util.VisualEffectUtil.impact(att.getWorld(),
+                        tgt.getLocation().add(0,1,0), Material.YELLOW_STAINED_GLASS, 0.3f, 4L);
+                att.getWorld().playSound(att.getLocation(), Sound.ENTITY_SKELETON_HURT, 1f, 0.6f);
+                return true;
+            });
+            c.sendActionBar(Component.text("💀 Frappe Siphon : prochaine attaque renforcée",NamedTextColor.GOLD));
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] bonus={30,50,70,90,110};
@@ -155,14 +159,26 @@ public final class Nasus extends BaseChampion implements fr.lolmc.champion.base.
                         }
                         cancel();return;
                     }
+                    // Armure réduite seulement TANT QUE l'ennemi est dans la zone (wiki ; avant :
+                    // jusqu'à la fin de la zone, même après en être sorti)
+                    var inside=new java.util.HashSet<java.util.UUID>();
                     for(var __t : TargetingUtil.entitiesInRadius(c, loc, 4.0)){
                         TargetingUtil.dealDamage(c, __t, perSec, TargetingUtil.DmgType.MAGICAL);
-                        if(__t instanceof Player __p && cmE.hasChampion(__p) && !shredded.containsKey(__p.getUniqueId())){
+                        if(__t instanceof Player __p && cmE.hasChampion(__p)){
+                            inside.add(__p.getUniqueId());
+                            if(shredded.containsKey(__p.getUniqueId())) continue;
                             var st=cmE.getChampion(__p).getStats();
                             double amount=Math.max(0, st.getFinalArmor())*shred;
                             st.addBonusArmor(-amount);
                             shredded.put(__p.getUniqueId(), amount);
                         }
+                    }
+                    for(var it=shredded.entrySet().iterator(); it.hasNext();){
+                        var e=it.next();
+                        if(inside.contains(e.getKey())) continue;
+                        Player p=org.bukkit.Bukkit.getPlayer(e.getKey());
+                        if(p!=null && cmE.hasChampion(p)) cmE.getChampion(p).getStats().addBonusArmor(e.getValue());
+                        it.remove();
                     }
                     fr.lolmc.util.VisualEffectUtil.impactBurst(loc.getWorld(),
                             loc, Material.YELLOW_STAINED_GLASS, 0.3f, 3.0, 8, 15L);
@@ -214,7 +230,10 @@ public final class Nasus extends BaseChampion implements fr.lolmc.champion.base.
                     for(var __t : TargetingUtil.entitiesInRadius(c, c.getLocation(), 4.0)){
                         // PV max réels de la cible (avant : 200 pour tout sbire ou monstre)
                         double tgtMaxHP = TargetingUtil.getRealMaxHealth(__t);
-                        double dmg=Math.min(tgtMaxHP*(pctHP+s.getFinalAP()/100*0.01), 240); // plafond 240/s (wiki)
+                        double dmg=tgtMaxHP*(pctHP+s.getFinalAP()/100*0.01);
+                        // Plafond de 240/s contre les sbires et monstres seulement (wiki ; avant : aussi
+                        // contre les champions)
+                        if(!(__t instanceof Player)) dmg=Math.min(dmg, 240);
                         TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);
                     }
                     tick+=20;

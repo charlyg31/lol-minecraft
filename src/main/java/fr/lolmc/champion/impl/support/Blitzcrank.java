@@ -32,6 +32,36 @@ public final class Blitzcrank extends BaseChampion implements fr.lolmc.champion.
 
     static class AA extends BasicAttackAbility {
         AA(){super("blitzcrank",Material.IRON_INGOT,2.0f,DamageType.PHYSICAL);}
+        @Override protected void onHit(Player c, ChampionStats s, org.bukkit.entity.LivingEntity tgt, double dmg) {
+            staticFieldMark(c, s, tgt);
+        }
+    }
+
+    // Passif du Champ Statique (wiki) : tant que le R n'est pas en recharge, chaque attaque ajoute
+    // une charge à la cible ; une charge par seconde la frappe : 50/100/150 (+30/40/50 % AP)
+    // (+2 % du mana max) dégâts magiques. Manquait.
+    private static final java.util.Map<java.util.UUID, Integer> staticCharges = new java.util.concurrent.ConcurrentHashMap<>();
+    static void staticFieldMark(Player c, ChampionStats s, org.bukkit.entity.LivingEntity tgt) {
+        var cm = LolPlugin.getInstance().getChampionManager();
+        if (!cm.hasChampion(c)) return;
+        var champ = cm.getChampion(c);
+        int rRank = champ.getLevelSystem().getAbilityRank(4);
+        var r = champ.getAbility(4);
+        if (rRank <= 0 || r == null || r.isOnCooldown(c)) return;
+        java.util.UUID id = tgt.getUniqueId();
+        if (staticCharges.merge(id, 1, Integer::sum) > 1) return; // une tâche par cible
+        int ri = Math.min(rRank, 3) - 1;
+        new org.bukkit.scheduler.BukkitRunnable() {
+            @Override public void run() {
+                int left = staticCharges.getOrDefault(id, 0);
+                if (left <= 0 || tgt.isDead() || !tgt.isValid() || !c.isOnline()) { staticCharges.remove(id); cancel(); return; }
+                staticCharges.put(id, left - 1);
+                double mana = champ.getResourceSystem() != null ? champ.getResourceSystem().getMax() : 0;
+                double dmg = new double[]{50,100,150}[ri] + s.getFinalAP() * new double[]{0.30,0.40,0.50}[ri] + mana * 0.02;
+                tgt.getWorld().strikeLightningEffect(tgt.getLocation());
+                TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.MAGICAL);
+            }
+        }.runTaskTimer(LolPlugin.getInstance(), 20L, 20L);
     }
 
     // Passif Barrière de Mana (wiki) : sous 30 % des PV, bouclier = 35 % du mana max pendant 10 s (90 s de recharge)
@@ -115,18 +145,18 @@ public final class Blitzcrank extends BaseChampion implements fr.lolmc.champion.
             new double[]{7,6.5,6,5.5,5},5,0,DamageType.PHYSICAL);
             resourceCost = 25;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            // LoL : prochaine attaque renforcée = knockup 1s + 200% AD
-            org.bukkit.entity.LivingEntity tgt = (t!=null && TargetingUtil.isEnemy(c,t))?t:TargetingUtil.getTargetedEnemy(c,2.5); if(tgt==null){cancelCast();c.sendActionBar(Component.text("⚡ Poing de Force prêt (frappe un ennemi)",NamedTextColor.YELLOW));return;}
-            // Double l'attaque de base : AA (100% AD) + 100% AD bonus = 200% AD total
-            double dmg=s.getFinalAD()*2.0+s.getFinalAP()*0.25; // attaque + 100 % AD (+25 % AP) (wiki)
-            TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.PHYSICAL);
-            fr.lolmc.LolPlugin.getInstance().getCCManager().setAirborne(tgt, 20); // projeté 1 s (wiki)
-            if(tgt instanceof Player __p)__p.sendActionBar(Component.text("⚡ KNOCKUP! Poing de Force",NamedTextColor.YELLOW));
-            c.getWorld().strikeLightningEffect(tgt.getLocation());
-            c.getWorld().playSound(c.getLocation(), Sound.ENTITY_PLAYER_ATTACK_CRIT, 1f, 0.7f);
+            // Wiki : la prochaine attaque (5 s, remise à zéro de l'attaque) inflige 100 % AD (+25 % AP)
+            // physiques en plus et projette la cible 1 s. Avant : frappe immédiate de la cible visée.
+            fr.lolmc.champion.base.EmpoweredAttack.arm(c, 5000L, (att, tgt, normal) -> {
+                TargetingUtil.dealDamage(att, tgt, s.getFinalAD()+s.getFinalAP()*0.25, TargetingUtil.DmgType.PHYSICAL);
+                fr.lolmc.LolPlugin.getInstance().getCCManager().setAirborne(tgt, 20); // projeté 1 s (wiki)
+                att.getWorld().strikeLightningEffect(tgt.getLocation());
+                return false; // s'ajoute aux dégâts de l'attaque
+            });
+            c.sendActionBar(Component.text("👊 Poing de Force : prochaine attaque renforcée",NamedTextColor.GOLD));
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            return String.format("Prochaine attaque double les dégâts: %.0f (200%%AD) + knockup 1s.",s.getFinalAD()*2.0);
+            return String.format("Prochaine attaque (5s) : +%.0f dégâts (100%%AD +25%%AP) et projette 1s.",s.getFinalAD()+s.getFinalAP()*0.25);
         }
     }
 
@@ -141,10 +171,9 @@ public final class Blitzcrank extends BaseChampion implements fr.lolmc.champion.
             var cm=LolPlugin.getInstance().getChampionManager();
             for(var __t : TargetingUtil.enemiesAround(c, 6.0)){ // rayon 600 (wiki)
                 // Détruit les boucliers avant les dégâts (signature du Champ Statique)
-                if(__t instanceof Player __sp && cm.hasChampion(__sp)){
-                    double sh=cm.getChampion(__sp).getStats().getShield();
-                    if(sh>0) cm.getChampion(__sp).getStats().addShield(-sh);
-                }
+                // Tous les boucliers, anti-magie compris (avant : seulement les boucliers normaux)
+                if(__t instanceof Player __sp && cm.hasChampion(__sp))
+                    cm.getChampion(__sp).getStats().clearShields();
                 TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);
                 if(__t instanceof Player __p){
                     if(cc!=null) cc.silence(__p, 10); // vrai silence 0.5s

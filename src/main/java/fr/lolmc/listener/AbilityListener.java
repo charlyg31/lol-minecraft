@@ -588,7 +588,9 @@ public class AbilityListener implements Listener {
         e.setCancelled(true);
         if (!(e.getEntity() instanceof org.bukkit.entity.LivingEntity victim)) return;
         if (!fr.lolmc.util.TargetingUtil.isEnemy(annie, victim)) return;
-        double dmg = fr.lolmc.champion.impl.mid.Annie.getTibbersAttackDamage(bear) * 0.625;
+        // Une frappe vanilla par seconde : × la vitesse d'attaque de Tibbers (enragée ou non)
+        double dmg = fr.lolmc.champion.impl.mid.Annie.getTibbersAttackDamage(bear)
+                * fr.lolmc.champion.impl.mid.Annie.consumeTibbersAttackSpeed(bear);
         fr.lolmc.util.DamageUtil.damageEntity(annie, victim, dmg, false, fr.lolmc.util.DamageUtil.Type.MAGICAL);
     }
 

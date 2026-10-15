@@ -36,6 +36,9 @@ public final class Ashe extends BaseChampion {
     private static final java.util.Map<java.util.UUID, Boolean> lastCrit = new java.util.concurrent.ConcurrentHashMap<>();
     @Override public double basicAttackDamage(Player attacker, org.bukkit.entity.LivingEntity target, double ad, boolean crit) {
         lastCrit.put(attacker.getUniqueId(), crit);
+        // Tir Concentré : chaque attaque est une rafale de 5 flèches de 22-26 % AD (110-130 %)
+        if (rangersFocusUntil.getOrDefault(attacker.getUniqueId(), 0L) > System.currentTimeMillis())
+            ad *= flurryMult.getOrDefault(attacker.getUniqueId(), 1.10);
         var cc = LolPlugin.getInstance().getCCManager();
         if (cc != null && cc.isSlowed(target)) {
             var st = getStats();
@@ -52,9 +55,34 @@ public final class Ashe extends BaseChampion {
         return frostShot(cm.hasChampion(ashe) ? cm.getChampion(ashe).getLevelSystem().getLevel() : 1);
     }
 
+    /**
+     * Concentration (wiki) : hors Tir Concentré, chaque attaque donne une charge (4 max, 4 s,
+     * rafraîchies par les attaques suivantes, puis perdues une par seconde). Il en faut 4 pour
+     * lancer le Q. Avant : Q lançable à tout moment.
+     */
+    private static final java.util.Map<java.util.UUID, int[]> focus = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final java.util.Map<java.util.UUID, Long> focusUntil = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final java.util.Map<java.util.UUID, Long> rangersFocusUntil = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final java.util.Map<java.util.UUID, Double> flurryMult = new java.util.concurrent.ConcurrentHashMap<>();
+    /** Charges actuelles, en appliquant la perte d'une charge par seconde après les 4 s. */
+    static int focusStacks(java.util.UUID id) {
+        int[] f = focus.get(id);
+        if (f == null) return 0;
+        long over = System.currentTimeMillis() - focusUntil.getOrDefault(id, 0L);
+        return over <= 0 ? f[0] : Math.max(0, f[0] - 1 - (int) (over / 1000));
+    }
+    static void gainFocus(Player c) {
+        var id = c.getUniqueId();
+        if (rangersFocusUntil.getOrDefault(id, 0L) > System.currentTimeMillis()) return;
+        int n = Math.min(4, focusStacks(id) + 1);
+        focus.put(id, new int[]{n});
+        focusUntil.put(id, System.currentTimeMillis() + 4000L);
+    }
+
     static class AA extends BasicAttackAbility {
         AA(){super("ashe",Material.ARROW,6.0f,DamageType.PHYSICAL);}
         @Override protected void onHit(Player c, ChampionStats s, org.bukkit.entity.LivingEntity tgt, double dmg){
+            gainFocus(c);
             // Passif Tir de Givre : slow 15-30% selon niveau (2s = 40 ticks)
             if(tgt instanceof Player __p){
                 var cm=LolPlugin.getInstance().getChampionManager();
@@ -71,14 +99,23 @@ public final class Ashe extends BaseChampion {
             new double[]{6,6,6,6,6},25,0,DamageType.PHYSICAL);
             resourceCost = 30;}
         @Override public void cast(Player c,ChampionStats s,Player t){
+            int stacks=focusStacks(c.getUniqueId());
+            if(stacks<4){
+                cancelCast();
+                c.sendActionBar(Component.text("🏹 Concentration "+stacks+"/4 : attaque pour charger le Tir Concentré",NamedTextColor.GRAY));
+                return;
+            }
+            focus.remove(c.getUniqueId()); focusUntil.remove(c.getUniqueId());
+            rangersFocusUntil.put(c.getUniqueId(), System.currentTimeMillis()+6000L);
             // Wiki : 6 s, +20-60 % de vitesse d'attaque ; la rafale inflige 110-130 % AD par attaque
             int r=getLevel()-1;
             double asBonus=new double[]{0.20,0.30,0.40,0.50,0.60}[r];
-            double adBonus=s.getFinalAD()*new double[]{0.10,0.15,0.20,0.25,0.30}[r];
+            // Rafale : multiplicateur appliqué aux attaques de base (avant : +10-30 % d'AD, qui
+            // renforçait aussi ses sorts)
+            flurryMult.put(c.getUniqueId(), new double[]{1.10,1.15,1.20,1.25,1.30}[r]);
             s.addBonusAttackSpeed(asBonus);
-            s.addBonusAD(adBonus);
             new org.bukkit.scheduler.BukkitRunnable(){@Override public void run(){
-                s.addBonusAttackSpeed(-asBonus); s.addBonusAD(-adBonus);
+                s.addBonusAttackSpeed(-asBonus);
             }}.runTaskLater(LolPlugin.getInstance(), 120L);
             c.sendActionBar(Component.text("🏹 Tir Concentré 6s!",NamedTextColor.AQUA));
         }

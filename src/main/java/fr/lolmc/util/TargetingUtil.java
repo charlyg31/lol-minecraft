@@ -36,6 +36,7 @@ public final class TargetingUtil {
     /** Une entité est-elle un ennemi attaquable du lanceur ? */
     public static boolean isEnemy(Player caster, LivingEntity entity) {
         if (entity == null || entity.equals(caster) || entity.isDead()) return false;
+        if (Untargetable.is(entity)) return false; // intouchable : ni ciblé ni touché
         var tm = LolPlugin.getInstance().getTeamManager();
         Team myTeam = tm.getTeam(caster);
 

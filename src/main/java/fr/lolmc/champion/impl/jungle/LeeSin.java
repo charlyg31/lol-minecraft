@@ -83,9 +83,9 @@ public final class LeeSin extends BaseChampion implements fr.lolmc.champion.base
     }
 
     private static final Map<UUID,UUID> sonicTarget=new java.util.concurrent.ConcurrentHashMap<>();
-    @Override public void resetState(UUID id){ sonicTarget.remove(id); endFlurry(id); flurryUntil.remove(id); }
+    @Override public void resetState(UUID id){ sonicTarget.remove(id); endFlurry(id); flurryUntil.remove(id); ironWillUntil.remove(id); crippleUntil.remove(id); tempestMarked.remove(id); }
     @Override public void resetAllState(){
-        sonicTarget.clear(); flurryCharges.clear(); flurryUntil.clear();
+        sonicTarget.clear(); flurryCharges.clear(); flurryUntil.clear(); ironWillUntil.clear(); crippleUntil.clear(); tempestMarked.clear();
         flurryAS.values().forEach(st -> st.addBonusAttackSpeed(-FLURRY_AS)); flurryAS.clear();
     }
 
@@ -111,6 +111,7 @@ public final class LeeSin extends BaseChampion implements fr.lolmc.champion.base
                     c.getWorld().playSound(c.getLocation(), Sound.ENTITY_PLAYER_ATTACK_CRIT, 1f, 0.9f);
                 }
                 sonicTarget.remove(c.getUniqueId());
+                resourceCost = 50;
                 return;
             }
             double[] base=fr.lolmc.util.Balance.base("q_leesin",new double[]{60,90,120,150,180});double dmg=base[getLevel()-1]+s.getBonusAD()*fr.lolmc.util.Balance.ratio("q_leesin","ad",0.9);
@@ -131,10 +132,12 @@ public final class LeeSin extends BaseChampion implements fr.lolmc.champion.base
         private void sonicHit(Player c, ChampionStats s, org.bukkit.entity.LivingEntity tgt, double dmg, BaseAbility q){
             TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.PHYSICAL);
             sonicTarget.put(c.getUniqueId(), tgt.getUniqueId());
+            resourceCost = 25; // Coup Résonnant : 25 d'énergie (wiki)
             final UUID markedId = tgt.getUniqueId();
             new BukkitRunnable(){@Override public void run(){
                 if(markedId.equals(sonicTarget.get(c.getUniqueId()))){
                     sonicTarget.remove(c.getUniqueId());
+                    resourceCost = 50;
                     q.triggerCooldown(c, s);
                 }
             }}.runTaskLater(LolPlugin.getInstance(),60L);
@@ -148,12 +151,34 @@ public final class LeeSin extends BaseChampion implements fr.lolmc.champion.base
         }
     }
 
+    private static final Map<UUID,Long> ironWillUntil=new java.util.concurrent.ConcurrentHashMap<>();
+    private static final Map<UUID,Long> crippleUntil=new java.util.concurrent.ConcurrentHashMap<>();
+    private static final Map<UUID,java.util.Set<UUID>> tempestMarked=new java.util.concurrent.ConcurrentHashMap<>();
+
     static class W extends BaseAbility {
         W(){super("w_leesin","Protection",Material.SHIELD,AbilitySlot.W,
                 new double[]{7,7,7,7,7},15,0,DamageType.TRUE);
             resourceCost = 50;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             fr.lolmc.champion.impl.jungle.LeeSin.onSpellCast(c.getUniqueId()); // Flurry
+            var cm=LolPlugin.getInstance().getChampionManager();
+            UUID id=c.getUniqueId();
+            // 2e activation, Volonté de fer (wiki) : 10-26 % d'omnivampirisme pendant 4 s, 25 d'énergie.
+            // Avant : appliquée d'office avec la Protection.
+            if(ironWillUntil.getOrDefault(id,0L)>System.currentTimeMillis()){
+                ironWillUntil.remove(id);
+                resourceCost=50;
+                double[] omni={0.10,0.14,0.18,0.22,0.26};
+                double o=omni[getLevel()-1];
+                if(cm.hasChampion(c)){
+                    final var fstats=cm.getChampion(c).getStats();
+                    fstats.addBonusOmnivamp(o);
+                    new BukkitRunnable(){@Override public void run(){ fstats.addBonusOmnivamp(-o); }}.runTaskLater(LolPlugin.getInstance(), 80L);
+                }
+                triggerCooldown(c, s);
+                c.sendActionBar(Component.text("🛡 Volonté de Fer : omnivampirisme 4s",NamedTextColor.GREEN));
+                return;
+            }
             Player dest = (t!=null && LolPlugin.getInstance().getTeamManager().areAllies(c,t)) ? t : c; // allié visé, sinon soi
             if(!dest.equals(c)){ // bond vers l'allié uniquement
                 Location safe=safeTeleport(c.getLocation(),dest.getLocation());
@@ -162,7 +187,6 @@ public final class LeeSin extends BaseChampion implements fr.lolmc.champion.base
             // Bouclier 60/105/150/195/240 +80%AP pendant 2s (40 ticks) sur Lee Sin (et la cible si champion)
             double[] shieldBase={60,105,150,195,240};
             double shield=shieldBase[getLevel()-1]+s.getFinalAP()*0.80;
-            var cm=LolPlugin.getInstance().getChampionManager();
             if(cm.hasChampion(c)) cm.getChampion(c).getStats().addShield(shield);
             if(!dest.equals(c) && cm.hasChampion(dest)) cm.getChampion(dest).getStats().addShield(shield);
             final Player fdest=dest; final double fsh=shield; final Player fc=c;
@@ -170,14 +194,16 @@ public final class LeeSin extends BaseChampion implements fr.lolmc.champion.base
                 if(cm.hasChampion(fc)) cm.getChampion(fc).getStats().addShield(-fsh);
                 if(!fdest.equals(fc) && cm.hasChampion(fdest)) cm.getChampion(fdest).getStats().addShield(-fsh);
             }}.runTaskLater(LolPlugin.getInstance(), 40L);
-            // Volonté de Fer : omnivamp 10/14/18/22/26% pendant 4s
-            double[] omni={0.10,0.14,0.18,0.22,0.26};
-            if(cm.hasChampion(c)){
-                final var fstats=cm.getChampion(c).getStats();
-                fstats.addBonusOmnivamp(omni[getLevel()-1]);
-                new BukkitRunnable(){@Override public void run(){ fstats.addBonusOmnivamp(-omni[getLevel()-1]); }}.runTaskLater(LolPlugin.getInstance(), 80L);
-            }
-            c.sendActionBar(Component.text(String.format("🛡 Protection %.0f + Volonté de Fer!",shield),NamedTextColor.GREEN));
+            // Fenêtre de 3 s pour la Volonté de fer ; la recharge démarre après
+            deferCooldown();
+            resourceCost=25;
+            final long until=System.currentTimeMillis()+3000L;
+            ironWillUntil.put(id, until);
+            final BaseAbility w=this;
+            new BukkitRunnable(){@Override public void run(){
+                if(ironWillUntil.getOrDefault(id,0L)==until){ ironWillUntil.remove(id); resourceCost=50; w.triggerCooldown(c, s); }
+            }}.runTaskLater(LolPlugin.getInstance(), 60L);
+            c.sendActionBar(Component.text(String.format("🛡 Protection %.0f ! (relancer : Volonté de Fer)",shield),NamedTextColor.GREEN));
             c.getWorld().playSound(c.getLocation(), Sound.ITEM_SHIELD_BLOCK, 1f, 1.3f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
@@ -192,24 +218,50 @@ public final class LeeSin extends BaseChampion implements fr.lolmc.champion.base
             resourceCost = 50;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             fr.lolmc.champion.impl.jungle.LeeSin.onSpellCast(c.getUniqueId()); // Flurry
-
+            UUID id=c.getUniqueId();
+            // 2e activation, Estropier (wiki) : ralentit de 35-75 % (décroît sur 4 s) les ennemis
+            // marqués par la Tempête et encore proches. Avant : ralentissement appliqué d'office.
+            if(crippleUntil.getOrDefault(id,0L)>System.currentTimeMillis()){
+                crippleUntil.remove(id);
+                resourceCost=50;
+                var marked=tempestMarked.remove(id);
+                if(marked!=null) for(UUID mid : marked){
+                    var e=org.bukkit.Bukkit.getEntity(mid);
+                    if(e instanceof org.bukkit.entity.LivingEntity le && !le.isDead() && le.getWorld().equals(c.getWorld())
+                            && le.getLocation().distanceSquared(c.getLocation())<=5.0*5.0)
+                        fr.lolmc.LolPlugin.getInstance().getCCManager().slowDecaying(le, new double[]{0.35,0.45,0.55,0.65,0.75}[getLevel()-1], 80);
+                }
+                triggerCooldown(c, s);
+                c.sendActionBar(Component.text("🔥 Estropier!",NamedTextColor.GOLD));
+                return;
+            }
             // 90 % de l'AD total (wiki, patch 26.10) ; avant : AD bonus
             double[] base=fr.lolmc.util.Balance.base("e_leesin",new double[]{35,60,85,110,135});
             double dmg=base[getLevel()-1]+s.getFinalAD()*fr.lolmc.util.Balance.ratio("e_leesin","ad",0.9);
+            var marked=new java.util.HashSet<UUID>();
             for(var __t : TargetingUtil.enemiesAround(c, 5.0)){ // rayon 450 (wiki)
                 TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);
-                if(__t instanceof Player __p){
-                    // Boiterie (wiki) : 35-75 %, décroît sur 4 s
-                    fr.lolmc.LolPlugin.getInstance().getCCManager().slowDecaying(__p, new double[]{0.35,0.45,0.55,0.65,0.75}[getLevel()-1], 80);
-                }
+                marked.add(__t.getUniqueId());
+                // Marqués et révélés 4 s
+                __t.addPotionEffect(new org.bukkit.potion.PotionEffect(org.bukkit.potion.PotionEffectType.GLOWING, 80, 0, false, false));
             }
             fr.lolmc.util.VisualEffectUtil.impactBurst(c.getWorld(),
                     c.getLocation().add(0,1,0), Material.LIGHT_GRAY_STAINED_GLASS, 0.4f, 2.0, 8, 6L);
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_RAVAGER_ROAR, 1f, 1.2f);
+            if(marked.isEmpty()) return; // personne touché : pas de 2e activation
+            tempestMarked.put(id, marked);
+            deferCooldown();
+            resourceCost=25;
+            final long until=System.currentTimeMillis()+3000L;
+            crippleUntil.put(id, until);
+            final BaseAbility e=this;
+            new BukkitRunnable(){@Override public void run(){
+                if(crippleUntil.getOrDefault(id,0L)==until){ crippleUntil.remove(id); tempestMarked.remove(id); resourceCost=50; e.triggerCooldown(c, s); }
+            }}.runTaskLater(LolPlugin.getInstance(), 60L);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] base=fr.lolmc.util.Balance.base("e_leesin",new double[]{35,60,85,110,135});
-            return String.format("%.0f dégâts magiques autour (+90%%AD) + ralentit (Boiterie).",base[getLevel()-1]+s.getFinalAD()*fr.lolmc.util.Balance.ratio("e_leesin","ad",0.9));
+            return String.format("%.0f dégâts magiques autour (+90%%AD), marque et révèle 4s. Relance (3s) : Estropier, ralentit les marqués.",base[getLevel()-1]+s.getFinalAD()*fr.lolmc.util.Balance.ratio("e_leesin","ad",0.9));
         }
     }
 

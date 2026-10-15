@@ -71,6 +71,8 @@ public final class MasterYi extends BaseChampion implements fr.lolmc.champion.ba
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             org.bukkit.entity.LivingEntity tgt = (t!=null && TargetingUtil.isEnemy(c,t))?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null){cancelCast();return;}
+            // Wiki : Yi est intouchable pendant la Frappe Alpha (~0.9 s)
+            fr.lolmc.util.Untargetable.apply(c, 18);
             Location dest=safeTeleport(c.getLocation(),tgt.getLocation());
             c.teleport(dest);
             double[] base=fr.lolmc.util.Balance.base("q_masteryi",new double[]{20,40,60,80,100});double dmg=base[getLevel()-1]+s.getFinalAD()*0.70; // wiki
@@ -99,27 +101,34 @@ public final class MasterYi extends BaseChampion implements fr.lolmc.champion.ba
             new double[]{10,10,10,10,10},0,0,DamageType.TRUE);
             resourceCost = 40;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            // Wiki : -70 % de dégâts la 1re demi-seconde puis -45 à -55 %, 4 s ; soin 120-440 (+100 % AP)
+            // Wiki : canalisation de 4 s, -70 % de dégâts la 1re demi-seconde puis -45 à -55 % ; soin
+            // 120-440 (+100 % AP) toutes les 0.5 s. Se déplacer interrompt la canalisation (avant :
+            // Yi pouvait marcher et combattre avec la réduction de dégâts et le soin)
             double[] drArr={0.45,0.475,0.50,0.525,0.55};
-            double dr=drArr[getLevel()-1];
-            s.addPercentDamageReduction(0.70);
-            new org.bukkit.scheduler.BukkitRunnable(){@Override public void run(){ s.addPercentDamageReduction(dr-0.70); }}
-                    .runTaskLater(LolPlugin.getInstance(), 10L);
-            new org.bukkit.scheduler.BukkitRunnable(){@Override public void run(){ s.addPercentDamageReduction(-dr); }}
-                    .runTaskLater(LolPlugin.getInstance(), 80L);
+            final double dr=drArr[getLevel()-1];
             double[] heals={120,200,280,360,440};
-            double perTick=(heals[getLevel()-1]+s.getFinalAP()*1.0)/8.0;
-            new org.bukkit.scheduler.BukkitRunnable(){ int n=0;
+            final double perTick=(heals[getLevel()-1]+s.getFinalAP()*1.0)/8.0;
+            final Location anchor=c.getLocation().clone();
+            s.addPercentDamageReduction(0.70);
+            new org.bukkit.scheduler.BukkitRunnable(){
+                int t=0; double applied=0.70;
+                void end(){ s.addPercentDamageReduction(-applied); applied=0; cancel(); }
                 @Override public void run(){
                     var cm=LolPlugin.getInstance().getChampionManager();
-                    if(n++>=8 || !c.isOnline() || !cm.hasChampion(c)){ cancel(); return; }
-                    // Soin augmenté de 1 % par 1 % de PV manquants (jusqu'à +100 %, données du jeu)
-                    var hp=cm.getChampion(c).getHPSystem();
-                    hp.heal(perTick*(2.0-hp.getHPRatio()));
-                }}.runTaskTimer(LolPlugin.getInstance(), 10L, 10L);
-            c.sendActionBar(Component.text("🧘 Méditation 4s...",NamedTextColor.AQUA));
+                    t+=2;
+                    if(t>80 || !c.isOnline() || !cm.hasChampion(c) || c.getGameMode()==GameMode.SPECTATOR
+                            || !c.getWorld().equals(anchor.getWorld())
+                            || c.getLocation().distanceSquared(anchor)>0.25){ end(); return; }
+                    if(t==10){ s.addPercentDamageReduction(dr-applied); applied=dr; }
+                    if(t%10==0){
+                        // Soin augmenté de 1 % par 1 % de PV manquants (jusqu'à +100 %, données du jeu)
+                        var hp=cm.getChampion(c).getHPSystem();
+                        hp.heal(perTick*(2.0-hp.getHPRatio()));
+                    }
+                }}.runTaskTimer(LolPlugin.getInstance(), 2L, 2L);
+            c.sendActionBar(Component.text("🧘 Méditation 4s (bouger interrompt)...",NamedTextColor.AQUA));
         }
-        @Override public String getDynamicDescription(ChampionStats s){return "Régénère des PV pendant 4s. Réduit les dégâts de 70% puis 45-55%.";}
+        @Override public String getDynamicDescription(ChampionStats s){return "Canalise 4s (bouger interrompt) : régénère des PV, réduit les dégâts de 70% puis 45-55%.";}
     }
 
     static class E extends BaseAbility {

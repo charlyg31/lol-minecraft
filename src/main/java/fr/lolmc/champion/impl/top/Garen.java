@@ -47,25 +47,27 @@ public final class Garen extends BaseChampion {
             new double[]{8,8,8,8,8},5,0,DamageType.PHYSICAL);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            org.bukkit.entity.LivingEntity tgt = (t!=null && TargetingUtil.isEnemy(c,t))?t:TargetingUtil.getTargetedEnemy(c,2.5); if(tgt==null){cancelCast();c.sendActionBar(Component.text("⚔ Aucune cible à portée",NamedTextColor.GRAY));return;}
-            // LoL : attaque renforcée = 30/60/90/120/150 + 150 % AD (100 % de l'attaque + 50 % en bonus),
-            // silence 1.5 s, boost vitesse (avant : 50 % de l'AD seulement)
+            // Wiki : la prochaine attaque dans les 4.5 s est renforcée (remise à zéro de l'attaque) :
+            // 30-150 + 150 % AD au total, silence 1.5 s. Avant : frappe immédiate de la cible visée.
             double[] base=fr.lolmc.util.Balance.base("q_garen",new double[]{30,60,90,120,150});
-            double dmg=base[getLevel()-1]+s.getFinalAD()*fr.lolmc.util.Balance.ratio("q_garen","ad",1.5);
-            TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.PHYSICAL);
-            // Silence 1.5s (30 ticks) via CCManager
-            var cc = LolPlugin.getInstance().getCCManager();
-            if (cc != null) cc.silence(tgt, 30);
-            // +35 % vitesse pendant 1.4/1.95/2.5/3.05/3.6 s (wiki)
+            final double flat=base[getLevel()-1];
+            // +35 % vitesse pendant 1.4/1.95/2.5/3.05/3.6 s (wiki) ; retire les ralentissements
             double[] msDur={1.4,1.95,2.5,3.05,3.6};
-            // Wiki : Coup Décisif retire aussi tous les ralentissements subis par Garen
             fr.lolmc.LolPlugin.getInstance().getCCManager().clearSlows(c.getUniqueId());
             c.removePotionEffect(PotionEffectType.SLOWNESS);
             fr.lolmc.LolPlugin.getInstance().getCCManager().speedPct(c, 0.35, (int)(msDur[getLevel()-1]*20));
-            if(tgt instanceof Player _tp)_tp.sendActionBar(Component.text("⚠ Silence — Garen Q",NamedTextColor.RED));
-            fr.lolmc.util.VisualEffectUtil.impact(c.getWorld(),
-                    tgt.getLocation().add(0,1,0), Material.WHITE_STAINED_GLASS, 0.3f, 4L);
-            c.getWorld().playSound(c.getLocation(), Sound.ENTITY_PLAYER_ATTACK_CRIT, 1f, 1f);
+            fr.lolmc.champion.base.EmpoweredAttack.arm(c, 4500L, (att, tgt, normal) -> {
+                double dmg=flat+s.getFinalAD()*fr.lolmc.util.Balance.ratio("q_garen","ad",1.5);
+                TargetingUtil.dealDamage(att, tgt, dmg, TargetingUtil.DmgType.PHYSICAL);
+                var cc = LolPlugin.getInstance().getCCManager();
+                if (cc != null) cc.silence(tgt, 30);
+                if(tgt instanceof Player _tp)_tp.sendActionBar(Component.text("⚠ Silence — Garen Q",NamedTextColor.RED));
+                fr.lolmc.util.VisualEffectUtil.impact(att.getWorld(),
+                        tgt.getLocation().add(0,1,0), Material.WHITE_STAINED_GLASS, 0.3f, 4L);
+                att.getWorld().playSound(att.getLocation(), Sound.ENTITY_PLAYER_ATTACK_CRIT, 1f, 1f);
+                return true;
+            });
+            c.sendActionBar(Component.text("⚔ Coup Décisif : prochaine attaque renforcée (4.5s)",NamedTextColor.GOLD));
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] base=fr.lolmc.util.Balance.base("q_garen",new double[]{30,60,90,120,150});
@@ -117,10 +119,15 @@ public final class Garen extends BaseChampion {
             double[] adRatio={0.40,0.43,0.46,0.49,0.52};
             int rank=getLevel()-1;
             double perTick=baseTick[rank]+s.getFinalAD()*adRatio[rank];
+            // Wiki : 7 tours (+1 par 25 % de vitesse d'attaque bonus) sur 3 s ; un champion touché
+            // 6 fois perd 25 % d'armure pendant 6 s
+            final int spins=7+(int)Math.floor(Math.max(0, s.getBonusAttackSpeedRatio())/0.25);
+            final long period=Math.max(1L, Math.round(60.0/spins));
+            final java.util.Map<java.util.UUID,Integer> hitCount=new java.util.HashMap<>();
             new BukkitRunnable(){
                 int hits=0;
                 @Override public void run(){
-                    if(hits>=7){cancel();return;}
+                    if(hits>=spins){cancel();return;}
                     var around=TargetingUtil.enemiesAround(c, 3.6);
                     org.bukkit.entity.LivingEntity nearest=null; double nd=Double.MAX_VALUE;
                     for(var e2 : around){ double d=e2.getLocation().distanceSquared(c.getLocation()); if(d<nd){nd=d;nearest=e2;} }
@@ -128,18 +135,39 @@ public final class Garen extends BaseChampion {
                         double dmg=perTick;
                         if(__t.equals(nearest)) dmg*=1.25;
                         TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.PHYSICAL);
+                        int n=hitCount.merge(__t.getUniqueId(), 1, Integer::sum);
+                        if(n%6==0 && __t instanceof Player sp) armorShred(sp);
                     }
                     fr.lolmc.util.VisualEffectUtil.groundRing(c.getWorld(),
                             c.getLocation().add(0,1,0), 1.8, Material.WHITE_STAINED_GLASS, 12, 0.3f, 0.1f, 4L);
                     c.getWorld().playSound(c.getLocation(), Sound.ENTITY_PLAYER_ATTACK_SWEEP, 0.5f, 1.2f);
                     hits++;
                 }
-            }.runTaskTimer(LolPlugin.getInstance(),0L,9L); // 7 frappes × 9 ticks ≈ 3.15s (LoL: 3s)
+            }.runTaskTimer(LolPlugin.getInstance(),0L,period); // réparties sur 3 s
+        }
+        /** Jugement : -25 % d'armure pendant 6 s (rafraîchi tous les 6 coups). */
+        private static final java.util.Map<java.util.UUID, double[]> shred = new java.util.concurrent.ConcurrentHashMap<>();
+        private static void armorShred(Player p) {
+            var cm=LolPlugin.getInstance().getChampionManager();
+            if(!cm.hasChampion(p)) return;
+            var st=cm.getChampion(p).getStats();
+            double[] cur=shred.get(p.getUniqueId());
+            long until=System.currentTimeMillis()+6000L;
+            if(cur!=null){ cur[1]=until; return; }
+            double amount=Math.max(0, st.getFinalArmor())*0.25;
+            st.addBonusArmor(-amount);
+            double[] state={amount, until};
+            shred.put(p.getUniqueId(), state);
+            new BukkitRunnable(){@Override public void run(){
+                if(System.currentTimeMillis()<state[1]) return;
+                st.addBonusArmor(state[0]); shred.remove(p.getUniqueId()); cancel();
+            }}.runTaskTimer(LolPlugin.getInstance(), 20L, 10L);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] baseTick={4,7,10,13,16};double[] adRatio={0.40,0.43,0.46,0.49,0.52};int r=getLevel()-1;
-            double total=(baseTick[r]+s.getFinalAD()*adRatio[r])*7;
-            return String.format("7 tours sur 3s, total %.0f dégâts. Ennemi le plus proche: +25%%.",total);
+            int spins=7+(int)Math.floor(Math.max(0, s.getBonusAttackSpeedRatio())/0.25);
+            double total=(baseTick[r]+s.getFinalAD()*adRatio[r])*spins;
+            return String.format("%d tours sur 3s (+1 par 25%% de vitesse d'attaque bonus), total %.0f dégâts. Plus proche : +25%%. 6 coups : -25%% d'armure 6s.",spins,total);
         }
     }
 

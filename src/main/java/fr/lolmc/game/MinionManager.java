@@ -632,7 +632,7 @@ public class MinionManager {
         var cm = LolPlugin.getInstance().getChampionManager();
         var tm = LolPlugin.getInstance().getTeamManager();
         if (!cm.hasChampion(p) || p.getGameMode() == org.bukkit.GameMode.SPECTATOR
-                || !p.getWorld().equals(minion.getWorld())) return false;
+                || !p.getWorld().equals(minion.getWorld()) || fr.lolmc.util.Untargetable.is(p)) return false;
         Team pt = tm.getTeam(p);
         if (pt == null || pt == team) return false;
         var bush = LolPlugin.getInstance().getBushManager();

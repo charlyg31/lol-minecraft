@@ -118,7 +118,8 @@ public class MonsterAbilities {
         Player best = null;
         double bestD = Double.MAX_VALUE;
         for (Player p : mob.getWorld().getPlayers()) {
-            if (!cm.hasChampion(p) || p.getGameMode() == org.bukkit.GameMode.SPECTATOR || p.isDead()) continue;
+            if (!cm.hasChampion(p) || p.getGameMode() == org.bukkit.GameMode.SPECTATOR || p.isDead()
+                    || fr.lolmc.util.Untargetable.is(p)) continue;
             double d = p.getLocation().distanceSquared(mob.getLocation());
             if (d > 14 * 14) continue;
             if (type != MonsterType.BARON && camp != null && horizontal(p.getLocation(), camp) > LEASH) continue;

@@ -48,6 +48,60 @@ public final class Annie extends BaseChampion implements fr.lolmc.champion.base.
         return tibbersAttack.getOrDefault(tibbers.getUniqueId(), 30.0);
     }
 
+    /** Annie est-elle morte (en attente de réapparition) ? */
+    private static boolean isAnnieDead(Player annie) {
+        var cm = LolPlugin.getInstance().getChampionManager();
+        return annie.getGameMode() == org.bukkit.GameMode.SPECTATOR
+                || (cm.hasChampion(annie) && cm.getChampion(annie).getHPSystem().isDead());
+    }
+
+    /** Perte de PV de Tibbers par seconde (part des PV max) tant qu'Annie est morte : estimation. */
+    private static final double TIBBERS_DECAY_PER_SEC = 0.05;
+
+    /** Vitesse d'attaque des 5 attaques enragées après la mort d'Annie (wiki), base 0.625. */
+    private static final double[] ENRAGED_AS = {1.736, 1.536, 1.307, 1.043, 0.739};
+    private static final Map<UUID, Integer> enragedAttacks = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /**
+     * Vitesse d'attaque de la frappe de Tibbers qui part : 0.625, ou celle de l'une des 5 attaques
+     * enragées (consommée). Les coups vanilla tombent à cadence fixe : les dégâts en tiennent compte.
+     */
+    public static double consumeTibbersAttackSpeed(org.bukkit.entity.Entity tibbers) {
+        Integer n = enragedAttacks.get(tibbers.getUniqueId());
+        if (n == null || n >= ENRAGED_AS.length) { enragedAttacks.remove(tibbers.getUniqueId()); return 0.625; }
+        enragedAttacks.put(tibbers.getUniqueId(), n + 1);
+        return ENRAGED_AS[n];
+    }
+
+    /** Ennemi le plus proche de Tibbers (champions et sbires, pas les monstres neutres), ou null. */
+    private static org.bukkit.entity.LivingEntity nearestTibbersTarget(Player annie, org.bukkit.entity.PolarBear t, double range) {
+        org.bukkit.entity.LivingEntity best = null;
+        double bestD = range * range;
+        for (Entity e : t.getNearbyEntities(range, range, range)) {
+            if (!(e instanceof org.bukkit.entity.LivingEntity le) || fr.lolmc.game.JungleManager.isJungleMonster(le)) continue;
+            if (!TargetingUtil.isEnemy(annie, le)) continue;
+            double d = le.getLocation().distanceSquared(t.getLocation());
+            if (d < bestD) { bestD = d; best = le; }
+        }
+        return best;
+    }
+
+    /** Rage de l'invocation (wiki) : +100 % de vitesse de déplacement qui décroît sur 3 s. */
+    private static void summonEnrage(org.bukkit.entity.PolarBear t) {
+        new BukkitRunnable() {
+            int ticks = 0;
+            @Override public void run() {
+                var sp = t.getAttribute(fr.lolmc.util.Compat.movementSpeed());
+                if (!t.isValid() || sp == null || ticks >= 60) {
+                    if (sp != null && t.isValid() && !enrageUntil.containsKey(t.getUniqueId())) sp.setBaseValue(0.38);
+                    cancel(); return;
+                }
+                sp.setBaseValue(0.38 * (1.0 + (60 - ticks) / 60.0));
+                ticks += 5;
+            }
+        }.runTaskTimer(LolPlugin.getInstance(), 0L, 5L);
+    }
+
     // ── État statique ─────────────────────────────────────────────
     private static final Map<UUID, org.bukkit.entity.PolarBear> activeTibbers  = new java.util.concurrent.ConcurrentHashMap<>();
     private static final Map<UUID, Long>    rCooldowns  = new java.util.concurrent.ConcurrentHashMap<>();
@@ -114,25 +168,41 @@ public final class Annie extends BaseChampion implements fr.lolmc.champion.base.
     public static void onAnnieDeath(Player annie) {
         var t = activeTibbers.get(annie.getUniqueId());
         if (t == null || !t.isValid()) return;
-        // 10 s (données du jeu : AvengerEnrageDuration ; avant : 5 s)
+        // Wiki : Tibbers se soigne de 50 % de ses PV manquants, s'enrage 10 s et ses 5 attaques
+        // suivantes sont bien plus rapides ; il vise le champion ennemi le plus proche et le plus
+        // blessé. Avant : +50 % à un attribut de dégâts Minecraft que le jeu n'utilise pas.
         enrageUntil.put(t.getUniqueId(), System.currentTimeMillis() + 10000L);
-        // Boost temporaire : +50% vitesse, +50% dégâts pendant 10s
-        var spAttr = t.getAttribute(fr.lolmc.util.Compat.movementSpeed());
-        if (spAttr != null) spAttr.setBaseValue(0.57); // 0.38 × 1.5
-        var dmgAttr = t.getAttribute(fr.lolmc.util.Compat.attackDamage());
-        if (dmgAttr != null) dmgAttr.setBaseValue(dmgAttr.getBaseValue() * 1.5);
+        enragedAttacks.put(t.getUniqueId(), 0);
+        if (fr.lolmc.util.VirtualHP.has(t))
+            fr.lolmc.util.VirtualHP.heal(t, (fr.lolmc.util.VirtualHP.getMax(t) - fr.lolmc.util.VirtualHP.getCurrent(t)) * 0.5);
+        var cm = LolPlugin.getInstance().getChampionManager();
+        Player best = null; double bestScore = Double.MAX_VALUE;
+        for (Entity e : t.getNearbyEntities(12, 12, 12)) {
+            if (!(e instanceof Player p) || !cm.hasChampion(p) || !TargetingUtil.isEnemy(annie, p)) continue;
+            double score = p.getLocation().distance(t.getLocation()) + 10 * cm.getChampion(p).getHPSystem().getHPRatio();
+            if (score < bestScore) { bestScore = score; best = p; }
+        }
+        if (best != null) t.setTarget(best);
         fr.lolmc.util.VisualEffectUtil.impactBurst(t.getWorld(),
                 t.getLocation().add(0,1,0), Material.ORANGE_STAINED_GLASS, 0.32f, 1.0, 10, 8L);
         t.getWorld().playSound(t.getLocation(), Sound.ENTITY_POLAR_BEAR_WARNING, 2f, 0.5f);
-        // Remettre les stats normales après 10s
         new BukkitRunnable() { @Override public void run() {
-            if (!t.isValid()) { cancel(); return; }
             enrageUntil.remove(t.getUniqueId());
-            var sp2 = t.getAttribute(fr.lolmc.util.Compat.movementSpeed());
-            if (sp2 != null) sp2.setBaseValue(0.38);
-            var dm2 = t.getAttribute(fr.lolmc.util.Compat.attackDamage());
-            if (dm2 != null) dm2.setBaseValue(dm2.getBaseValue() / 1.5);
+            enragedAttacks.remove(t.getUniqueId());
         }}.runTaskLater(LolPlugin.getInstance(), 200L);
+        // Tant qu'Annie est morte (wiki) : Tibbers perd des PV régulièrement et doit rester à moins
+        // de 1200 unités de son corps. Le rythme n'est publié nulle part (wiki, données du jeu) :
+        // 5 % des PV max par seconde est une estimation (« décroît rapidement »).
+        final Location body = annie.getLocation().clone();
+        new BukkitRunnable() { @Override public void run() {
+            if (!t.isValid() || t.isDead() || !annie.isOnline() || !isAnnieDead(annie)) { cancel(); return; }
+            if (fr.lolmc.util.VirtualHP.has(t))
+                fr.lolmc.util.VirtualHP.damage(t, fr.lolmc.util.VirtualHP.getMax(t) * TIBBERS_DECAY_PER_SEC / 2, null);
+            if (t.getWorld().equals(body.getWorld()) && t.getLocation().distanceSquared(body) > 12 * 12) {
+                t.setTarget(null);
+                t.getPathfinder().moveTo(body, 1.4);
+            }
+        }}.runTaskTimer(LolPlugin.getInstance(), 10L, 10L);
         // Notifier les alliés
         for (Player p : annie.getWorld().getPlayers()) {
             if (!LolPlugin.getInstance().getTeamManager().areEnemies(annie, p))
@@ -346,12 +416,10 @@ public final class Annie extends BaseChampion implements fr.lolmc.champion.base.
             activeTibbers.put(uuid, tibbers);
             thisAbility.resourceCost = 0;
 
-            // Cibler ennemi proche immédiatement
-            for (Entity e : tibbers.getNearbyEntities(10,10,10)) {
-                if (e instanceof Player ep && LolPlugin.getInstance().getTeamManager().areEnemies(c,ep)) {
-                    tibbers.setTarget(ep); break;
-                }
-            }
+            // Cibler l'ennemi le plus proche (champions et sbires) et rage d'invocation
+            var first = nearestTibbersTarget(c, tibbers, 10);
+            if (first != null) tibbers.setTarget(first);
+            summonEnrage(tibbers);
 
             c.sendActionBar(Component.text(pyroActive
                             ? "🔥 TIBBERS + STUN DE PYROMANIE!"
@@ -383,7 +451,8 @@ public final class Annie extends BaseChampion implements fr.lolmc.champion.base.
                             && System.currentTimeMillis() < enrageUntil.get(tibbers.getUniqueId());
 
                     // ── 1. Suivi d'Annie : si elle s'éloigne de >8 blocs et Tibbers n'a pas de cible ──
-                    if (c.isOnline() && tLoc.getWorld().equals(c.getWorld())) {
+                    if (c.isOnline() && tLoc.getWorld().equals(c.getWorld())
+                            && !isAnnieDead(c)) { // Annie morte : laisse sur son corps
                         double dist = tLoc.distance(c.getLocation());
                         if (dist > 22.0) {
                             // Trop loin → TP derrière Annie
@@ -399,15 +468,8 @@ public final class Annie extends BaseChampion implements fr.lolmc.champion.base.
                     }
 
                     // ── 2. Re-ciblage automatique : si pas de cible, chercher l'ennemi le plus proche ──
-                    if (tibbers.getTarget() == null || !tibbers.getTarget().isValid()) {
-                        org.bukkit.entity.LivingEntity closest = null;
-                        double bestDist = 12.0;
-                        for (Entity e : tibbers.getNearbyEntities(12,12,12)) {
-                            if (!(e instanceof Player ep)) continue;
-                            if (!LolPlugin.getInstance().getTeamManager().areEnemies(c,ep)) continue;
-                            double d = e.getLocation().distance(tLoc);
-                            if (d < bestDist) { bestDist=d; closest=ep; }
-                        }
+                    if (tibbers.getTarget() == null || !tibbers.getTarget().isValid() || tibbers.getTarget().isDead()) {
+                        var closest = nearestTibbersTarget(c, tibbers, 12); // sbires compris (wiki)
                         if (closest != null) tibbers.setTarget(closest);
                     }
 
@@ -420,7 +482,7 @@ public final class Annie extends BaseChampion implements fr.lolmc.champion.base.
                     // Dégâts aura (toutes les 2 ticks = 1s pour ne pas flood)
                     if (ticks % 2 == 0) {
                         // Aura (wiki) : 2/3/4 (+1 % AP) toutes les 0.25 s → ×4 par seconde
-                        double auraDmg = (new double[]{2,3,4}[r] + finalAP*0.01) * 4 * (enraged ? 1.5 : 1.0);
+                        double auraDmg = (new double[]{2,3,4}[r] + finalAP*0.01) * 4; // la rage ne renforce pas l'aura (wiki)
                         for (Entity entity : tibbers.getNearbyEntities(3.5,3.5,3.5)) {
                             if (!(entity instanceof org.bukkit.entity.LivingEntity target)) continue;
                             if (entity.equals(c) || entity.equals(tibbers)) continue;

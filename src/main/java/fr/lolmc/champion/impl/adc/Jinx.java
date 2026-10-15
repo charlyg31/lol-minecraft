@@ -166,24 +166,51 @@ public final class Jinx extends BaseChampion implements fr.lolmc.champion.base.S
                 new double[]{24,20.5,17,13.5,10},25,2,DamageType.MAGICAL);
             resourceCost = 90;}
         @Override public void cast(Player c,ChampionStats s,Player t){
+            // Wiki : 3 pièges posés en ligne perpendiculaire à Jinx au point visé ; armés après
+            // 0.5 s, ils durent 5 s et explosent au contact d'un champion ennemi (dégâts magiques
+            // et enracinement 1.5 s autour). Avant : explosion immédiate sur toute la zone.
             Location loc=TargetingUtil.getAimedGroundLocation(c, 9.0);
             double[] base=fr.lolmc.util.Balance.base("e_jinx",new double[]{90,140,190,240,290});double dmg=base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("e_jinx","ap",1);
-            for(var __t : TargetingUtil.entitiesInRadius(c, loc, 4.0)){
-                TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);
-                if(__t instanceof Player __p){
-                    fr.lolmc.LolPlugin.getInstance().getCCManager().root(__p, 30); // root 1.5 s (wiki)
-                    __p.sendActionBar(Component.text("🦷 ENRACINÉ par les Croque-Flammes!",NamedTextColor.RED));
+            org.bukkit.util.Vector fwd=loc.toVector().subtract(c.getLocation().toVector()).setY(0);
+            if(fwd.lengthSquared()<1e-6) fwd=c.getLocation().getDirection().setY(0);
+            if(fwd.lengthSquared()<1e-6) fwd=new org.bukkit.util.Vector(1,0,0);
+            fwd.normalize();
+            org.bukkit.util.Vector side=new org.bukkit.util.Vector(-fwd.getZ(),0,fwd.getX());
+            var traps=new java.util.ArrayList<Location>();
+            for(int i=-1;i<=1;i++) traps.add(loc.clone().add(side.clone().multiply(1.5*i)));
+            var cm=LolPlugin.getInstance().getChampionManager();
+            new org.bukkit.scheduler.BukkitRunnable(){
+                int ticks=0;
+                @Override public void run(){
+                    if(ticks>110 || traps.isEmpty() || !c.isOnline()){cancel();return;}
+                    if(ticks%10==0) for(var tr : traps)
+                        fr.lolmc.util.VisualEffectUtil.impact(tr.getWorld(), tr.clone().add(0,0.2,0),
+                                ticks<10 ? Material.YELLOW_STAINED_GLASS : Material.ORANGE_STAINED_GLASS, 0.35f, 10L);
+                    if(ticks>=10) for(var it=traps.iterator(); it.hasNext();){
+                        var tr=it.next();
+                        boolean sprung=false;
+                        for(var e : TargetingUtil.entitiesInRadius(c, tr, 1.0))
+                            if(e instanceof Player p && cm.hasChampion(p) && p.getGameMode()!=GameMode.SPECTATOR){ sprung=true; break; }
+                        if(!sprung) continue;
+                        it.remove();
+                        for(var __t : TargetingUtil.entitiesInRadius(c, tr, 1.5)){
+                            TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);
+                            if(__t instanceof Player __p){
+                                fr.lolmc.LolPlugin.getInstance().getCCManager().root(__p, 30); // root 1.5 s (wiki)
+                                __p.sendActionBar(Component.text("🦷 ENRACINÉ par les Croque-Flammes!",NamedTextColor.RED));
+                            }
+                        }
+                        fr.lolmc.util.VisualEffectUtil.impactBurst(tr.getWorld(), tr, Material.MAGMA_BLOCK, 0.28f, 1.0, 6, 8L);
+                        tr.getWorld().playSound(tr, Sound.ENTITY_GENERIC_EXPLODE, 0.6f, 1.4f);
+                    }
+                    ticks+=2;
                 }
-            }
-            fr.lolmc.util.VisualEffectUtil.groundRing(loc.getWorld(), loc, 4.0,
-                    Material.ORANGE_STAINED_GLASS, 18, 0.35f, 0.1f, 10L);
-            fr.lolmc.util.VisualEffectUtil.impactBurst(loc.getWorld(),
-                    loc, Material.MAGMA_BLOCK, 0.28f, 2.0, 6, 8L);
-            c.getWorld().playSound(loc, Sound.ENTITY_BLAZE_SHOOT, 1f, 1f);
+            }.runTaskTimer(LolPlugin.getInstance(), 0L, 2L);
+            c.getWorld().playSound(loc, Sound.BLOCK_TRIPWIRE_ATTACH, 1f, 1f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] base=fr.lolmc.util.Balance.base("e_jinx",new double[]{90,140,190,240,290});
-            return String.format("Pièges (zone visée): %.0f dégâts magiques + enracine 1.5s.",base[getLevel()-1]+s.getFinalAP());
+            return String.format("3 pièges (5s) : au contact d'un champion, %.0f dégâts magiques + enracine 1.5s.",base[getLevel()-1]+s.getFinalAP());
         }
     }
 

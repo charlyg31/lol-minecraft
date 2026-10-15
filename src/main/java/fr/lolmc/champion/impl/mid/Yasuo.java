@@ -35,6 +35,26 @@ public final class Yasuo extends BaseChampion implements fr.lolmc.champion.base.
     }
 
     public static final Map<UUID,Integer> qCasts=new java.util.concurrent.ConcurrentHashMap<>();
+    // Dernier Souffle : 15 s pendant lesquelles ses critiques ignorent 60 % de l'armure bonus
+    private static final Map<UUID,Long> lastBreathUntil=new java.util.concurrent.ConcurrentHashMap<>();
+    // Fin du bond de Lame Déferlante : un Q lancé pendant ce temps frappe en cercle (E-Q)
+    private static final Map<UUID,Long> eDashUntil=new java.util.concurrent.ConcurrentHashMap<>();
+
+    /**
+     * Critiques sous Dernier Souffle (wiki) : ignorent 60 % de l'armure bonus de la cible. Modélisé
+     * en augmentant le coup avant la réduction par l'armure. Avant : 60 % de pénétration de l'armure
+     * totale, sur toutes ses attaques et ses sorts.
+     */
+    @Override public double basicAttackDamage(Player attacker, org.bukkit.entity.LivingEntity target, double ad, boolean crit) {
+        double dmg = super.basicAttackDamage(attacker, target, ad, crit);
+        if (!crit || lastBreathUntil.getOrDefault(attacker.getUniqueId(), 0L) <= System.currentTimeMillis()) return dmg;
+        var cm = LolPlugin.getInstance().getChampionManager();
+        if (!(target instanceof Player tp) || !cm.hasChampion(tp)) return dmg;
+        var ts = cm.getChampion(tp).getStats();
+        double armor = ts.getFinalArmor(), ignored = Math.max(0, ts.getBonusArmor()) * 0.60;
+        if (armor <= 0 || ignored <= 0) return dmg;
+        return dmg * (100.0 + armor) / (100.0 + Math.max(0, armor - ignored));
+    }
     // Les charges de Tempête d'Acier se perdent 6 s après la dernière (wiki ; avant : jamais)
     private static final Map<UUID,Long> qStackUntil=new java.util.concurrent.ConcurrentHashMap<>();
 
@@ -73,8 +93,8 @@ public final class Yasuo extends BaseChampion implements fr.lolmc.champion.base.
     // E : chaque cible ne peut être traversée qu'une fois par 10/9/8/7/6 s (LoL)
     private static final Map<String,Long> eLockout=new java.util.concurrent.ConcurrentHashMap<>();
     /** Reinitialise l'etat de ce joueur (fin de partie / deconnexion). */
-    @Override public void resetState(UUID id){ qCasts.remove(id); qStackUntil.remove(id); eStacks.remove(id); eLastCast.remove(id); }
-    @Override public void resetAllState(){ qCasts.clear(); eStacks.clear(); eLastCast.clear(); walls.clear(); eLockout.clear(); }
+    @Override public void resetState(UUID id){ qCasts.remove(id); qStackUntil.remove(id); eStacks.remove(id); eLastCast.remove(id); lastBreathUntil.remove(id); eDashUntil.remove(id); }
+    @Override public void resetAllState(){ qCasts.clear(); eStacks.clear(); eLastCast.clear(); walls.clear(); eLockout.clear(); lastBreathUntil.clear(); eDashUntil.clear(); }
 
     // Passif Voie du Vagabond : au double crit chance passif (déjà configuré via ChampionStats)
     // Passif Esprit du Vent : bouclier égal 100+50%AP quand Flow est plein
@@ -102,12 +122,35 @@ public final class Yasuo extends BaseChampion implements fr.lolmc.champion.base.
             new double[]{4,4,4,4,4},20,6,DamageType.PHYSICAL);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
+            // Wiki : la recharge de 4 s baisse de 1 % par 1.67 % de vitesse d'attaque bonus, jusqu'à
+            // 1.33 s (avant : 4 s fixes)
+            setDynamicCooldown(4.0*(1.0-Math.min(0.6667, Math.max(0, s.getBonusAttackSpeedRatio())/1.67)));
             // 2 coups touchés → le 3e Q est une tornade (avant : chaque lancer, même raté, comptait)
             int qStacks=qStackUntil.getOrDefault(c.getUniqueId(),0L)>System.currentTimeMillis()
                     ? qCasts.getOrDefault(c.getUniqueId(),0) : 0;
             // LoL : coup d'estoc en ligne. 20/45/70/95/120 + 100% AD (peut critiquer)
             double[] base=fr.lolmc.util.Balance.base("q_yasuo",new double[]{20,45,70,95,120});double dmg=base[getLevel()-1]+s.getFinalAD()*fr.lolmc.util.Balance.ratio("q_yasuo","ad",1.05);
             boolean tornado = qStacks>=2;
+            // E-Q (wiki) : un Q lancé pendant le bond de Lame Déferlante frappe en cercle autour de
+            // Yasuo à l'arrivée ; avec 2 charges, il projette les ennemis touchés en l'air. Manquait.
+            if(eDashUntil.getOrDefault(c.getUniqueId(),0L)>System.currentTimeMillis()){
+                eDashUntil.remove(c.getUniqueId());
+                var ccQ = LolPlugin.getInstance().getCCManager();
+                var around = TargetingUtil.enemiesAround(c, 2.6); // rayon 215 + rayons des unités
+                for(var __t : around){
+                    TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.PHYSICAL);
+                    if(tornado && ccQ!=null) ccQ.setAirborne(__t, 18); // projeté 0.9 s
+                }
+                if(tornado) qCasts.put(c.getUniqueId(),0);
+                else if(!around.isEmpty()){
+                    qCasts.put(c.getUniqueId(), Math.min(2, qStacks+1));
+                    qStackUntil.put(c.getUniqueId(), System.currentTimeMillis()+6000L);
+                }
+                fr.lolmc.util.VisualEffectUtil.groundRing(c.getWorld(), c.getLocation().add(0,0.5,0), 2.2,
+                        Material.WHITE_STAINED_GLASS, 16, 0.3f, 0.1f, 6L);
+                c.getWorld().playSound(c.getLocation(), Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 0.9f);
+                return;
+            }
             if(tornado){
                 // Tornade : skillshot plus long qui projette en l'air
                 // Projectile réel : tornade de 1150 unités à 1200/s qui traverse
@@ -199,7 +242,8 @@ public final class Yasuo extends BaseChampion implements fr.lolmc.champion.base.
             eLastCast.put(c.getUniqueId(), castAt);
             new BukkitRunnable(){@Override public void run(){
                 if(eLastCast.getOrDefault(c.getUniqueId(),0L)==castAt) eStacks.put(c.getUniqueId(),0);
-            }}.runTaskLater(LolPlugin.getInstance(),120L);
+            }}.runTaskLater(LolPlugin.getInstance(),100L); // 5 s (wiki)
+            eDashUntil.put(c.getUniqueId(), System.currentTimeMillis()+500L); // Q pendant le bond : E-Q
             fr.lolmc.util.VisualEffectUtil.impact(c.getWorld(),
                     c.getLocation().add(0,1,0), Material.WHITE_STAINED_GLASS, 0.3f, 4L);
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 1.4f);
@@ -253,9 +297,7 @@ public final class Yasuo extends BaseChampion implements fr.lolmc.champion.base.
             if(cm.hasChampion(c)){
                 var champ=cm.getChampion(c);
                 if(champ.getResourceSystem()!=null) champ.getResourceSystem().setCurrent(champ.getResourceSystem().getMax());
-                champ.getStats().addBonusArmorPenPercent(0.60);
-                final var fstats=champ.getStats();
-                new BukkitRunnable(){@Override public void run(){ fstats.addBonusArmorPenPercent(-0.60); }}.runTaskLater(LolPlugin.getInstance(), 300L);
+                lastBreathUntil.put(c.getUniqueId(), System.currentTimeMillis()+15_000L);
             }
             fr.lolmc.util.VisualEffectUtil.groundRing(c.getWorld(),
                     c.getLocation().add(0,1,0), 3.0, Material.WHITE_STAINED_GLASS, 20, 0.4f, 0.12f, 8L);

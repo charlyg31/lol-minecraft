@@ -262,6 +262,7 @@ public class AutoAttackManager {
                     // Cible cachee par le fog/bush : pause (anti-wallhack),
                     // l'auto-fire reprend si elle redevient visible
                     if (!attacker.canSee(target)) continue;
+                    if (fr.lolmc.util.Untargetable.is(target)) continue; // intouchable : on attend
 
                     double range = cm.getChampion(attacker).getAutoAttackRange();
                     double dist = attacker.getLocation().distance(target.getLocation());
@@ -304,11 +305,14 @@ public class AutoAttackManager {
 
         AAType type = getAAType(champ);
         final double dmg = rawDamage;
+        // Attaque renforcée par un sort (consommée au lancer de l'attaque)
+        final var empowered = fr.lolmc.champion.base.EmpoweredAttack.take(attacker);
         Runnable hit = () -> {
             if (!cm.hasChampion(attacker) || !cm.hasChampion(target)
                     || target.getGameMode() == GameMode.SPECTATOR) return;
             // Dégâts (les attaques de base sont physiques dans LoL, même celles des mages)
-            DamageUtil.damage(attacker, target, dmg, false, DamageUtil.Type.PHYSICAL);
+            if (empowered == null || !empowered.apply(attacker, target, dmg))
+                DamageUtil.damage(attacker, target, dmg, false, DamageUtil.Type.PHYSICAL);
             // Passif d'attaque du champion (onHit), puis passifs d'objets
             if (champ.getAbility(0) instanceof fr.lolmc.ability.base.BasicAttackAbility baa)
                 baa.applyOnHit(attacker, champ.getStats(), target, dmg);
@@ -371,11 +375,13 @@ public class AutoAttackManager {
 
         AAType type = getAAType(champ);
         final double dmg = rawDamage;
+        final var empowered = fr.lolmc.champion.base.EmpoweredAttack.take(attacker);
         Runnable hit = () -> {
             if (target.isDead() || !cm.hasChampion(attacker)) return;
             target.playHurtAnimation(attacker.getLocation().getYaw());
             // Sbire/monstre : armure, bonus anti-sbires, PV virtuels ; coup fatal attribué (last-hit)
-            fr.lolmc.util.MobCombat.damage(attacker, target, dmg, fr.lolmc.util.DamageUtil.Type.PHYSICAL);
+            if (empowered == null || !empowered.apply(attacker, target, dmg))
+                fr.lolmc.util.MobCombat.damage(attacker, target, dmg, fr.lolmc.util.DamageUtil.Type.PHYSICAL);
             if (champ.getAbility(0) instanceof fr.lolmc.ability.base.BasicAttackAbility baa)
                 baa.applyOnHit(attacker, champ.getStats(), target, dmg);
             var pm = LolPlugin.getInstance().getPassiveManager();
@@ -620,6 +626,11 @@ public class AutoAttackManager {
         long cooldownMs = (long)(1000.0 / Math.max(0.1, attackSpeed));
         Long last = lastAttack.get(attacker.getUniqueId());
         return last == null || (now - last) >= cooldownMs;
+    }
+
+    /** Remet à zéro le délai entre deux attaques (sorts qui réinitialisent l'attaque de base). */
+    public void resetAttackTimer(Player attacker) {
+        lastAttack.remove(attacker.getUniqueId());
     }
 
     /** Déclenche le cooldown d'AA sans infliger de dégâts. */

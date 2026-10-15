@@ -76,8 +76,15 @@ public final class Malphite extends BaseChampion implements fr.lolmc.champion.ba
                 double bonusDmg = new double[]{30,40,50,60,70}[wr] + s.getFinalAP()*0.20 + s.getFinalArmor()*0.15;
                 double coneDmg = new double[]{15,25,35,45,55}[wr] + s.getFinalAP()*0.30 + s.getFinalArmor()*0.15;
                 TargetingUtil.dealDamage(c, tgt, bonusDmg, TargetingUtil.DmgType.PHYSICAL);
-                for (var e : TargetingUtil.enemiesAround(c, 4.0))
-                    if (!e.equals(tgt)) TargetingUtil.dealDamage(c, e, coneDmg, TargetingUtil.DmgType.PHYSICAL);
+                // Onde en cône derrière la cible, dans l'axe Malphite → cible (wiki ; avant : cercle
+                // autour de Malphite)
+                org.bukkit.util.Vector axis = tgt.getLocation().toVector().subtract(c.getLocation().toVector()).setY(0);
+                for (var e : TargetingUtil.entitiesInRadius(c, tgt.getLocation(), 4.0)) {
+                    if (e.equals(tgt)) continue;
+                    org.bukkit.util.Vector to = e.getLocation().toVector().subtract(tgt.getLocation().toVector()).setY(0);
+                    if (axis.lengthSquared() > 1e-6 && to.lengthSquared() > 1e-6 && axis.angle(to) > Math.toRadians(45)) continue;
+                    TargetingUtil.dealDamage(c, e, coneDmg, TargetingUtil.DmgType.PHYSICAL);
+                }
                 fr.lolmc.util.VisualEffectUtil.impact(c.getWorld(),
                         tgt.getLocation().add(0,1,0), Material.STONE, 0.3f, 4L);
             }
@@ -175,8 +182,11 @@ public final class Malphite extends BaseChampion implements fr.lolmc.champion.ba
             new double[]{130,115,100},6.5,4,DamageType.MAGICAL);
             resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            org.bukkit.entity.LivingEntity tgt = (t!=null && TargetingUtil.isEnemy(c,t))?t:TargetingUtil.getTargetedEnemy(c,10.0); if(tgt==null){cancelCast();return;} // 1000 unités
-            Location dest=safeTeleport(c.getLocation(),tgt.getLocation());
+            // Wiki : charge imparable vers le POINT visé (1000 unités), pas besoin de cible (avant :
+            // une cible était obligatoire)
+            Location aim=(t!=null && TargetingUtil.isEnemy(c,t)) ? t.getLocation() : TargetingUtil.getAimedGroundLocation(c, 10.0);
+            Location dest=safeTeleport(c.getLocation(),aim);
+            dest.setYaw(c.getLocation().getYaw()); dest.setPitch(c.getLocation().getPitch());
             c.teleport(dest);
             // LoL : 200/300/400 + 90% AP, knockup + stun 1.5s (30 ticks)
             double[] baseR={200,300,400};int rr=Math.min(getLevel()-1,2);double dmg=baseR[rr]+s.getFinalAP()*0.9;
@@ -192,7 +202,7 @@ public final class Malphite extends BaseChampion implements fr.lolmc.champion.ba
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] baseR={200,300,400};int rr=Math.min(getLevel()-1,2);
-            return String.format("Bondit sur la cible. %.0f dégâts (+90%%AP) + knockup/stun 1.5s.",baseR[rr]+s.getFinalAP()*0.9);
+            return String.format("Charge vers le point visé. %.0f dégâts (+90%%AP) + projette 1.5s autour.",baseR[rr]+s.getFinalAP()*0.9);
         }
     }
 }

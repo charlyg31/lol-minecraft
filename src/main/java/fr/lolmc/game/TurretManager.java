@@ -313,7 +313,7 @@ public class TurretManager {
     }
 
     private boolean isValidTarget(Location center, Team turretTeam, LivingEntity le) {
-        if (le.isDead() || !inCylinder(center, le.getLocation())) return false;
+        if (le.isDead() || !inCylinder(center, le.getLocation()) || fr.lolmc.util.Untargetable.is(le)) return false;
         if (le instanceof Player p) {
             return championManager.hasChampion(p) && p.getGameMode() != org.bukkit.GameMode.SPECTATOR
                     && teamManager.getTeam(p) != null && teamManager.getTeam(p) != turretTeam;

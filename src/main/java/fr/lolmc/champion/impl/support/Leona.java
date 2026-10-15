@@ -65,18 +65,19 @@ public final class Leona extends BaseChampion implements fr.lolmc.champion.base.
             new double[]{5,5,5,5,5},5,0,DamageType.MAGICAL);
             resourceCost = 45;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            // LoL : prochaine attaque renforcée = stun 1s + dégâts magiques 20/45/70/95/120 + 30% AP
-            org.bukkit.entity.LivingEntity tgt = (t!=null && TargetingUtil.isEnemy(c,t))?t:TargetingUtil.getTargetedEnemy(c,2.5); if(tgt==null){cancelCast();c.sendActionBar(Component.text("☀ Bouclier de l'Aube prêt (frappe un ennemi)",NamedTextColor.YELLOW));return;}
-            double[] base=fr.lolmc.util.Balance.base("q_leona",new double[]{10,35,60,85,110});double dmg=base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("q_leona","ap",0.3);
-            TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.MAGICAL);
-            if(tgt instanceof Player __p){
-                fr.lolmc.LolPlugin.getInstance().getCCManager().stun(__p, 20); // stun 1s
-                __p.sendActionBar(Component.text("☀ STUN 1s — Bouclier de l'Aube!",NamedTextColor.YELLOW));
-            }
-            applyMark(c, tgt); // marque Lumière du Soleil
-            fr.lolmc.util.VisualEffectUtil.impact(c.getWorld(),
-                    tgt.getLocation().add(0,1,0), Material.YELLOW_STAINED_GLASS, 0.3f, 5L);
-            c.getWorld().playSound(c.getLocation(), Sound.ITEM_SHIELD_BLOCK, 1f, 0.8f);
+            // Wiki : la prochaine attaque (6 s, remise à zéro de l'attaque) inflige en plus 10-110
+            // (+30 % AP) dégâts magiques et étourdit 1 s. Avant : frappe immédiate de la cible visée.
+            double[] base=fr.lolmc.util.Balance.base("q_leona",new double[]{10,35,60,85,110});
+            final double dmg=base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("q_leona","ap",0.3);
+            fr.lolmc.champion.base.EmpoweredAttack.arm(c, 6000L, (att, tgt, normal) -> {
+                TargetingUtil.dealDamage(att, tgt, dmg, TargetingUtil.DmgType.MAGICAL);
+                fr.lolmc.LolPlugin.getInstance().getCCManager().stun(tgt, 20); // stun 1s
+                applyMark(att, tgt); // marque Lumière du Soleil
+                fr.lolmc.util.VisualEffectUtil.impact(att.getWorld(),
+                        tgt.getLocation().add(0,1,0), Material.YELLOW_STAINED_GLASS, 0.3f, 5L);
+                return false; // s'ajoute aux dégâts de l'attaque
+            });
+            c.sendActionBar(Component.text("☀ Bouclier de l'Aube : prochaine attaque renforcée",NamedTextColor.GOLD));
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] base=fr.lolmc.util.Balance.base("q_leona",new double[]{10,35,60,85,110});
@@ -171,7 +172,8 @@ public final class Leona extends BaseChampion implements fr.lolmc.champion.base.
         }
 
         private void zenithDash(Player c, org.bukkit.entity.LivingEntity last){
-            if(!c.isOnline() || last.isDead()) return;
+            // Aucun champion touché : pas de bond (avant : erreur, last était null)
+            if(!c.isOnline() || last == null || last.isDead()) return;
             dashTo(c, last, -1.0);
             if(last instanceof Player __p){
                 fr.lolmc.LolPlugin.getInstance().getCCManager().root(__p, 10); // root 0.5s

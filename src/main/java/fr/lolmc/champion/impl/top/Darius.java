@@ -164,34 +164,32 @@ public final class Darius extends BaseChampion implements fr.lolmc.champion.base
             new double[]{5,5,5,5,5},5,0,DamageType.PHYSICAL);
             resourceCost = 40;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            // LoL : prochaine attaque renforcée, dégâts bonus + ralentit 90% 1s
-            org.bukkit.entity.LivingEntity tgt = (t!=null && TargetingUtil.isEnemy(c,t))?t:TargetingUtil.getTargetedEnemy(c,2.5); if(tgt==null){cancelCast();c.sendActionBar(Component.text("🪓 Aucune cible",NamedTextColor.GRAY));return;}
-            // LoL : 140/145/150/155/160% AD physique
+            // Wiki : la prochaine attaque (4 s, remise à zéro de l'attaque) inflige 140-160 % AD et
+            // ralentit de 90 % pendant 1 s. Avant : frappe immédiate de la cible visée.
             double[] adMult={1.40,1.45,1.50,1.55,1.60};
-            double dmg=s.getFinalAD()*adMult[getLevel()-1];
-            TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.PHYSICAL);
-            applyBleed(c, tgt); // applique un stack d'Hémorragie
-            // Ralentit 90% pendant 1s (20 ticks)
-            if(tgt instanceof Player __p){
-                fr.lolmc.LolPlugin.getInstance().getCCManager().slowPct(__p, 0.90, 20); // 90 % 1 s (wiki)
-                __p.sendActionBar(Component.text("🪓 Estropié! (ralenti 90%%)",NamedTextColor.DARK_RED));
-            }
-            // Reset : CD-50%% si la cible meurt
-            final org.bukkit.entity.LivingEntity wTgt=tgt; final BaseAbility wThis=this;
-            new BukkitRunnable(){@Override public void run(){
-                boolean killed=wTgt.isDead()||wTgt.getHealth()<=0;
-                if(!killed && wTgt instanceof Player pt){var cm=LolPlugin.getInstance().getChampionManager(); if(cm.hasChampion(pt)) killed=cm.getChampion(pt).getHPSystem().isDead();}
-                if(killed){
-                    // Wiki : un kill rend le mana et la moitié de la recharge (avant : recharge remise à zéro)
-                    wThis.reduceCooldown(c, wThis.getRemainingCooldown(c)*0.5);
+            final double mult=adMult[getLevel()-1];
+            final BaseAbility wThis=this;
+            fr.lolmc.champion.base.EmpoweredAttack.arm(c, 4000L, (att, tgt, normal) -> {
+                TargetingUtil.dealDamage(att, tgt, s.getFinalAD()*mult, TargetingUtil.DmgType.PHYSICAL);
+                // (l'Hémorragie est appliquée par l'attaque de base elle-même)
+                fr.lolmc.LolPlugin.getInstance().getCCManager().slowPct(tgt, 0.90, 20); // 90 % 1 s (wiki)
+                if(tgt instanceof Player __p) __p.sendActionBar(Component.text("🪓 Estropié! (ralenti 90%%)",NamedTextColor.DARK_RED));
+                // Wiki : un kill rend le mana et la moitié de la recharge
+                new BukkitRunnable(){@Override public void run(){
+                    boolean killed=tgt.isDead()||TargetingUtil.getRealHealth(tgt)<=0;
+                    if(!killed) return;
+                    wThis.reduceCooldown(att, wThis.getRemainingCooldown(att)*0.5);
                     var cmW=LolPlugin.getInstance().getChampionManager();
-                    if(cmW.hasChampion(c)&&cmW.getChampion(c).getResourceSystem()!=null)
-                        cmW.getChampion(c).getResourceSystem().addCurrent(wThis.getResourceCost());
-                    c.sendActionBar(Component.text("🪓 Frappe Estropiante : mana rendu, -50% de recharge",NamedTextColor.DARK_RED)); }
-            }}.runTaskLater(LolPlugin.getInstance(),1L);
-            fr.lolmc.util.VisualEffectUtil.impact(c.getWorld(),
-                    tgt.getLocation().add(0,1,0), Material.WHITE_STAINED_GLASS, 0.32f, 5L);
-            c.getWorld().playSound(c.getLocation(), Sound.ENTITY_PLAYER_ATTACK_CRIT, 1f, 0.8f);
+                    if(cmW.hasChampion(att)&&cmW.getChampion(att).getResourceSystem()!=null)
+                        cmW.getChampion(att).getResourceSystem().addCurrent(wThis.getResourceCost());
+                    att.sendActionBar(Component.text("🪓 Frappe Estropiante : mana rendu, -50% de recharge",NamedTextColor.DARK_RED));
+                }}.runTaskLater(LolPlugin.getInstance(),1L);
+                fr.lolmc.util.VisualEffectUtil.impact(att.getWorld(),
+                        tgt.getLocation().add(0,1,0), Material.WHITE_STAINED_GLASS, 0.32f, 5L);
+                att.getWorld().playSound(att.getLocation(), Sound.ENTITY_PLAYER_ATTACK_CRIT, 1f, 0.8f);
+                return true;
+            });
+            c.sendActionBar(Component.text("🪓 Frappe Estropiante : prochaine attaque renforcée",NamedTextColor.DARK_RED));
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] adMult={1.40,1.45,1.50,1.55,1.60};
