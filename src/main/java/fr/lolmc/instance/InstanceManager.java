@@ -305,6 +305,12 @@ public final class InstanceManager {
     }
 
     /** Retourne toutes les instances actives. */
+    /** Joueur rejoignant une instance déjà lancée ({@code /l rejoindre}). */
+    public void registerLateJoiner(GameInstance instance, Player player, TeamManager.Team team) {
+        playerMap.put(player.getUniqueId(), instance);
+        instance.addPlayer(player, team);
+    }
+
     public Collection<GameInstance> getAllInstances() {
         return Collections.unmodifiableCollection(instances.values());
     }

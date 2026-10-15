@@ -112,8 +112,13 @@ public class ChampionGUI {
             }
             lore.add(Component.text("─────────────────", NamedTextColor.DARK_GRAY)
                     .decoration(TextDecoration.ITALIC, false));
-            lore.add(Component.text("Clic pour sélectionner", NamedTextColor.GRAY)
-                    .decoration(TextDecoration.ITALIC, true));
+            if (fr.lolmc.champion.ChampionAccess.canPlay(player, champId))
+                lore.add(Component.text(fr.lolmc.champion.ChampionAccess.owns(player, champId)
+                        ? "Clic pour sélectionner" : "Rotation gratuite — clic pour sélectionner", NamedTextColor.GRAY)
+                        .decoration(TextDecoration.ITALIC, true));
+            else
+                lore.add(Component.text("🔒 Non possédé", NamedTextColor.RED)
+                        .decoration(TextDecoration.ITALIC, false));
 
             meta.lore(lore);
             head.setItemMeta(meta);

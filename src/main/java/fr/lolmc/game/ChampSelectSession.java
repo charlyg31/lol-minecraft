@@ -395,7 +395,7 @@ public class ChampSelectSession {
             player.sendActionBar(Component.text("⏳ Ce n'est pas ton tour (" + nameOf(currentTurn()) + " choisit).", NamedTextColor.RED));
             return false;
         }
-        if (!player.hasPermission("lolmc.champion." + championId)) {
+        if (!fr.lolmc.champion.ChampionAccess.canPlay(player, championId)) {
             player.sendActionBar(Component.text("❌ Tu n'as pas accès à ce champion.", NamedTextColor.RED));
             return false;
         }
@@ -430,8 +430,21 @@ public class ChampSelectSession {
 
     private boolean isAvailable(UUID id, String championId) {
         Player p = Bukkit.getPlayer(id);
-        if (p != null && !p.hasPermission("lolmc.champion." + championId)) return false;
+        if (p != null && !fr.lolmc.champion.ChampionAccess.canPlay(p, championId)) return false;
         return !isBanned(championId) && !isTaken(id, championId);
+    }
+
+    /**
+     * Aucun champion libre pour ce joueur : un champion qu'il peut jouer même s'il est déjà pris,
+     * sinon le premier de la rotation gratuite, sinon le premier champion (la partie ne peut pas
+     * démarrer avec une place vide ; les files refusent déjà un joueur qui ne possède aucun champion).
+     */
+    private String fallbackChampion(UUID id) {
+        Player p = Bukkit.getPlayer(id);
+        var all = LolPlugin.getInstance().getChampionManager().getAllChampions();
+        for (var c : all) if (p != null && fr.lolmc.champion.ChampionAccess.canPlay(p, c.getId())) return c.getId();
+        for (var c : all) if (fr.lolmc.champion.ChampionAccess.isFreeRotation(c.getId())) return c.getId();
+        return all.isEmpty() ? "garen" : all.iterator().next().getId();
     }
 
     /** Premier champion disponible pour ce joueur (hors {@code exclude}), ou null. */
@@ -564,7 +577,7 @@ public class ChampSelectSession {
                 String h = hovered.get(id);
                 c = (h != null && isAvailable(id, h)) ? h : firstAvailable(id, Set.of());
             }
-            if (c == null) c = "garen";
+            if (c == null) c = fallbackChampion(id);
             chosenChampion.put(id, c); // réserve pour les suivants
             finalChamp.put(id, c);
         }

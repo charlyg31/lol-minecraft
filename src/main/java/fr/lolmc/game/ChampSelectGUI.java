@@ -63,7 +63,8 @@ public class ChampSelectGUI implements Listener {
         var csmMenu = LolPlugin.getInstance().getChampSelectManager();
         for (int i = 0; i < CHAMPIONS.length; i++) {
             String id = CHAMPIONS[i];
-            if (csmMenu.isBanned(player.getUniqueId(), id)) inv.setItem(i, unavailableIcon(id, "⛔ Banni"));
+            if (!fr.lolmc.champion.ChampionAccess.canPlay(player, id)) inv.setItem(i, unavailableIcon(id, "🔒 Non possédé"));
+            else if (csmMenu.isBanned(player.getUniqueId(), id)) inv.setItem(i, unavailableIcon(id, "⛔ Banni"));
             else if (csmMenu.isTaken(player.getUniqueId(), id)) inv.setItem(i, unavailableIcon(id, "✖ Déjà pris"));
             else inv.setItem(i, championIcon(id, isMyRole(player, id)));
         }

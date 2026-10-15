@@ -240,6 +240,18 @@ public class GameManager {
         }
     }
 
+    /**
+     * Joueur arrivé en cours de partie ({@code /l rejoindre}) : il devient participant (reconnexion,
+     * fin de partie) et reçoit le chrono et la minimap. Son champion doit déjà être assigné.
+     */
+    public void addLateJoiner(Player player, fr.lolmc.team.TeamManager.Team team) {
+        participants.add(player.getUniqueId());
+        participantTeam.put(player.getUniqueId(), team);
+        if (timerBar != null) player.showBossBar(timerBar);
+        var mm = LolPlugin.getInstance().getMinimapManager();
+        if (mm != null) mm.giveMinimap(player);
+    }
+
     /** Ce joueur fait-il partie de la partie en cours ? (pour la reconnexion) */
     public boolean isParticipant(UUID id) { return participants.contains(id); }
     public fr.lolmc.team.TeamManager.Team getParticipantTeam(UUID id) { return participantTeam.get(id); }

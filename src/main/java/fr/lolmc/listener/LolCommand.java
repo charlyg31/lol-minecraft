@@ -63,6 +63,11 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
             String sub = args.length > 0 ? args[0].toLowerCase() : "help";
             boolean inGame = fr.lolmc.instance.InstanceHelper.gameManager(player).isGameRunning()
                     && LolPlugin.getInstance().getChampionManager().hasChampion(player);
+            String playerPerm = playerPermission(sub);
+            if (playerPerm != null && !player.hasPermission(playerPerm)) {
+                player.sendMessage(Component.text("❌ Permission requise : " + playerPerm, NamedTextColor.RED));
+                return true;
+            }
 
             switch (sub) {
                 case "runes" ->
@@ -114,25 +119,19 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
         }
 
         // /lola → commandes admin uniquement
-        if (!player.hasPermission("lolmc.admin") && !player.hasPermission("lolmc.admin.config")
-                && !player.hasPermission("lolmc.admin.test") && !player.isOp()) {
+        if (!hasAnyAdmin(player)) {
             player.sendMessage(Component.text("❌ Permission requise.", NamedTextColor.RED));
             return true;
         }
 
-        if (args.length == 0) { sendHelp(player); return true; }
+        if (args.length == 0) { handleAdminHelp(player); return true; }
 
-        // Permission fine par sous-commande : lolmc.admin donne tout (enfants), sinon
-        // lolmc.admin.config (carte) ou lolmc.admin.test (tests) séparément.
-        String requiredPerm = switch (args[0].toLowerCase()) {
-            case "set", "position", "center", "lane", "schem", "road", "jungle", "baronpit", "shopnpc", "mode",
-                 "pos1", "pos2", "save" -> "lolmc.admin.config";
-            case "solo", "give", "level", "gold", "team", "testgame", "debug", "spawn", "buff",
-                 "resetcd", "hp", "wave" -> "lolmc.admin.test";
-            default -> "lolmc.admin";
-        };
-        if (!player.isOp() && !player.hasPermission(requiredPerm)) {
-            player.sendMessage(Component.text("❌ Permission requise : " + requiredPerm, NamedTextColor.RED));
+        // Permission par sous-commande : lolmc.admin.<commande> (ex. lolmc.admin.join), donnée aussi
+        // par son groupe (lolmc.admin.config / .test / .game) et par lolmc.admin.* (tout)
+        String adminSub = canonicalAdminSub(args[0].toLowerCase());
+        if (ADMIN_GROUPS.containsKey(adminSub) && !canUseAdmin(player, adminSub)) {
+            player.sendMessage(Component.text("❌ Permission requise : lolmc.admin." + adminSub
+                    + " (ou lolmc.admin." + ADMIN_GROUPS.get(adminSub) + ", lolmc.admin.*)", NamedTextColor.RED));
             return true;
         }
 
@@ -165,6 +164,8 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
             case "gold" -> handleGold(player, args);
             case "team" -> handleTeamCmd(player, args);
             case "testgame" -> handleTestGame(player);
+            case "rejoindre", "join" -> fr.lolmc.game.JoinInProgress.join(player,
+                    args.length > 1 ? args[1] : null, args.length > 2 ? args[2] : null);
             case "debug" -> handleDebug(player, args);
             case "spawn"   -> handleSpawn(player, args);
             case "buff"    -> handleBuff(player, args);
@@ -190,9 +191,7 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
                 }
                 // Recharger les skins
                 LolPlugin.getInstance().getSkinManager().reload();
-                // Recharger l'échelle des portées AA
-                LolPlugin.getInstance().applyAAScaleFromConfig();
-                player.sendMessage(Component.text("✔ Config, équilibrage, fog, skins et portées rechargés.", NamedTextColor.GREEN));
+                player.sendMessage(Component.text("✔ Config, équilibrage, fog et skins rechargés.", NamedTextColor.GREEN));
             }
             case "permcheck" -> {
                 // Diagnostic : les permissions de skins déclarées dans le code
@@ -248,7 +247,7 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
                 }
                 player.sendMessage(Component.text("⏹ Partie arrêtée.", NamedTextColor.YELLOW));
             }
-            default -> sendHelp(player);
+            default -> handleAdminHelp(player);
         }
         return true;
     }
@@ -836,21 +835,84 @@ private void handleSolo(Player player, String[] args) {
         };
     }
 
-    private void sendHelp(Player p) {
-        p.sendMessage(Component.text("═══ Configuration LoL ═══", NamedTextColor.GOLD));
-        p.sendMessage(Component.text("/lola set turret <blue|red> <top|mid|bot|base> <index>", NamedTextColor.AQUA));
-        p.sendMessage(Component.text("/lola set nexus <blue|red> <top|mid|bot> <index>", NamedTextColor.AQUA));
-        p.sendMessage(Component.text("/lola set basenexus <blue|red>", NamedTextColor.AQUA));
-        p.sendMessage(Component.text("/lola position <blue|red> <1-5>", NamedTextColor.AQUA));
-        p.sendMessage(Component.text("/lola lane <top|mid|bot> ... /lola lane done", NamedTextColor.AQUA));
-        p.sendMessage(Component.text("/lola schem <pos1|pos2|save>", NamedTextColor.YELLOW)); // AJOUT : Aide textuelle
-        p.sendMessage(Component.text("/lola baronpit <territorial|omniscient> <start|save|preview|clear>", NamedTextColor.YELLOW));
-        p.sendMessage(Component.text("/lola start | /lola stop", NamedTextColor.AQUA));
+    // ── Permissions ───────────────────────────────────────────────────
+    /** Sous-commandes de /lola → groupe (lolmc.admin.<groupe>). Permission : lolmc.admin.<sous-commande>. */
+    static final Map<String, String> ADMIN_GROUPS = new java.util.LinkedHashMap<>();
+    static {
+        for (String s : List.of("set", "position", "center", "lane", "schem", "road", "jungle", "baronpit",
+                "shopnpc", "mode", "template")) ADMIN_GROUPS.put(s, "config");
+        for (String s : List.of("solo", "testgame", "give", "level", "gold", "hp", "resetcd", "buff", "spawn",
+                "wave", "team", "debug")) ADMIN_GROUPS.put(s, "test");
+        for (String s : List.of("start", "stop", "select", "join", "instance", "reload", "permcheck"))
+            ADMIN_GROUPS.put(s, "game");
+    }
+
+    static String canonicalAdminSub(String sub) {
+        return switch (sub) {
+            case "rejoindre" -> "join";
+            case "instances" -> "instance";
+            default -> sub;
+        };
+    }
+
+    static boolean canUseAdmin(Player p, String sub) {
+        return p.isOp() || p.hasPermission("lolmc.admin." + canonicalAdminSub(sub));
+    }
+
+    /** Au moins une commande /lola autorisée. */
+    static boolean hasAnyAdmin(Player p) {
+        if (p.isOp()) return true;
+        for (String s : ADMIN_GROUPS.keySet()) if (p.hasPermission("lolmc.admin." + s)) return true;
+        return false;
+    }
+
+    /** Permission d'une sous-commande de /l (null = aucune). */
+    private static String playerPermission(String sub) {
+        return switch (sub) {
+            case "runes" -> "lolmc.player.runes";
+            case "ping" -> "lolmc.player.ping";
+            case "ff", "forfait" -> "lolmc.player.ff";
+            case "stats" -> "lolmc.player.stats";
+            case "shop" -> "lolmc.player.shop";
+            case "grimoire", "spellbook" -> "lolmc.player.grimoire";
+            default -> null;
+        };
     }
 
     @Override
     public List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command cmd, @NotNull String alias, @NotNull String @NotNull [] args) {
-        if (args.length == 1) return List.of("set", "position", "lane", "schem", "road", "jungle", "baronpit", "shopnpc", "mode", "select", "solo", "give", "level", "gold", "team", "testgame", "debug", "reload", "start", "stop", "center", "instance", "template"); // MODIFICATION : Injecté "schem"
+        if (cmd.getName().equalsIgnoreCase("l")) {
+            if (args.length == 1) {
+                List<String> subs = new java.util.ArrayList<>();
+                for (String s : List.of("runes", "ping", "ff", "stats", "shop", "grimoire"))
+                    if (s.startsWith(args[0].toLowerCase()) && sender.hasPermission(playerPermission(s))) subs.add(s);
+                return subs;
+            }
+            if (args.length == 2 && args[0].equalsIgnoreCase("ping")) return List.of("danger", "omw", "miss", "assist", "enemy");
+            return List.of();
+        }
+        if (!(sender instanceof Player tp) || !hasAnyAdmin(tp)) return List.of();
+        if (args.length == 1) {
+            List<String> subs = new java.util.ArrayList<>();
+            for (String s : ADMIN_GROUPS.keySet())
+                if (canUseAdmin(tp, s) && s.startsWith(args[0].toLowerCase())) subs.add(s);
+            if ("help".startsWith(args[0].toLowerCase())) subs.add("help");
+            return subs;
+        }
+        if (!canUseAdmin(tp, args[0].toLowerCase())) return List.of();
+        if (args.length == 2 && (args[0].equalsIgnoreCase("rejoindre") || args[0].equalsIgnoreCase("join"))) {
+            List<String> ids = new java.util.ArrayList<>();
+            for (var c : LolPlugin.getInstance().getChampionManager().getAllChampions())
+                if (c.getId().startsWith(args[1].toLowerCase())) ids.add(c.getId());
+            return ids;
+        }
+        if (args.length == 3 && (args[0].equalsIgnoreCase("rejoindre") || args[0].equalsIgnoreCase("join"))) {
+            List<String> ids = new java.util.ArrayList<>();
+            var im = LolPlugin.getInstance().getInstanceManager();
+            if (im != null) for (var gi : im.getAllInstances())
+                if (gi.getState() == fr.lolmc.instance.GameInstance.State.RUNNING) ids.add(String.valueOf(gi.getId()));
+            return ids;
+        }
         if (args.length == 2) {
             return switch (args[0].toLowerCase()) {
                 case "template" -> List.of("save", "info");
@@ -1144,6 +1206,7 @@ private void handleSolo(Player player, String[] args) {
                 {"/lola start",                   "Lancer la partie"},
                 {"/lola stop",                    "Arrêter la partie"},
                 {"/lola testgame",                "Lancer une partie test"},
+                {"/lola join <champion> [instance]", "Rejoindre une partie en cours (alias rejoindre)"},
                 {"/lola debug on|off",            "Activer/désactiver le debug"},
                 {"/lola reload",                  "Recharger champions.yml"},
                 {"/lola set <turret|nexus|basenexus> ...", "Placer une structure"},
@@ -1161,6 +1224,8 @@ private void handleSolo(Player player, String[] args) {
                 {"/lola permcheck",                "Vérifier les permissions de skin vs plugin.yml"},
         };
         for (String[] cmd : cmds) {
+            String sub = canonicalAdminSub(cmd[0].split(" ")[1]);
+            if (!"help".equals(sub) && !canUseAdmin(player, sub)) continue;
             player.sendMessage(Component.text("§e" + cmd[0] + " §7— " + cmd[1]));
         }
     }}

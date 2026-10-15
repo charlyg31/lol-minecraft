@@ -2,7 +2,7 @@
 
 Plugin Paper qui recrée la Faille de l'invocateur dans Minecraft, **sans mod client** : 20 champions jouables, sbires, jungle, tourelles, brouillard de guerre, boutique, runes, sorts d'invocateur, file d'attente avec groupes et API web de statistiques.
 
-Les valeurs de jeu (stats, dégâts, timers, règles de ciblage) suivent le wiki officiel de League of Legends, **patch 26**.
+Les valeurs de jeu (stats, dégâts, délais, coûts, portées, vitesses de projectiles, règles de ciblage) sont alignées sur les données du jeu du **patch 26.20** : Data Dragon 16.20.1, fichiers de CommunityDragon et wiki officiel de League of Legends. Les portées et vitesses de projectiles viennent des missiles du jeu (CommunityDragon) ; 100 unités LoL = 1 bloc.
 
 > **Stack :** Paper 26.3 · Java 25 · Maven · BungeeCord (optionnel)
 
@@ -93,14 +93,15 @@ Les monstres dorment jusqu'au premier coup, puis tout le camp attaque le champio
 - Brouillard de guerre : champions, sbires, tourelles et wards donnent la vision de leur équipe.
 - Buissons : un champion dedans est invisible pour les ennemis, sauf si ceux-ci ont un champion ou une ward dans le même buisson.
 - Attaquer ou lancer un sort **révèle 2 s**, même depuis un buisson, si un champion ou un sbire ennemi est à 10 blocs ou moins (les monstres de la jungle ne comptent pas).
-- Wards furtives, de contrôle et lointaines.
+- **Reliques** (une à la fois, à charges, recharge selon le niveau moyen des champions) : Balise camouflée (2 charges, 210 → 90 s, donnée au départ), Brouilleur oraculaire (2 charges, 160 → 100 s ; drone de 8 s qui révèle et neutralise les balises ennemies), Altération divinatoire (dès le niveau 9 ; 198 → 99 s, vision 500 puis 800 et autodestruction 3 s après avoir repéré un champion).
+- Balises de contrôle (2 max).
 
 ### Autres systèmes
 
 - **Dégâts** : armure/RM, pénétration plate et en %, boucliers, réduction de soins, vrais dégâts, critiques, vol de vie, omnivamp.
 - **Contrôles** : étourdissement, immobilisation, silence, ralentissement, projection, avec ténacité.
 - **Économie** : or passif, or des sbires, primes de série, assistances, plaques.
-- **Runes** : les 5 voies complètes, keystones et runes mineures.
+- **Runes** : les 5 voies complètes, keystones et runes mineures (Grimoire déchaîné via `/l grimoire`).
 - **Objets** : catalogue complet avec passifs et actifs, élixirs dès le niveau 9 ; boutique à la fontaine, hotbar à deux pages.
 - **Sorts d'invocateur** : Flash, Embrasement, Soin, Barrière, Fatigue, Téléportation, Châtiment, Purge, Fantôme.
 
@@ -125,9 +126,6 @@ world:
 
 bushes:
   blocks: [TALL_GRASS, LARGE_FERN, FERN, SWEET_BERRY_BUSH]   # blocs qui forment un buisson
-
-scale:
-  lol-units-per-block: 65        # conversion des portées de sorts (unités LoL → blocs)
 
 shop:
   base-only: true                # achat uniquement à la fontaine
@@ -161,6 +159,10 @@ api:
   key: ""                        # clé exigée dans l'en-tête X-Api-Key (vide = sans auth)
   cors-origin: "*"
 ```
+
+### Équilibrage — `plugins/LolMC/champions.yml`
+
+Facultatif. Les valeurs du jeu (délais, coûts par rang, dégâts, ratios) sont dans le code de chaque champion ; ce fichier ne sert qu'à les **surcharger** (une clé absente = valeur du code), rechargé par `/lola reload`. Il est livré vide (version 3) : au démarrage, une ancienne version qui dupliquait toutes les valeurs est sauvegardée en `champions.yml.v<ancienne version>.bak` puis remplacée.
 
 Le bloc `heads:` liste les 20 champions avec un champ `PASTE_VALUE_HERE` à remplacer par la valeur base64 d'une tête personnalisée (par exemple depuis minecraft-heads.com).
 
@@ -223,16 +225,19 @@ Avec `use-instances: true`, chaque match copie le monde template dans un monde i
 | `/team <bleu\|rouge\|auto>` · `/t <message>` | Équipe, chat d'équipe |
 | `/recall` | Retour à la base |
 | `/ping <danger\|omw\|missing\|assist\|enemy>` | Ping d'équipe |
-| `/l <runes\|ping\|ff\|stats>` | Raccourcis en partie (`ff` = vote d'abandon) |
+| `/l <runes\|ping\|ff\|stats\|shop>` | Raccourcis en partie (`ff` = vote d'abandon) |
+| `/l grimoire <sort possédé> <nouveau>` | Grimoire déchaîné : échanger un sort d'invocateur |
 
 ### Admin — `/lola` (alias `/lolAdmin`)
 
 | Catégorie | Sous-commandes |
 |-----------|----------------|
-| Partie | `start`, `stop`, `select`, `reload`, `help`, `permcheck` |
+| Partie | `start`, `stop`, `select`, `join <champion> [instance]` (alias `rejoindre`), `reload`, `help`, `permcheck` |
 | Carte (monde template) | `set`, `position`, `center`, `lane`, `schem`, `road`, `jungle`, `baronpit`, `shopnpc`, `mode`, `template [save]` |
 | Test (partie en cours) | `solo`, `testgame`, `give`, `level`, `gold`, `hp`, `resetcd`, `buff`, `spawn`, `wave`, `team`, `debug` |
 | Instances | `instance` (liste), `instance <n>`, `instance template` (téléportation) |
+
+**`/lola join` — rejoindre une partie en cours.** LoL ne le permet pas : les règles de rattrapage sont propres au plugin. Le joueur entre dans l'équipe la moins remplie (refus si 5 contre 5), dans la partie la moins remplie si plusieurs instances tournent (ou celle donnée en argument). Il arrive à la fontaine au niveau moyen des participants (arrondi à l'inférieur, points de compétence à répartir), avec 500 PO plus l'or passif écoulé depuis 1:50, sa page de runes, Saut éclair + Embrasement (Châtiment pour un jungler) et la Balise camouflée. Il devient participant à part entière (reconnexion, statistiques, fin de partie). Un joueur déjà dans la partie se reconnecte simplement ; la commande est refusée pendant la sélection des champions.
 
 ### Proxy — `/lol`, `/lols`, `/lolr`
 
@@ -253,22 +258,29 @@ Rôles : `top`, `jungle`, `mid`, `adc`, `support`. En groupe, chaque membre choi
 
 ## Permissions
 
-Déclarées dans `plugin.yml`, compatibles **LuckPerms**. Sans plugin de permissions : tout le monde joue, seuls les opérateurs administrent.
+Déclarées dans `plugin.yml`, compatibles **LuckPerms**. Chaque famille a un joker `.*` qui donne tout, et chaque commande sa propre permission. Sans plugin de permissions, les opérateurs ont tout et les autres joueurs ont les commandes joueur, mais aucun champion (sauf la rotation gratuite).
 
 ### Serveur de jeu
 
-| Permission | Défaut | Rôle |
-|------------|--------|------|
-| `lolmc.admin` | op | Tout `/lola` (inclut `.config` et `.test`) |
-| `lolmc.admin.config` | op | Configuration de la carte |
-| `lolmc.admin.test` | op | Commandes de test |
-| `lolmc.player` | true | Toutes les commandes joueur (`lolmc.player.<commande>`) |
-| `lolmc.champion.use` | true | Tous les champions |
-| `lolmc.champion.<id>` | true | Un champion : `garen`, `darius`, `malphite`, `nasus`, `warwick`, `amumu`, `masteryi`, `leesin`, `annie`, `veigar`, `zed`, `yasuo`, `morgana`, `leona`, `blitzcrank`, `janna`, `ashe`, `sivir`, `jinx`, `missfortune` |
-| `lolmc.skin` | false | Tous les skins |
-| `lolmc.skin.<champion>.<skin>` | false | Un skin, par ex. `lolmc.skin.jinx.arcane` |
+**Admin (`/lola`)** : `lolmc.admin.<commande>` pour une seule commande, `lolmc.admin.<groupe>` pour un groupe, `lolmc.admin.*` pour tout (défaut : op). `lolmc.admin` reste accepté comme ancien nom de `lolmc.admin.*`. L'aide et l'autocomplétion de `/lola` n'affichent que les commandes autorisées.
 
-Permissions joueur fines : `shop`, `team`, `party`, `queue`, `recall`, `ping`, `pick` (aussi `/champion`), `runes`, `spell`, `lock`, `roles`, `lobby`. `/lola permcheck` vérifie que chaque skin du code a sa permission déclarée.
+| Groupe | Commandes (`lolmc.admin.<commande>`) |
+|--------|--------------------------------------|
+| `lolmc.admin.game` | `start`, `stop`, `select`, `join` (aussi `/lola rejoindre`), `instance`, `reload`, `permcheck` |
+| `lolmc.admin.config` | `set`, `position`, `center`, `lane`, `schem`, `road`, `jungle`, `baronpit`, `shopnpc`, `mode`, `template` |
+| `lolmc.admin.test` | `solo`, `testgame`, `give`, `level`, `gold`, `hp`, `resetcd`, `buff`, `spawn`, `wave`, `team`, `debug` |
+
+`lolmc.admin.give` permet aussi de changer de champion pendant une partie ou une sélection.
+
+**Joueur** : `lolmc.player.<commande>`, toutes : `lolmc.player.*` (défaut : tout le monde ; `lolmc.player` = ancien nom). Commandes : `shop`, `team`, `party`, `queue`, `recall`, `ping`, `pick` (aussi `/champion`), `runes`, `spell`, `lock`, `roles`, `lobby`, et pour `/l` : `ff`, `stats`, `grimoire` (`/l runes`, `/l ping` et `/l shop` utilisent `runes`, `ping` et `shop`).
+
+**Champions** : il faut **posséder** un champion pour le jouer : `lolmc.champion.<id>`, tous : `lolmc.champion.*` (défaut : op ; `lolmc.champion.use` = ancien nom). Identifiants : `garen`, `darius`, `malphite`, `nasus`, `warwick`, `amumu`, `masteryi`, `leesin`, `annie`, `veigar`, `zed`, `yasuo`, `morgana`, `leona`, `blitzcrank`, `janna`, `ashe`, `sivir`, `jinx`, `missfortune`.
+- Les champions de la **rotation gratuite** (`champions.free-rotation` dans `config.yml`, vide par défaut) sont jouables par tout le monde.
+- Les champions non possédés apparaissent verrouillés (🔒) dans les menus et barrés dans `/champion list` ; la sélection automatique (fin du temps) ne choisit qu'un champion possédé.
+- Un joueur qui ne possède aucun champion ne peut pas entrer en file locale (`/queue`, `/roles`). Via le proxy, le contrôle n'a lieu qu'en sélection : s'il ne possède rien, il reçoit le premier champion de la rotation gratuite (ou, si elle est vide, Garen : la partie ne peut pas démarrer avec une place vide).
+- `/lola join` exige aussi de posséder le champion choisi.
+
+**Skins** : `lolmc.skin.<champion>.<skin>` (ex. `lolmc.skin.jinx.arcane`), tous : `lolmc.skin.*` (défaut : personne ; `lolmc.skin` = ancien nom). `/lola permcheck` vérifie que chaque skin du code a sa permission déclarée.
 
 ### Proxy
 
@@ -282,10 +294,12 @@ Permissions joueur fines : `shop`, `team`, `party`, `queue`, `recall`, `ping`, `
 ```
 /lpb group default permission set lolmc.play true      # proxy : file pour tous
 /lpb group admin permission set lolmc.admin true       # proxy : gestion du classé
-/lp group admin permission set lolmc.admin true        # jeu : admin complet
+/lp group admin permission set lolmc.admin.* true      # jeu : admin complet
 /lp group moderateur permission set lolmc.admin.test true
-/lp group vip permission set lolmc.skin true
-/lp group default permission set lolmc.champion.zed false
+/lp group animateur permission set lolmc.admin.join true   # seulement /lola join
+/lp group default permission set lolmc.champion.garen true # posséder Garen
+/lp user Pseudo permission set lolmc.champion.* true       # tous les champions
+/lp group vip permission set lolmc.skin.* true
 ```
 
 ---

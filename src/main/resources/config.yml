@@ -90,15 +90,14 @@ bushes:
     - SWEET_BERRY_BUSH
 
 # ═══════════════════════════════════════════════════════
-# ÉCHELLE — conversion unités LoL → blocs Minecraft
+# CHAMPIONS
 # ═══════════════════════════════════════════════════════
-# Toutes les portées AA des champions sont définies en unités LoL
-# et converties automatiquement au démarrage.
-# 1 bloc Minecraft = X unités LoL
-# Valeur recommandée : 65 (défaut). Ajuster si les portées semblent
-# trop grandes (augmenter) ou trop petites (diminuer) en jeu.
-scale:
-  lol-units-per-block: 65
+# Un joueur ne joue que les champions qu'il possède (permission lolmc.champion.<id>,
+# ou lolmc.champion.* pour tous ; les opérateurs les ont tous).
+# Rotation gratuite (comme dans LoL) : champions jouables par tout le monde, sans permission.
+# Exemple : free-rotation: [garen, annie, ashe, warwick, morgana]
+champions:
+  free-rotation: []
 
 # ═══════════════════════════════════════════════════════
 # COMBAT

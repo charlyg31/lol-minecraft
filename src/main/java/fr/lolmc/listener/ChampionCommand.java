@@ -49,11 +49,11 @@ public class ChampionCommand implements CommandExecutor, TabCompleter {
                 boolean locked = (fr.lolmc.instance.InstanceHelper.gameManager(player).isGameRunning()
                         && manager.hasChampion(player))
                         || fr.lolmc.LolPlugin.getInstance().getChampSelectManager().isParticipant(player.getUniqueId());
-                if (locked && !player.hasPermission("lolmc.admin.test")) {
+                if (locked && !player.hasPermission("lolmc.admin.give")) {
                     player.sendMessage("§c❌ Impossible de changer de champion pendant une partie ou une sélection.");
                     return true;
                 }
-                if (!player.hasPermission("lolmc.champion." + args[1].toLowerCase())) {
+                if (!fr.lolmc.champion.ChampionAccess.canPlay(player, args[1])) {
                     player.sendMessage("§c❌ Tu n'as pas accès à ce champion.");
                     return true;
                 }
@@ -104,7 +104,12 @@ public class ChampionCommand implements CommandExecutor, TabCompleter {
             List<BaseChampion> champs = manager.getChampionsByRole(role);
             StringBuilder names = new StringBuilder();
             for (BaseChampion c : champs) {
-                names.append(c.getDisplayName()).append(", ");
+                // Non possédés en gris barré, rotation gratuite marquée
+                String id = c.getId();
+                if (fr.lolmc.champion.ChampionAccess.owns(player, id)) names.append(c.getDisplayName());
+                else if (fr.lolmc.champion.ChampionAccess.isFreeRotation(id)) names.append(c.getDisplayName()).append(" (gratuit)");
+                else names.append("§8§m").append(c.getDisplayName()).append("§r");
+                names.append(", ");
             }
             if (names.length() > 2) names.setLength(names.length() - 2);
 
@@ -153,7 +158,8 @@ public class ChampionCommand implements CommandExecutor, TabCompleter {
         } else if (args.length == 2) {
             if (args[0].equalsIgnoreCase("pick")) {
                 for (BaseChampion c : manager.getAllChampions()) {
-                    completions.add(c.getId());
+                    if (!(sender instanceof Player sp) || fr.lolmc.champion.ChampionAccess.canPlay(sp, c.getId()))
+                        completions.add(c.getId());
                 }
             } else if (args[0].equalsIgnoreCase("list")) {
                 for (BaseChampion.ChampionRole r : BaseChampion.ChampionRole.values()) {

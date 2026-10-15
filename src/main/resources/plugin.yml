@@ -8,12 +8,10 @@ commands:
   l:
     description: Commandes joueur LoL (en partie)
     usage: /l <runes|ping|ff|stats|shop|grimoire>
-    permission: lolmc.player
   lola:
     description: Commandes admin LoL
-    usage: /lola <start|stop|instance|template|set|position|lane|solo|give|level|gold|hp|resetcd|buff|spawn|wave|select|reload|debug|testgame|schem|road|jungle|shopnpc|mode|team|help>
+    usage: /lola <start|stop|select|join|instance|reload|permcheck|set|position|center|lane|schem|road|jungle|baronpit|shopnpc|mode|template|solo|testgame|give|level|gold|hp|resetcd|buff|spawn|wave|team|debug|help>
     aliases: [lolAdmin]
-    permission: lolmc.admin
 
   # ── Raccourcis joueur (mêmes fonctions que /l, plus le chat d'équipe) ──
   team:
@@ -67,20 +65,94 @@ commands:
     permission: lolmc.player.roles
 
 permissions:
-  lolmc.admin:
-    description: Accès à toutes les commandes admin
+  # ── Admin : lolmc.admin.<commande> (ex. lolmc.admin.join), groupes .config / .test / .game, tout : lolmc.admin.* ──
+  lolmc.admin.*:
+    description: Toutes les commandes admin (/lola)
     default: op
     children:
       lolmc.admin.config: true
       lolmc.admin.test: true
-  lolmc.admin.config:
-    description: Configurer la carte
+      lolmc.admin.game: true
+  lolmc.admin:
+    description: Ancien nom de lolmc.admin.* (toutes les commandes admin)
     default: op
+    children:
+      lolmc.admin.*: true
+  lolmc.admin.config:
+    description: Configurer la carte (monde template)
+    default: op
+    children:
+      lolmc.admin.set: true
+      lolmc.admin.position: true
+      lolmc.admin.center: true
+      lolmc.admin.lane: true
+      lolmc.admin.schem: true
+      lolmc.admin.road: true
+      lolmc.admin.jungle: true
+      lolmc.admin.baronpit: true
+      lolmc.admin.shopnpc: true
+      lolmc.admin.mode: true
+      lolmc.admin.template: true
   lolmc.admin.test:
     description: Commandes de test
     default: op
+    children:
+      lolmc.admin.solo: true
+      lolmc.admin.testgame: true
+      lolmc.admin.give: true
+      lolmc.admin.level: true
+      lolmc.admin.gold: true
+      lolmc.admin.hp: true
+      lolmc.admin.resetcd: true
+      lolmc.admin.buff: true
+      lolmc.admin.spawn: true
+      lolmc.admin.wave: true
+      lolmc.admin.team: true
+      lolmc.admin.debug: true
+  lolmc.admin.game:
+    description: Gérer les parties
+    default: op
+    children:
+      lolmc.admin.start: true
+      lolmc.admin.stop: true
+      lolmc.admin.select: true
+      lolmc.admin.join: true
+      lolmc.admin.instance: true
+      lolmc.admin.reload: true
+      lolmc.admin.permcheck: true
+  lolmc.admin.set:       {description: "/lola set — Placer les structures", default: op}
+  lolmc.admin.position:  {description: "/lola position — Points d'apparition", default: op}
+  lolmc.admin.center:    {description: "/lola center — Centre de la minimap", default: op}
+  lolmc.admin.lane:      {description: "/lola lane — Tracer une lane", default: op}
+  lolmc.admin.schem:     {description: "/lola schem — Schématiques", default: op}
+  lolmc.admin.road:      {description: "/lola road — Routes des sbires", default: op}
+  lolmc.admin.jungle:    {description: "/lola jungle — Camps de jungle", default: op}
+  lolmc.admin.baronpit:  {description: "/lola baronpit — Formes de la fosse du Baron", default: op}
+  lolmc.admin.shopnpc:   {description: "/lola shopnpc — PNJ boutique", default: op}
+  lolmc.admin.mode:      {description: "/lola mode — Mode de partie", default: op}
+  lolmc.admin.template:  {description: "/lola template — Monde template", default: op}
+  lolmc.admin.solo:      {description: "/lola solo — Mode test solo", default: op}
+  lolmc.admin.testgame:  {description: "/lola testgame — Partie test", default: op}
+  lolmc.admin.give:      {description: "/lola give — Assigner un champion (et en changer en partie)", default: op}
+  lolmc.admin.level:     {description: "/lola level — Changer de niveau", default: op}
+  lolmc.admin.gold:      {description: "/lola gold — Ajouter de l'or", default: op}
+  lolmc.admin.hp:        {description: "/lola hp — Modifier les PV", default: op}
+  lolmc.admin.resetcd:   {description: "/lola resetcd — Réinitialiser les délais", default: op}
+  lolmc.admin.buff:      {description: "/lola buff — Appliquer un buff", default: op}
+  lolmc.admin.spawn:     {description: "/lola spawn — Faire apparaître une entité", default: op}
+  lolmc.admin.wave:      {description: "/lola wave — Forcer une vague", default: op}
+  lolmc.admin.team:      {description: "/lola team — Changer d'équipe", default: op}
+  lolmc.admin.debug:     {description: "/lola debug — Mode debug", default: op}
+  lolmc.admin.start:     {description: "/lola start — Lancer la partie", default: op}
+  lolmc.admin.stop:      {description: "/lola stop — Arrêter la partie", default: op}
+  lolmc.admin.select:    {description: "/lola select — Lancer la sélection des champions", default: op}
+  lolmc.admin.join:      {description: "/lola join — Rejoindre une partie en cours", default: op}
+  lolmc.admin.instance:  {description: "/lola instance — Lister / rejoindre une instance", default: op}
+  lolmc.admin.reload:    {description: "/lola reload — Recharger la config", default: op}
+  lolmc.admin.permcheck: {description: "/lola permcheck — Vérifier les permissions de skins", default: op}
 
-  lolmc.player:
+  # ── Joueur : lolmc.player.<commande>, tout : lolmc.player.* ──
+  lolmc.player.*:
     description: Toutes les commandes joueur
     default: true
     children:
@@ -96,22 +168,35 @@ permissions:
       lolmc.player.lock: true
       lolmc.player.roles: true
       lolmc.player.lobby: true
-  lolmc.player.shop:    {description: Ouvrir la boutique,          default: true}
-  lolmc.player.team:    {description: Rejoindre une équipe,         default: true}
-  lolmc.player.party:   {description: Gérer son groupe,             default: true}
-  lolmc.player.queue:   {description: Rejoindre la file,            default: true}
-  lolmc.player.recall:  {description: Utiliser le recall,           default: true}
-  lolmc.player.ping:    {description: Envoyer des pings,            default: true}
-  lolmc.player.pick:    {description: Choisir un champion,          default: true}
-  lolmc.player.runes:   {description: Configurer ses runes,         default: true}
-  lolmc.player.spell:   {description: Choisir ses sorts,            default: true}
-  lolmc.player.lock:    {description: Verrouiller sa sélection,     default: true}
-  lolmc.player.roles:   {description: Choisir ses rôles,            default: true}
-  lolmc.player.lobby:   {description: Ouvrir le menu de préparation,default: true}
-
-  lolmc.champion.use:
-    description: Jouer tous les champions
+      lolmc.player.ff: true
+      lolmc.player.stats: true
+      lolmc.player.grimoire: true
+  lolmc.player:
+    description: Ancien nom de lolmc.player.*
     default: true
+    children:
+      lolmc.player.*: true
+  lolmc.player.shop:     {description: "Ouvrir la boutique", default: true}
+  lolmc.player.team:     {description: "Rejoindre une équipe", default: true}
+  lolmc.player.party:    {description: "Gérer son groupe", default: true}
+  lolmc.player.queue:    {description: "Rejoindre la file", default: true}
+  lolmc.player.recall:   {description: "Utiliser le recall", default: true}
+  lolmc.player.ping:     {description: "Envoyer des pings", default: true}
+  lolmc.player.pick:     {description: "Choisir un champion", default: true}
+  lolmc.player.runes:    {description: "Configurer ses runes", default: true}
+  lolmc.player.spell:    {description: "Choisir ses sorts", default: true}
+  lolmc.player.lock:     {description: "Verrouiller sa sélection", default: true}
+  lolmc.player.roles:    {description: "Choisir ses rôles", default: true}
+  lolmc.player.lobby:    {description: "Ouvrir le menu de préparation", default: true}
+  lolmc.player.ff:       {description: "Voter l'abandon (/l ff)", default: true}
+  lolmc.player.stats:    {description: "Statistiques de la partie (/l stats)", default: true}
+  lolmc.player.grimoire: {description: "Grimoire déchaîné (/l grimoire)", default: true}
+
+  # ── Champions : il faut POSSÉDER un champion pour le jouer : lolmc.champion.<id>, tous : lolmc.champion.* ──
+  # (les opérateurs les ont tous ; rotation gratuite pour tout le monde : champions.free-rotation dans config.yml)
+  lolmc.champion.*:
+    description: Posséder tous les champions
+    default: op
     children:
       lolmc.champion.garen: true
       lolmc.champion.darius: true
@@ -133,30 +218,40 @@ permissions:
       lolmc.champion.sivir: true
       lolmc.champion.jinx: true
       lolmc.champion.missfortune: true
-  lolmc.champion.garen:       {description: Jouer Garen,        default: true}
-  lolmc.champion.darius:      {description: Jouer Darius,       default: true}
-  lolmc.champion.malphite:    {description: Jouer Malphite,     default: true}
-  lolmc.champion.nasus:       {description: Jouer Nasus,        default: true}
-  lolmc.champion.warwick:     {description: Jouer Warwick,      default: true}
-  lolmc.champion.amumu:       {description: Jouer Amumu,        default: true}
-  lolmc.champion.masteryi:    {description: Jouer Master Yi,    default: true}
-  lolmc.champion.leesin:      {description: Jouer Lee Sin,      default: true}
-  lolmc.champion.annie:       {description: Jouer Annie,        default: true}
-  lolmc.champion.veigar:      {description: Jouer Veigar,       default: true}
-  lolmc.champion.zed:         {description: Jouer Zed,          default: true}
-  lolmc.champion.yasuo:       {description: Jouer Yasuo,        default: true}
-  lolmc.champion.morgana:     {description: Jouer Morgana,      default: true}
-  lolmc.champion.leona:       {description: Jouer Leona,        default: true}
-  lolmc.champion.blitzcrank:  {description: Jouer Blitzcrank,   default: true}
-  lolmc.champion.janna:       {description: Jouer Janna,        default: true}
-  lolmc.champion.ashe:        {description: Jouer Ashe,         default: true}
-  lolmc.champion.sivir:       {description: Jouer Sivir,        default: true}
-  lolmc.champion.jinx:        {description: Jouer Jinx,         default: true}
-  lolmc.champion.missfortune: {description: Jouer Miss Fortune, default: true}
+  lolmc.champion.use:
+    description: Ancien nom de lolmc.champion.*
+    default: op
+    children:
+      lolmc.champion.*: true
+  lolmc.champion.garen:       {description: "Posséder Garen", default: op}
+  lolmc.champion.darius:      {description: "Posséder Darius", default: op}
+  lolmc.champion.malphite:    {description: "Posséder Malphite", default: op}
+  lolmc.champion.nasus:       {description: "Posséder Nasus", default: op}
+  lolmc.champion.warwick:     {description: "Posséder Warwick", default: op}
+  lolmc.champion.amumu:       {description: "Posséder Amumu", default: op}
+  lolmc.champion.masteryi:    {description: "Posséder Master Yi", default: op}
+  lolmc.champion.leesin:      {description: "Posséder Lee Sin", default: op}
+  lolmc.champion.annie:       {description: "Posséder Annie", default: op}
+  lolmc.champion.veigar:      {description: "Posséder Veigar", default: op}
+  lolmc.champion.zed:         {description: "Posséder Zed", default: op}
+  lolmc.champion.yasuo:       {description: "Posséder Yasuo", default: op}
+  lolmc.champion.morgana:     {description: "Posséder Morgana", default: op}
+  lolmc.champion.leona:       {description: "Posséder Leona", default: op}
+  lolmc.champion.blitzcrank:  {description: "Posséder Blitzcrank", default: op}
+  lolmc.champion.janna:       {description: "Posséder Janna", default: op}
+  lolmc.champion.ashe:        {description: "Posséder Ashe", default: op}
+  lolmc.champion.sivir:       {description: "Posséder Sivir", default: op}
+  lolmc.champion.jinx:        {description: "Posséder Jinx", default: op}
+  lolmc.champion.missfortune: {description: "Posséder Miss Fortune", default: op}
 
   # ── Skins de champions ─────────────────────────────────────────────
   lolmc.skin:
-    description: Accès à tous les skins (donne tous les skins)
+    description: Ancien nom de lolmc.skin.*
+    default: false
+    children:
+      lolmc.skin.*: true
+  lolmc.skin.*:
+    description: Tous les skins
     default: false
     children:
       lolmc.skin.garen.steel_legion: true

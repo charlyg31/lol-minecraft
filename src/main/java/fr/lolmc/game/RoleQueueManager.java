@@ -62,6 +62,10 @@ public class RoleQueueManager {
     // ══════════════════════════════════════════════════════════════
 
     public boolean joinQueue(Player player) {
+        if (!fr.lolmc.champion.ChampionAccess.canPlayAny(player)) {
+            player.sendMessage(Component.text("❌ Tu ne possèdes aucun champion.", NamedTextColor.RED));
+            return false;
+        }
         Set<Role> roles = getPreferredRoles(player.getUniqueId());
         if (roles.size() < 2) {
             player.sendMessage(Component.text(

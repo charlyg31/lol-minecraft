@@ -55,13 +55,13 @@ public class GUIListener implements Listener {
         boolean locked = (fr.lolmc.instance.InstanceHelper.gameManager(player).isGameRunning()
                 && manager.hasChampion(player))
                 || LolPlugin.getInstance().getChampSelectManager().isParticipant(player.getUniqueId());
-        if (locked && !player.hasPermission("lolmc.admin.test")) {
+        if (locked && !player.hasPermission("lolmc.admin.give")) {
             player.closeInventory();
             player.sendMessage(Component.text(
                 "❌ Impossible de changer de champion pendant une partie ou une sélection.", NamedTextColor.RED));
             return;
         }
-        if (!player.hasPermission("lolmc.champion." + champId.toLowerCase())) {
+        if (!fr.lolmc.champion.ChampionAccess.canPlay(player, champId)) {
             player.sendMessage(Component.text("❌ Tu n'as pas accès à ce champion.", NamedTextColor.RED));
             return;
         }

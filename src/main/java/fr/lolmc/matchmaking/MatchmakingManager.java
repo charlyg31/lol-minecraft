@@ -63,6 +63,15 @@ public class MatchmakingManager {
             group = new ArrayList<>(List.of(player.getUniqueId()));
         }
 
+        // Chaque membre doit posséder au moins un champion
+        for (UUID id : group) {
+            Player m = Bukkit.getPlayer(id);
+            if (m != null && !fr.lolmc.champion.ChampionAccess.canPlayAny(m)) {
+                player.sendMessage(Component.text("❌ " + m.getName() + " ne possède aucun champion.", NamedTextColor.RED));
+                return;
+            }
+        }
+
         // Vérifier qu'aucun membre n'est déjà en file
         for (UUID id : group) {
             if (inQueue.contains(id)) {
