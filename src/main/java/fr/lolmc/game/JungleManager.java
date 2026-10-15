@@ -330,7 +330,20 @@ public class JungleManager {
      * @param location position de spawn
      */
     public void setCamp(MonsterType type, Team team, Location location) {
+        setCamp(type, team, 0, location);
+    }
+
+    /** {@code river} : crabe de la rivière du haut (1) ou du bas (2) ; 0 pour les autres camps. */
+    public void setCamp(MonsterType type, Team team, int river, Location location) {
         String id = campId(type, team);
+        // Deux crabes dans LoL (avant : un seul emplacement, le second écrasait le premier)
+        if (type == MonsterType.SCUTTLE_CRAB && river > 0) {
+            id += river == 1 ? "_top" : "_bot";
+            if (config.contains("camps." + campId(type, team))) { // ancien emplacement unique
+                config.set("camps." + campId(type, team), null);
+                camps.remove(campId(type, team));
+            }
+        }
         camps.put(id, new CampSpawn(id, type, location.clone()));
         // Persister
         String path = "camps." + id + ".";
@@ -343,8 +356,8 @@ public class JungleManager {
     }
 
     private String campId(MonsterType type, Team team) {
-        // Les épiques (dragons/Baron/Héraut) et le crabe sont neutres → pas d'équipe
-        if (type.isEpic() || type == MonsterType.SCUTTLE_CRAB) {
+        // Les épiques (dragons/Baron/Héraut), les larves et le crabe sont neutres → pas d'équipe
+        if (type.isEpic() || type == MonsterType.SCUTTLE_CRAB || type == MonsterType.VOIDGRUB) {
             return type.name().toLowerCase();
         }
         return type.name().toLowerCase() + "_" + (team != null ? team.name().toLowerCase() : "neutral");
@@ -461,6 +474,9 @@ public class JungleManager {
                     : type.displayName;
             mob.customName(Component.text(name));
             mob.setCustomNameVisible(true);
+            if (isLarge && type.groupCount > 1)
+                mob.getPersistentDataContainer().set(new NamespacedKey(LolPlugin.getInstance(), "camp_large"),
+                    PersistentDataType.BYTE, (byte) 1);
             if (type == MonsterType.KRUG)
                 mob.getPersistentDataContainer().set(
                     new NamespacedKey(LolPlugin.getInstance(), isLarge ? "krug_large" : "krug_medium"),
@@ -518,10 +534,10 @@ public class JungleManager {
     }
 
     /** Mini-krug issu de la division d'un Krug (un niveau sous lui, wiki). */
-    private void spawnKrugMini(CampSpawn camp, Location loc) {
+    private LivingEntity spawnKrugMini(CampSpawn camp, Location loc) {
         MonsterType type = MonsterType.KRUG;
         Entity entity = loc.getWorld().spawnEntity(loc, type.entity);
-        if (!(entity instanceof LivingEntity mob)) { entity.remove(); return; }
+        if (!(entity instanceof LivingEntity mob)) { entity.remove(); return null; }
         mob.customName(Component.text(type.displayName + " (Mini)"));
         mob.setCustomNameVisible(true);
         mob.setRemoveWhenFarAway(false);
@@ -537,8 +553,10 @@ public class JungleManager {
         MobModel model = modelFor(type, false);
         if (model != null) monsterDeco.put(mob.getUniqueId(), model.spawnOn(mob));
         camp.liveEntities.add(mob.getUniqueId());
+        liveMonsters.put(mob.getUniqueId(), type);
         fr.lolmc.util.VisualEffectUtil.impactBurst(loc.getWorld(),
             loc.clone().add(0, 0.5, 0), Material.STONE, 0.25f, 0.3, 5, 6L);
+        return mob;
     }
 
     /**
@@ -629,8 +647,28 @@ public class JungleManager {
                       : kpdc.has(new NamespacedKey(LolPlugin.getInstance(), "krug_medium"), PersistentDataType.BYTE) ? 2 : 0;
             for (int i = 0; i < minis; i++) {
                 double a = 2 * Math.PI * i / minis;
-                spawnKrugMini(camp, deathLoc.clone().add(Math.cos(a) * 0.8, 0, Math.sin(a) * 0.8));
+                LivingEntity mini = spawnKrugMini(camp, deathLoc.clone().add(Math.cos(a) * 0.8, 0, Math.sin(a) * 0.8));
+                // Les mini-krugs naissent en combat (avant : ils attendaient d'être frappés)
+                if (mini != null && killer != null) MonsterAbilities.onDamaged(mini, killer);
             }
+        }
+
+        // Loups et raptors : les petits monstres meurent 10 s après leur grand monstre (wiki)
+        if ((type == MonsterType.MURKWOLF || type == MonsterType.RAPTOR) && camp != null && deadEnt != null
+                && deadEnt.getPersistentDataContainer().has(new NamespacedKey(LolPlugin.getInstance(), "camp_large"),
+                        PersistentDataType.BYTE)
+                && !camp.liveEntities.isEmpty()) {
+            final Set<UUID> marked = new HashSet<>(camp.liveEntities);
+            final CampSpawn fc = camp;
+            new BukkitRunnable() {
+                @Override public void run() {
+                    for (UUID id : marked) {
+                        if (!fc.liveEntities.contains(id)) continue;
+                        if (Bukkit.getEntity(id) instanceof LivingEntity le && !le.isDead())
+                            fr.lolmc.util.VirtualHP.kill(le, null);
+                    }
+                }
+            }.runTaskLater(LolPlugin.getInstance(), 200L);
         }
 
         // ── Scuttle : shrine de vision + vitesse 60s pour l'équipe du tueur ──
@@ -691,14 +729,16 @@ public class JungleManager {
                             }
                         }
                     }
-                    if (type.isDragon()) {
+                    // Dragons élémentaires seulement : l'Ancien ne compte pas pour l'âme (avant : le
+                    // tuer redonnait l'âme et refaisait l'annonce)
+                    if (type.isDragon() && type != MonsterType.DRAGON_ELDER) {
                         var dtm = LolPlugin.getInstance().getTeamManager();
                         var dteam = dtm.getTeam(killer);
                         if (dteam != null) {
                             // Enregistrer le type de dragon si c'est le premier
                             dragonSoulType.putIfAbsent(dteam, type.buff.replace("drake_", ""));
                             int n = dragonsKilled.merge(dteam, 1, Integer::sum);
-                            if (n >= 4) {
+                            if (n == 4) {
                                 String soul = lockedDragonElement != null
                                     ? lockedDragonElement.buff.replace("drake_", "")
                                     : dragonSoulType.getOrDefault(dteam, "infernal");

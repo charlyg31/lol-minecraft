@@ -128,4 +128,14 @@ public final class VirtualHP {
         entity.setHealth(Compat.maxHealthOf(entity));
         HealthBar.update(entity, max, max);
     }
+
+    /** Rend {@code amount} PV à l'entité, sans dépasser son maximum (monstre qui rentre au camp). */
+    public static void heal(LivingEntity entity, double amount) {
+        if (entity.isDead() || !has(entity) || isDying(entity)) return;
+        double max = getMax(entity);
+        double cur = Math.min(max, getCurrent(entity) + Math.max(0, amount));
+        entity.getPersistentDataContainer().set(keyCur(), PersistentDataType.DOUBLE, cur);
+        entity.setHealth(Math.max(1.0, cur / max * Compat.maxHealthOf(entity)));
+        HealthBar.update(entity, cur, max);
+    }
 }

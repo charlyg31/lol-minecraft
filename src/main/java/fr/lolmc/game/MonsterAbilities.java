@@ -32,10 +32,11 @@ import java.util.*;
  *    (Bassin d'acide → Attraction → Jet d'acide → Tentacules)
  *  - Héraut : Force colossale, Charge, Balayage à 66 % et 33 % des PV, œil vulnérable dans le dos
  *
- * Combat de base (LoL) : un monstre ne fait rien tant qu'on ne l'a pas frappé. Frappé, tout
- * son camp se réveille et attaque le champion à sa vitesse d'attaque (mêlée, ou projectile pour
- * Gromp, les dragons et le Baron). Si le champion sort de la laisse du camp ou cesse de le
- * frapper, le monstre rentre et récupère tous ses PV.
+ * Combat de base (wiki) : un monstre ne fait rien tant qu'on ne l'a pas frappé. Frappé, tout
+ * son camp se réveille et attaque le champion le plus proche à portée de sa laisse, à sa vitesse
+ * d'attaque (mêlée, ou projectile pour Gromp, les dragons et le Baron). Patience : chaque
+ * changement de cible en coûte un point (6 au total) ; à zéro, sans cible dans la laisse ou sans
+ * coup reçu, il rentre au camp en récupérant 6 % de ses PV max par seconde, puis tous ses PV.
  */
 public class MonsterAbilities {
 
@@ -57,6 +58,9 @@ public class MonsterAbilities {
     private static final Map<UUID, Long> LAST_HURT = new java.util.concurrent.ConcurrentHashMap<>();
     private static final Map<UUID, Long> NEXT_ATTACK = new java.util.concurrent.ConcurrentHashMap<>();
     private static final Map<UUID, Long> RETURNING = new java.util.concurrent.ConcurrentHashMap<>();
+    /** Patience restante (changements de cible avant de rentrer, monstres non épiques). */
+    private static final Map<UUID, Integer> PATIENCE = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final int MAX_PATIENCE = 6;
     /** Distance max au camp avant que le monstre lâche sa cible (blocs). */
     private static final double LEASH = 9.0;
     /** Sans coup reçu pendant ce délai, le monstre abandonne et rentre (ms). */
@@ -74,7 +78,12 @@ public class MonsterAbilities {
     }
 
     private static void engage(LivingEntity mob, MonsterType type, Player attacker, long now) {
-        if (AGGRO.putIfAbsent(mob.getUniqueId(), attacker.getUniqueId()) == null && type.isDragon()) takingFlight(mob);
+        // Réveil : le monstre vise le champion le plus proche (wiki), pas forcément l'attaquant
+        Player first = nearestInLeash(mob, type);
+        if (AGGRO.putIfAbsent(mob.getUniqueId(), (first != null ? first : attacker).getUniqueId()) == null) {
+            PATIENCE.put(mob.getUniqueId(), MAX_PATIENCE);
+            if (type.isDragon()) takingFlight(mob);
+        }
         LAST_HURT.put(mob.getUniqueId(), now);
         RETURNING.remove(mob.getUniqueId());
         if (mob instanceof org.bukkit.entity.Mob m && chases(type)) m.setAware(true);
@@ -97,8 +106,25 @@ public class MonsterAbilities {
         return type != MonsterType.BARON && !type.isDragon();
     }
 
+    /** Gromp (« monstre à distance », wiki), dragons et Baron attaquent avec un projectile. */
     private static boolean isRanged(MonsterType type) {
-        return type == MonsterType.BARON || type.isDragon();
+        return type == MonsterType.BARON || type == MonsterType.GROMP || type.isDragon();
+    }
+
+    /** Champion valide le plus proche du monstre et dans la laisse de son camp (Baron : 14 blocs). */
+    private static Player nearestInLeash(LivingEntity mob, MonsterType type) {
+        var cm = LolPlugin.getInstance().getChampionManager();
+        Location camp = campOf(mob);
+        Player best = null;
+        double bestD = Double.MAX_VALUE;
+        for (Player p : mob.getWorld().getPlayers()) {
+            if (!cm.hasChampion(p) || p.getGameMode() == org.bukkit.GameMode.SPECTATOR || p.isDead()) continue;
+            double d = p.getLocation().distanceSquared(mob.getLocation());
+            if (d > 14 * 14) continue;
+            if (type != MonsterType.BARON && camp != null && horizontal(p.getLocation(), camp) > LEASH) continue;
+            if (d < bestD) { bestD = d; best = p; }
+        }
+        return best;
     }
 
     /** Portée d'attaque (blocs, du centre du monstre au champion, hors largeur du monstre). */
@@ -107,6 +133,7 @@ public class MonsterAbilities {
         return switch (type) {
             case BARON -> 9.5;                 // 955
             case HERALD -> 2.6;
+            case GROMP -> 1.5;                 // 150
             default -> 2.0;                    // mêlée (~175)
         };
     }
@@ -121,15 +148,19 @@ public class MonsterAbilities {
                 it.remove(); forget(id); continue;
             }
             MonsterType type = JungleManager.getMonsterType(mob);
-            Player t = org.bukkit.Bukkit.getPlayer(en.getValue());
             Location camp = campOf(mob);
-            boolean lost = type == null || t == null || !t.isOnline()
-                    || t.getGameMode() == org.bukkit.GameMode.SPECTATOR || !cm.hasChampion(t)
-                    || !t.getWorld().equals(mob.getWorld())
-                    || t.getLocation().distanceSquared(mob.getLocation()) > 14 * 14
-                    || (camp != null && horizontal(mob.getLocation(), camp) > LEASH)
+            // Cible : le champion le plus proche dans la laisse ; en changer coûte de la patience
+            // (avant : il gardait le premier attaquant et rentrait se soigner s'il mourait, même
+            // si un autre champion le frappait encore)
+            Player t = type == null ? null : nearestInLeash(mob, type);
+            boolean lost = t == null
+                    || (type != MonsterType.BARON && camp != null && horizontal(mob.getLocation(), camp) > LEASH)
                     || now - LAST_HURT.getOrDefault(id, now) > RESET_MS;
-            if (lost) { it.remove(); RETURNING.put(id, now); continue; }
+            if (!lost && !t.getUniqueId().equals(en.getValue())) {
+                if (!type.isEpic() && PATIENCE.merge(id, -1, Integer::sum) <= 0) lost = true;
+                else en.setValue(t.getUniqueId());
+            }
+            if (lost) { it.remove(); PATIENCE.remove(id); RETURNING.put(id, now); continue; }
 
             Location ml = mob.getLocation(), tl = t.getLocation();
             if (mob instanceof org.bukkit.entity.Mob m && m.isAware()) m.setTarget(t);
@@ -154,9 +185,13 @@ public class MonsterAbilities {
                 if (mob instanceof org.bukkit.entity.Mob m) { m.setTarget(null); m.setAware(false); }
                 fr.lolmc.util.VirtualHP.healFull(mob);
                 it.remove(); NEXT_ATTACK.remove(en.getKey());
-            } else if (mob instanceof org.bukkit.entity.Mob m) {
-                m.setTarget(null);
-                m.getPathfinder().moveTo(camp, 1.2);
+            } else {
+                // Retour : 6 % des PV max par seconde (tâche toutes les 0.25 s), plein au camp
+                fr.lolmc.util.VirtualHP.heal(mob, fr.lolmc.util.VirtualHP.getMax(mob) * 0.015);
+                if (mob instanceof org.bukkit.entity.Mob m) {
+                    m.setTarget(null);
+                    m.getPathfinder().moveTo(camp, 1.2);
+                }
             }
         }
     }
@@ -177,6 +212,7 @@ public class MonsterAbilities {
             fr.lolmc.util.TargetingUtil.launchHoming(null, mob.getLocation().add(0, mob.getHeight() * 0.7, 0), t,
                     type == MonsterType.GROMP ? 10.0 : 14.0, new org.bukkit.inventory.ItemStack(shot),
                     type == MonsterType.GROMP ? 0.6f : 0.9f, burst, false, () -> {
+                        if (type == MonsterType.GROMP) { grompHit(t, ad); return; }
                         basicHit(t, ad + dragonBreath(type, t));
                         if (hexChain) hextechChain(mob, t, ad);
                     });
@@ -517,6 +553,14 @@ public class MonsterAbilities {
         if (cc != null) cc.slowDecaying(first, 0.40, 40);
     }
 
+    /** Gromp (wiki) : 100 % AD + 5 % des PV actuels de la cible, en dégâts magiques. */
+    private static void grompHit(Player t, double ad) {
+        var cm = LolPlugin.getInstance().getChampionManager();
+        if (t.getGameMode() == org.bukkit.GameMode.SPECTATOR || !cm.hasChampion(t)) return;
+        double bonus = cm.getChampion(t).getHPSystem().getCurrentHP() * 0.05;
+        DamageUtil.damage(null, t, ad + bonus, false, DamageUtil.Type.MAGICAL);
+    }
+
     private static void basicHit(Player t, double ad) {
         if (t.getGameMode() == org.bukkit.GameMode.SPECTATOR
                 || !LolPlugin.getInstance().getChampionManager().hasChampion(t)) return;
@@ -560,7 +604,7 @@ public class MonsterAbilities {
     }
 
     private static void forget(UUID id) {
-        LAST_HURT.remove(id); NEXT_ATTACK.remove(id); RETURNING.remove(id); ATTACK_COUNT.remove(id);
+        LAST_HURT.remove(id); NEXT_ATTACK.remove(id); RETURNING.remove(id); ATTACK_COUNT.remove(id); PATIENCE.remove(id);
     }
 
     /** Cible actuelle du monstre (champion qui l'a réveillé), ou null s'il dort. */

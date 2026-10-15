@@ -86,6 +86,8 @@ Chaque champion a son passif et ses 4 sorts (Q/W/E/R) avec scaling AD/AP, une pr
 
 Camps classiques, buffs Bleu et Rouge, Larves du Néant, Héraut (invoqué puis monté par un allié qui dirige sa charge), Baron Nashor (3 formes de fosse, Main du Baron qui renforce les sbires), dragons élémentaires avec âme au 4ᵉ et Dragon Ancien.
 
+Les monstres dorment jusqu'au premier coup, puis tout le camp attaque le champion le plus proche dans sa laisse. Chaque changement de cible coûte de la patience (6 au total) ; à zéro, hors laisse ou sans coup reçu, le monstre rentre au camp en se soignant. Les petits loups et raptors meurent 10 s après leur grand monstre, et les Krugs se divisent en mini-krugs déjà en combat.
+
 ### Vision
 
 - Brouillard de guerre : champions, sbires, tourelles et wards donnent la vision de leur équipe.
@@ -181,7 +183,7 @@ max-party-size: 5
 ## Configurer la carte
 
 1. Créer et construire le monde `lolmc_template` (nom défini par `world.template`).
-2. Poser structures, spawns, routes des sbires (`/lola road`), camps de jungle (`/lola jungle`) et PNJ de boutique (`/lola shopnpc`).
+2. Poser structures, spawns, routes des sbires (`/lola road`), camps de jungle (`/lola jungle <type> <blue|red>` ; épiques et larves sans équipe ; `/lola jungle scuttle_crab <top|bot>` pour chacun des deux crabes) et PNJ de boutique (`/lola shopnpc`).
 3. Tester avec `/lola testgame` ou `/lola solo`.
 
 **Fosse du Baron** : les formes Territoriale et Omnisciente modifient le terrain. Pour chacune : sélectionner la fosse (`/lola schem pos1` / `pos2`), lancer `/lola baronpit <territorial|omniscient> start`, construire la variante, puis `/lola baronpit <forme> save`. Seuls les blocs modifiés sont enregistrés (`jungle.yml`). `preview` pose une variante, `clear` la retire, `/lola baronpit reset` remet le terrain normal.

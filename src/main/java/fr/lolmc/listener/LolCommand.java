@@ -599,8 +599,19 @@ private void handleSolo(Player player, String[] args) {
             return;
         }
 
-        boolean isEpic = type.isEpic() || type == fr.lolmc.game.JungleManager.MonsterType.SCUTTLE_CRAB;
+        boolean isEpic = type.isEpic() || type == fr.lolmc.game.JungleManager.MonsterType.SCUTTLE_CRAB
+                || type == fr.lolmc.game.JungleManager.MonsterType.VOIDGRUB; // fosse neutre
         Team team = null;
+        // Deux crabes dans LoL : rivière du haut et du bas (index 1 = top, 2 = bot)
+        int river = 0;
+        if (type == fr.lolmc.game.JungleManager.MonsterType.SCUTTLE_CRAB) {
+            String r = args.length >= 3 ? args[2].toLowerCase() : "";
+            river = switch (r) { case "top", "haut" -> 1; case "bot", "bas" -> 2; default -> 0; };
+            if (river == 0) {
+                player.sendMessage("§cUsage: /lola jungle scuttle_crab <top|bot>");
+                return;
+            }
+        }
         if (!isEpic) {
             if (args.length < 3) {
                 player.sendMessage("§cCe camp nécessite une équipe: /lola jungle " + args[1] + " <blue|red>");
@@ -610,8 +621,9 @@ private void handleSolo(Player player, String[] args) {
             if (team == null) { player.sendMessage("§cÉquipe: blue ou red"); return; }
         }
 
-        pending.put(player.getUniqueId(), new PendingSetup("jungle", null, team, args[1].toUpperCase(), 0, 0));
-        player.sendMessage(Component.text(String.format("👉 Clique au sol pour placer %s%s.", type.displayName, team != null ? " (" + team.name() + ")" : " (neutre)"), NamedTextColor.AQUA));
+        pending.put(player.getUniqueId(), new PendingSetup("jungle", null, team, args[1].toUpperCase(), river, 0));
+        String where = team != null ? " (" + team.name() + ")" : river == 1 ? " (rivière haute)" : river == 2 ? " (rivière basse)" : " (neutre)";
+        player.sendMessage(Component.text(String.format("👉 Clique au sol pour placer %s%s.", type.displayName, where), NamedTextColor.AQUA));
     }
 
     /**
@@ -770,7 +782,7 @@ private void handleSolo(Player player, String[] args) {
             case "jungle" -> {
                 var type = fr.lolmc.game.JungleManager.MonsterType.valueOf(setup.lane());
                 // Configuration de la carte template (reste global, jamais une instance)
-                LolPlugin.getInstance().getJungleManager().setCamp(type, setup.team(), clicked.clone().add(0.5, 1, 0.5));
+                LolPlugin.getInstance().getJungleManager().setCamp(type, setup.team(), setup.index(), clicked.clone().add(0.5, 1, 0.5));
                 player.sendMessage(Component.text(String.format("✔ %s placé.", type.displayName), NamedTextColor.GREEN));
             }
             case "spawn" -> {
@@ -845,12 +857,19 @@ private void handleSolo(Player player, String[] args) {
                 case "shopnpc", "position", "lane" -> List.of("blue", "red");
                 case "mode" -> List.of("ranked", "normal");
                 case "road" -> List.of("top", "mid", "bot", "end");
-                case "jungle" -> List.of("gromp", "murkwolf", "raptor", "krug", "red_buff", "blue_buff", "scuttle_crab", "dragon_infernal", "dragon_ocean", "dragon_mountain", "dragon_cloud", "dragon_chemtech", "dragon_elder", "herald", "baron");
+                case "jungle" -> List.of("gromp", "murkwolf", "raptor", "krug", "red_buff", "blue_buff", "scuttle_crab", "dragon_infernal", "dragon_ocean", "dragon_mountain", "dragon_cloud", "dragon_chemtech", "dragon_hextech", "dragon_elder", "voidgrub", "herald", "baron");
                 default -> List.of();
             };
         }
         if (args.length == 3 && args[0].equalsIgnoreCase("baronpit") && !args[1].equalsIgnoreCase("reset"))
             return List.of("start", "save", "preview", "clear");
+        if (args.length == 3 && args[0].equalsIgnoreCase("jungle")) {
+            if (args[1].equalsIgnoreCase("scuttle_crab")) return List.of("top", "bot");
+            try {
+                var jt = fr.lolmc.game.JungleManager.MonsterType.valueOf(args[1].toUpperCase());
+                return jt.isEpic() || jt == fr.lolmc.game.JungleManager.MonsterType.VOIDGRUB ? List.of() : List.of("blue", "red");
+            } catch (IllegalArgumentException ex) { return List.of(); }
+        }
         if (args.length == 3 && args[0].equalsIgnoreCase("set")) {
             return List.of("blue", "red");
         }
