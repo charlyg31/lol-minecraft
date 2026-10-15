@@ -332,7 +332,10 @@ public class AbilityListener implements Listener {
                 return;
             }
 
-            // 3. Structure ennemie dans la portée AA (annule le lock précédent)
+            // 3. Plante de la jungle visée : une attaque la détruit
+            if (LolPlugin.getInstance().getPlantManager().tryAttack(caster)) { aam.clearLock(caster); return; }
+
+            // 4. Structure ennemie dans la portée AA (annule le lock précédent)
             if (tryAttackStructure(caster)) { aam.clearLock(caster); return; }
 
             // 4. Rien de verrouillable : annule le lock (comme le Stop de LoL), aucune attaque

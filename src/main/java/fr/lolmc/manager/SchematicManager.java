@@ -25,6 +25,8 @@ public class SchematicManager {
     private final LolPlugin plugin;
     private final Gson gson;
     private final File schematicsFolder;
+    /** Dernière schématique collée sur chaque four (monde:x:y:z). */
+    private final java.util.Map<String, String> lastPasted = new java.util.concurrent.ConcurrentHashMap<>();
 
     public SchematicManager(LolPlugin plugin) {
         this.plugin = plugin;
@@ -116,10 +118,38 @@ public class SchematicManager {
         Directional targetData = (Directional) targetBlock.getBlockData();
         BlockFace targetFacing = targetData.getFacing();
 
+        String anchorKey = groundFurnaceLoc.getWorld().getName() + ":" + groundFurnaceLoc.getBlockX() + ":"
+                + groundFurnaceLoc.getBlockY() + ":" + groundFurnaceLoc.getBlockZ();
+        String previous = lastPasted.put(anchorKey, name);
+
         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
             try (FileReader reader = new FileReader(file)) {
                 Type listType = new TypeToken<ArrayList<SavedBlock>>() {}.getType();
                 List<SavedBlock> blocks = gson.fromJson(reader, listType);
+
+                // Blocs de la phase précédente que la nouvelle ne couvre pas : remis en air (les
+                // schématiques n'enregistrent pas l'air, une phase plus petite laissait des restes)
+                List<int[]> toClear = new ArrayList<>();
+                if (previous != null && !previous.equals(name)) {
+                    File prevFile = new File(schematicsFolder, previous + ".json");
+                    if (prevFile.exists()) {
+                        try (FileReader pr = new FileReader(prevFile)) {
+                            List<SavedBlock> prevBlocks = gson.fromJson(pr, listType);
+                            java.util.Set<String> kept = new java.util.HashSet<>();
+                            StructureRotation rNew = calculateRotation(anchorFacing(blocks), targetFacing);
+                            for (SavedBlock sb : blocks) { int[] r = rotate(sb, rNew); kept.add(r[0] + ":" + sb.getRelY() + ":" + r[1]); }
+                            StructureRotation rOld = calculateRotation(anchorFacing(prevBlocks), targetFacing);
+                            for (SavedBlock sb : prevBlocks) {
+                                int[] r = rotate(sb, rOld);
+                                if (!kept.contains(r[0] + ":" + sb.getRelY() + ":" + r[1])) toClear.add(new int[]{r[0], sb.getRelY(), r[1]});
+                            }
+                        }
+                    }
+                }
+                if (!toClear.isEmpty()) Bukkit.getScheduler().runTask(plugin, () -> {
+                    for (int[] c : toClear)
+                        groundFurnaceLoc.clone().add(c[0], c[1] + 1, c[2]).getBlock().setType(Material.AIR, false);
+                });
 
                 // 2. Trouver le four d'origine dans le fichier (coordonnées 0, 0, 0) pour connaître son orientation de base
                 BlockFace savedFacing = BlockFace.NORTH;
@@ -189,6 +219,28 @@ public class SchematicManager {
                 plugin.getLogger().log(java.util.logging.Level.SEVERE, "Échec de chargement de la schématique", e);
             }
         });
+    }
+
+    /** Orientation du four d'origine (0,0,0) d'une schématique (nord par défaut). */
+    private static BlockFace anchorFacing(List<SavedBlock> blocks) {
+        for (SavedBlock sb : blocks) {
+            if (sb.getRelX() == 0 && sb.getRelY() == 0 && sb.getRelZ() == 0) {
+                BlockData bd = Bukkit.createBlockData(sb.getBlockData());
+                if (bd instanceof Directional d) return d.getFacing();
+                break;
+            }
+        }
+        return BlockFace.NORTH;
+    }
+
+    /** Position X/Z d'un bloc après rotation autour du four. */
+    private static int[] rotate(SavedBlock sb, StructureRotation rotation) {
+        return switch (rotation) {
+            case CLOCKWISE_90 -> new int[]{-sb.getRelZ(), sb.getRelX()};
+            case CLOCKWISE_180 -> new int[]{-sb.getRelX(), -sb.getRelZ()};
+            case COUNTERCLOCKWISE_90 -> new int[]{sb.getRelZ(), -sb.getRelX()};
+            default -> new int[]{sb.getRelX(), sb.getRelZ()};
+        };
     }
 
     private StructureRotation calculateRotation(BlockFace snapshot, BlockFace target) {

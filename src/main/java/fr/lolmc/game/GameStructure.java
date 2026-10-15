@@ -8,11 +8,11 @@ import java.util.List;
 /**
  * Représente une structure de jeu : tourelle, nexus de lane, ou nexus de base.
  *
- * Système de phases par nom de schématique :
- *   "TurretBlue"    = 100% (schématique de base)
- *   "TurretBlue75"  = affiché quand HP <= 75%
- *   "TurretBlue50"  = affiché quand HP <= 50%
- *   "TurretBlue25"  = affiché quand HP <= 25%
+ * Système de phases par nom de schématique (plugins/LolMC/schematics, voir MapManager) :
+ *   "Turret_Blue"     = 100 % (schématique de base)
+ *   "Turret_Blue_75"  = affichée quand PV <= 75 %
+ *   "Turret_Blue_50"  = affichée quand PV <= 50 %
+ *   "Turret_Blue_0"   = ruines, affichées à la destruction
  * Le plugin détecte automatiquement les seuils depuis les noms de fichiers.
  */
 public class GameStructure {
@@ -83,6 +83,7 @@ public class GameStructure {
         updateHealthBarNametag();
         if (currentHP <= 0) {
             destroyed = true;
+            if (!phases.isEmpty()) currentPhaseIndex = phases.size() - 1; // phase la plus basse (ruines)
             return true;
         }
         return checkPhaseChange();

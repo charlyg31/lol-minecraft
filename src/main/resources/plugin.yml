@@ -10,7 +10,7 @@ commands:
     usage: /l <runes|ping|ff|stats|shop|grimoire>
   lola:
     description: Commandes admin LoL
-    usage: /lola <start|stop|select|join|instance|reload|permcheck|set|position|center|lane|schem|road|jungle|baronpit|shopnpc|mode|template|solo|testgame|give|level|gold|hp|resetcd|buff|spawn|wave|team|debug|help>
+    usage: /lola <start|stop|select|join|instance|reload|permcheck|set|position|center|schem|road|jungle|plant|baronpit|shopnpc|mode|template|solo|testgame|give|level|gold|hp|resetcd|buff|spawn|wave|team|debug|help>
     aliases: [lolAdmin]
 
   # ── Raccourcis joueur (mêmes fonctions que /l, plus le chat d'équipe) ──
@@ -85,7 +85,7 @@ permissions:
       lolmc.admin.set: true
       lolmc.admin.position: true
       lolmc.admin.center: true
-      lolmc.admin.lane: true
+      lolmc.admin.plant: true
       lolmc.admin.schem: true
       lolmc.admin.road: true
       lolmc.admin.jungle: true
@@ -123,7 +123,7 @@ permissions:
   lolmc.admin.set:       {description: "/lola set — Placer les structures", default: op}
   lolmc.admin.position:  {description: "/lola position — Points d'apparition", default: op}
   lolmc.admin.center:    {description: "/lola center — Centre de la minimap", default: op}
-  lolmc.admin.lane:      {description: "/lola lane — Tracer une lane", default: op}
+  lolmc.admin.plant:     {description: "/lola plant — Plantes de la jungle", default: op}
   lolmc.admin.schem:     {description: "/lola schem — Schématiques", default: op}
   lolmc.admin.road:      {description: "/lola road — Routes des sbires", default: op}
   lolmc.admin.jungle:    {description: "/lola jungle — Camps de jungle", default: op}

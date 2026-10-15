@@ -176,6 +176,8 @@ public class GameManager {
 
     public void stopGame() {
         gameRunning = false;
+        // Plantes de la jungle de cette partie (les instances les retirent dans GameInstance.stop)
+        if (gameInstance == null) LolPlugin.getInstance().getPlantManager().clearAll();
         stopSystems();
         // États statiques champions
         final boolean last = !otherGameRunning();

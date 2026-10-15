@@ -134,7 +134,6 @@ public class LolPlugin extends JavaPlugin {
         this.abilityPreview   = new fr.lolmc.ability.AbilityPreview();
         this.instanceManager  = new fr.lolmc.instance.InstanceManager(this);
         this.plantManager     = new fr.lolmc.game.PlantManager();
-        getServer().getPluginManager().registerEvents(this.plantManager, this);
         this.minimapManager   = new fr.lolmc.game.MinimapManager();
         this.skinManager      = new fr.lolmc.manager.SkinManager();
         // Bridge cross-serveur (BungeeCord)

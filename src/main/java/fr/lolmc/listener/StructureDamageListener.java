@@ -212,6 +212,10 @@ public class StructureDamageListener implements Listener {
      */
     public void onStructureDestroyedByMinions(GameStructure structure, org.bukkit.World world) {
         Team enemyTeam = structure.getTeam();
+        if (!world.getPlayers().isEmpty()) {
+            var mmS = fr.lolmc.instance.InstanceHelper.mapManager(world.getPlayers().getFirst());
+            if (mmS != null) mmS.updateStructurePhase(structure); // dernière phase (ruines)
+        }
         Team attacking = enemyTeam.opposite();
         // Joueur de référence (équipe attaquante de cette partie) pour retrouver instance et managers
         Player ref = null;
@@ -259,6 +263,8 @@ public class StructureDamageListener implements Listener {
     }
 
     private void onStructureDestroyed(GameStructure structure, Player destroyer) {
+        var mmS = map(destroyer);
+        if (mmS != null) mmS.updateStructurePhase(structure); // dernière phase (ruines)
         String name = structureName(structure);
         Team enemyTeam = structure.getTeam();
         Team playerTeam = LolPlugin.getInstance().getTeamManager().getTeam(destroyer);

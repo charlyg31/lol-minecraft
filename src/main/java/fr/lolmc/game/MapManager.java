@@ -186,11 +186,18 @@ public class MapManager {
             List<GameStructure.Phase> phases = new ArrayList<>();
 
             if (folder.exists() && folder.isDirectory()) {
-                File[] files = folder.listFiles((dir, name) -> name.startsWith(baseName) && name.endsWith(".json"));
+                // Seulement <base>.json et <base>_<seuil>.json (avant : Turret_Blue prenait aussi
+                // Turret_Blue_Top_1.json, et « _75 » n'était jamais lu comme un seuil → tout à 100 %)
+                File[] files = folder.listFiles((dir, name) -> {
+                    if (!name.endsWith(".json")) return false;
+                    String b = name.substring(0, name.length() - 5);
+                    return b.equals(baseName) || (b.startsWith(baseName + "_") && isPhaseSuffix(baseName, b.substring(baseName.length() + 1)));
+                });
                 if (files != null) {
                     for (File f : files) {
                         String schemName = f.getName().substring(0, f.getName().length() - 5); // Retire ".json"
-                        String suffix = schemName.substring(baseName.length()); // Récupère ce qui suit (ex: "75", "50" ou "")
+                        String suffix = schemName.length() > baseName.length()
+                                ? schemName.substring(baseName.length() + 1) : ""; // « 75 », « 50 », « 0 » ou vide
 
                         int threshold = 100; // Par défaut, si aucun chiffre (ex: TurretBlue.json), c'est 100%
                         if (!suffix.isEmpty()) {
@@ -404,7 +411,7 @@ public class MapManager {
                     // Vérifier si c'est candidate_<number>
                     if (base.startsWith(candidate + "_")) {
                         String suffix = base.substring(candidate.length() + 1);
-                        return suffix.matches("\\d+");
+                        return isPhaseSuffix(candidate, suffix);
                     }
                     return false;
                 });
@@ -412,6 +419,17 @@ public class MapManager {
             }
         }
         return root;
+    }
+
+    /**
+     * Suffixe de seuil de PV ? Après un nom de lane (Turret_Blue_Top), 1 à 5 est un rang de
+     * structure (Turret_Blue_Top_1 = tourelle précise), pas un seuil.
+     */
+    private static boolean isPhaseSuffix(String base, String suffix) {
+        if (!suffix.matches("\\d+")) return false;
+        boolean laneBase = base.endsWith("_Top") || base.endsWith("_Mid") || base.endsWith("_Bot") || base.endsWith("_Base");
+        int v = Integer.parseInt(suffix);
+        return !(laneBase && v >= 1 && v <= 5);
     }
 
     /** Noms candidats du plus spécifique au plus générique (sans seuil de HP). */

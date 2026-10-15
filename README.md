@@ -84,7 +84,7 @@ Chaque champion a son passif et ses 4 sorts (Q/W/E/R) avec scaling AD/AP, une pr
 
 ### Jungle
 
-Camps classiques, buffs Bleu et Rouge, Larves du Néant, Héraut (invoqué puis monté par un allié qui dirige sa charge), Baron Nashor (3 formes de fosse, Main du Baron qui renforce les sbires), dragons élémentaires avec âme au 4ᵉ et Dragon Ancien.
+Camps classiques, buffs Bleu et Rouge, Larves du Néant, Héraut (invoqué puis monté par un allié qui dirige sa charge), Baron Nashor (3 formes de fosse, Main du Baron qui renforce les sbires), dragons élémentaires avec âme au 4ᵉ et Dragon Ancien. Plantes : Cône explosif, Fruit de miel et Bulbe révélateur (voir [Plantes](#plantes--lola-plant)).
 
 Les monstres dorment jusqu'au premier coup, puis tout le camp attaque le champion le plus proche dans sa laisse. Chaque changement de cible coûte de la patience (6 au total) ; à zéro, hors laisse ou sans coup reçu, le monstre rentre au camp en se soignant. Les petits loups et raptors meurent 10 s après leur grand monstre, et les Krugs se divisent en mini-krugs déjà en combat.
 
@@ -184,11 +184,220 @@ max-party-size: 5
 
 ## Configurer la carte
 
-1. Créer et construire le monde `lolmc_template` (nom défini par `world.template`).
-2. Poser structures, spawns, routes des sbires (`/lola road`), camps de jungle (`/lola jungle <type> <blue|red>` ; épiques et larves sans équipe ; `/lola jungle scuttle_crab <top|bot>` pour chacun des deux crabes) et PNJ de boutique (`/lola shopnpc`).
-3. Tester avec `/lola testgame` ou `/lola solo`.
+Toute la configuration se fait **dans le monde template** (`lolmc_template` par défaut, `world.template` dans `config.yml`), jamais dans une copie `lolmc_game_N` : celles-ci sont supprimées en fin de partie. Les commandes demandent les permissions `lolmc.admin.<commande>` (groupe `lolmc.admin.config`).
 
-**Fosse du Baron** : les formes Territoriale et Omnisciente modifient le terrain. Pour chacune : sélectionner la fosse (`/lola schem pos1` / `pos2`), lancer `/lola baronpit <territorial|omniscient> start`, construire la variante, puis `/lola baronpit <forme> save`. Seuls les blocs modifiés sont enregistrés (`jungle.yml`). `preview` pose une variante, `clear` la retire, `/lola baronpit reset` remet le terrain normal.
+Fichiers écrits dans `plugins/LolMC/` :
+
+| Fichier | Contenu | Commandes |
+|---------|---------|-----------|
+| `map.yml` | structures (position, orientation, niveau), points d'apparition | `/lola set`, `/lola position` |
+| `roads.yml` | routes des sbires | `/lola road` |
+| `jungle.yml` | camps de jungle, terrains de la fosse du Baron | `/lola jungle`, `/lola baronpit` |
+| `plants.yml` | emplacements des plantes | `/lola plant` |
+| `npcs.yml` | position des PNJ boutique (le PNJ lui-même est une entité du monde) | `/lola shopnpc` |
+| `schematics/*.json` | apparence des structures par phase de PV | `/lola schem` |
+
+### Check-list avant `/lola template save`
+
+Cocher chaque ligne, dans cet ordre :
+
+1. **Monde construit** : la Faille complète (lanes, jungle, rivière, bases, buissons). Les buissons sont les blocs listés dans `bushes.blocks` de `config.yml` (herbes hautes, fougères…) : un champion dedans est invisible pour l'ennemi.
+2. **Fours d'ancrage** : un four posé au sol sous **chaque** structure (11 tourelles, 3 inhibiteurs et 1 Nexus par équipe), face avant tournée dans l'orientation voulue. Voir [Le four sous les structures](#le-four-sous-les-structures).
+3. **Schématiques** des structures enregistrées (`/lola schem`) : au minimum une par type et par équipe (`Turret_Blue`, `Turret_Red`, `Inhibitor_Blue`…), plus les phases si tu veux que les tourelles s'abîment.
+4. **Structures déclarées** avec `/lola set` en cliquant sur chaque four : 22 tourelles, 6 inhibiteurs, 2 Nexus.
+5. **Points d'apparition** : `/lola position <blue|red> <1-5>` pour les deux équipes. La position 1 sert aussi de **fontaine** (soin, boutique, rappel).
+6. **Routes des sbires** : `/lola road` pour `top`, `mid` et `bot`, de base à base.
+7. **Camps de jungle** : 2 × (Gromp, Loups, Raptors, Krugs, Sentinelle bleue, Sanglepince), 2 crabes, 1 dragon, la fosse du Néant (larves, Héraut, Baron au même point).
+8. **Fosse du Baron** (facultatif) : terrains Territorial et Omniscient avec `/lola baronpit`.
+9. **Plantes** : Cônes explosifs, Fruits de miel et Bulbes révélateurs avec `/lola plant`.
+10. **PNJ boutique** : `/lola shopnpc <blue|red>` dans chaque fontaine.
+11. **Centre de la minimap** : `/lola center` au milieu de la carte.
+12. **Test** : `/lola testgame` ou `/lola solo`, vérifier que les sbires avancent, que les tourelles tirent, que les camps et les plantes apparaissent, puis `/lola stop`.
+13. **Enregistrer** : `/lola template save` depuis le monde template (aucune partie en cours). Le monde est copié dans `plugins/LolMC/template/`, et `map.yml`, `roads.yml`, `jungle.yml` et `plants.yml` sont rattachés à ce monde.
+14. **Mode instances** : décharger le monde template avant de lancer des parties (`/mv unload lolmc_template` avec Multiverse).
+
+### Le four sous les structures
+
+Chaque structure repose sur **un four posé au sol**. C'est son **ancre** :
+
+- **Position** : le four est le **centre** de la structure. Les tourelles tirent depuis ce point (zone cylindrique de `turrets.attack-radius` = 7,5 blocs, soit 750 unités, sur `turrets.detection-height` blocs de haut), les champions et les sbires mesurent leur portée d'attaque jusqu'à lui, et la barre de vie s'affiche au-dessus.
+- **Orientation** : la face avant du four (celle qui a l'ouverture) indique dans quelle direction la structure regarde. En collant une schématique, le plugin compare l'orientation du four enregistré dans la schématique à celle du four au sol et **tourne** la schématique de 0, 90, 180 ou 270° : une seule schématique sert pour les tourelles des deux côtés et de toutes les lanes.
+- **Collage** : la schématique est collée **juste au-dessus** du four (le four de la schématique se retrouve 1 bloc plus haut que celui du sol). C'est ce qui permet de changer l'apparence de la structure selon ses PV (phases), puis d'afficher des ruines à sa destruction.
+- **Le four doit rester en place** : `/lola set` ne le supprime pas. Sans four au sol, la structure fonctionne (PV, tirs, récompenses), mais son apparence ne change jamais.
+
+### Structures : `/lola set`
+
+```
+/lola set turret <blue|red> <top|mid|bot|base> <rang> [outer|inner|inhibitor|nexus]
+/lola set inhibitor <blue|red> <top|mid|bot> 1
+/lola set basenexus <blue|red>
+```
+
+Après la commande, **clic (gauche ou droit) sur le four** de la structure. Le message confirme l'orientation lue sur le four.
+
+| Structure | Commande | PV | Remarques |
+|-----------|----------|----|-----------|
+| Tourelle extérieure | `/lola set turret blue top 1` | 9000 | rang 1 = extérieure |
+| Tourelle intérieure | `/lola set turret blue top 2` | 5000 | rang 2 |
+| Tourelle d'inhibiteur | `/lola set turret blue top 3` | 4750 | rang 3 |
+| Tourelles du Nexus | `/lola set turret blue base 1` puis `base 2` | 3500 | lane `base`, 2 par équipe |
+| Inhibiteur | `/lola set inhibitor blue top 1` | 4000 | un par lane ; réapparaît 5 min après sa destruction |
+| Nexus | `/lola set basenexus blue` | 5500 | — |
+
+À faire pour `top`, `mid` et `bot`, et pour les deux équipes (11 tourelles + 3 inhibiteurs + 1 Nexus par équipe). Le niveau de tourelle (dernier argument) est déduit de la lane et du rang ; ne le préciser que pour une carte non standard. Règles appliquées : une tourelle n'est attaquable qu'une fois la précédente de sa lane détruite, un inhibiteur qu'une fois les tourelles de sa lane tombées, les tourelles du Nexus qu'une fois un inhibiteur détruit, et le Nexus qu'une fois un inhibiteur et les 2 tourelles du Nexus détruits.
+
+`/lola set nexus <équipe> <lane> <rang>` déclare un « Nexus de lane » : cette structure n'existe pas dans LoL. Ne pas l'utiliser pour une Faille standard.
+
+### Schématiques et phases : `/lola schem`
+
+```
+/lola schem pos1          (coin 1 = position de tes pieds)
+/lola schem pos2          (coin 2)
+/lola schem save <nom>
+```
+
+1. Construire la structure **sur un four** (le four fait partie de la sélection et devient le point 0,0,0).
+2. Se placer à un coin de la boîte englobante : `/lola schem pos1`, puis au coin opposé : `/lola schem pos2`.
+3. `/lola schem save <nom>`. Le fichier `plugins/LolMC/schematics/<nom>.json` contient tous les blocs sauf l'air, relatifs au four. Sans four dans la zone, rien n'est enregistré (erreur dans la console).
+
+**Noms** (du plus précis au plus général, le premier trouvé est utilisé) :
+
+| Nom | S'applique à |
+|-----|--------------|
+| `Turret_Blue_Top_1` | la tourelle extérieure bleue du haut uniquement |
+| `Turret_Blue_Top` | toutes les tourelles bleues du haut |
+| `Turret_Blue` | toutes les tourelles bleues |
+
+Types : `Turret`, `Inhibitor`, `Nexus` (Nexus de lane), `NexusBase` (Nexus) ; équipes : `Blue`, `Red` ; lanes : `Top`, `Mid`, `Bot`, `Base`.
+
+**Phases** : ajouter `_<seuil>` au nom. La phase affichée est celle du plus petit seuil supérieur ou égal au pourcentage de PV restant.
+
+| Fichier | Affiché quand |
+|---------|---------------|
+| `Turret_Blue.json` | PV > 75 % (et au lancement de la partie) |
+| `Turret_Blue_75.json` | PV ≤ 75 % |
+| `Turret_Blue_50.json` | PV ≤ 50 % |
+| `Turret_Blue_25.json` | PV ≤ 25 % |
+| `Turret_Blue_0.json` | structure détruite (ruines) |
+
+Après un nom de lane, `_1` à `_5` désigne le rang de la structure et non un seuil : `Turret_Blue_Top_1` est la tourelle extérieure, ses phases sont `Turret_Blue_Top_1_75`, etc. Pour les phases d'un nom de lane (`Turret_Blue_Top_…`), utiliser des seuils de 0 ou supérieurs à 5.
+
+Quand la phase change, les blocs de l'ancienne phase que la nouvelle ne contient pas sont retirés. Au lancement de chaque partie, la phase 100 % est recollée sur toutes les structures.
+
+### Points d'apparition et fontaine : `/lola position`
+
+```
+/lola position <blue|red> <1-5>
+```
+
+Puis clic au sol : le joueur apparaît 1 bloc au-dessus, tourné dans la direction où tu regardes. 5 positions par équipe.
+
+La **position 1** (ou la plus petite définie) est la **fontaine** de l'équipe :
+- départ des joueurs en début de partie, réapparition et rappel (`/recall`) ;
+- soin de la fontaine dans un rayon de 8 blocs (et tir de la fontaine contre les ennemis) ;
+- achat à la boutique dans un rayon de `shop.base-radius` (15 blocs) si `shop.base-only: true`.
+
+### Routes des sbires : `/lola road`
+
+```
+/lola road <top|mid|bot> <blue|red>
+/lola road end
+```
+
+1. `/lola road top blue` : tu reçois une **houe en or** (pinceau). `blue` = tu traces depuis la base bleue, `red` = depuis la base rouge.
+2. Clic sur les blocs du chemin, **dans l'ordre**, de la base de départ jusqu'à la base adverse. Les blocs peints deviennent de la terre cuite verte (temporaire).
+3. `/lola road end` : les blocs reprennent leur apparence, les blocs proches (3 blocs) sont regroupés en points de passage, et la route est enregistrée (`roads.yml`) dans le sens base bleue → base rouge.
+
+Les sbires bleus **apparaissent au premier point** de la route et les rouges **au dernier** : commencer et finir la route devant chaque Nexus. Ils suivent les points et s'en écartent pour combattre. À faire pour `top`, `mid` et `bot` ; retracer une route la remplace.
+
+### Camps de jungle : `/lola jungle`
+
+```
+/lola jungle <type> <blue|red>     (camps de chaque équipe)
+/lola jungle scuttle_crab <top|bot>
+/lola jungle <épique>              (sans équipe)
+```
+
+Puis clic au sol : le camp apparaît 1 bloc au-dessus (les monstres d'un groupe autour du point, sur 1,5 bloc).
+
+| Type | Camp | Où | 1ʳᵉ apparition | Réapparition |
+|------|------|----|----------------|--------------|
+| `blue_buff` | Sentinelle bleue | jungle de chaque équipe | 0:55 | 5 min |
+| `red_buff` | Sanglepince (buff rouge) | jungle de chaque équipe | 0:55 | 5 min |
+| `murkwolf` | Loups (1 grand + 2 petits) | jungle de chaque équipe | 0:55 | 2 min 15 |
+| `raptor` | Raptors (1 grand + 5 petits) | jungle de chaque équipe | 0:55 | 2 min 15 |
+| `gromp` | Gromp | jungle de chaque équipe | 1:07 | 2 min 15 |
+| `krug` | Krugs (se divisent) | jungle de chaque équipe | 1:07 | 2 min 15 |
+| `scuttle_crab` + `top`/`bot` | Crabe Pillargot | rivière, un en haut et un en bas | 2:55 | 2 min 30 |
+| `dragon_infernal` (ou tout `dragon_*`) | Dragon | fosse du dragon | 5:00 | 5 min |
+| `voidgrub` | Larves du Néant (3) | fosse du Baron | 8:00 | jusqu'à 14:45 |
+| `herald` | Héraut de la Faille | fosse du Baron | 15:00 | une fois, jusqu'à 19:45 |
+| `baron` | Baron Nashor | fosse du Baron | 20:00 | 6 min |
+
+- **Dragon** : ne placer **qu'un seul** `dragon_*` (n'importe lequel). L'élément suit la rotation de LoL (le 3ᵉ dragon fixe l'élément de la Faille), puis le **Dragon Ancien** apparaît au même endroit après une âme. Placer plusieurs types de dragon ferait apparaître plusieurs dragons.
+- **Fosse du Baron** : placer `voidgrub`, `herald` et `baron` **au même point**, ils se succèdent.
+- Replacer un camp le déplace (un emplacement par camp et par équipe).
+
+**Terrain de la fosse du Baron** (formes Territoriale et Omnisciente, qui modifient le décor) :
+
+```
+/lola schem pos1 / pos2                         (sélection englobant la fosse)
+/lola baronpit <territorial|omniscient> start   (photographie le terrain normal)
+   … construire la variante …
+/lola baronpit <territorial|omniscient> save    (enregistre les blocs modifiés, remet le terrain normal)
+/lola baronpit <forme> preview | clear          (poser pour vérifier / supprimer)
+/lola baronpit reset                            (remettre le terrain normal)
+```
+
+200 000 blocs au plus. Seuls les blocs qui diffèrent du terrain normal sont enregistrés (`jungle.yml`).
+
+### Plantes : `/lola plant`
+
+```
+/lola plant blastcone [inner|outer]     (Cône explosif)
+/lola plant honeyfruit                  (Fruit de miel)
+/lola plant scryer [normal|late]        (Bulbe révélateur)
+/lola plant list | remove | clear
+```
+
+La plante est posée **à tes pieds** (centre du bloc). `remove` supprime l'emplacement le plus proche (5 blocs max), `clear` les supprime tous, `list` les affiche. Enregistré dans `plants.yml`.
+
+Valeurs du wiki LoL (patch 26.20). Toutes les plantes ont 1 PV : **une attaque de base** (clic d'attaque en la visant, à portée d'attaque du champion) les détruit. Elles apparaissent d'abord en **bourgeon** 🌱 inactif pendant 60 s, puis mûrissent.
+
+| Plante | Variante | Où (Faille standard) | 1ʳᵉ apparition | Réapparition | Effet |
+|--------|----------|----------------------|----------------|--------------|-------|
+| Cône explosif | `inner` | 2 par quadrant de jungle, dont un qui permet d'entrer dans la fosse du dragon/du Baron | 1:15-1:25 | 5-7 min | Explosion de 325 unités de rayon : toutes les unités (attaquant compris) sont projetées jusqu'à 900 unités (9 blocs) à l'opposé du cône, par-dessus le décor |
+| Cône explosif | `outer` | près des rivières, côté lanes | 9:00-9:30 | 5,5-6,5 min | idem |
+| Fruit de miel | — | le long des murs de la rivière | 6:00-6:30 | 5,5-7 min | 5 fruits au sol pendant 30 s ; marcher dessus rend 6 % du mana max et max(3,5 % des PV max, 14-116 selon le niveau) PV, et ralentit de 35 % pendant 0,25 s |
+| Bulbe révélateur | `normal` | 2 par quadrant, près des rampes de la rivière | 3:00-3:30 | 200-260 s (patch 26.1) | Pollen en cône dans la direction de l'attaque : champions ennemis révélés 3 s, sbires, monstres et balises ennemis 12 s |
+| Bulbe révélateur | `late` | emplacements ouverts à 15:00 (patch 26.1) : côtes de la rivière près des lanes latérales, derrière les tourelles intérieures des lanes latérales, rochers des bases | 15:00 | 90-120 s | idem |
+
+Chaque partie (monde unique ou instance) a ses propres plantes, programmées depuis le début de la partie et retirées à la fin.
+
+Différences avec LoL :
+- Chaque emplacement est indépendant. LoL limite à 1 Bulbe par quadrant (la 1ʳᵉ apparition se fait au point le plus proche des lanes latérales) et à 2 Fruits de miel par moitié de rivière, en déplaçant les fruits vers les lanes au fil de la partie. Pour s'en approcher, poser 1 Bulbe `normal` par quadrant et 1 à 2 Fruits par moitié de rivière.
+- Le cône du Bulbe porte à 1500 unités (indicateur du jeu, CommunityDragon), mais son angle n'est publié nulle part : 60° ici.
+- Le rayon de ramassage des fruits n'est pas publié : 0,8 bloc ici. Le soin de 14 à 116 PV est supposé linéaire (+6 PV par niveau).
+
+### PNJ boutique : `/lola shopnpc`
+
+```
+/lola shopnpc <blue|red>
+```
+
+Crée un villageois immobile et invulnérable **à ta position**. Clic droit dessus : ouvre la boutique (seulement pour son équipe). C'est une entité du monde : elle est copiée avec le template. Pour en déplacer un, le tuer (`/kill` en le visant) puis le recréer. La boutique s'ouvre aussi par `/shop` ou `/l shop` dans la fontaine.
+
+### Minimap : `/lola center`
+
+Enregistre ta position comme centre de la minimap (`minimap.center-x/z` dans `config.yml`). L'échelle se règle avec `minimap.scale` (`CLOSE` = 256 blocs de côté).
+
+### Tester et enregistrer
+
+- `/lola testgame` : lance une partie de test (structures, sbires, jungle, plantes) dans le monde de jeu.
+- `/lola solo [champion]` : partie seule, niveau 18 et 20 000 PO.
+- `/lola stop` : arrête la partie (et ferme l'instance si tu es dans une instance).
+- `/lola template save` : enregistre le monde où tu te trouves comme template (voir la check-list).
+- `/lola instance` : liste les instances ; `/lola instance <n>` ou `/lola instance template` : s'y téléporter.
 
 En mode instances, sauvegarder et **décharger** `lolmc_template` avant de lancer des parties (`/mv unload lolmc_template` avec Multiverse), et ne jamais configurer la carte dans une copie `lolmc_game_N` : elle est supprimée en fin de partie.
 
@@ -203,7 +412,7 @@ Avec `use-instances: true`, chaque match copie le monde template dans un monde i
 - **Isolé par instance :** partie, sbires, jungle, tourelles, brouillard, récompenses, annonces, hauts faits, passifs, base, sélection des champions, vote d'abandon, tab et statistiques de fin de partie.
 - **Équipes :** une seule table joueur → équipe, mais toutes les lectures sont limitées au monde du joueur ; deux parties ne se mélangent jamais.
 - **Template :** copié depuis `plugins/LolMC/template/` s'il contient un monde, sinon depuis le dossier `world.template`. `/lola template save` enregistre le monde courant comme template et y rattache `map.yml`, `roads.yml` et `jungle.yml`.
-- **Plantes :** chaque instance a les siennes, dont les chunks restent chargés pendant la partie.
+- **Plantes :** chaque instance a les siennes (mêmes emplacements que le template), dont les chunks restent chargés pendant la partie.
 - **Nettoyage :** un monde d'instance vide est supprimé (60 s après pour une partie en cours) ; les mondes `lolmc_game_*` laissés par un crash sont supprimés au démarrage.
 - **BungeeTabListPlus :** variables `lolmc_team`, `lolmc_champion`, `lolmc_kills`, `lolmc_deaths`, `lolmc_assists`, `lolmc_kda`, `lolmc_cs`, `lolmc_gold`, `lolmc_game` (ex. `${player lolmc_kda}`). Les classes BTLP de `src/main/java/codecrafter47` sont des stubs de compilation exclus du JAR.
 
@@ -233,7 +442,7 @@ Avec `use-instances: true`, chaque match copie le monde template dans un monde i
 | Catégorie | Sous-commandes |
 |-----------|----------------|
 | Partie | `start`, `stop`, `select`, `join <champion> [instance]` (alias `rejoindre`), `reload`, `help`, `permcheck` |
-| Carte (monde template) | `set`, `position`, `center`, `lane`, `schem`, `road`, `jungle`, `baronpit`, `shopnpc`, `mode`, `template [save]` |
+| Carte (monde template) | `set`, `position`, `center`, `schem`, `road`, `jungle`, `plant`, `baronpit`, `shopnpc`, `mode`, `template [save]` (détail : [Configurer la carte](#configurer-la-carte)) |
 | Test (partie en cours) | `solo`, `testgame`, `give`, `level`, `gold`, `hp`, `resetcd`, `buff`, `spawn`, `wave`, `team`, `debug` |
 | Instances | `instance` (liste), `instance <n>`, `instance template` (téléportation) |
 
@@ -267,7 +476,7 @@ Déclarées dans `plugin.yml`, compatibles **LuckPerms**. Chaque famille a un jo
 | Groupe | Commandes (`lolmc.admin.<commande>`) |
 |--------|--------------------------------------|
 | `lolmc.admin.game` | `start`, `stop`, `select`, `join` (aussi `/lola rejoindre`), `instance`, `reload`, `permcheck` |
-| `lolmc.admin.config` | `set`, `position`, `center`, `lane`, `schem`, `road`, `jungle`, `baronpit`, `shopnpc`, `mode`, `template` |
+| `lolmc.admin.config` | `set`, `position`, `center`, `schem`, `road`, `jungle`, `plant`, `baronpit`, `shopnpc`, `mode`, `template` |
 | `lolmc.admin.test` | `solo`, `testgame`, `give`, `level`, `gold`, `hp`, `resetcd`, `buff`, `spawn`, `wave`, `team`, `debug` |
 
 `lolmc.admin.give` permet aussi de changer de champion pendant une partie ou une sélection.

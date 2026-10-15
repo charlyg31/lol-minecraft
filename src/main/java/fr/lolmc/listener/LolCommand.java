@@ -40,9 +40,6 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
     // Mode setup en attente d'un clic, par joueur
     private final Map<UUID, PendingSetup> pending = new HashMap<>();
     private final Map<UUID, fr.lolmc.game.GameStructure.TurretTier> pendingTier = new HashMap<>();
-    // Waypoints en cours de définition (mode lane)
-    private final Map<UUID, List<Location>> laneSetup = new HashMap<>();
-    private final Map<UUID, String> laneSetupName = new HashMap<>();
 
     // AJOUT : Sélections locales des coins de schématiques par joueur
     private final Map<UUID, Location[]> schematicSelections = new HashMap<>();
@@ -151,10 +148,10 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
                                 loc.getBlockX(), loc.getBlockZ()),
                         net.kyori.adventure.text.format.NamedTextColor.GREEN));
             }
-            case "lane" -> handleLane(player, args);
             case "schem" -> handleSchem(player, args);
             case "road" -> handleRoad(player, args);
             case "jungle" -> handleJungle(player, args);
+            case "plant" -> handlePlant(player, args);
             case "baronpit" -> handleBaronPit(player, args);
             case "shopnpc" -> handleShopNpc(player, args);
             case "mode" -> handleMode(player, args);
@@ -372,31 +369,6 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
         pending.put(player.getUniqueId(), new PendingSetup("spawn", null, team, null, 0, pos));
         player.sendMessage(Component.text(String.format(
                 "👉 Clique au sol pour définir le spawn %s #%d.", team.name(), pos), NamedTextColor.AQUA));
-    }
-
-    // ── /lola lane ─────────────────────────────────────────────────
-
-    private void handleLane(Player player, String[] args) {
-        if (args.length < 2) { player.sendMessage("§cUsage: /lola lane <top|mid|bot> | /lola lane done"); return; }
-        if (args[1].equalsIgnoreCase("done")) {
-            List<Location> wps = laneSetup.remove(player.getUniqueId());
-            String lane = laneSetupName.remove(player.getUniqueId());
-            if (wps == null || lane == null || wps.isEmpty()) {
-                player.sendMessage("§cAucune lane en cours de définition.");
-                return;
-            }
-            // Configuration de la carte template (reste global, jamais une instance)
-            LolPlugin.getInstance().getMinionManager().setLaneWaypoints(lane, wps);
-            player.sendMessage(Component.text(String.format(
-                    "✔ Lane %s enregistrée (%d points).", lane, wps.size()), NamedTextColor.GREEN));
-            return;
-        }
-        String lane = args[1].toLowerCase();
-        laneSetup.put(player.getUniqueId(), new ArrayList<>());
-        laneSetupName.put(player.getUniqueId(), lane);
-        player.sendMessage(Component.text(String.format(
-                "👉 Clique successivement sur le chemin de la lane %s (du spawn BLEU vers ROUGE). "
-                        + "Tape /lola lane done pour finir.", lane), NamedTextColor.AQUA));
     }
 
     // ── /lola debug ────────────────────────────────────────────────
@@ -638,6 +610,63 @@ private void handleSolo(Player player, String[] args) {
      * /lola baronpit <territorial|omniscient> <start|save|preview|clear>, /lola baronpit reset :
      * enregistre le terrain de la fosse propre à une forme du Baron (sélection de /lola schem).
      */
+    /**
+     * /lola plant <blastcone|honeyfruit|scryer> [inner|outer|late] : pose un emplacement de plante
+     * à tes pieds ; /lola plant list | remove | clear.
+     */
+    private void handlePlant(Player player, String[] args) {
+        var pm = LolPlugin.getInstance().getPlantManager();
+        String sub = args.length >= 2 ? args[1].toLowerCase() : "";
+        switch (sub) {
+            case "list" -> {
+                var spots = pm.getSpots();
+                player.sendMessage(Component.text("🌱 " + spots.size() + " emplacement(s) de plante :", NamedTextColor.GOLD));
+                for (var s : spots) {
+                    var l = s.location();
+                    player.sendMessage(Component.text(String.format("§e%s §7%s (%s) — %.1f %.1f %.1f",
+                            s.id(), s.type().displayName, s.variant().name().toLowerCase(), l.getX(), l.getY(), l.getZ())));
+                }
+                return;
+            }
+            case "remove" -> {
+                var s = pm.removeNearest(player.getLocation(), 5);
+                player.sendMessage(s == null
+                        ? Component.text("❌ Aucun emplacement de plante à moins de 5 blocs.", NamedTextColor.RED)
+                        : Component.text("✔ " + s.id() + " supprimé.", NamedTextColor.GREEN));
+                return;
+            }
+            case "clear" -> {
+                int n = pm.clearSpots();
+                player.sendMessage(Component.text("✔ " + n + " emplacement(s) de plante supprimé(s).", NamedTextColor.GREEN));
+                return;
+            }
+            default -> { }
+        }
+        fr.lolmc.game.PlantManager.PlantType type = switch (sub) {
+            case "blastcone", "cone" -> fr.lolmc.game.PlantManager.PlantType.BLASTCONE;
+            case "honeyfruit", "miel" -> fr.lolmc.game.PlantManager.PlantType.HONEYFRUIT;
+            case "scryer", "bulbe" -> fr.lolmc.game.PlantManager.PlantType.SCRYER;
+            default -> null;
+        };
+        if (type == null) {
+            player.sendMessage("§cUsage: /lola plant <blastcone [inner|outer] | honeyfruit | scryer [normal|late]> — pose à tes pieds");
+            player.sendMessage("§c       /lola plant list | remove (le plus proche) | clear");
+            return;
+        }
+        var variant = fr.lolmc.game.PlantManager.defaultVariant(type);
+        if (args.length >= 3) {
+            try { variant = fr.lolmc.game.PlantManager.Variant.valueOf(args[2].toUpperCase()); }
+            catch (IllegalArgumentException ex) { variant = null; }
+            if (variant == null || !fr.lolmc.game.PlantManager.accepts(type, variant)) {
+                player.sendMessage("§cVariante invalide : blastcone → inner|outer, scryer → normal|late");
+                return;
+            }
+        }
+        var s = pm.addSpot(type, variant, player.getLocation());
+        player.sendMessage(Component.text("✔ " + type.displayName + " (" + variant.name().toLowerCase() + ") enregistré : "
+                + s.id(), NamedTextColor.GREEN));
+    }
+
     private void handleBaronPit(Player player, String[] args) {
         var jm = LolPlugin.getInstance().getJungleManager();
         var pit = jm.getBaronPit();
@@ -747,14 +776,6 @@ private void handleSolo(Player player, String[] args) {
             }
         }
 
-        if (laneSetup.containsKey(player.getUniqueId())) {
-            e.setCancelled(true);
-            Location wp = e.getClickedBlock().getLocation().add(0.5, 1, 0.5);
-            laneSetup.get(player.getUniqueId()).add(wp);
-            player.sendActionBar(Component.text("📍 Waypoint #" + laneSetup.get(player.getUniqueId()).size() + " ajouté.", NamedTextColor.YELLOW));
-            return;
-        }
-
         PendingSetup setup = pending.get(player.getUniqueId());
         if (setup == null) return;
         e.setCancelled(true);
@@ -766,6 +787,12 @@ private void handleSolo(Player player, String[] args) {
                 int angle = 0;
                 String facingMsg = "orientation par défaut (Sud)";
                 var bd = e.getClickedBlock().getBlockData();
+                // Le four est l'ancre des schématiques de phases (collées juste au-dessus, tournées
+                // selon son orientation) : il doit RESTER en place (avant : il était supprimé au
+                // clic, et aucune phase ne pouvait plus être collée)
+                if (e.getClickedBlock().getType() != Material.FURNACE)
+                    player.sendMessage(Component.text("⚠ Ce bloc n'est pas un four : les schématiques de phases ne pourront pas "
+                            + "être collées ici. Pose un four (face avant = orientation) et reclique dessus.", NamedTextColor.GOLD));
                 if (bd instanceof org.bukkit.block.data.Directional dir) {
                     // SOUTH est l orientation par defaut documentee du batiment ; elle
                     // retombe naturellement sur le default technique du switch (0°).
@@ -776,7 +803,6 @@ private void handleSolo(Player player, String[] args) {
                         default    -> 0;
                     };
                     facingMsg = "orientée vers " + dir.getFacing() + " (" + angle + "°)";
-                    e.getClickedBlock().setType(org.bukkit.Material.AIR);
                 }
                 mapManager.setStructure(setup.type(), setup.team(), setup.lane(), setup.index(), clicked, angle);
                 var tier = pendingTier.remove(player.getUniqueId());
@@ -839,7 +865,7 @@ private void handleSolo(Player player, String[] args) {
     /** Sous-commandes de /lola → groupe (lolmc.admin.<groupe>). Permission : lolmc.admin.<sous-commande>. */
     static final Map<String, String> ADMIN_GROUPS = new java.util.LinkedHashMap<>();
     static {
-        for (String s : List.of("set", "position", "center", "lane", "schem", "road", "jungle", "baronpit",
+        for (String s : List.of("set", "position", "center", "schem", "road", "jungle", "plant", "baronpit",
                 "shopnpc", "mode", "template")) ADMIN_GROUPS.put(s, "config");
         for (String s : List.of("solo", "testgame", "give", "level", "gold", "hp", "resetcd", "buff", "spawn",
                 "wave", "team", "debug")) ADMIN_GROUPS.put(s, "test");
@@ -925,7 +951,8 @@ private void handleSolo(Player player, String[] args) {
                 case "set" -> List.of("turret", "inhibitor", "nexus", "basenexus");
                 case "schem" -> List.of("pos1", "pos2", "save"); // AJOUT : Auto-complétion de l'action de schématique
                 case "baronpit" -> List.of("territorial", "omniscient", "reset");
-                case "shopnpc", "position", "lane" -> List.of("blue", "red");
+                case "plant" -> List.of("blastcone", "honeyfruit", "scryer", "list", "remove", "clear");
+                case "shopnpc", "position" -> List.of("blue", "red");
                 case "mode" -> List.of("ranked", "normal");
                 case "road" -> List.of("top", "mid", "bot", "end");
                 case "jungle" -> List.of("gromp", "murkwolf", "raptor", "krug", "red_buff", "blue_buff", "scuttle_crab", "dragon_infernal", "dragon_ocean", "dragon_mountain", "dragon_cloud", "dragon_chemtech", "dragon_hextech", "dragon_elder", "voidgrub", "herald", "baron");
@@ -940,6 +967,11 @@ private void handleSolo(Player player, String[] args) {
                 var jt = fr.lolmc.game.JungleManager.MonsterType.valueOf(args[1].toUpperCase());
                 return jt.isEpic() || jt == fr.lolmc.game.JungleManager.MonsterType.VOIDGRUB ? List.of() : List.of("blue", "red");
             } catch (IllegalArgumentException ex) { return List.of(); }
+        }
+        if (args.length == 3 && args[0].equalsIgnoreCase("plant")) {
+            if (args[1].equalsIgnoreCase("blastcone")) return List.of("inner", "outer");
+            if (args[1].equalsIgnoreCase("scryer")) return List.of("normal", "late");
+            return List.of();
         }
         if (args.length == 3 && args[0].equalsIgnoreCase("set")) {
             return List.of("blue", "red");
@@ -1098,7 +1130,8 @@ private void handleSolo(Player player, String[] args) {
                     lp.getMapManager().rebindWorld(name);
                     lp.getJungleManager().rebindWorld(name);
                     lp.getRoadManager().rebindWorld(name);
-                    player.sendMessage(Component.text("✔ Tours, nexus, spawns, chemins et jungle de « " + name
+                    lp.getPlantManager().rebindWorld(name);
+                    player.sendMessage(Component.text("✔ Tours, nexus, spawns, chemins, jungle et plantes de « " + name
                             + " » seront utilisés par toutes les instances.", NamedTextColor.GREEN));
                 });
             }
@@ -1212,11 +1245,11 @@ private void handleSolo(Player player, String[] args) {
                 {"/lola set <turret|nexus|basenexus> ...", "Placer une structure"},
                 {"/lola position <blue|red> <1-5>", "Définir un point de spawn"},
                 {"/lola center",                  "Définir le centre de la minimap ici"},
-                {"/lola lane <top|mid|bot> | done", "Tracer une lane"},
                 {"/lola schem <pos1|pos2|save> ...", "Gérer une schématique"},
                 {"/lola baronpit <forme> <start|save|preview|clear>", "Terrain de la fosse du Baron par forme"},
                 {"/lola road <top|mid|bot|end> ...", "Tracer une route"},
-                {"/lola jungle <type> [blue|red]", "Spawner un monstre de jungle"},
+                {"/lola jungle <type> [blue|red]", "Placer un camp de jungle (clic au sol)"},
+                {"/lola plant <type> [variante]", "Placer une plante à tes pieds (list, remove, clear)"},
                 {"/lola shopnpc <blue|red>",      "Créer un PNJ boutique ici"},
                 {"/lola mode <ranked|normal>",    "Définir le mode de partie"},
                 {"/lola team <blue|red>",         "Se placer dans une équipe"},
