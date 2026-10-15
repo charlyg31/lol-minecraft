@@ -174,8 +174,27 @@ public class BushManager implements Listener {
             if (p != null && p.getGameMode() != org.bukkit.GameMode.SPECTATOR
                     && teamManager.getTeam(p) == viewerTeam) return false; // un allié est dans le bush
         }
+        if (viewerTeam == null || turretTrueSight(viewerTeam, target)) return false;
         var wardMgr = LolPlugin.getInstance().getWardManager();
-        return wardMgr == null || viewerTeam == null || !wardMgr.hasVisionAt(viewerTeam, target.getLocation());
+        return wardMgr == null || !wardMgr.hasVisionAt(viewerTeam, target.getLocation());
+    }
+
+    // Vision vraie des tourelles (Œil du gardien, wiki) : 1100 unités
+    private static final double TURRET_TRUE_SIGHT = 11.0;
+
+    /** Une tourelle debout de cette équipe voit-elle cette position (bushs compris) ? */
+    private static boolean turretTrueSight(TeamManager.Team team, Player target) {
+        Location loc = target.getLocation();
+        var inst = fr.lolmc.instance.InstanceHelper.instanceOf(target);
+        var map = inst != null ? inst.getMapManager() : LolPlugin.getInstance().getMapManager();
+        if (map == null) return false;
+        for (var s : map.getStructuresForTeam(team)) {
+            if (s.isDestroyed() || s.getType() != GameStructure.Type.TURRET) continue;
+            Location c = s.getCenter();
+            if (c != null && c.getWorld() != null && c.getWorld().equals(loc.getWorld())
+                    && c.distanceSquared(loc) <= TURRET_TRUE_SIGHT * TURRET_TRUE_SIGHT) return true;
+        }
+        return false;
     }
 
     /** Identifiant du bush à cette position (null hors bush). */

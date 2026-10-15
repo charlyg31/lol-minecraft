@@ -82,17 +82,9 @@ public class StructureDamageListener implements Listener {
 
         // Armure renforcée (LoL, tourelles) : -80 % de dégâts sans sbire de l'attaquant à proximité.
         // (L'ancienne « fortification » des 5 premières minutes n'existe plus sur la Faille.)
-        boolean minionNearby = structure.getType() != Type.TURRET;
-        for (var ent : structure.getCenter().getWorld()
-                .getNearbyEntities(structure.getCenter(), 12, 8, 12)) {
-            if (ent instanceof org.bukkit.entity.LivingEntity le
-                    && fr.lolmc.game.MinionManager.isMinion(le)
-                    && fr.lolmc.game.MinionManager.getMinionTeam(le) == playerTeam) {
-                minionNearby = true; break;
-            }
-        }
-        if (!minionNearby) {
-            damage *= 0.20;
+        boolean reinforced = tm.hasReinforcedArmor(structure, playerTeam);
+        if (reinforced) {
+            damage *= fr.lolmc.game.TurretManager.REINFORCED_ARMOR_MULT;
             player.sendActionBar(Component.text(
                 "🛡 Armure renforcée (-80% sans sbires)", NamedTextColor.GRAY));
         } else if (structure.getType() == Type.TURRET) {
@@ -135,6 +127,7 @@ public class StructureDamageListener implements Listener {
                         boolean melee = champ.getAutoAttackRange() <= 3.0;
                         double demolishDmg = melee ? 85.0 + champ.getStats().getFinalMaxHP() * 0.28
                                                    : 50.0 + champ.getStats().getFinalMaxHP() * 0.20;
+                        if (reinforced) demolishDmg *= fr.lolmc.game.TurretManager.REINFORCED_ARMOR_MULT;
                         structure.takeDamage(demolishDmg);
                         player.sendActionBar(Component.text(
                                 "💥 Démolition ! +" + (int) demolishDmg + " dégâts", NamedTextColor.GOLD));
@@ -172,12 +165,16 @@ public class StructureDamageListener implements Listener {
         String key = player.getUniqueId() + ":" + structure.getId();
         boolean running = voidBurnUntil.getOrDefault(key, 0L) > System.currentTimeMillis();
         voidBurnUntil.put(key, System.currentTimeMillis() + 4000L); // rafraîchie à chaque attaque
+        var turrets = fr.lolmc.instance.InstanceHelper.turretManager(player);
         if (!running) new org.bukkit.scheduler.BukkitRunnable() {
             @Override public void run() {
                 if (structure.isDestroyed() || voidBurnUntil.getOrDefault(key, 0L) <= System.currentTimeMillis()) {
                     voidBurnUntil.remove(key); cancel(); return;
                 }
-                boolean phase = structure.takeDamage(perTick);
+                // Armure renforcée : la brûlure aussi est réduite de 80 %
+                boolean reinforced = turrets != null && turrets.hasReinforcedArmor(structure, team);
+                boolean phase = structure.takeDamage(reinforced
+                        ? perTick * fr.lolmc.game.TurretManager.REINFORCED_ARMOR_MULT : perTick);
                 if (structure.isDestroyed()) {
                     if (player.isOnline()) onStructureDestroyed(structure, player);
                     else onStructureDestroyedByMinions(structure, structure.getCenter().getWorld());

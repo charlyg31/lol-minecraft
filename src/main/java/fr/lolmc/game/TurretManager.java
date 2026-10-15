@@ -69,6 +69,7 @@ public class TurretManager {
         gameStartMs = System.currentTimeMillis();
         platingLeft.clear(); target.clear(); warmup.clear(); lastChampionHit.clear();
         bulwark.clear(); destroyedAt.clear(); overgrowthSince.clear(); overgrowthNext.clear();
+        reinforcedOffUntil.clear();
     }
 
     /** Tourelle à plaques : toutes sauf celles du nexus (patch 26.1). */
@@ -228,6 +229,35 @@ public class TurretManager {
         }
     }
 
+    // Armure renforcée : tourelle → fin de la désactivation (dernier sbire attaquant vu + 3 s)
+    private final Map<String, Long> reinforcedOffUntil = new HashMap<>();
+    private static final long REINFORCED_REACTIVATE_MS = 3000L;
+    public static final double REINFORCED_ARMOR_MULT = 0.20;
+
+    /** Un sbire (ou le Héraut invoqué) de l'équipe attaquante est-il près de la tourelle ? */
+    private static boolean attackerMinionNear(GameStructure turret, Team attackers) {
+        for (var ent : turret.getCenter().getWorld().getNearbyEntities(turret.getCenter(), 12, 8, 12)) {
+            if (ent instanceof LivingEntity le && !le.isDead() && MinionManager.isMinion(le)
+                    && MinionManager.getMinionTeam(le) == attackers) return true;
+        }
+        return false;
+    }
+
+    /**
+     * Armure renforcée (wiki) : la tourelle réduit TOUS les dégâts de 80 % (vrais dégâts compris)
+     * tant qu'aucun sbire ennemi ni Héraut invoqué n'est proche ; elle se coupe aussitôt et se
+     * réactive 3 s après leur départ. Avant : pas de délai, et seule l'auto-attaque était réduite.
+     */
+    public boolean hasReinforcedArmor(GameStructure turret, Team attackers) {
+        if (turret.getType() != Type.TURRET || turret.isDestroyed()) return false;
+        long now = System.currentTimeMillis();
+        if (attackerMinionNear(turret, attackers)) {
+            reinforcedOffUntil.put(turret.getId(), now + REINFORCED_REACTIVATE_MS);
+            return false;
+        }
+        return now >= reinforcedOffUntil.getOrDefault(turret.getId(), 0L);
+    }
+
     /** Clé des plaques : propre à chaque tourelle (avant : partagée par toute la lane). */
     public static String platingKey(GameStructure s) {
         return s.getId();
@@ -288,7 +318,7 @@ public class TurretManager {
             return championManager.hasChampion(p) && p.getGameMode() != org.bukkit.GameMode.SPECTATOR
                     && teamManager.getTeam(p) != null && teamManager.getTeam(p) != turretTeam;
         }
-        if (!MinionManager.isMinion(le)) return false;
+        if (!MinionManager.isMinion(le) || fr.lolmc.util.VirtualHP.isDying(le)) return false;
         Team mt = MinionManager.getMinionTeam(le);
         return mt != null && mt != turretTeam;
     }
@@ -370,6 +400,15 @@ public class TurretManager {
     }
 
     private void fireAtMinion(GameStructure turret, Location beamFrom, LivingEntity minion) {
+        // Héraut invoqué : dégâts normaux d'un tir de tourelle, réduits par son armure (avant :
+        // traité comme un sbire de mêlée, il perdait 45 % de ses PV max par tir)
+        if ("herald".equals(MinionManager.getMinionTypeTag(minion))) {
+            double dmg = shotDamage(turret);
+            fr.lolmc.util.TargetingUtil.launchHoming(null, beamFrom, minion, 12.0,
+                    new org.bukkit.inventory.ItemStack(Material.WHITE_STAINED_GLASS), 0.7f, Material.WHITE_STAINED_GLASS, false,
+                    () -> fr.lolmc.util.MobCombat.damage(null, minion, dmg, fr.lolmc.util.DamageUtil.Type.PHYSICAL));
+            return;
+        }
         // Un tir retire un % des PV max selon le type (wiki LoL) : mêlée 3 tirs, caster 2,
         // canon 8, super-sbire 20 — appliqué à l'impact du tir à tête chercheuse
         double pct = switch (String.valueOf(MinionManager.getMinionTypeTag(minion))) {
@@ -482,6 +521,7 @@ public class TurretManager {
                     if (turret.getType() != Type.TURRET) continue;
                     if (gameStartMs != 0) regenAndRespawn(turret);
                     if (turret.isDestroyed()) continue;
+                    hasReinforcedArmor(turret, turret.getTeam().opposite()); // suit le départ des sbires (délai 3 s)
                     tickOvergrowth(turret);
                     processTurret(turret);
                 }
