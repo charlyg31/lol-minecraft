@@ -149,7 +149,9 @@ public final class ChampionStats {
     /** Vitesse d'attaque bonus (croissance + objets/effets), en fraction : 0.25 = +25 %. */
     public double getBonusAttackSpeedRatio() { return growthBonus(growthAttackSpeed) + bonusAttackSpeed; }
     public double getFinalAttackSpeed()  { return Math.min(baseAttackSpeed * (1 + growthBonus(growthAttackSpeed) + bonusAttackSpeed) * multAttackSpeed, 2.5); }
-    public double getFinalCritChance()   { return Math.min(baseCritChance + bonusCritChance * critChanceMultiplier, 1.0); }
+    public double getFinalCritChance()   { return Math.min(getUncappedCritChance(), 1.0); }
+    /** Chances de critique sans le plafond de 100 % (Yasuo convertit l'excédent en AD). */
+    public double getUncappedCritChance() { return baseCritChance + bonusCritChance * critChanceMultiplier; }
 
     /** Multiplicateur des chances de critique des objets (Yasuo : x2, Voie du Vagabond). */
     private double critChanceMultiplier = 1.0;

@@ -191,6 +191,19 @@ public final class TargetingUtil {
                                        java.util.function.Predicate<LivingEntity> canHit,
                                        java.util.function.Consumer<LivingEntity> onHit,
                                        java.util.function.BiConsumer<List<LivingEntity>, Location> onEnd) {
+        launchSkillshot(caster, origin, direction, range, width, pierce, travelled -> speed, visual, size, burst, canHit, onHit, onEnd);
+    }
+
+    /**
+     * Variante à vitesse variable : {@code speedAt} donne la vitesse (blocs/s) selon la distance
+     * déjà parcourue (roquette de Jinx : 1700 unités/s, puis 2200 après 1350 unités).
+     */
+    public static void launchSkillshot(Player caster, Location origin, Vector direction, double range,
+                                       double width, boolean pierce, java.util.function.DoubleUnaryOperator speedAt,
+                                       org.bukkit.inventory.ItemStack visual, float size, Material burst,
+                                       java.util.function.Predicate<LivingEntity> canHit,
+                                       java.util.function.Consumer<LivingEntity> onHit,
+                                       java.util.function.BiConsumer<List<LivingEntity>, Location> onEnd) {
         Location start = origin.clone();
         Vector dir = direction.clone().normalize();
         List<LivingEntity> hit = new ArrayList<>();
@@ -202,7 +215,7 @@ public final class TargetingUtil {
 
             @Override public void run() {
                 if (!caster.isOnline()) { finish(false); return; }
-                double perTick = speed / 20.0, moved = 0;
+                double perTick = speedAt.applyAsDouble(travelled) / 20.0, moved = 0;
                 while (moved < perTick && travelled < range) {
                     double st = Math.min(0.5, Math.min(perTick - moved, range - travelled));
                     Location next = pos.clone().add(dir.clone().multiply(st));

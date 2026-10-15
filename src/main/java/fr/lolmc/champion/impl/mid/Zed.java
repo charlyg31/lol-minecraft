@@ -114,6 +114,8 @@ public final class Zed extends BaseChampion implements fr.lolmc.champion.base.St
                 int lvl=cm.hasChampion(c)?cm.getChampion(c).getLevelSystem().getLevel():1;
                 double pct = lvl>=17 ? 0.10 : (lvl>=7 ? 0.075 : 0.05);
                 double bonus = realMax * pct;
+                // Contre les monstres : 75 %, plafonné à 175 (wiki, V26.03)
+                if (fr.lolmc.game.JungleManager.isJungleMonster(tgt)) bonus = Math.min(175, bonus * 0.75);
                 TargetingUtil.dealDamage(c, tgt, bonus, TargetingUtil.DmgType.MAGICAL);
                 fr.lolmc.util.VisualEffectUtil.impact(tgt.getWorld(),
                         tgt.getLocation().add(0,1,0), Material.GRAY_STAINED_GLASS, 0.25f, 4L);
@@ -140,7 +142,7 @@ public final class Zed extends BaseChampion implements fr.lolmc.champion.base.St
             var dir=c.getEyeLocation().getDirection();
             java.util.function.Consumer<Location> throwFrom = from -> {
                 final boolean[] first={true};
-                TargetingUtil.launchSkillshot(c, from, dir, 9.9, 0.6, true, 17.0,
+                TargetingUtil.launchSkillshot(c, from, dir, 9.25, 0.6, true, 17.0, // missile : 925 unités à 1700/s (données du jeu)
                         new org.bukkit.inventory.ItemStack(Material.NETHER_STAR), 0.7f, Material.GRAY_STAINED_GLASS,
                         __t -> {
                             boolean wasHit = alreadyHit.contains(__t.getUniqueId());

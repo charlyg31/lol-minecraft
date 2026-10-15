@@ -53,8 +53,8 @@ public class SummonerSpellManager {
     /** Châtiment : 2 charges, chacune rechargée en 90 s (le délai de 15 s sépare deux lancers). */
     private static final int SMITE_CHARGES = 2;
     private static final long SMITE_RECHARGE_MS = 90_000L;
-    /** Soins reçus de nouveau dans les 35 s : moitié moins efficaces. */
-    private static final long HEAL_REDUCED_MS = 35_000L;
+    /** Soins reçus de nouveau dans les 30 s : moitié moins efficaces. */
+    private static final long HEAL_REDUCED_MS = 30_000L; // DebuffDuration 30 (données du jeu)
 
     // Cooldowns par joueur et par sort : "uuid:SPELL" → timestamp de fin
     private final Map<String, Long> cooldowns = new HashMap<>();
@@ -104,7 +104,7 @@ public class SummonerSpellManager {
             l.add(from + SMITE_RECHARGE_MS);
         }
         long base = spell == Spell.TELEPORT && isUnleashedTeleport(player)
-                ? (long) (byLevel(player, 330, 240) * 1000) : spell.cooldownSeconds * 1000L;
+                ? (long) (unleashedTeleportCooldown(level(player)) * 1000) : spell.cooldownSeconds * 1000L;
         long cd = rm != null ? rm.summonerCooldownMs(player, base) : base;
         cooldowns.put(player.getUniqueId() + ":" + spell.name(), now + cd);
         // Icône de la barre d'action remise en couleur à la fin de la recharge
@@ -164,6 +164,11 @@ public class SummonerSpellManager {
     private static int level(Player p) {
         var cm = LolPlugin.getInstance().getChampionManager();
         return cm.hasChampion(p) ? cm.getChampion(p).getLevelSystem().getLevel() : 1;
+    }
+
+    /** Recharge de la Téléportation déchaînée (données du jeu) : 330, -10 par niveau jusqu'au 9, -10 au 10 (240 ensuite). */
+    static double unleashedTeleportCooldown(int lvl) {
+        return 330 - 10 * (Math.min(lvl, 9) - 1) - (lvl >= 10 ? 10 : 0);
     }
 
     /** Valeur selon le niveau du lanceur, de {@code at1} (niveau 1) à {@code at18} (niveau 18). */
@@ -390,7 +395,7 @@ public class SummonerSpellManager {
             triggerCooldown(caster, Spell.TELEPORT);
             // Téléportation déchaînée (10 min) : +50 % de vitesse pendant 3 s à l'arrivée
             var cc = LolPlugin.getInstance().getCCManager();
-            if (isUnleashedTeleport(caster) && cc != null) cc.speedPct(caster, 0.50, 60);
+            if (isUnleashedTeleport(caster) && cc != null) cc.speedPct(caster, 0.50, 80); // 4 s (MSDuration, données du jeu)
         });
     }
 

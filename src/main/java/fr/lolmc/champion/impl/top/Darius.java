@@ -76,7 +76,7 @@ public final class Darius extends BaseChampion implements fr.lolmc.champion.base
         var cm = LolPlugin.getInstance().getChampionManager();
         int lvl = cm.hasChampion(darius) ? cm.getChampion(darius).getLevelSystem().getLevel() : 1;
 
-        // Saignement : une seule tâche par cible, qui inflige chaque seconde 1/5 des dégâts par stack
+        // Saignement : une seule tâche par cible, 4 ticks de 1.25 s (données du jeu), ×2.5 contre les monstres
         if (!bleedTasks.containsKey(vid)) {
             bleedTasks.put(vid, new org.bukkit.scheduler.BukkitRunnable() {
                 @Override public void run() {
@@ -86,17 +86,19 @@ public final class Darius extends BaseChampion implements fr.lolmc.champion.base
                     }
                     double bonusAD = cm.hasChampion(darius) ? cm.getChampion(darius).getStats().getBonusAD() : 0;
                     double perStack = 13 + 17.0 * (lvl - 1) / 17.0 + bonusAD * 0.30; // sur 5 s
-                    fr.lolmc.util.DamageUtil.damageEntity(darius, victim, st * perStack / 5.0, false,
+                    double monster = fr.lolmc.game.JungleManager.isJungleMonster(victim) ? 2.5 : 1.0;
+                    fr.lolmc.util.DamageUtil.damageEntity(darius, victim, st * perStack / 4.0 * monster, false,
                             fr.lolmc.util.DamageUtil.Type.PHYSICAL);
                     fr.lolmc.util.VisualEffectUtil.impact(victim.getWorld(),
                         victim.getLocation().add(0,1.5,0), Material.RED_STAINED_GLASS, 0.24f, 4L);
                 }
-            }.runTaskTimer(LolPlugin.getInstance(), 20L, 20L));
+            }.runTaskTimer(LolPlugin.getInstance(), 25L, 25L));
         }
 
         // Puissance noxienne : +30-230 AD pendant 5 s
         if (stacks == 5 && !might && victim instanceof Player && cm.hasChampion(darius)) {
-            double bonus = 30 + 200.0 * (lvl - 1) / 17.0;
+            // Données du jeu : 30, +5/niveau, +10/niveau dès 11, +25/niveau dès 14 (230 au 18)
+            double bonus = lvl <= 10 ? 30 + 5 * (lvl - 1) : lvl <= 13 ? 75 + 10 * (lvl - 10) : 105 + 25 * (lvl - 13);
             var stats = cm.getChampion(darius).getStats();
             stats.addBonusAD(bonus);
             noxianMightUntil.put(darius.getUniqueId(), now + 5000L);
@@ -131,7 +133,7 @@ public final class Darius extends BaseChampion implements fr.lolmc.champion.base
             c.sendActionBar(Component.text("🪓 Décimation...",NamedTextColor.DARK_RED));
             new BukkitRunnable(){@Override public void run(){
                 int hitChamps=0;
-                for(var __t : TargetingUtil.enemiesAround(c, 4.9)){
+                for(var __t : TargetingUtil.enemiesAround(c, 5.25)){ // rayon 460 + collision (65)
                     double dist=__t.getLocation().distance(c.getLocation());
                     double dmg = dist<2.4 ? edgeDmg*0.35 : edgeDmg; // manche 35 %
                     TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.PHYSICAL);
@@ -203,7 +205,7 @@ public final class Darius extends BaseChampion implements fr.lolmc.champion.base
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : cône devant, tire les ennemis vers Darius + ralentit 40% 1s
-            var targets=TargetingUtil.enemiesInCone(c, 6.0, 50); // 535 unités, 50° (wiki)
+            var targets=TargetingUtil.enemiesInCone(c, 6.0, 50); // 535 unités + collision (65), 50° (wiki)
             if(targets.isEmpty()){c.sendActionBar(Component.text("🪝 Personne à attraper",NamedTextColor.GRAY));return;}
             for(var __t : targets){
                 TargetingUtil.pullTo(__t, c, 1.6, 22.0); // attiré devant Darius (avant : simple poussée)
@@ -234,9 +236,14 @@ public final class Darius extends BaseChampion implements fr.lolmc.champion.base
             int r=Math.min(getLevel()-1,2);
             double dmg=base[r]+s.getBonusAD()*fr.lolmc.util.Balance.ratio("r_darius","ad",0.75); // AD bonus (wiki)
             // +0-100%% de dégâts selon les stacks d'Hémorragie sur la cible
-            int stacks=getBleedStacks(tgt.getUniqueId());
-            dmg*=(1.0 + 0.20*stacks); // 5 stacks = +100%%
-            // Bond vers la cible (sans traverser les murs)
+            final double rawDmg=dmg; // +20 % par effet d'Hémorragie, compté à l'impact
+            // Wiki : 0.3667 s de lancement, puis bond sur la cible et dégâts bruts
+            final org.bukkit.entity.LivingEntity finalTgt = tgt;
+            final BaseAbility thisAbility = this;
+            new org.bukkit.scheduler.BukkitRunnable() { @Override public void run() {
+            if (!c.isOnline() || finalTgt.isDead() || !finalTgt.isValid()) return;
+            var tgt = finalTgt;
+            double dmg = rawDmg * (1.0 + 0.20 * getBleedStacks(tgt.getUniqueId())); // 5 effets = +100 %
             dashTo(c, tgt, -1.2);
             tgt.getWorld().strikeLightningEffect(tgt.getLocation());
             fr.lolmc.util.VisualEffectUtil.impactBurst(tgt.getWorld(),
@@ -245,8 +252,6 @@ public final class Darius extends BaseChampion implements fr.lolmc.champion.base
             if(tgt instanceof Player _tp)_tp.sendMessage(Component.text("☠ GUILLOTINE NOXIENNE!",NamedTextColor.DARK_RED));
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_PLAYER_ATTACK_CRIT, 1.5f, 0.5f);
             // Reset du CD si la cible meurt dans le tick suivant (mécanique Juggernaut LoL)
-            final org.bukkit.entity.LivingEntity finalTgt = tgt;
-            final BaseAbility thisAbility = this;
             new org.bukkit.scheduler.BukkitRunnable() {
                 @Override public void run() {
                     boolean killed = finalTgt.isDead() || finalTgt.getHealth() <= 0;
@@ -261,6 +266,7 @@ public final class Darius extends BaseChampion implements fr.lolmc.champion.base
                     }
                 }
             }.runTaskLater(LolPlugin.getInstance(), 1L);
+            }}.runTaskLater(LolPlugin.getInstance(), 7L);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] base=fr.lolmc.util.Balance.base("r_darius",new double[]{125,250,375});int r=Math.min(getLevel()-1,2);

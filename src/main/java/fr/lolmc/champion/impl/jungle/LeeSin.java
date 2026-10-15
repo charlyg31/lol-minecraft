@@ -102,16 +102,21 @@ public final class LeeSin extends BaseChampion implements fr.lolmc.champion.base
                 org.bukkit.entity.LivingEntity tgt=null;
                 for(var e: c.getWorld().getNearbyLivingEntities(c.getLocation(),15)) if(e.getUniqueId().equals(marked)) tgt=e;
                 if(tgt!=null){
-                    dashTo(c, tgt, -1.0);
+                    // Ruée de 1350 unités/s (+100 % de la vitesse de déplacement, wiki), dégâts à l'arrivée
+                    final org.bukkit.entity.LivingEntity ftgt=tgt;
+                    dashToward(c, dashPoint(c, tgt, -1.0), 1350+s.getFinalMovementSpeed(), () -> {
+                    if(ftgt.isDead() || !ftgt.isValid()) return;
+                    var tgt2=ftgt;
                     double[] base=fr.lolmc.util.Balance.base("q_leesin",new double[]{60,90,120,150,180});
 
-                    double missingPct=1.0-(TargetingUtil.getRealHealth(tgt)/Math.max(1, TargetingUtil.getRealMaxHealth(tgt)));
+                    double missingPct=1.0-(TargetingUtil.getRealHealth(tgt2)/Math.max(1, TargetingUtil.getRealMaxHealth(tgt2)));
                     double dmg=(base[getLevel()-1]+s.getBonusAD()*fr.lolmc.util.Balance.ratio("q_leesin","ad",0.9))*(1.0+missingPct);
-                    TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.PHYSICAL);
+                    TargetingUtil.dealDamage(c, tgt2, dmg, TargetingUtil.DmgType.PHYSICAL);
                     c.getWorld().playSound(c.getLocation(), Sound.ENTITY_PLAYER_ATTACK_CRIT, 1f, 0.9f);
+                    });
                 }
                 sonicTarget.remove(c.getUniqueId());
-                resourceCost = 50;
+                clearCostOverride();
                 return;
             }
             double[] base=fr.lolmc.util.Balance.base("q_leesin",new double[]{60,90,120,150,180});double dmg=base[getLevel()-1]+s.getBonusAD()*fr.lolmc.util.Balance.ratio("q_leesin","ad",0.9);
@@ -119,7 +124,7 @@ public final class LeeSin extends BaseChampion implements fr.lolmc.champion.base
             // recharge tout de suite ; touché → 3 s pour la 2e activation (Coup Résonnant)
             deferCooldown();
             final BaseAbility q = this;
-            TargetingUtil.launchSkillshot(c, c.getEyeLocation(), c.getEyeLocation().getDirection(), 12.0, 0.6, false, 18.0,
+            TargetingUtil.launchSkillshot(c, c.getEyeLocation(), c.getEyeLocation().getDirection(), 12.0, 0.6, false, 18.0, // missile : 1200 unités (données du jeu)
                     new org.bukkit.inventory.ItemStack(Material.ECHO_SHARD), 0.8f, Material.LIGHT_GRAY_STAINED_GLASS,
                     tgt -> sonicHit(c, s, tgt, dmg, q),
                     hits -> { if(hits.isEmpty()){
@@ -132,12 +137,12 @@ public final class LeeSin extends BaseChampion implements fr.lolmc.champion.base
         private void sonicHit(Player c, ChampionStats s, org.bukkit.entity.LivingEntity tgt, double dmg, BaseAbility q){
             TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.PHYSICAL);
             sonicTarget.put(c.getUniqueId(), tgt.getUniqueId());
-            resourceCost = 25; // Coup Résonnant : 25 d'énergie (wiki)
+            overrideCost(25); // Coup Résonnant : 25 d'énergie (wiki)
             final UUID markedId = tgt.getUniqueId();
             new BukkitRunnable(){@Override public void run(){
                 if(markedId.equals(sonicTarget.get(c.getUniqueId()))){
                     sonicTarget.remove(c.getUniqueId());
-                    resourceCost = 50;
+                    clearCostOverride();
                     q.triggerCooldown(c, s);
                 }
             }}.runTaskLater(LolPlugin.getInstance(),60L);
@@ -167,7 +172,7 @@ public final class LeeSin extends BaseChampion implements fr.lolmc.champion.base
             // Avant : appliquée d'office avec la Protection.
             if(ironWillUntil.getOrDefault(id,0L)>System.currentTimeMillis()){
                 ironWillUntil.remove(id);
-                resourceCost=50;
+                clearCostOverride();
                 double[] omni={0.10,0.14,0.18,0.22,0.26};
                 double o=omni[getLevel()-1];
                 if(cm.hasChampion(c)){
@@ -179,30 +184,33 @@ public final class LeeSin extends BaseChampion implements fr.lolmc.champion.base
                 c.sendActionBar(Component.text("🛡 Volonté de Fer : omnivampirisme 4s",NamedTextColor.GREEN));
                 return;
             }
-            Player dest = (t!=null && LolPlugin.getInstance().getTeamManager().areAllies(c,t)) ? t : c; // allié visé, sinon soi
-            if(!dest.equals(c)){ // bond vers l'allié uniquement
-                Location safe=safeTeleport(c.getLocation(),dest.getLocation());
-                c.teleport(safe);
-                fr.lolmc.LolPlugin.getInstance().getRuneManager().onDash(c); // Impact soudain
-            }
-            // Bouclier 60/105/150/195/240 +80%AP pendant 2s (40 ticks) sur Lee Sin (et la cible si champion)
+            // Allié visé à 700 unités au plus (+ collision), sinon soi
+            Player dest = (t!=null && LolPlugin.getInstance().getTeamManager().areAllies(c,t)
+                    && t.getWorld().equals(c.getWorld()) && t.getLocation().distance(c.getLocation()) <= 7.65) ? t : c;
+            // Bouclier 60/105/150/195/240 +80%AP pendant 2s sur Lee Sin (et l'allié), posé à l'arrivée (wiki)
             double[] shieldBase={60,105,150,195,240};
-            double shield=shieldBase[getLevel()-1]+s.getFinalAP()*0.80;
-            if(cm.hasChampion(c)) cm.getChampion(c).getStats().addShield(shield);
-            if(!dest.equals(c) && cm.hasChampion(dest)) { cm.getChampion(dest).getStats().addShield(shield); fr.lolmc.item.ItemEffects.onAllyHealShield(c, dest, 0, shield); }
-            final Player fdest=dest; final double fsh=shield; final Player fc=c;
-            new BukkitRunnable(){@Override public void run(){
-                if(cm.hasChampion(fc)) cm.getChampion(fc).getStats().addShield(-fsh);
-                if(!fdest.equals(fc) && cm.hasChampion(fdest)) cm.getChampion(fdest).getStats().addShield(-fsh);
-            }}.runTaskLater(LolPlugin.getInstance(), 40L);
+            final double shield=shieldBase[getLevel()-1]+s.getFinalAP()*0.80;
+            final Player fdest=dest; final Player fc=c;
+            Runnable protect=() -> {
+                if(cm.hasChampion(fc)) cm.getChampion(fc).getStats().addShield(shield);
+                if(!fdest.equals(fc) && cm.hasChampion(fdest)) { cm.getChampion(fdest).getStats().addShield(shield); fr.lolmc.item.ItemEffects.onAllyHealShield(fc, fdest, 0, shield); }
+                new BukkitRunnable(){@Override public void run(){
+                    if(cm.hasChampion(fc)) cm.getChampion(fc).getStats().addShield(-shield);
+                    if(!fdest.equals(fc) && cm.hasChampion(fdest)) cm.getChampion(fdest).getStats().addShield(-shield);
+                }}.runTaskLater(LolPlugin.getInstance(), 40L);
+            };
+            if(!dest.equals(c)){ // bond vers l'allié uniquement
+                // Ruée de 1350 unités/s (+100 % de la vitesse de déplacement, wiki)
+                dashToward(c, dashPoint(c, dest, -1.0), 1350+s.getFinalMovementSpeed(), protect);
+            } else protect.run();
             // Fenêtre de 3 s pour la Volonté de fer ; la recharge démarre après
             deferCooldown();
-            resourceCost=25;
+            overrideCost(25);
             final long until=System.currentTimeMillis()+3000L;
             ironWillUntil.put(id, until);
             final BaseAbility w=this;
             new BukkitRunnable(){@Override public void run(){
-                if(ironWillUntil.getOrDefault(id,0L)==until){ ironWillUntil.remove(id); resourceCost=50; w.triggerCooldown(c, s); }
+                if(ironWillUntil.getOrDefault(id,0L)==until){ ironWillUntil.remove(id); clearCostOverride(); w.triggerCooldown(c, s); }
             }}.runTaskLater(LolPlugin.getInstance(), 60L);
             c.sendActionBar(Component.text(String.format("🛡 Protection %.0f ! (relancer : Volonté de Fer)",shield),NamedTextColor.GREEN));
             c.getWorld().playSound(c.getLocation(), Sound.ITEM_SHIELD_BLOCK, 1f, 1.3f);
@@ -224,7 +232,7 @@ public final class LeeSin extends BaseChampion implements fr.lolmc.champion.base
             // marqués par la Tempête et encore proches. Avant : ralentissement appliqué d'office.
             if(crippleUntil.getOrDefault(id,0L)>System.currentTimeMillis()){
                 crippleUntil.remove(id);
-                resourceCost=50;
+                clearCostOverride();
                 var marked=tempestMarked.remove(id);
                 if(marked!=null) for(UUID mid : marked){
                     var e=org.bukkit.Bukkit.getEntity(mid);
@@ -240,7 +248,7 @@ public final class LeeSin extends BaseChampion implements fr.lolmc.champion.base
             double[] base=fr.lolmc.util.Balance.base("e_leesin",new double[]{35,60,85,110,135});
             double dmg=base[getLevel()-1]+s.getFinalAD()*fr.lolmc.util.Balance.ratio("e_leesin","ad",0.9);
             var marked=new java.util.HashSet<UUID>();
-            for(var __t : TargetingUtil.enemiesAround(c, 5.0)){ // rayon 450 (wiki)
+            for(var __t : TargetingUtil.enemiesAround(c, 5.15)){ // rayon 450 + collision (65)
                 TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);
                 marked.add(__t.getUniqueId());
                 // Marqués et révélés 4 s
@@ -252,12 +260,12 @@ public final class LeeSin extends BaseChampion implements fr.lolmc.champion.base
             if(marked.isEmpty()) return; // personne touché : pas de 2e activation
             tempestMarked.put(id, marked);
             deferCooldown();
-            resourceCost=25;
+            overrideCost(25);
             final long until=System.currentTimeMillis()+3000L;
             crippleUntil.put(id, until);
             final BaseAbility e=this;
             new BukkitRunnable(){@Override public void run(){
-                if(crippleUntil.getOrDefault(id,0L)==until){ crippleUntil.remove(id); tempestMarked.remove(id); resourceCost=50; e.triggerCooldown(c, s); }
+                if(crippleUntil.getOrDefault(id,0L)==until){ crippleUntil.remove(id); tempestMarked.remove(id); clearCostOverride(); e.triggerCooldown(c, s); }
             }}.runTaskLater(LolPlugin.getInstance(), 60L);
         }
         @Override public String getDynamicDescription(ChampionStats s){
@@ -283,16 +291,28 @@ public final class LeeSin extends BaseChampion implements fr.lolmc.champion.base
             fr.lolmc.rune.RuneManager.beginSingleTarget(); // cible frappée : dégâts à cible unique
             try { TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.PHYSICAL); }
             finally { fr.lolmc.rune.RuneManager.endSingleTarget(); }
-            Vector dir=tgt.getLocation().toVector().subtract(c.getLocation().toVector()).normalize();
-            Vector kb=dir.clone().multiply(2.5); kb.setY(0.8);
+            // Wiki : la cible est projetée de 800 unités en 0.8 s ; les ennemis percutés sur
+            // son trajet subissent les dégâts de collision et sont projetés 1 s
+            Vector dir=tgt.getLocation().toVector().subtract(c.getLocation().toVector()).setY(0);
+            if(dir.lengthSquared()<1e-6) dir=c.getLocation().getDirection().setY(0);
+            final Vector fdir=dir.normalize();
             fr.lolmc.LolPlugin.getInstance().getCCManager().setAirborne(tgt, 20); // projeté 1 s (wiki)
-            tgt.setVelocity(kb);
-            Location landing=tgt.getLocation().clone().add(dir.clone().multiply(4));
-            for(var __t : TargetingUtil.entitiesInRadius(c, landing, 3.0)){
-                if(__t.equals(tgt)) continue;
-                TargetingUtil.dealDamage(c, __t, collideDmg, TargetingUtil.DmgType.PHYSICAL);
-                fr.lolmc.LolPlugin.getInstance().getCCManager().setAirborne(__t, 20); // percuté : projeté 1 s
-            }
+            final org.bukkit.entity.LivingEntity kicked=tgt;
+            final java.util.Set<UUID> struck=new java.util.HashSet<>();
+            struck.add(kicked.getUniqueId());
+            new BukkitRunnable(){ int n=0;
+                @Override public void run(){
+                    if(n++>=16 || kicked.isDead() || !kicked.isValid()){ cancel(); return; }
+                    Location next=kicked.getLocation().clone().add(fdir.clone().multiply(0.5)); // 8 blocs en 0.8 s
+                    if(next.getBlock().getType().isSolid() || next.clone().add(0,1,0).getBlock().getType().isSolid()){ cancel(); return; }
+                    kicked.teleport(next);
+                    for(var __t : TargetingUtil.entitiesInRadius(c, next, 1.3)){
+                        if(!struck.add(__t.getUniqueId())) continue;
+                        TargetingUtil.dealDamage(c, __t, collideDmg, TargetingUtil.DmgType.PHYSICAL);
+                        fr.lolmc.LolPlugin.getInstance().getCCManager().setAirborne(__t, 20); // percuté : projeté 1 s
+                    }
+                }
+            }.runTaskTimer(LolPlugin.getInstance(), 0L, 1L);
             if(tgt instanceof Player _tp)_tp.sendMessage(Component.text("🐉 FURIE DU DRAGON!",NamedTextColor.RED));
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_ENDER_DRAGON_GROWL, 1f, 1.2f);
         }

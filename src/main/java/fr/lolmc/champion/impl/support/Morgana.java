@@ -51,7 +51,7 @@ public final class Morgana extends BaseChampion {
         @Override public void cast(Player c,ChampionStats s,Player t){
             // Wiki : skillshot de 1300 unités, enracine 2-3 s (avant : sort ciblé à 6.5 blocs, 2 s)
             // Projectile réel : 1300 unités à 1200/s
-            TargetingUtil.launchSkillshot(c, c.getEyeLocation(), c.getEyeLocation().getDirection(), 13.0, 0.7, false, 12.0,
+            TargetingUtil.launchSkillshot(c, c.getEyeLocation(), c.getEyeLocation().getDirection(), 13.0, 0.7, false, 12.0, // missile : 1300 unités (données du jeu)
                     new org.bukkit.inventory.ItemStack(Material.PURPLE_STAINED_GLASS), 0.8f, Material.PURPLE_STAINED_GLASS,
                     tgt -> bindingHit(c, s, tgt),
                     hits -> { if(hits.isEmpty()) c.sendActionBar(Component.text("🕸 Entrave manquée!",NamedTextColor.GRAY)); });
@@ -91,6 +91,7 @@ public final class Morgana extends BaseChampion {
                         // PV manquants de toute cible (avant : champions seulement)
                         double missingPct=1.0-TargetingUtil.getRealHealth(__t)/Math.max(1, TargetingUtil.getRealMaxHealth(__t));
                         double dmg=baseTick*(1.0+missingPct); // jusqu'à x2 sur cible basse vie
+                        if(fr.lolmc.game.JungleManager.isJungleMonster(__t)) dmg*=1.70; // 170 % contre les monstres (données du jeu)
                         TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);
                         siphon(c, __t, dmg);
                     }

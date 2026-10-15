@@ -106,6 +106,55 @@ public abstract class BaseAbility {
         fr.lolmc.LolPlugin.getInstance().getRuneManager().onDash(caster); // Impact soudain
     }
 
+    /** Point d'arrivée d'une ruée vers {@code target} (même calcul que dashTo, sans se téléporter). */
+    protected Location dashPoint(Player caster, org.bukkit.entity.LivingEntity target, double offset) {
+        Location from = caster.getLocation();
+        Location to = target.getLocation();
+        org.bukkit.util.Vector dir = to.toVector().subtract(from.toVector()).setY(0);
+        if (dir.lengthSquared() < 1e-6) return from.clone();
+        dir.normalize();
+        Location dest = to.clone().add(dir.clone().multiply(offset));
+        dest.setY(to.getY());
+        return safeTeleport(from, dest);
+    }
+
+    /**
+     * Ruée réelle (LoL) : le lanceur glisse jusqu'à {@code dest} à {@code unitsPerSec} unités/s,
+     * monte les marches, s'arrête contre un mur, puis {@code onArrive} est appelé (peut être null).
+     * Avant, les ruées étaient des téléportations instantanées.
+     */
+    protected static void dashToward(Player caster, Location dest, double unitsPerSec, Runnable onArrive) {
+        fr.lolmc.LolPlugin.getInstance().getRuneManager().onDash(caster); // Impact soudain
+        Location from = caster.getLocation().clone();
+        org.bukkit.util.Vector path = dest.toVector().subtract(from.toVector()).setY(0);
+        double total = path.length();
+        if (total < 1e-3) { if (onArrive != null) onArrive.run(); return; }
+        org.bukkit.util.Vector unit = path.multiply(1.0 / total);
+        double perTick = unitsPerSec / 100.0 / 20.0;
+        new org.bukkit.scheduler.BukkitRunnable() {
+            double done = 0;
+            Location pos = from.clone();
+            @Override public void run() {
+                if (!caster.isOnline() || caster.getGameMode() == org.bukkit.GameMode.SPECTATOR) { cancel(); return; }
+                double step = Math.min(perTick, total - done);
+                Location next = pos.clone().add(unit.clone().multiply(step));
+                boolean blocked = blocked(next);
+                if (blocked) { next.add(0, 1, 0); blocked = blocked(next); }
+                if (!blocked) { pos = next; done += step; }
+                Location tp = pos.clone();
+                tp.setYaw(caster.getLocation().getYaw()); tp.setPitch(caster.getLocation().getPitch());
+                caster.teleport(tp);
+                if (blocked || done >= total - 1e-6) {
+                    cancel();
+                    if (onArrive != null) onArrive.run();
+                }
+            }
+            private boolean blocked(Location l) {
+                return l.getBlock().getType().isSolid() || l.clone().add(0, 1, 0).getBlock().getType().isSolid();
+            }
+        }.runTaskTimer(fr.lolmc.LolPlugin.getInstance(), 0L, 1L);
+    }
+
     // ─── Cooldown ────────────────────────────────────────────────
 
     // ── Charges (LoL : Faucon d'Ashe, Bandage d'Amumu…) ──
@@ -320,7 +369,13 @@ public abstract class BaseAbility {
                 .append(Component.text(val, NamedTextColor.WHITE).decoration(TextDecoration.ITALIC, false));
     }
     // ─── Ressource ───────────────────────────────────────────────
+    /** Coût temporaire d'une relance (Lee Sin : 25 d'énergie), prioritaire sur champions.yml ; -1 = aucun. */
+    private double costOverride = -1;
+    protected void overrideCost(double cost) { costOverride = cost; }
+    protected void clearCostOverride() { costOverride = -1; }
+
     public double getResourceCost() {
+        if (costOverride >= 0) return costOverride;
         double[] byRank = fr.lolmc.util.Balance.costs(id); // coût par rang (LoL)
         if (byRank != null) return byRank[Math.max(0, Math.min(level - 1, byRank.length - 1))];
         return fr.lolmc.util.Balance.cost(id, resourceCost);

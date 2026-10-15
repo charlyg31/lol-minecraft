@@ -65,10 +65,12 @@ public class RewardManager {
 
     // ── Système d'assists ─────────────────────────────────────────────────
     // Map<victim_uuid, Map<attacker_uuid, lastDamageTimestamp>>
-    // Fenêtre : dégâts infligés dans les 10s avant la mort = assist
+    // Fenêtre : dégâts infligés dans les 15 s avant la mort = assistance (AssistDurationOverride, données du jeu)
     private final java.util.Map<java.util.UUID,
         java.util.Map<java.util.UUID, Long>> damageContrib = new java.util.concurrent.ConcurrentHashMap<>();
-    private static final long ASSIST_WINDOW_MS = 10_000L;
+    private static final long ASSIST_WINDOW_MS = 15_000L;
+    /** Crédit d'un kill à un champion quand la victime meurt sans tueur (exécution) : 10 s. */
+    private static final long KILL_CREDIT_MS = 10_000L;
 
     /** Enregistre un dégât infligé par [attacker] sur [victim] (appelé depuis DamageUtil). */
     public void recordDamage(java.util.UUID attacker, java.util.UUID victim) {
@@ -81,7 +83,7 @@ public class RewardManager {
     public java.util.UUID getLastAttacker(java.util.UUID victim) {
         var contribs = damageContrib.get(victim);
         if (contribs == null) return null;
-        long threshold = System.currentTimeMillis() - ASSIST_WINDOW_MS;
+        long threshold = System.currentTimeMillis() - KILL_CREDIT_MS;
         java.util.UUID best = null;
         long bestTime = Long.MIN_VALUE;
         for (var entry : contribs.entrySet()) {
@@ -93,7 +95,7 @@ public class RewardManager {
         return best;
     }
 
-    /** Retourne les joueurs éligibles à l'assist (ont infligé des dégâts dans les 10s). */
+    /** Retourne les joueurs éligibles à l'assist (ont infligé des dégâts dans les 15 s). */
     public java.util.Set<java.util.UUID> getAssistants(java.util.UUID victim, java.util.UUID killer) {
         var contribs = damageContrib.remove(victim);
         if (contribs == null) return java.util.Collections.emptySet();

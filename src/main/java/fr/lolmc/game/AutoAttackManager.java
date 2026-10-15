@@ -315,6 +315,7 @@ public class AutoAttackManager {
                     || target.getGameMode() == GameMode.SPECTATOR) return;
             // Dégâts (les attaques de base sont physiques dans LoL, même celles des mages)
             fr.lolmc.item.ItemEffects.currentAttackCrit = crit; // Présage de Randuin
+            fr.lolmc.item.ItemEffects.lastAttackCrit = crit;
             try {
                 if (empowered == null || !empowered.apply(attacker, target, dmg))
                     DamageUtil.damage(attacker, target, dmg, false, DamageUtil.Type.PHYSICAL);

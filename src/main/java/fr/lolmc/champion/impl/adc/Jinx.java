@@ -139,7 +139,7 @@ public final class Jinx extends BaseChampion implements fr.lolmc.champion.base.S
         @Override public void cast(Player c,ChampionStats s,Player t){
             double[] base=fr.lolmc.util.Balance.base("w_jinx",new double[]{10,60,110,160,210});double dmg=base[getLevel()-1]+s.getFinalAD()*fr.lolmc.util.Balance.ratio("w_jinx","ad",1.4);
             // Projectile réel : 1500 unités à 3300/s
-            TargetingUtil.launchSkillshot(c, c.getEyeLocation(), c.getEyeLocation().getDirection(), 15.0, 0.6, false, 33.0,
+            TargetingUtil.launchSkillshot(c, c.getEyeLocation(), c.getEyeLocation().getDirection(), 15.0, 0.6, false, 33.0, // missile : 1500 unités (données du jeu)
                     new org.bukkit.inventory.ItemStack(Material.LIGHTNING_ROD), 0.8f, Material.YELLOW_STAINED_GLASS,
                     main -> zapHit(c, s, main, dmg),
                     hits -> { if(hits.isEmpty()) c.sendActionBar(Component.text("⚡ Zap manqué!",NamedTextColor.GRAY)); });
@@ -221,7 +221,9 @@ public final class Jinx extends BaseChampion implements fr.lolmc.champion.base.S
         @Override public void cast(Player c,ChampionStats s,Player t){
             // Projectile réel : roquette (≈2000 unités/s) qui explose sur le 1er champion
             final Location from=c.getLocation();
-            TargetingUtil.launchSkillshot(c, c.getEyeLocation(), c.getEyeLocation().getDirection(), 30.0, 1.2, false, 20.0,
+            // Portée globale ; 1700 unités/s, puis 2200 après 1350 unités (données du jeu, wiki)
+            TargetingUtil.launchSkillshot(c, c.getEyeLocation(), c.getEyeLocation().getDirection(), 250.0, 1.2, false,
+                    travelled -> travelled < 13.5 ? 17.0 : 22.0,
                     new org.bukkit.inventory.ItemStack(Material.FIREWORK_ROCKET), 1.2f, Material.ORANGE_STAINED_GLASS,
                     e -> e instanceof Player, // explose sur le 1er champion (wiki), traverse les sbires
                     main -> rocketHit(c, s, main, from.distance(main.getLocation())),
@@ -237,7 +239,7 @@ public final class Jinx extends BaseChampion implements fr.lolmc.champion.base.S
             double[] missPct={0.25,0.30,0.35};
             double baseDmg=(baseMax[rr]+s.getBonusAD()*fr.lolmc.util.Balance.ratio("r_jinx","ad",1.2))*distMult;
 
-            for(var __t : TargetingUtil.entitiesInRadius(c, main.getLocation(), 5.0)){
+            for(var __t : TargetingUtil.entitiesInRadius(c, main.getLocation(), 4.65)){ // rayon 400 + collision (65)
                 // PV manquants à l'échelle LoL (joueur=HPSystem, Baron=virtuel, sbire=vanilla)
                 double missingHP = TargetingUtil.getRealMaxHealth(__t) - TargetingUtil.getRealHealth(__t);
                 double missingBonus=missingHP*missPct[rr];

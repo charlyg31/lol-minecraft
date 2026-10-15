@@ -36,6 +36,23 @@ public final class Nasus extends BaseChampion implements fr.lolmc.champion.base.
     @Override public void resetState(UUID id){ qStacks.remove(id); }
     @Override public void resetAllState(){ qStacks.clear(); }
 
+    /** Portée d'attaque bonus temporaire (Q, R) : retirée après {@code ticks} (0 = tout de suite, sans retrait différé). */
+    private static final Map<UUID,Double> rangeApplied = new java.util.concurrent.ConcurrentHashMap<>();
+    static void addRange(Player p, double blocks, long ticks) {
+        var cm = LolPlugin.getInstance().getChampionManager();
+        if (!cm.hasChampion(p)) return;
+        var ch = cm.getChampion(p);
+        double cur = rangeApplied.getOrDefault(p.getUniqueId(), 0.0);
+        if (blocks < 0 && cur <= 0) return; // déjà retiré
+        ch.setAutoAttackRange(ch.getAutoAttackRange() + blocks);
+        rangeApplied.put(p.getUniqueId(), cur + blocks);
+        if (ticks > 0) new org.bukkit.scheduler.BukkitRunnable() { @Override public void run() {
+            if (rangeApplied.getOrDefault(p.getUniqueId(), 0.0) >= blocks - 1e-9 && cm.getChampion(p) == ch) {
+                ch.setAutoAttackRange(ch.getAutoAttackRange() - blocks);
+                rangeApplied.merge(p.getUniqueId(), -blocks, Double::sum);
+            }
+        }}.runTaskLater(LolPlugin.getInstance(), ticks);
+    }
     static class AA extends BasicAttackAbility {
         AA(){super("nasus",Material.BONE,2.5f,DamageType.PHYSICAL);}
         @Override protected void onHit(Player c, ChampionStats s, org.bukkit.entity.LivingEntity tgt, double dmg){
@@ -61,7 +78,9 @@ public final class Nasus extends BaseChampion implements fr.lolmc.champion.base.
             // stacks. Avant : frappe immédiate de la cible visée.
             double[] bonus={30,50,70,90,110}; // wiki
             final double flat=bonus[getLevel()-1];
+            addRange(c, 0.5, 200L); // +50 de portée d'attaque pour l'attaque renforcée (données du jeu)
             fr.lolmc.champion.base.EmpoweredAttack.arm(c, 10_000L, (att, tgt, normal) -> {
+                addRange(att, -0.5, 0L);
                 int stacks=qStacks.getOrDefault(att.getUniqueId(),0);
                 double dmg=s.getFinalAD()+flat+stacks;
                 TargetingUtil.dealDamage(att, tgt, dmg, TargetingUtil.DmgType.PHYSICAL);
@@ -94,7 +113,7 @@ public final class Nasus extends BaseChampion implements fr.lolmc.champion.base.
             new double[]{15,14,13,12,11},6.0,0,DamageType.MAGICAL);
             resourceCost = 80;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            org.bukkit.entity.LivingEntity tgt = (t!=null && TargetingUtil.isEnemy(c,t))?t:TargetingUtil.getTargetedEnemy(c,7.5); if(tgt==null){cancelCast();c.sendActionBar(Component.text("💀 Aucune cible",NamedTextColor.GRAY));return;}
+            org.bukkit.entity.LivingEntity tgt = (t!=null && TargetingUtil.isEnemy(c,t))?t:TargetingUtil.getTargetedEnemy(c,7.65); if(tgt==null){cancelCast();c.sendActionBar(Component.text("💀 Aucune cible",NamedTextColor.GRAY));return;}
             // LoL : ralentit 35% montant jusqu'à 95% sur 5s (+ ralentit vitesse d'attaque)
             // Approximation : lenteur progressive (amplifier croît) sur 5s
             new BukkitRunnable(){
@@ -130,7 +149,7 @@ public final class Nasus extends BaseChampion implements fr.lolmc.champion.base.
             resourceCost = 70;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : burst initial + dot/s pendant 5s + réduction armure 30-50%
-            Location loc=TargetingUtil.getAimedGroundLocation(c, 7.0); // 650 unités
+            Location loc=TargetingUtil.getAimedGroundLocation(c, 6.5); // 650 unités
             int rank=getLevel()-1;
             double[] burstBase={50,80,110,140,170};
             double[] dotBase={10,16,22,28,34};
@@ -139,7 +158,7 @@ public final class Nasus extends BaseChampion implements fr.lolmc.champion.base.
             // Délai 0.264s (5 ticks) avant le burst initial — LoL
             c.getWorld().playSound(loc, Sound.ENTITY_BLAZE_SHOOT, 1f, 0.8f);
             new BukkitRunnable(){@Override public void run(){
-                for(var __t : TargetingUtil.entitiesInRadius(c, loc, 4.0))
+                for(var __t : TargetingUtil.entitiesInRadius(c, loc, 4.45)) // rayon 380 + collision (65)
                     TargetingUtil.dealDamage(c, __t, burst, TargetingUtil.DmgType.MAGICAL);
             }}.runTaskLater(LolPlugin.getInstance(), 5L);
             // Zone persistante 5s : dot/s + réduction d'armure 25-45 %
@@ -162,7 +181,7 @@ public final class Nasus extends BaseChampion implements fr.lolmc.champion.base.
                     // Armure réduite seulement TANT QUE l'ennemi est dans la zone (wiki ; avant :
                     // jusqu'à la fin de la zone, même après en être sorti)
                     var inside=new java.util.HashSet<java.util.UUID>();
-                    for(var __t : TargetingUtil.entitiesInRadius(c, loc, 4.0)){
+                    for(var __t : TargetingUtil.entitiesInRadius(c, loc, 4.45)){
                         TargetingUtil.dealDamage(c, __t, perSec, TargetingUtil.DmgType.MAGICAL);
                         if(__t instanceof Player __p && cmE.hasChampion(__p)){
                             inside.add(__p.getUniqueId());
@@ -215,6 +234,7 @@ public final class Nasus extends BaseChampion implements fr.lolmc.champion.base.
             // Réduction CD du Q de 50%% pendant la durée
             final BaseAbility qAbil = cm.hasChampion(c) ? cm.getChampion(c).getAbility(1) : null;
             if(qAbil!=null) qAbil.setDynamicCooldown(Math.max(0.5, qAbil.getCurrentCooldown(s)*0.5));
+            addRange(c, 0.5, 300L); // +50 de portée d'attaque pendant 15 s (données du jeu)
             new BukkitRunnable(){
                 int tick=0;
                 @Override public void run(){

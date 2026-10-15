@@ -43,7 +43,9 @@ public final class Warwick extends BaseChampion {
             var cm = LolPlugin.getInstance().getChampionManager();
             if (!cm.hasChampion(nearby)) continue;
             double hpRatio = cm.getChampion(nearby).getHPSystem().getHPRatio();
-            if (hpRatio < 0.50) {
+            Object[] hunt = huntTarget.get(ww.getUniqueId());
+            boolean hunted = hunt != null && nearby.getUniqueId().equals(hunt[0]) && (Long) hunt[1] > System.currentTimeMillis();
+            if (hpRatio < 0.50 || hunted) {
                 // Révéler via GLOWING
                 nearby.addPotionEffect(new org.bukkit.potion.PotionEffect(
                     org.bukkit.potion.PotionEffectType.GLOWING, 25, 0, false, false));
@@ -61,6 +63,8 @@ public final class Warwick extends BaseChampion {
         setBloodHuntAS(ww, woundedInMelee ? new double[]{0.70,0.80,0.90,1.00,1.10}[wRank-1] : 0);
     }
 
+    /** Traque sanglante active : Warwick → {cible, fin}. */
+    private static final java.util.Map<java.util.UUID, Object[]> huntTarget = new java.util.concurrent.ConcurrentHashMap<>();
     /** Applique (ou retire) le bonus de vitesse d'attaque de Traque sanglante. */
     private static void setBloodHuntAS(Player ww, double want) {
         var id = ww.getUniqueId();
@@ -92,7 +96,7 @@ public final class Warwick extends BaseChampion {
             if(!cm.hasChampion(c)) return;
             var champ=cm.getChampion(c);
             int lvl=champ.getLevelSystem().getLevel();
-            double bonus=6+(60.76-6)*(lvl-1)/17.0+s.getBonusAD()*0.15+s.getFinalAP()*0.10;
+            double bonus=6+(55-6)*(lvl-1)/17.0+s.getBonusAD()*0.15+s.getFinalAP()*0.10; // 6-55 (données du jeu)
             TargetingUtil.dealDamage(c, tgt, bonus, TargetingUtil.DmgType.MAGICAL);
             double ratio=champ.getHPSystem().getHPRatio();
             if(ratio<0.50) champ.getHPSystem().heal(bonus*(ratio<0.25?2.5:1.0));
@@ -114,7 +118,10 @@ public final class Warwick extends BaseChampion {
             double tgtMaxHealth = TargetingUtil.getRealMaxHealth(tgt);
 
             // Wiki : 6-10 % des PV max de la cible (+120 % AD +100 % AP), soin 25-75 % des dégâts
-            double dmg=s.getFinalAD()*fr.lolmc.util.Balance.ratio("q_warwick","ad",1.2)+s.getFinalAP()+tgtMaxHealth*pct[getLevel()-1];
+            double pctDmg=tgtMaxHealth*pct[getLevel()-1];
+            // Contre les monstres, la part en % des PV est plafonnée à 150-210 (données du jeu)
+            if(fr.lolmc.game.JungleManager.isJungleMonster(tgt)) pctDmg=Math.min(pctDmg, new double[]{150,165,180,195,210}[getLevel()-1]);
+            double dmg=s.getFinalAD()*fr.lolmc.util.Balance.ratio("q_warwick","ad",1.2)+s.getFinalAP()+pctDmg;
             TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.MAGICAL);
             double[] healPct={0.25,0.375,0.50,0.625,0.75};
             var cm=LolPlugin.getInstance().getChampionManager();
@@ -136,7 +143,24 @@ public final class Warwick extends BaseChampion {
                 new double[]{80,70,60,50,40},0,0,DamageType.TRUE);
             resourceCost = 55;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            fr.lolmc.LolPlugin.getInstance().getCCManager().speedPct(c, new double[]{0.35,0.425,0.50,0.575,0.65}[getLevel()-1], 60); // wiki
+            // Données du jeu : 8 s de traque du champion ennemi le plus proche (effets du passif
+            // envers lui) ; sans cible, la recharge est réduite de 70 %
+            Player best=null; double bd=40*40;
+            for(Player e : c.getWorld().getPlayers()){
+                var cmH=LolPlugin.getInstance().getChampionManager();
+                if(e.equals(c) || !cmH.hasChampion(e) || e.getGameMode()==GameMode.SPECTATOR
+                        || !LolPlugin.getInstance().getTeamManager().areEnemies(c, e)) continue;
+                double d=e.getLocation().distanceSquared(c.getLocation());
+                if(d<bd){bd=d;best=e;}
+            }
+            if(best!=null){
+                huntTarget.put(c.getUniqueId(), new Object[]{best.getUniqueId(), System.currentTimeMillis()+8000L});
+                c.sendActionBar(Component.text("🐺 Traque : "+best.getName(),NamedTextColor.DARK_RED));
+            } else {
+                final BaseAbility w=this;
+                new BukkitRunnable(){@Override public void run(){ w.reduceCooldown(c, w.getRemainingCooldown(c)*0.70); }}
+                        .runTaskLater(LolPlugin.getInstance(),1L);
+            }
             c.sendActionBar(Component.text("🐺 Meute actif!",NamedTextColor.RED));
         }
         @Override public String getDynamicDescription(ChampionStats s){return "Passif : ennemis sous 50% PV révélés, +35-65% vitesse vers eux et +70-110% vitesse d'attaque contre eux. Actif : boost vitesse 3s.";}
@@ -159,7 +183,7 @@ public final class Warwick extends BaseChampion {
                 @Override public void run(){
                     // Peur 1 s sur tous les ennemis proches, sbires et monstres compris (wiki ; avant :
                     // champions seulement)
-                    for(var __t : TargetingUtil.enemiesAround(c, 4.0)){
+                    for(var __t : TargetingUtil.enemiesAround(c, 4.4)){ // rayon 375 + collision (65)
                         fr.lolmc.LolPlugin.getInstance().getCCManager().stun(__t, 20); // peur : ni déplacement ni action
                         if(__t instanceof Player __p)
                             __p.sendActionBar(Component.text("😱 Peur! (Hurlement Primal)",NamedTextColor.DARK_RED));
@@ -192,7 +216,7 @@ public final class Warwick extends BaseChampion {
                     if(e instanceof Player p && cmL.hasChampion(p)){ tgt=e; break; }
             }
             if(tgt==null){
-                Location end=safeTeleport(c.getLocation(), c.getLocation().add(dir.clone().multiply(leap)));
+                Location end=safeTeleport(c.getLocation(), c.getLocation().add(dir.clone().multiply(leap+1.5)) /* glisse ~150 unités de plus sans collision (wiki) */);
                 end.setYaw(c.getLocation().getYaw()); end.setPitch(c.getLocation().getPitch());
                 c.teleport(end);
                 fr.lolmc.LolPlugin.getInstance().getRuneManager().onDash(c); // Impact soudain
@@ -202,9 +226,22 @@ public final class Warwick extends BaseChampion {
             dashTo(c, tgt, -0.8);
             double[] base=fr.lolmc.util.Balance.base("r_warwick",new double[]{175,350,525});int r=Math.min(getLevel()-1,2);
             double dmg=base[r]+s.getBonusAD()*fr.lolmc.util.Balance.ratio("r_warwick","ad",1.67); // AD bonus (wiki)
-            TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.MAGICAL);
+            // Wiki : canalisation de 1.5 s, 6 coups toutes les 0.25 s : les 1er, 3e et 5e font 2/9 des
+            // dégâts avec les effets à l'impact, les 2e, 4e et 6e 1/9 ; soin de 100 % des dégâts
             var cm=LolPlugin.getInstance().getChampionManager();
-            if(cm.hasChampion(c)) cm.getChampion(c).getHPSystem().heal(dmg); // soin 100% au R
+            final org.bukkit.entity.LivingEntity ftgt=tgt; final double total=dmg;
+            new BukkitRunnable(){ int n=0;
+                @Override public void run(){
+                    if(n>=6 || !c.isOnline() || ftgt.isDead() || !ftgt.isValid()
+                            || c.getGameMode()==GameMode.SPECTATOR){ cancel(); return; }
+                    boolean big = n%2==0;
+                    double part = total*(big ? 2.0/9.0 : 1.0/9.0);
+                    TargetingUtil.dealDamage(c, ftgt, part, TargetingUtil.DmgType.MAGICAL);
+                    if(big) fr.lolmc.item.ItemEffects.applyOnHit(c, ftgt, part, 1.0);
+                    if(cm.hasChampion(c)) cm.getChampion(c).getHPSystem().heal(part);
+                    n++;
+                }
+            }.runTaskTimer(LolPlugin.getInstance(), 5L, 5L);
             // Suppression 1.5s (30 ticks) — vrai CC verrouillant (stun)
             var cc=LolPlugin.getInstance().getCCManager();
             if(cc!=null) cc.stun(tgt, 30);

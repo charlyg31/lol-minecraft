@@ -340,17 +340,11 @@ public class GameManager {
         // Time Increase Factor (TIFx) : augmente le timer selon le temps de jeu
         double minutes = getElapsedSeconds() / 60.0;
         double tifx = 0;
-        if (minutes >= 15) {
-            // Formule officielle LoL (par paliers de temps)
-            // Entre 15 et 30 min : +0.425% par demi-minute écoulée depuis 15min
-            tifx += (Math.ceil((minutes - 15) * 2) * 0.425) / 100.0;
-        }
-        if (minutes >= 30) {
-            tifx += (Math.ceil((minutes - 30) * 2) * 0.30) / 100.0;
-        }
-        if (minutes >= 45) {
-            tifx += (Math.ceil((minutes - 45) * 2) * 1.45) / 100.0;
-        }
+        // Données du jeu (DeathTimes) : par tranche de 30 s, +0.425 % de 15 à 30 min, +0.30 % de 30
+        // à 45 min, +1.45 % au-delà (avant : la hausse 15-30 continuait après 30 min et se cumulait)
+        if (minutes >= 15) tifx += Math.ceil((Math.min(minutes, 30) - 15) * 2) * 0.425 / 100.0;
+        if (minutes >= 30) tifx += Math.ceil((Math.min(minutes, 45) - 30) * 2) * 0.30 / 100.0;
+        if (minutes >= 45) tifx += Math.ceil((minutes - 45) * 2) * 1.45 / 100.0;
         // Plafond du TIFx à 50%
         tifx = Math.min(tifx, 0.50);
 

@@ -23,6 +23,25 @@ public final class MissFortune extends BaseChampion implements fr.lolmc.champion
         setLolAttackRange(550); // stats LoL (wiki)
     }
     @Override public void resetState(java.util.UUID id) { lastTarget.remove(id); }
+    // Passif de Fanfaronne (wiki) : après 4 s sans subir de dégâts non périodiques, +30-50 de
+    // vitesse, puis +60-100 au bout de 3 s de plus ; l'actif donne tout de suite le maximum
+    private double strutApplied = 0;
+    private long strutForcedFrom = 0;
+    public static void tickStrut(Player p, fr.lolmc.champion.base.BaseChampion ch) {
+        if (!(ch instanceof MissFortune mf)) return;
+        int w = mf.getLevelSystem().getAbilityRank(2);
+        long quiet = mf.getHPSystem().msSinceLastDamage();
+        double want = 0;
+        if (w > 0) {
+            boolean forced = mf.strutForcedFrom > 0 && System.currentTimeMillis() - mf.strutForcedFrom < quiet;
+            if (forced || quiet >= 7000) want = new double[]{60,70,80,90,100}[w-1];
+            else if (quiet >= 4000) want = new double[]{30,35,40,45,50}[w-1];
+        }
+        if (want != mf.strutApplied) {
+            mf.getStats().addBonusMoveSpeed(want - mf.strutApplied);
+            mf.strutApplied = want;
+        }
+    }
     @Override public void resetAllState() { lastTarget.clear(); }
 
     @Override protected void registerAbilities() {
@@ -42,7 +61,9 @@ public final class MissFortune extends BaseChampion implements fr.lolmc.champion
                 // Nouvelle cible : Love Tap, 49-105% AD selon niveau (LoL)
                 var cm0=LolPlugin.getInstance().getChampionManager();
                 int lvl=cm0.hasChampion(c)?cm0.getChampion(c).getLevelSystem().getLevel():1;
-                double lovePct=0.50+(1.00-0.50)*((lvl-1)/17.0); // 50 % → 100 % AD (wiki)
+                // Données du jeu : 50 % AD, +10 % aux niveaux 4, 7, 9, 11 et 13 (100 % dès 13)
+                double lovePct=0.50;
+                for(int bp : new int[]{4,7,9,11,13}) if(lvl>=bp) lovePct+=0.10;
                 if (!(tgt instanceof Player)) lovePct *= 0.5;     // moitié contre les sbires
                 double bonusDmg = s.getFinalAD() * lovePct;
                 fr.lolmc.util.TargetingUtil.dealDamage(c, tgt, bonusDmg, fr.lolmc.util.TargetingUtil.DmgType.PHYSICAL);
@@ -111,7 +132,12 @@ public final class MissFortune extends BaseChampion implements fr.lolmc.champion
             double asBonus=new double[]{0.40,0.55,0.70,0.85,1.00}[getLevel()-1];
             s.addBonusAttackSpeed(asBonus);
             new BukkitRunnable(){@Override public void run(){ s.addBonusAttackSpeed(-asBonus); }}.runTaskLater(LolPlugin.getInstance(), 80L);
-            fr.lolmc.LolPlugin.getInstance().getCCManager().speedPct(c, new double[]{0.30,0.35,0.40,0.45,0.50}[getLevel()-1]/3.25, 80); // 30-50 vitesse
+            // L'actif donne tout de suite le bonus maximal de Fanfaronne (jusqu'aux prochains dégâts)
+            var cmS=LolPlugin.getInstance().getChampionManager();
+            if(cmS.hasChampion(c) && cmS.getChampion(c) instanceof MissFortune mf){
+                mf.strutForcedFrom=System.currentTimeMillis();
+                tickStrut(c, mf);
+            }
             c.sendActionBar(Component.text("💃 Fanfaronnade 4s!",NamedTextColor.LIGHT_PURPLE));
         }
         @Override public String getDynamicDescription(ChampionStats s){return "4s: +40-100% vitesse d'attaque et vitesse de déplacement.";}
@@ -123,7 +149,7 @@ public final class MissFortune extends BaseChampion implements fr.lolmc.champion
             resourceCost = 80;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : zone au sol visée, dégâts magiques toutes les 0.25s sur 2s + ralentit 40-60%
-            Location loc=TargetingUtil.getAimedGroundLocation(c, 8.0);
+            Location loc=TargetingUtil.getAimedGroundLocation(c, 10.0); // portée 1000
             // Total 70/100/130/160/190 sur 8 ticks + 120% AP total (15% AP/tick)
             double[] totalBase={70,100,130,160,190};
             double perTick=totalBase[getLevel()-1]/8.0+s.getFinalAP()*0.15;
@@ -142,7 +168,7 @@ public final class MissFortune extends BaseChampion implements fr.lolmc.champion
                             loc, Material.PURPLE_STAINED_GLASS, 0.2f, 3.0, 5, 5L);
                     ticks++;
                 }
-            }.runTaskTimer(LolPlugin.getInstance(),0L,5L); // toutes les 0.25s
+            }.runTaskTimer(LolPlugin.getInstance(),5L,5L); // délai de 0.25 s, puis toutes les 0.25 s
             c.getWorld().playSound(loc, Sound.ENTITY_FIREWORK_ROCKET_LAUNCH, 1f, 1.2f);
         }
         @Override public String getDynamicDescription(ChampionStats s){

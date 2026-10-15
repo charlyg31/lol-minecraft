@@ -20,7 +20,7 @@ import java.util.UUID;
  */
 public class FlashManager {
 
-    private static final double FLASH_DISTANCE = 5.0; // ~400 unités LoL
+    private static final double FLASH_DISTANCE = 4.0; // 400 unités LoL (wiki)
     private static final long FLASH_COOLDOWN_MS = 300_000L; // 5 minutes
 
     private final Map<UUID, Long> cooldowns = new HashMap<>();

@@ -393,6 +393,11 @@ public class TurretManager {
         double armor = champ.getStats().getFinalArmor();
         double effArmor = armor > 0 ? armor * (1 - TURRET_SHOT_ARMOR_PEN) : armor;
         double reduced = damage * fr.lolmc.util.MobCombat.resistMultiplier(effArmor);
+        // Réductions de dégâts du champion (Courage, Méditation…) : le tir est ensuite appliqué en
+        // dégâts bruts, qui les ignoreraient. La Méditation de Yi est deux fois moins efficace.
+        reduced = champ.getStats().applyDamageReductions(reduced, false);
+        double yiDR = fr.lolmc.champion.impl.jungle.MasterYi.meditateDR(victim.getUniqueId());
+        if (yiDR > 0 && yiDR < 1) reduced = reduced / (1 - yiDR) * (1 - yiDR * 0.5);
         fr.lolmc.util.DamageUtil.damage(null, victim, reduced, false, fr.lolmc.util.DamageUtil.Type.TRUE);
         var drm = LolPlugin.getInstance().getDeathRecapManager();
         if (drm != null) drm.record(victim.getUniqueId(), "Tourelle", "physical", reduced);

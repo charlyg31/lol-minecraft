@@ -27,13 +27,16 @@ public final class Amumu extends BaseChampion implements fr.lolmc.champion.base.
         if (e != null && getLevelSystem().getAbilityRank(3) > 0) e.reduceCooldown(self, 0.75);
     }
 
-    // Passif de Caprice (données du jeu) : dégâts physiques reçus réduits de 5/7/9/11/13 (max 50 %)
-    // (+3 % armure et RM bonus, non modélisés). Manquait.
+    // Passif de Caprice (données du jeu) : dégâts physiques reçus réduits de 5/7/9/11/13
+    // (+3 % de l'armure bonus, +3 % de la RM bonus), 50 % des dégâts au maximum
     private double appliedReduction = 0;
-    @Override public void onAbilityRanksChanged() {
+    @Override public void onAbilityRanksChanged() { refreshTantrum(); }
+    /** Recalcule la réduction de Caprice (appelé aussi chaque seconde : l'armure et la RM bonus changent). */
+    public void refreshTantrum() {
         int r = getLevelSystem().getAbilityRank(3);
-        double red = r > 0 ? 3 + 2 * r : 0;
-        getStats().addFlatPhysicalReduction(red - appliedReduction);
+        var st = getStats();
+        double red = r > 0 ? 3 + 2 * r + 0.03 * st.getBonusArmor() + 0.03 * st.getBonusMagicResistValue() : 0;
+        st.addFlatPhysicalReduction(red - appliedReduction);
         appliedReduction = red;
     }
 
@@ -74,7 +77,7 @@ public final class Amumu extends BaseChampion implements fr.lolmc.champion.base.
         }
 
         private void bandageHit(Player c, ChampionStats s, org.bukkit.entity.LivingEntity tgt){
-            dashTo(c, tgt, -1.2); // tiré vers la cible
+            dashToward(c, dashPoint(c, tgt, -1.2), 1800, null); // tiré vers la cible à 1800 unités/s (données du jeu)
             double[] base=fr.lolmc.util.Balance.base("q_amumu",new double[]{70,95,120,145,170});double dmg=base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("q_amumu","ap",0.85);
             TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.MAGICAL);
             fr.lolmc.LolPlugin.getInstance().getCCManager().stun(tgt, 20);
@@ -123,7 +126,7 @@ public final class Amumu extends BaseChampion implements fr.lolmc.champion.base.
                         }
                     }
                     double pct=pctHP[self.getLevel()-1]+s.getFinalAP()/100.0*0.0025;
-                    for(var __t : TargetingUtil.entitiesInRadius(c, c.getLocation(), 4.0)){
+                    for(var __t : TargetingUtil.entitiesInRadius(c, c.getLocation(), 3.65)){ // rayon 300 + rayon de collision de la cible (65)
                         double dmg=5+TargetingUtil.getRealMaxHealth(__t)*pct;
                         TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);
                     }
@@ -145,7 +148,7 @@ public final class Amumu extends BaseChampion implements fr.lolmc.champion.base.
             resourceCost = 35;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             double[] base=fr.lolmc.util.Balance.base("e_amumu",new double[]{65,95,125,155,185});double dmg=base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("e_amumu","ap",0.5);
-            for(var __t : TargetingUtil.entitiesInRadius(c, c.getLocation(), 4.0)){ // rayon 350 (wiki)
+            for(var __t : TargetingUtil.entitiesInRadius(c, c.getLocation(), 4.15)){ // rayon 350 + collision (65)
                 TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);
             }
             fr.lolmc.util.VisualEffectUtil.impactBurst(c.getWorld(),
@@ -164,10 +167,9 @@ public final class Amumu extends BaseChampion implements fr.lolmc.champion.base.
             resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
             double[] base=fr.lolmc.util.Balance.base("r_amumu",new double[]{200,300,400});int rr=Math.min(getLevel()-1,2);double dmg=base[rr]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("r_amumu","ap",0.8);
-            for(var __t : TargetingUtil.enemiesAround(c, 6.0)){ // rayon 550 (wiki)
+            for(var __t : TargetingUtil.enemiesAround(c, 6.15)){ // rayon 550 + collision (65)
                 applyCurse(__t); // R applique la Malédiction
                 TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);
-                __t.setVelocity(new Vector(0,0.4,0));
                 fr.lolmc.LolPlugin.getInstance().getCCManager().stun(__t, 30);
                 fr.lolmc.LolPlugin.getInstance().getCCManager().markCoordinatedFire(c, __t);
                 fr.lolmc.LolPlugin.getInstance().getCCManager().applyZekeConduit(c, __t);

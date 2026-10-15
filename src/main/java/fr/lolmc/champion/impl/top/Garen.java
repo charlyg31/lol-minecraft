@@ -33,10 +33,22 @@ public final class Garen extends BaseChampion {
     public static void tickGarenPassive(fr.lolmc.champion.base.BaseChampion champ) {
         if (champ.getHPSystem().msSinceLastDamage() < 8000L) return;
         int lvl = champ.getLevelSystem().getLevel();
-        double pctPer5s = 0.015 + (0.101 - 0.015) * (lvl - 1) / 17.0;
+        // Données du jeu : 1.5 %, +0.2/niveau, +0.8/niveau dès 7, +0.4/niveau dès 14 (10.1 % au 18)
+        double pctPer5s = (lvl <= 6 ? 1.5 + 0.2 * (lvl - 1) : lvl <= 13 ? 2.5 + 0.8 * (lvl - 6) : 8.1 + 0.4 * (lvl - 13)) / 100.0;
         champ.getHPSystem().heal(champ.getHPSystem().getMaxHP() * pctPer5s / 5.0);
     }
 
+    // Passif de Courage (wiki) : chaque ennemi tué par Garen (champion, sbire, monstre) donne
+    // +0.2 armure et +0.2 RM bonus, jusqu'à 30 (150 éliminations) ; il faut avoir appris le W
+    private int courageStacks = 0;
+    public static void onKill(Player killer) {
+        var cm = LolPlugin.getInstance().getChampionManager();
+        if (!cm.hasChampion(killer) || !(cm.getChampion(killer) instanceof Garen g)) return;
+        if (g.getLevelSystem().getAbilityRank(2) <= 0 || g.courageStacks >= 150) return;
+        g.courageStacks++;
+        g.getStats().addBonusArmor(0.2);
+        g.getStats().addBonusMR(0.2);
+    }
     static class AA extends BasicAttackAbility {
         AA(){super("garen",Material.IRON_SWORD,2.5f,DamageType.PHYSICAL);}
     }
@@ -128,7 +140,7 @@ public final class Garen extends BaseChampion {
                 int hits=0;
                 @Override public void run(){
                     if(hits>=spins){cancel();return;}
-                    var around=TargetingUtil.enemiesAround(c, 3.6);
+                    var around=TargetingUtil.enemiesAround(c, 3.9); // rayon 325 + collision (65)
                     org.bukkit.entity.LivingEntity nearest=null; double nd=Double.MAX_VALUE;
                     for(var e2 : around){ double d=e2.getLocation().distanceSquared(c.getLocation()); if(d<nd){nd=d;nearest=e2;} }
                     for(var __t : around){

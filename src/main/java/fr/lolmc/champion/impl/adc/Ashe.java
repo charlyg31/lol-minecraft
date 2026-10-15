@@ -137,7 +137,7 @@ public final class Ashe extends BaseChampion {
             for(int i=0;i<arrows;i++){
                 double ang=Math.toRadians(-20+40.0*i/(arrows-1));
                 var d=dir.clone().rotateAroundY(ang);
-                TargetingUtil.launchSkillshot(c, c.getEyeLocation(), d, 12.0, 0.4, false, 20.0,
+                TargetingUtil.launchSkillshot(c, c.getEyeLocation(), d, 12.0, 0.4, false, 15.0, // 1200 unités à 1500/s (données du jeu)
                         new org.bukkit.inventory.ItemStack(Material.ARROW), 0.6f, Material.WHITE_STAINED_GLASS,
                         __t -> {
                             if(!struck.add(__t.getUniqueId())) return;
@@ -158,11 +158,14 @@ public final class Ashe extends BaseChampion {
             new double[]{90,80,70,60,50},60,0,DamageType.TRUE);
             resourceCost = 0; maxCharges = 2;} // 2 charges (wiki)
         @Override public void cast(Player c,ChampionStats s,Player t){
-            // Faucon qui voyage 40 blocs dans la direction du regard
-            // Révèle les ennemis dans un rayon de 8 blocs autour de son trajet
+            // Wiki / données du jeu : le faucon vole jusqu'au point visé (portée globale) à 1400
+            // unités/s, révèle son trajet, puis la zone d'arrivée (rayon 1000) pendant 5 s
             org.bukkit.Location start = c.getEyeLocation();
-            org.bukkit.util.Vector dir = start.getDirection().normalize();
-            int maxSteps = 80; // 40 blocs à 0.5 bloc/tick
+            org.bukkit.Location goal = TargetingUtil.getAimedGroundLocation(c, 250.0);
+            org.bukkit.util.Vector dir0 = goal.toVector().subtract(start.toVector());
+            if (dir0.lengthSquared() < 1e-6) dir0 = start.getDirection();
+            int maxSteps = (int) Math.max(1, Math.ceil(dir0.length() / 0.7)); // 0.7 bloc/tick = 1400 unités/s
+            final org.bukkit.util.Vector dir = dir0.normalize();
             var tm = LolPlugin.getInstance().getTeamManager();
             var fogMgr = fr.lolmc.instance.InstanceHelper.fogOfWarManager(c);
             var casterTeam = tm.getTeam(c);
@@ -172,19 +175,25 @@ public final class Ashe extends BaseChampion {
                 int step = 0;
                 final org.bukkit.Location pos = start.clone();
                 @Override public void run() {
-                    if (step >= maxSteps || !c.isOnline()) {
+                    if (step >= maxSteps || !c.isOnline() || pos.getBlock().getType().isSolid()) {
                         fr.lolmc.util.VisualEffectUtil.endProjectile(hawkDisplay, pos, null);
+                        // Vision de la zone d'arrivée : rayon 1000, 5 s
+                        if (fogMgr != null && casterTeam != null) fogMgr.revealPoint(casterTeam, pos, 10.0, 100L);
+                        for (var nearby : pos.getWorld().getNearbyEntities(pos, 10, 5, 10))
+                            if (nearby instanceof Player enemy && tm.areEnemies(c, enemy))
+                                enemy.addPotionEffect(new org.bukkit.potion.PotionEffect(
+                                        org.bukkit.potion.PotionEffectType.GLOWING, 100, 0, false, false));
                         cancel(); return;
                     }
-                    pos.add(dir.clone().multiply(0.5));
+                    pos.add(dir.clone().multiply(0.7));
                     fr.lolmc.util.VisualEffectUtil.moveProjectile(hawkDisplay, pos, dir, 0.9f, 0);
                     // Révèle la zone survolée pour l'équipe d'Ashe pendant 0.5s
                     // (fenêtre glissante qui suit le faucon le long de son trajet)
                     if (fogMgr != null && casterTeam != null) {
-                        fogMgr.revealPoint(casterTeam, pos, 8.0, 10L);
+                        fogMgr.revealPoint(casterTeam, pos, 10.0, 10L);
                     }
                     // Révéler les ennemis dans un rayon de 8 blocs
-                    for (var nearby : pos.getWorld().getNearbyEntities(pos, 8, 4, 8)) {
+                    for (var nearby : pos.getWorld().getNearbyEntities(pos, 10, 5, 10)) {
                         if (nearby instanceof Player enemy
                                 && !enemy.equals(c)
                                 && tm.areEnemies(c, enemy)) {
@@ -197,18 +206,13 @@ public final class Ashe extends BaseChampion {
                         }
                     }
                     step++;
-                    // S'arrêter sur un bloc solide
-                    if (pos.getBlock().getType().isSolid()) {
-                        fr.lolmc.util.VisualEffectUtil.endProjectile(hawkDisplay, pos, null);
-                        cancel();
-                    }
                 }
             }.runTaskTimer(LolPlugin.getInstance(), 0L, 1L);
             c.sendActionBar(Component.text("🦅 Faucon envoyé!", NamedTextColor.YELLOW));
             c.getWorld().playSound(c.getLocation(), org.bukkit.Sound.ENTITY_PARROT_FLY, 0.8f, 1.5f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
-            return "Envoie un faucon 40 blocs: révèle ennemis dans son trajet (GLOWING 3s).";
+            return "Envoie un faucon au point visé (portée globale) : révèle son trajet, puis la zone d'arrivée 5 s.";
         }
     }
 
@@ -221,7 +225,9 @@ public final class Ashe extends BaseChampion {
             double[] base=fr.lolmc.util.Balance.base("r_ashe",new double[]{200,400,600});int rr=Math.min(getLevel()-1,2);double dmg=base[rr]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("r_ashe","ap",1.2);
             // Projectile réel : flèche de cristal (≈1800 unités/s), s'arrête au 1er ennemi
             final Location from=c.getLocation();
-            TargetingUtil.launchSkillshot(c, c.getEyeLocation(), c.getEyeLocation().getDirection(), 25.0, 1.2, false, 18.0,
+            // Portée globale ; 1500 unités/s, +200 unités/s², 2100 max (données du jeu)
+            TargetingUtil.launchSkillshot(c, c.getEyeLocation(), c.getEyeLocation().getDirection(), 250.0, 1.2, false,
+                    travelled -> Math.min(21.0, Math.sqrt(15.0*15.0 + 2*2.0*travelled)),
                     new org.bukkit.inventory.ItemStack(Material.BLUE_ICE), 0.8f, Material.LIGHT_BLUE_STAINED_GLASS,
                     e -> e instanceof Player, // ne percute que les champions (wiki)
                     main -> arrowHit(c, s, main, dmg, from.distance(main.getLocation())),

@@ -93,10 +93,10 @@ public final class Annie extends BaseChampion implements fr.lolmc.champion.base.
             @Override public void run() {
                 var sp = t.getAttribute(fr.lolmc.util.Compat.movementSpeed());
                 if (!t.isValid() || sp == null || ticks >= 60) {
-                    if (sp != null && t.isValid() && !enrageUntil.containsKey(t.getUniqueId())) sp.setBaseValue(0.38);
+                    if (sp != null && t.isValid() && !enrageUntil.containsKey(t.getUniqueId())) sp.setBaseValue(tibbersSpeed.getOrDefault(t.getUniqueId(), 0.27));
                     cancel(); return;
                 }
-                sp.setBaseValue(0.38 * (1.0 + (60 - ticks) / 60.0));
+                sp.setBaseValue(tibbersSpeed.getOrDefault(t.getUniqueId(), 0.27) * (1.0 + (60 - ticks) / 60.0));
                 ticks += 5;
             }
         }.runTaskTimer(LolPlugin.getInstance(), 0L, 5L);
@@ -123,6 +123,17 @@ public final class Annie extends BaseChampion implements fr.lolmc.champion.base.
     public static boolean hasPyromancyStun(UUID id) {
         return pyroStacks.getOrDefault(id, 0) == 0 && pyroStacks.containsKey(id);
     }
+    /** PV de base de Tibbers (données du jeu) : 1150, +50/niveau dès 7, +250 dès 11, +300 dès 16. */
+    static double tibbersBaseHP(int lvl) {
+        if (lvl <= 6) return 1150;
+        if (lvl <= 10) return 1150 + 50 * (lvl - 6);
+        if (lvl <= 15) return 1350 + 250 * (lvl - 10);
+        return 2600 + 300 * (lvl - 15);
+    }
+    /** Vitesse de Tibbers : 350 (+0/25/50 selon le rang du R), même échelle que les sbires (325 = 0.25). */
+    static double tibbersSpeed(int rankIndex) { return 0.25 * (350 + 25 * rankIndex) / 325.0; }
+    private static final Map<UUID, Double> tibbersSpeed = new java.util.concurrent.ConcurrentHashMap<>();
+
     public static int pyroStunTicks(int level) {
         return level >= 11 ? 35 : (level >= 6 ? 30 : 25); // 1.25/1.5/1.75 s aux niveaux 1/6/11 (wiki)
     }
@@ -363,14 +374,14 @@ public final class Annie extends BaseChampion implements fr.lolmc.champion.base.
             // ── Explosion d'invocation ──
             double[] base = fr.lolmc.util.Balance.base("r_annie",new double[]{150,275,400});
             double dmg = base[r]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("r_annie","ap",0.75);
-            var ground = TargetingUtil.getAimedGroundLocation(c,7.0);
+            var ground = TargetingUtil.getAimedGroundLocation(c,6.0); // portée 600
 
             // Stun Pyromanie à l'invocation si chargé
             boolean pyroActive = hasPyromancyStun(uuid);
             int lvl = LolPlugin.getInstance().getChampionManager().hasChampion(c)
                     ? LolPlugin.getInstance().getChampionManager().getChampion(c).getLevelSystem().getLevel() : 1;
 
-            for (var e : TargetingUtil.entitiesInRadius(c, ground, 4.0)) {
+            for (var e : TargetingUtil.entitiesInRadius(c, ground, 3.15)) { // rayon 250 + collision (65)
                 TargetingUtil.dealDamage(c, e, dmg, TargetingUtil.DmgType.MAGICAL);
                 e.setFireTicks(60);
                 // Stun Pyromanie sur tous les ennemis de la zone d'invocation
@@ -398,7 +409,7 @@ public final class Annie extends BaseChampion implements fr.lolmc.champion.base.
                 // (PV LoL appliqués juste après l'apparition : 1150-4100 selon le niveau +50 % AP)
                 // Vitesse
                 var sp = bear.getAttribute(fr.lolmc.util.Compat.movementSpeed());
-                if (sp != null) sp.setBaseValue(0.38);
+                if (sp != null) sp.setBaseValue(tibbersSpeed(r));
                 // Dégâts
                 var da = bear.getAttribute(fr.lolmc.util.Compat.attackDamage());
                 if (da != null) da.setBaseValue(20.0 + finalAP*0.15);
@@ -408,14 +419,15 @@ public final class Annie extends BaseChampion implements fr.lolmc.champion.base.
                 bear.getScoreboardTags().add("tibbers_"+c.getUniqueId().toString().substring(0,8));
             });
 
-            // PV de Tibbers (wiki) : 1150 → 4100 selon le niveau (+50 % AP), en PV virtuels (avant : 200)
-            fr.lolmc.util.VirtualHP.init(tibbers, 1150 + (4100 - 1150) * (lvl - 1) / 17.0 + finalAP * 0.5);
+            // PV de Tibbers (données du jeu) : 1150, +50/niveau dès 7, +250 dès 11, +300 dès 16 (+50 % AP)
+            fr.lolmc.util.VirtualHP.init(tibbers, tibbersBaseHP(lvl) + finalAP * 0.5);
+            tibbersSpeed.put(tibbers.getUniqueId(), tibbersSpeed(r));
             // Armure / RM 30 → 100 selon le niveau (wiki), dégâts d'attaque 30/45/60 (+10 % AP)
-            double tibRes = 30 + 70.0 * (lvl - 1) / 17.0;
+            double tibRes = 30 + 5.0 * Math.max(0, lvl - 6); // 30, +5 par niveau dès 7 (données du jeu)
             fr.lolmc.util.MobCombat.setStats(tibbers, 0, 0.625, tibRes, tibRes, 0, 0);
             tibbersAttack.put(tibbers.getUniqueId(), new double[]{30,45,60}[r] + finalAP * 0.10);
             activeTibbers.put(uuid, tibbers);
-            thisAbility.resourceCost = 0;
+            thisAbility.overrideCost(0); // relance (contrôle de Tibbers) gratuite
 
             // Cibler l'ennemi le plus proche (champions et sbires) et rage d'invocation
             var first = nearestTibbersTarget(c, tibbers, 10);
@@ -439,7 +451,8 @@ public final class Annie extends BaseChampion implements fr.lolmc.champion.base.
                             tibbers.remove();
                         }
                         activeTibbers.remove(uuid);
-                        thisAbility.resourceCost = 100;
+                        tibbersSpeed.remove(tibbers.getUniqueId());
+                        thisAbility.clearCostOverride();
                         rCooldowns.put(uuid, System.currentTimeMillis()+(long)(realCDs[r]*1000));
                         if (c.isOnline()) c.sendActionBar(Component.text("🐻 Tibbers s'est dissipé.",NamedTextColor.GRAY));
                         enrageUntil.remove(tibbers.getUniqueId());

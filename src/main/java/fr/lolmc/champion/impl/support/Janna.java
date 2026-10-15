@@ -36,10 +36,14 @@ public final class Janna extends BaseChampion {
         var cc = LolPlugin.getInstance().getCCManager();
         var tm = LolPlugin.getInstance().getTeamManager();
         var cm = LolPlugin.getInstance().getChampionManager();
+        // Données du jeu : +6 % aux alliés (pas à Janna) qui se DIRIGENT vers elle
         for (Player p : janna.getWorld().getPlayers()) {
-            if (!cm.hasChampion(p) || !(p.equals(janna) || tm.areAllies(janna, p))) continue;
-            if (p.getLocation().distanceSquared(janna.getLocation()) > 12 * 12) continue;
-            cc.speedPct(p, 0.06, 20);
+            if (p.equals(janna) || !cm.hasChampion(p) || !tm.areAllies(janna, p)) continue;
+            Location prev = tailwindLast.put(p.getUniqueId(), p.getLocation().clone());
+            if (prev == null || !prev.getWorld().equals(p.getWorld())) continue;
+            Vector moved = p.getLocation().toVector().subtract(prev.toVector()).setY(0);
+            Vector toJanna = janna.getLocation().toVector().subtract(p.getLocation().toVector()).setY(0);
+            if (moved.lengthSquared() > 0.01 && moved.dot(toJanna) > 0) cc.speedPct(p, 0.06, 20);
         }
         // Passif de Zéphyr (données du jeu) : +6-10 % (+2 % par 100 AP) de vitesse pour Janna
         // (avant : potion Vitesse II quand le sort touchait)
@@ -49,6 +53,13 @@ public final class Janna extends BaseChampion {
             if (wr > 0) cc.speedPct(janna, new double[]{0.06,0.07,0.08,0.09,0.10}[wr-1]
                     + 0.0002 * champ.getStats().getFinalAP(), 20);
         }
+    }
+
+    private static final java.util.Map<java.util.UUID, Location> tailwindLast = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** Passif (données du jeu) : dégâts magiques bonus = 30 % de la vitesse de déplacement bonus de Janna. */
+    static double tailwindDamage(ChampionStats s) {
+        return Math.max(0, s.getFinalMovementSpeed() - 325) * 0.30;
     }
 
     /** Contrôler un champion avec Bourrasque réduit de 20 % la recharge restante de l'E (données du jeu). */
@@ -61,34 +72,64 @@ public final class Janna extends BaseChampion {
 
     static class AA extends BasicAttackAbility {
         AA(){super("janna",Material.FEATHER,5.5f,DamageType.MAGICAL);}
+        @Override protected void onHit(Player c, ChampionStats s, org.bukkit.entity.LivingEntity tgt, double dmg) {
+            double bonus = tailwindDamage(s);
+            if (bonus > 0) TargetingUtil.dealDamage(c, tgt, bonus, TargetingUtil.DmgType.MAGICAL);
+        }
     }
 
     static class Q extends BaseAbility {
         Q(){super("q_janna","Bourrasque Hurlante",Material.WHITE_DYE,AbilitySlot.Q,
             new double[]{14,14,14,14,14},20,2,DamageType.MAGICAL);
             resourceCost = 60;}
+        /** Début de la charge en cours, par Janna. */
+        private static final java.util.Map<java.util.UUID, Long> chargeStart = new java.util.concurrent.ConcurrentHashMap<>();
         @Override public void cast(Player c,ChampionStats s,Player t){
-            // LoL : skillshot tornade en ligne, 60/90/120/150/180 + 50% AP, knockup les ennemis traversés
-            double[] base=fr.lolmc.util.Balance.base("q_janna",new double[]{55,90,125,160,195});double dmg=base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("q_janna","ap",0.5);
-            // Projectile réel : tornade de 1100 unités à ~900/s qui traverse
-            TargetingUtil.launchSkillshot(c, c.getLocation().add(0,0.6,0), c.getEyeLocation().getDirection().setY(0), 11.0, 1.2, true, 9.0,
+            // Données du jeu : 1re activation = charge (3 s max), 2e = lancer. Dégâts 55-195 (+50 % AP)
+            // +10-30 (+10 % AP) par seconde de charge ; projection 0.5 s +0.25 s/s ; portée
+            // 1100 unités, +20 % par seconde de charge ; la tornade met 1.25 s à arriver.
+            java.util.UUID id=c.getUniqueId();
+            Long start=chargeStart.remove(id);
+            final BaseAbility q=this;
+            if(start==null){
+                deferCooldown();
+                final long st=System.currentTimeMillis();
+                chargeStart.put(id, st);
+                overrideCost(0); // la relance est gratuite
+                c.sendActionBar(Component.text("🌪 Bourrasque : charge… (relancer pour lâcher)",NamedTextColor.WHITE));
+                new BukkitRunnable(){@Override public void run(){
+                    Long cur=chargeStart.get(id);
+                    if(cur!=null && cur==st){ chargeStart.remove(id); release(c, s, 3.0, q); }
+                }}.runTaskLater(LolPlugin.getInstance(), 60L);
+                return;
+            }
+            release(c, s, Math.min(3.0, (System.currentTimeMillis()-start)/1000.0), q);
+        }
+        private void release(Player c, ChampionStats s, double charged, BaseAbility q){
+            clearCostOverride();
+            q.triggerCooldown(c, s);
+            if(!c.isOnline()) return;
+            int r=getLevel()-1;
+            double[] base=fr.lolmc.util.Balance.base("q_janna",new double[]{55,90,125,160,195});
+            double dmg=base[r]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("q_janna","ap",0.5)
+                    +charged*(new double[]{10,15,20,25,30}[r]+s.getFinalAP()*0.10);
+            int knockTicks=(int)Math.round((0.5+0.25*charged)*20);
+            double range=11.0*(1+0.20*charged);
+            TargetingUtil.launchSkillshot(c, c.getLocation().add(0,0.6,0), c.getEyeLocation().getDirection().setY(0), range, 1.2, true, range/1.25,
                     new org.bukkit.inventory.ItemStack(Material.WHITE_STAINED_GLASS), 1.5f, Material.WHITE_STAINED_GLASS,
                     __t -> {
                         TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);
-                        fr.lolmc.LolPlugin.getInstance().getCCManager().setAirborne(__t, 10); // projeté 0.5 s (wiki, sans charge)
-                        if(__t instanceof Player __p){
-                            __p.sendActionBar(Component.text("🌪 Bourrasque! Knockup",NamedTextColor.WHITE));
-                            eRefundOnCC(c);
-                        }
+                        fr.lolmc.LolPlugin.getInstance().getCCManager().setAirborne(__t, knockTicks);
+                        if(__t instanceof Player) eRefundOnCC(c);
                     }, null);
-            c.getWorld().playSound(c.getLocation(), Sound.ENTITY_PHANTOM_FLAP, 1f, 1.3f);
+            c.getWorld().playSound(c.getLocation(), Sound.ENTITY_PHANTOM_FLAP, 1f, 0.6f);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] base=fr.lolmc.util.Balance.base("q_janna",new double[]{55,90,125,160,195});
-            return String.format("Skillshot tornade: %.0f dégâts (+50%%AP) + knockup les ennemis.",base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("q_janna","ap",0.5));
+            return String.format("Charge (3 s max, relancer pour lâcher) : tornade de %.0f dégâts (+50%%AP), +%.0f/s de charge, projette 0.5 s (+0.25 s/s).",
+                    base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("q_janna","ap",0.5), new double[]{10,15,20,25,30}[getLevel()-1]+s.getFinalAP()*0.10);
         }
     }
-
     static class W extends BaseAbility {
         W(){super("w_janna","Zéphyr",Material.CYAN_DYE,AbilitySlot.W,
             new double[]{8,7.5,7,6.5,6},20,0,DamageType.MAGICAL);
@@ -105,7 +146,7 @@ public final class Janna extends BaseChampion {
         }
 
         private void zephyrHit(Player c, ChampionStats s, org.bukkit.entity.LivingEntity tgt, double dmg){
-            TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.MAGICAL);
+            TargetingUtil.dealDamage(c, tgt, dmg + tailwindDamage(s), TargetingUtil.DmgType.MAGICAL); // + passif
             if(tgt instanceof Player __p)
                 fr.lolmc.LolPlugin.getInstance().getCCManager().slowPct(__p, new double[]{0.20,0.24,0.28,0.32,0.36}[getLevel()-1]+0.06*s.getFinalAP()/100.0, 40); // wiki
             fr.lolmc.util.VisualEffectUtil.impactBurst(tgt.getWorld(),
@@ -113,7 +154,7 @@ public final class Janna extends BaseChampion {
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] base=fr.lolmc.util.Balance.base("w_janna",new double[]{55,85,115,145,175});
-            return String.format("%.0f dégâts (+50%%AP) + ralentit 3s. Janna gagne de la vitesse.",base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("w_janna","ap",0.5));
+            return String.format("%.0f dégâts (+50%%AP) + ralentit 2s. Passif : Janna gagne de la vitesse.",base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("w_janna","ap",0.5));
         }
     }
 

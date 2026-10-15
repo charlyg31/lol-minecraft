@@ -95,7 +95,7 @@ public final class Blitzcrank extends BaseChampion implements fr.lolmc.champion.
             // LoL : SKILLSHOT signature. Attrape le 1er ennemi, 110-310 + 120% AP, stun + tire vers Blitz
             double[] base=fr.lolmc.util.Balance.base("q_blitzcrank",new double[]{110,160,210,260,310});double dmg=base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("q_blitzcrank","ap",1.2);
             // Projectile réel : la main du grappin part à 1800 unités/s et ramène le 1er ennemi
-            TargetingUtil.launchSkillshot(c, c.getEyeLocation(), c.getEyeLocation().getDirection(), 11.2, 0.7, false, 18.0,
+            TargetingUtil.launchSkillshot(c, c.getEyeLocation(), c.getEyeLocation().getDirection(), 10.8, 0.7, false, 18.0, // missile : 1080 unités à 1800/s (données du jeu)
                     new org.bukkit.inventory.ItemStack(Material.IRON_CHAIN), 0.9f, Material.YELLOW_STAINED_GLASS,
                     finalTgt -> {
                         TargetingUtil.dealDamage(c, finalTgt, dmg, TargetingUtil.DmgType.MAGICAL);
@@ -129,7 +129,10 @@ public final class Blitzcrank extends BaseChampion implements fr.lolmc.champion.
             // puis Blitzcrank est ralenti de 30 % pendant 1.5 s
             double asBonus=new double[]{0.30,0.40,0.50,0.60,0.70}[getLevel()-1];
             s.addBonusAttackSpeed(asBonus);
-            fr.lolmc.LolPlugin.getInstance().getCCManager().speedDecaying(c, new double[]{0.60,0.65,0.70,0.75,0.80}[getLevel()-1], 58);
+            // Données du jeu : de 60-80 % jusqu'à 10 % en 2.5 s, puis 10 % jusqu'à la fin des 5 s
+            double ms=new double[]{0.60,0.65,0.70,0.75,0.80}[getLevel()-1];
+            fr.lolmc.LolPlugin.getInstance().getCCManager().speedDecaying(c, ms-0.10, 50);
+            fr.lolmc.LolPlugin.getInstance().getCCManager().speedPct(c, 0.10, 100);
             new org.bukkit.scheduler.BukkitRunnable(){@Override public void run(){
                 s.addBonusAttackSpeed(-asBonus);
                 fr.lolmc.LolPlugin.getInstance().getCCManager().slowPct(c, 0.30, 30);

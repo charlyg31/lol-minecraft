@@ -153,6 +153,7 @@ public final class ItemEffects {
      * être bloqués par un bouclier anti-sorts.
      */
     public static void itemDamage(Player src, LivingEntity t, double amount, DamageUtil.Type type, boolean onHit) {
+        if (onHit) amount *= onHitScale;
         if (amount <= 0 || t == null || t.isDead() || !t.isValid()) return;
         itemDepth++;
         try {
@@ -270,6 +271,8 @@ public final class ItemEffects {
 
     /** Thread serveur : vrai pendant l'application d'une attaque de base critique (Présage de Randuin). */
     public static boolean currentAttackCrit = false;
+    /** Dernière attaque de base (thread serveur) : critique ou non (rebonds de Ricochet de Sivir). */
+    public static boolean lastAttackCrit = false;
 
     public static void resetAll() { FX.clear(); DAMAGED_BY.clear(); ARMOR_SHRED.clear(); BURNS.clear(); MARKS.clear(); }
 
@@ -551,6 +554,16 @@ public final class ItemEffects {
             bonus += Math.min(1.5, champ(a).getAutoAttackRange() * 0.35);
         if (has(a, "hexoptics_c44") && f.hexopticsUntil > System.currentTimeMillis()) bonus += 1.0;
         return bonus;
+    }
+
+    /** Efficacité des dégâts à l'impact des objets en cours (Frappe alpha : 75 % / 18.75 %). */
+    static double onHitScale = 1.0;
+
+    /** Effets à l'impact appliqués par un sort à {@code effectiveness} (sans relancer les effets « attaque principale »). */
+    public static void applyOnHit(Player a, LivingEntity t, double dmg, double effectiveness) {
+        double prev = onHitScale;
+        onHitScale = effectiveness;
+        try { onAttackHit(a, t, dmg, false, false); } finally { onHitScale = prev; }
     }
 
     /** Effets à l'impact d'une attaque de base (champions, sbires, monstres). */

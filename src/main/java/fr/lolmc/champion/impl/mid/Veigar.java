@@ -76,7 +76,7 @@ public final class Veigar extends BaseChampion implements fr.lolmc.champion.base
             double dmg=base[getLevel()-1]+s.getFinalAP()*apR[getLevel()-1];
             // Projectile réel (1050 unités à 2200/s), touche 2 ennemis au plus
             final int[] touched={0};
-            TargetingUtil.launchSkillshot(c, c.getEyeLocation(), c.getEyeLocation().getDirection(), 10.5, 0.7, true, 22.0,
+            TargetingUtil.launchSkillshot(c, c.getEyeLocation(), c.getEyeLocation().getDirection(), 10.5, 0.7, true, 22.0, // missile : 1050 unités à 2200/s (données du jeu)
                     new org.bukkit.inventory.ItemStack(Material.AMETHYST_SHARD), 0.8f, Material.PURPLE_STAINED_GLASS,
                     __t -> { if(touched[0]++ < 2) balefulHit(c, s, __t, dmg); }, null);
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_EVOKER_CAST_SPELL, 1f, 1.3f);
@@ -125,7 +125,7 @@ public final class Veigar extends BaseChampion implements fr.lolmc.champion.base
                     double[] base=fr.lolmc.util.Balance.base("w_veigar",new double[]{85,140,195,250,305});
                     double[] apR={0.70,0.80,0.90,1.00,1.10};
                     double dmg=base[getLevel()-1]+s.getFinalAP()*apR[getLevel()-1];
-                    for(var __t : TargetingUtil.entitiesInRadius(c, loc, 3.0)){
+                    for(var __t : TargetingUtil.entitiesInRadius(c, loc, 2.9)){ // rayon 225 + collision (65)
                         TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);
                         onChampionHit(c, s, __t);
                     }

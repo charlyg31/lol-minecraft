@@ -89,6 +89,7 @@ public class EntityDeathListener implements Listener {
             boolean epic = type != null && (type.name().startsWith("DRAGON_") || type == JungleManager.MonsterType.VOIDGRUB
                     || type == JungleManager.MonsterType.HERALD || type == JungleManager.MonsterType.BARON);
             LolPlugin.getInstance().getRuneManager().onUnitDeath(dead, killer, true, epic);
+            if (killer != null) fr.lolmc.champion.impl.top.Garen.onKill(killer); // Courage
             fr.lolmc.instance.InstanceHelper.jungleManager(dead).onMonsterDeath(dead.getUniqueId(), killer);
             return;
         }
@@ -100,6 +101,7 @@ public class EntityDeathListener implements Listener {
             fr.lolmc.instance.InstanceHelper.minionManager(dead).onMinionDeath(dead.getUniqueId());
             // Runes : Légende, Absorption vitale, Surcroissance
             LolPlugin.getInstance().getRuneManager().onUnitDeath(dead, killer, false, false);
+            if (killer != null) fr.lolmc.champion.impl.top.Garen.onKill(killer); // Courage
             // XP de proximité des autres champions : gérée par onMinionDeath
             if (killer != null && championManager.hasChampion(killer)) {
                 // Or/XP (et CS) selon le type de sbire
@@ -187,6 +189,9 @@ public class EntityDeathListener implements Listener {
                 net.kyori.adventure.text.format.NamedTextColor.YELLOW));
             plugin.getMatchScoreboard().addAssist(assistant);
             plugin.getRuneManager().onTakedown(assistant, victim);
+            fr.lolmc.champion.impl.adc.Sivir.onTakedown(assistant); // En chasse
+            if ("masteryi".equals(championManager.getChampion(assistant).getId()))
+                fr.lolmc.champion.impl.jungle.MasterYi.onKillDuringHighlander(assistant); // assistance aussi
         }
 
         // ── Suivi commun à toutes les morts ──
@@ -215,6 +220,8 @@ public class EntityDeathListener implements Listener {
         // Veigar passif Malfaisance
         if ("veigar".equals(killerChamp.getId()))
             fr.lolmc.champion.impl.mid.Veigar.onTakedown(killer.getUniqueId());
+        fr.lolmc.champion.impl.top.Garen.onKill(killer); // Courage
+        fr.lolmc.champion.impl.adc.Sivir.onTakedown(killer); // En chasse
         // Jinx passif Get Excited
         if ("jinx".equals(killerChamp.getId()))
             fr.lolmc.champion.impl.adc.Jinx.getExcited(killer);

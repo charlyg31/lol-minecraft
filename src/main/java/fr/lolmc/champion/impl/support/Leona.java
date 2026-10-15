@@ -109,7 +109,7 @@ public final class Leona extends BaseChampion implements fr.lolmc.champion.base.
             new BukkitRunnable(){
                 @Override public void run(){
                     boolean hit=false;
-                    for(var __t : TargetingUtil.enemiesAround(c, 5.0)){ // rayon 450 (wiki)
+                    for(var __t : TargetingUtil.enemiesAround(c, 5.15)){ // rayon 450 + collision (65)
                         TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);
                         applyMark(c, __t);
                         hit=true;
@@ -174,7 +174,9 @@ public final class Leona extends BaseChampion implements fr.lolmc.champion.base.
         private void zenithDash(Player c, org.bukkit.entity.LivingEntity last){
             // Aucun champion touché : pas de bond (avant : erreur, last était null)
             if(!c.isOnline() || last == null || last.isDead()) return;
-            dashTo(c, last, -1.0);
+            // Ruée jusqu'à 225 unités au-delà de la cible (wiki), à 2000 unités/s (paramètre « speed »
+            // du modèle du wiki, qui couvre projectile et ruée ; aucune autre valeur publiée)
+            dashToward(c, dashPoint(c, last, 2.25), 2000, null);
             if(last instanceof Player __p){
                 fr.lolmc.LolPlugin.getInstance().getCCManager().root(__p, 10); // root 0.5s
                 __p.sendActionBar(Component.text("⚔ Enraciné — Lame du Zénith!",NamedTextColor.YELLOW));

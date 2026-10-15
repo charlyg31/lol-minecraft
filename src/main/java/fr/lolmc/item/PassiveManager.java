@@ -53,6 +53,8 @@ public class PassiveManager {
                 var ch = championManager.getChampion(p);
                 switch (ch.getId()) {
                     case "warwick" -> fr.lolmc.champion.impl.jungle.Warwick.tickWarwickPassive(p);
+                    case "amumu" -> ((fr.lolmc.champion.impl.jungle.Amumu) ch).refreshTantrum();
+                    case "missfortune" -> fr.lolmc.champion.impl.adc.MissFortune.tickStrut(p, ch);
                     case "malphite" -> fr.lolmc.champion.impl.top.Malphite.tickGraniteShield(p, ch);
                     case "garen" -> fr.lolmc.champion.impl.top.Garen.tickGarenPassive(ch);
                     case "janna" -> fr.lolmc.champion.impl.support.Janna.tickJannaPassive(p);

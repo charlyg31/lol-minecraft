@@ -75,7 +75,9 @@ public final class Malphite extends BaseChampion implements fr.lolmc.champion.ba
                 int wr = Math.min(wlvl-1,4);
                 double bonusDmg = new double[]{30,40,50,60,70}[wr] + s.getFinalAP()*0.20 + s.getFinalArmor()*0.15;
                 double coneDmg = new double[]{15,25,35,45,55}[wr] + s.getFinalAP()*0.30 + s.getFinalArmor()*0.15;
-                TargetingUtil.dealDamage(c, tgt, bonusDmg, TargetingUtil.DmgType.PHYSICAL);
+                // Coup de Tonnerre : 180 % contre les monstres (wiki, V26.02)
+                double monsterMod = fr.lolmc.game.JungleManager.isJungleMonster(tgt) ? 1.8 : 1.0;
+                TargetingUtil.dealDamage(c, tgt, bonusDmg * monsterMod, TargetingUtil.DmgType.PHYSICAL);
                 // Onde en cône derrière la cible, dans l'axe Malphite → cible (wiki ; avant : cercle
                 // autour de Malphite)
                 org.bukkit.util.Vector axis = tgt.getLocation().toVector().subtract(c.getLocation().toVector()).setY(0);
@@ -83,7 +85,7 @@ public final class Malphite extends BaseChampion implements fr.lolmc.champion.ba
                     if (e.equals(tgt)) continue;
                     org.bukkit.util.Vector to = e.getLocation().toVector().subtract(tgt.getLocation().toVector()).setY(0);
                     if (axis.lengthSquared() > 1e-6 && to.lengthSquared() > 1e-6 && axis.angle(to) > Math.toRadians(45)) continue;
-                    TargetingUtil.dealDamage(c, e, coneDmg, TargetingUtil.DmgType.PHYSICAL);
+                    TargetingUtil.dealDamage(c, e, coneDmg * (fr.lolmc.game.JungleManager.isJungleMonster(e) ? 1.8 : 1.0), TargetingUtil.DmgType.PHYSICAL);
                 }
                 fr.lolmc.util.VisualEffectUtil.impact(c.getWorld(),
                         tgt.getLocation().add(0,1,0), Material.STONE, 0.3f, 4L);
@@ -182,24 +184,38 @@ public final class Malphite extends BaseChampion implements fr.lolmc.champion.ba
             new double[]{130,115,100},6.5,4,DamageType.MAGICAL);
             resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            // Wiki : charge imparable vers le POINT visé (1000 unités), pas besoin de cible (avant :
-            // une cible était obligatoire)
+            // Wiki : charge imparable (1500 + 100 % de la vitesse de déplacement) vers le point visé
+            // (1000 unités) ; à l'arrivée, 200/300/400 (+90 % AP) et projection 1.5 s dans un rayon de 325
             Location aim=(t!=null && TargetingUtil.isEnemy(c,t)) ? t.getLocation() : TargetingUtil.getAimedGroundLocation(c, 10.0);
             Location dest=safeTeleport(c.getLocation(),aim);
-            dest.setYaw(c.getLocation().getYaw()); dest.setPitch(c.getLocation().getPitch());
-            c.teleport(dest);
+            final Location from=c.getLocation().clone();
+            org.bukkit.util.Vector path=dest.toVector().subtract(from.toVector());
+            final double total=path.length();
+            final org.bukkit.util.Vector unit=total>1e-6 ? path.multiply(1.0/total) : new org.bukkit.util.Vector();
+            final double perTick=(1500+s.getFinalMovementSpeed())/100.0/20.0;
+            double[] baseR={200,300,400};int rr=Math.min(getLevel()-1,2);
+            final double dmg=baseR[rr]+s.getFinalAP()*0.9;
             fr.lolmc.LolPlugin.getInstance().getRuneManager().onDash(c); // Impact soudain
-            // LoL : 200/300/400 + 90% AP, knockup + stun 1.5s (30 ticks)
-            double[] baseR={200,300,400};int rr=Math.min(getLevel()-1,2);double dmg=baseR[rr]+s.getFinalAP()*0.9;
-            var cc=LolPlugin.getInstance().getCCManager();
-            for(var __t : TargetingUtil.enemiesAround(c, 3.9)){ // rayon 325 (wiki)
-                TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);
-                if(cc!=null){ cc.setAirborne(__t, 30); cc.stun(__t, 30); } // projeté 1.5 s (wiki)
-                if(__t instanceof Player __p)
-                    __p.sendActionBar(Component.text("🪨 KNOCKUP + STUN Malphite!",NamedTextColor.DARK_GRAY));
-            }
-            fr.lolmc.util.VisualEffectUtil.impactBurst(c.getWorld(),
-                    c.getLocation(), Material.STONE, 0.45f, 1.0, 10, 8L);
+            new org.bukkit.scheduler.BukkitRunnable(){ double done=0;
+                @Override public void run(){
+                    if(!c.isOnline() || c.getGameMode()==org.bukkit.GameMode.SPECTATOR){ cancel(); return; }
+                    done=Math.min(total, done+perTick);
+                    Location p=from.clone().add(unit.clone().multiply(done));
+                    p.setYaw(c.getLocation().getYaw()); p.setPitch(c.getLocation().getPitch());
+                    c.teleport(p);
+                    if(done<total) return;
+                    cancel();
+                    var cc=LolPlugin.getInstance().getCCManager();
+                    for(var __t : TargetingUtil.enemiesAround(c, 3.9)){ // rayon 325 + collision (65)
+                        TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.MAGICAL);
+                        if(cc!=null){ cc.setAirborne(__t, 30); cc.stun(__t, 30); } // projeté 1.5 s (wiki)
+                        if(__t instanceof Player __p)
+                            __p.sendActionBar(Component.text("🪨 Projeté par Malphite !",NamedTextColor.DARK_GRAY));
+                    }
+                    fr.lolmc.util.VisualEffectUtil.impactBurst(c.getWorld(),
+                            c.getLocation(), Material.STONE, 0.45f, 1.0, 10, 8L);
+                }
+            }.runTaskTimer(LolPlugin.getInstance(), 0L, 1L);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] baseR={200,300,400};int rr=Math.min(getLevel()-1,2);

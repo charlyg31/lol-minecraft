@@ -22,8 +22,34 @@ public final class MasterYi extends BaseChampion implements fr.lolmc.champion.ba
         getStats().setGrowthStats(105,2.5,5,2.05,0.025,0.65);
         setLolAttackRange(175); // stats LoL (wiki)
     }
-    @Override public void resetState(java.util.UUID id) { aaCount.remove(id); wujuUntil.remove(id); }
-    @Override public void resetAllState() { aaCount.clear(); wujuUntil.clear(); }
+    @Override public void resetState(java.util.UUID id) { aaCount.remove(id); aaLast.remove(id); wujuUntil.remove(id); highlanderUntil.remove(id); }
+    @Override public void resetAllState() { aaCount.clear(); aaLast.clear(); wujuUntil.clear(); highlanderUntil.clear(); }
+    /** Méditation en cours : réduction de dégâts appliquée (moitié contre les tourelles, données du jeu). */
+    private static final java.util.Map<java.util.UUID, Double> meditate = new java.util.concurrent.ConcurrentHashMap<>();
+    public static double meditateDR(java.util.UUID id) { return meditate.getOrDefault(id, 0.0); }
+    /** Coup double : instant du dernier effet (les effets durent 4 s). */
+    private static final java.util.Map<java.util.UUID, Long> aaLast = new java.util.concurrent.ConcurrentHashMap<>();
+    /** Highlander : fin de l'effet (prolongée de 7 s par élimination). */
+    private static final java.util.Map<java.util.UUID, Long> highlanderUntil = new java.util.concurrent.ConcurrentHashMap<>();
+    /** Ajoute un effet de Coup double (3 max, 4 s). */
+    static void addDoubleStrikeStack(java.util.UUID id) {
+        long now = System.currentTimeMillis();
+        Long last = aaLast.put(id, now);
+        if (last == null || now - last > 4000) aaCount.put(id, 0);
+        aaCount.merge(id, 1, (a, b) -> Math.min(3, a + b));
+    }
+    /**
+     * Effets à l'impact d'un coup de Frappe alpha à {@code eff} d'efficacité (75 % ou 18.75 %) :
+     * Style Wuju et effets à l'impact des objets.
+     */
+    static void alphaOnHit(Player c, ChampionStats s, org.bukkit.entity.LivingEntity tgt, double dmg, double eff) {
+        if (wujuUntil.getOrDefault(c.getUniqueId(), 0L) > System.currentTimeMillis()) {
+            var cmW = LolPlugin.getInstance().getChampionManager();
+            int er = cmW.hasChampion(c) ? Math.max(1, cmW.getChampion(c).getAbility(3).getLevel()) : 1;
+            DamageUtil.damageEntity(c, tgt, (new double[]{20,25,30,35,40}[Math.min(er,5)-1] + s.getBonusAD() * 0.35) * eff, false, DamageUtil.Type.TRUE);
+        }
+        fr.lolmc.item.ItemEffects.applyOnHit(c, tgt, dmg, eff);
+    }
     // Style Wuju actif (5 s) : vrais dégâts à chaque attaque
     private static final java.util.Map<java.util.UUID, Long> wujuUntil = new java.util.concurrent.ConcurrentHashMap<>();
 
@@ -53,9 +79,13 @@ public final class MasterYi extends BaseChampion implements fr.lolmc.champion.ba
                 var q = cmQ.getChampion(c).getAbility(1);
                 if (q != null) q.reduceCooldown(c, 1.0);
             }
-            int count = aaCount.merge(c.getUniqueId(), 1, Integer::sum);
-            if (count >= 4) {
-                aaCount.put(c.getUniqueId(), 0);
+            // Coup double (wiki) : 1 effet par attaque (4 s, 3 max) ; à 3, l'attaque suivante frappe deux fois
+            long now = System.currentTimeMillis();
+            Long last = aaLast.get(c.getUniqueId());
+            int stacks = (last == null || now - last > 4000) ? 0 : aaCount.getOrDefault(c.getUniqueId(), 0);
+            if (stacks < 3) { addDoubleStrikeStack(c.getUniqueId()); }
+            else {
+                aaCount.put(c.getUniqueId(), 0); aaLast.remove(c.getUniqueId());
                 // Double Frappe : 2e coup = 50 % AD physiques (avant : vrais dégâts, à la 3e attaque)
                 DamageUtil.damageEntity(c, tgt, s.getFinalAD() * 0.50, false, DamageUtil.Type.PHYSICAL);
                 fr.lolmc.util.VisualEffectUtil.impact(c.getWorld(),
@@ -70,33 +100,61 @@ public final class MasterYi extends BaseChampion implements fr.lolmc.champion.ba
             new double[]{20,19.5,19,18.5,18},15,0,DamageType.TRUE);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            org.bukkit.entity.LivingEntity tgt = (t!=null && TargetingUtil.isEnemy(c,t))?t:TargetingUtil.getTargetedEnemy(c,6.5); if(tgt==null){cancelCast();return;}
-            // Wiki : Yi est intouchable pendant la Frappe Alpha (~0.9 s)
-            fr.lolmc.util.Untargetable.apply(c, 18);
-            Location dest=safeTeleport(c.getLocation(),tgt.getLocation());
-            c.teleport(dest);
-            fr.lolmc.LolPlugin.getInstance().getRuneManager().onDash(c); // Impact soudain
-            double[] base=fr.lolmc.util.Balance.base("q_masteryi",new double[]{20,40,60,80,100});double dmg=base[getLevel()-1]+s.getFinalAD()*0.70; // wiki
-            // Wiki : Frappe Alpha touche jusqu'à 4 ennemis (la cible et 3 autres autour d'elle)
-            var struck=new java.util.ArrayList<org.bukkit.entity.LivingEntity>(); struck.add(tgt);
-            for(var e2 : TargetingUtil.entitiesInRadius(c, tgt.getLocation(), 6.0)){
-                if(struck.size()>=4) break;
-                if(!e2.equals(tgt)) struck.add(e2);
-            }
-            double monsterBonus=new double[]{60,85,110,135,160}[getLevel()-1]; // contre les monstres (manquait)
-            for(var e2 : struck){
-                double d = fr.lolmc.game.JungleManager.isJungleMonster(e2) ? dmg+monsterBonus : dmg;
-                TargetingUtil.dealDamage(c, e2, d, TargetingUtil.DmgType.PHYSICAL);
-                fr.lolmc.util.VisualEffectUtil.impactBurst(c.getWorld(),
-                        e2.getLocation().add(0,1,0), Material.WHITE_STAINED_GLASS, 0.25f, 0.5, 6, 5L);
-            }
+            org.bukkit.entity.LivingEntity tgt = (t!=null && TargetingUtil.isEnemy(c,t))?t:TargetingUtil.getTargetedEnemy(c,6.65); if(tgt==null){cancelCast();return;}
+            // Wiki : 4 marques, une toutes les 0.231 s : la cible, puis l'ennemi non marqué le plus
+            // proche (600 unités) ; sans autre ennemi, une cible déjà marquée est reprise pour 25 %
+            // des dégâts et 18.75 % des effets à l'impact (75 % sur la 1re marque de chaque cible).
+            // Peut critiquer. Yi est intouchable (~1.09 s) puis réapparaît devant la cible.
+            fr.lolmc.util.Untargetable.apply(c, 22);
+            int rank=getLevel()-1;
+            double[] base=fr.lolmc.util.Balance.base("q_masteryi",new double[]{20,40,60,80,100});
+            final double full=base[rank]+s.getFinalAD()*0.70;
+            final double monsterBonus=new double[]{60,85,110,135,160}[rank];
+            final org.bukkit.entity.LivingEntity primary=tgt;
+            final java.util.List<org.bukkit.entity.LivingEntity> marked=new java.util.ArrayList<>();
+            new org.bukkit.scheduler.BukkitRunnable(){
+                int n=0; org.bukkit.entity.LivingEntity last=primary;
+                @Override public void run(){
+                    org.bukkit.entity.LivingEntity next=null;
+                    if(n==0) next=primary;
+                    else if(n<4 && c.isOnline()){
+                        double best=36;
+                        for(var e : TargetingUtil.entitiesInRadius(c, last.getLocation(), 6.0)){
+                            if(marked.contains(e)) continue;
+                            double d=e.getLocation().distanceSquared(last.getLocation());
+                            if(d<best){best=d;next=e;}
+                        }
+                        if(next==null){
+                            var alive=marked.stream().filter(e -> e.isValid() && !e.isDead()).toList();
+                            if(!alive.isEmpty()) next=alive.get(n % alive.size());
+                        }
+                    }
+                    if(next==null || n>=4 || !c.isOnline()){ finish(); cancel(); return; }
+                    boolean repeat=marked.contains(next);
+                    if(!repeat) marked.add(next);
+                    double dmg=repeat ? full*0.25 : full;
+                    if(Math.random()<s.getFinalCritChance()) dmg*=s.getFinalCritDamage(); // critique (wiki)
+                    if(!repeat && fr.lolmc.game.JungleManager.isJungleMonster(next)) dmg+=monsterBonus;
+                    TargetingUtil.dealDamage(c, next, dmg, TargetingUtil.DmgType.PHYSICAL);
+                    alphaOnHit(c, s, next, dmg, repeat ? 0.1875 : 0.75);
+                    fr.lolmc.util.VisualEffectUtil.impactBurst(next.getWorld(),
+                            next.getLocation().add(0,1,0), Material.WHITE_STAINED_GLASS, 0.25f, 0.5, 6, 5L);
+                    last=next; n++;
+                }
+                void finish(){
+                    if(!c.isOnline()) return;
+                    var anchor=primary.isValid() ? primary : last;
+                    Location dest=safeTeleport(c.getLocation(), anchor.getLocation());
+                    c.teleport(dest);
+                    fr.lolmc.LolPlugin.getInstance().getRuneManager().onDash(c); // Impact soudain
+                }
+            }.runTaskTimer(LolPlugin.getInstance(), 0L, 5L);
         }
         @Override public String getDynamicDescription(ChampionStats s){
             double[] base=fr.lolmc.util.Balance.base("q_masteryi",new double[]{20,40,60,80,100});
-            return String.format("%.0f dégâts physiques (+70%%AD) à la cible et 3 ennemis proches. Dash, intouchable.",base[getLevel()-1]+s.getFinalAD()*0.70);
+            return String.format("4 marques : %.0f dégâts physiques (+70%%AD) par cible, 25%% sur une cible reprise. Peut critiquer, intouchable.",base[getLevel()-1]+s.getFinalAD()*0.70);
         }
     }
-
     static class W extends BaseAbility {
         W(){super("w_masteryi","Méditation",Material.GOLDEN_APPLE,AbilitySlot.W,
             new double[]{10,10,10,10,10},0,0,DamageType.TRUE);
@@ -111,16 +169,18 @@ public final class MasterYi extends BaseChampion implements fr.lolmc.champion.ba
             final double perTick=(heals[getLevel()-1]+s.getFinalAP()*1.0)/8.0;
             final Location anchor=c.getLocation().clone();
             s.addPercentDamageReduction(0.70);
+            meditate.put(c.getUniqueId(), 0.70);
             new org.bukkit.scheduler.BukkitRunnable(){
                 int t=0; double applied=0.70;
-                void end(){ s.addPercentDamageReduction(-applied); applied=0; cancel(); }
+                void end(){ s.addPercentDamageReduction(-applied); applied=0; meditate.remove(c.getUniqueId()); cancel(); }
                 @Override public void run(){
                     var cm=LolPlugin.getInstance().getChampionManager();
                     t+=2;
                     if(t>80 || !c.isOnline() || !cm.hasChampion(c) || c.getGameMode()==GameMode.SPECTATOR
                             || !c.getWorld().equals(anchor.getWorld())
                             || c.getLocation().distanceSquared(anchor)>0.25){ end(); return; }
-                    if(t==10){ s.addPercentDamageReduction(dr-applied); applied=dr; }
+                    if(t==10){ s.addPercentDamageReduction(dr-applied); applied=dr; meditate.put(c.getUniqueId(), dr); }
+                    if(t%20==0) addDoubleStrikeStack(c.getUniqueId()); // 1 effet de Coup double par seconde (wiki)
                     if(t%10==0){
                         // Soin augmenté de 1 % par 1 % de PV manquants (jusqu'à +100 %, données du jeu)
                         var hp=cm.getChampion(c).getHPSystem();
@@ -152,25 +212,27 @@ public final class MasterYi extends BaseChampion implements fr.lolmc.champion.ba
             new double[]{85,85,85},0,0,DamageType.TRUE);
             resourceCost = 100;}
         @Override public void cast(Player c,ChampionStats s,Player t){
-            // Wiki : 7 s, +25/45/65 % de vitesse d'attaque et +40/50/60 % de vitesse
+            // Wiki : 7 s (+7 s par élimination de champion), +25/45/65 % de vitesse d'attaque,
+            // +40/50/60 % de vitesse, insensible aux ralentissements
             int r=Math.min(getLevel()-1,2);
-            double asBonus=new double[]{0.25,0.45,0.65}[r];
+            final double asBonus=new double[]{0.25,0.45,0.65}[r];
+            final double ms=new double[]{0.40,0.50,0.60}[r];
+            final java.util.UUID id=c.getUniqueId();
+            highlanderUntil.put(id, System.currentTimeMillis()+7000L);
             s.addBonusAttackSpeed(asBonus);
-            new org.bukkit.scheduler.BukkitRunnable(){@Override public void run(){ s.addBonusAttackSpeed(-asBonus); }}
-                    .runTaskLater(LolPlugin.getInstance(), 140L);
-            fr.lolmc.LolPlugin.getInstance().getCCManager().speedPct(c, new double[]{0.40,0.50,0.60}[r], 140);
-            // Insensible aux ralentissements pendant les 7 s (avant : retirés seulement au lancement)
-            new org.bukkit.scheduler.BukkitRunnable(){ int t=0;
+            var cc=fr.lolmc.LolPlugin.getInstance().getCCManager();
+            new org.bukkit.scheduler.BukkitRunnable(){
                 @Override public void run(){
-                    if((t+=2)>140 || !c.isOnline()){ cancel(); return; }
+                    if(!c.isOnline() || System.currentTimeMillis()>=highlanderUntil.getOrDefault(id,0L)){
+                        s.addBonusAttackSpeed(-asBonus); highlanderUntil.remove(id); cancel(); return;
+                    }
+                    cc.speedPct(c, ms, 6);
                     c.removePotionEffect(PotionEffectType.SLOWNESS);
-                    fr.lolmc.LolPlugin.getInstance().getCCManager().clearSlows(c.getUniqueId());
-                }}.runTaskTimer(LolPlugin.getInstance(), 0L, 2L);
-            c.sendActionBar(Component.text("⚡ HIGHLANDER 7s!",NamedTextColor.GOLD));
+                    cc.clearSlows(id);
+                }}.runTaskTimer(LolPlugin.getInstance(), 0L, 5L);
         }
-        @Override public String getDynamicDescription(ChampionStats s){return "7s: +25-65% vitesse d'attaque, +40-60% vitesse. Passif: les takedowns réduisent les sorts de 70%.";}
+        @Override public String getDynamicDescription(ChampionStats s){return "7s (+7 s par élimination) : +25-65% vitesse d'attaque, +40-60% vitesse, insensible aux ralentissements. Passif : les éliminations réduisent les sorts de 70%.";}
     }
-
     /** Appelé par EntityDeathListener sur kill ou assist de MasterYi pendant Highlander. */
     public static void onKillDuringHighlander(Player yi) {
         // Passif du Highlander (wiki) : dès que R est appris, un takedown réduit de 70 % la recharge
@@ -179,6 +241,9 @@ public final class MasterYi extends BaseChampion implements fr.lolmc.champion.ba
         if (!cm.hasChampion(yi)) return;
         var champ = cm.getChampion(yi);
         if (champ.getLevelSystem().getAbilityRank(4) <= 0) return;
+        // Highlander actif : +7 s par élimination de champion (wiki)
+        Long until = highlanderUntil.get(yi.getUniqueId());
+        if (until != null && until > System.currentTimeMillis()) highlanderUntil.put(yi.getUniqueId(), until + 7000L);
         for (int i = 1; i <= 3; i++) {
             var a = champ.getAbility(i);
             if (a != null) a.reduceCooldown(yi, a.getRemainingCooldown(yi) * 0.70);

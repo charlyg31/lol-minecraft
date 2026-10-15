@@ -98,14 +98,21 @@ public final class Yasuo extends BaseChampion implements fr.lolmc.champion.base.
 
     // Passif Voie du Vagabond : au double crit chance passif (déjà configuré via ChampionStats)
     // Passif Esprit du Vent : bouclier égal 100+50%AP quand Flow est plein
+    // Voie du vagabond (données du jeu) : chaque 1 % de chances de critique au-delà de 100 % donne 0.5 AD
+    private double critToAD = 0;
     public static void tickWindShield(org.bukkit.entity.Player p, fr.lolmc.champion.base.BaseChampion champ) {
+        if (champ instanceof Yasuo y) {
+            double want = Math.max(0, y.getStats().getUncappedCritChance() - 1.0) * 100 * 0.5;
+            if (Math.abs(want - y.critToAD) > 1e-6) { y.getStats().addBonusAD(want - y.critToAD); y.critToAD = want; }
+        }
         var res = champ.getResourceSystem();
         if (res.getType() == fr.lolmc.stats.ResourceSystem.ResourceType.FLOW
                 && res.getCurrent() >= res.getMax()
                 && champ.getStats().getShield() <= 0) {
             int lvl = champ.getLevelSystem().getLevel();
             // 125 → 600 du niveau 1 au 18 (données du jeu ; 674 est la valeur du niveau 20)
-            double shield = 125 + (600 - 125) * (lvl - 1) / 17.0;
+            int n = Math.max(0, Math.min(17, lvl - 1)); // courbe de croissance des stats (données du jeu)
+            double shield = 125 + (600 - 125) * n * (0.7025 + 0.0175 * n) / 17.0;
             champ.getStats().addShield(shield);
             res.setCurrent(0);
             p.sendActionBar(net.kyori.adventure.text.Component.text(
@@ -129,7 +136,11 @@ public final class Yasuo extends BaseChampion implements fr.lolmc.champion.base.
             int qStacks=qStackUntil.getOrDefault(c.getUniqueId(),0L)>System.currentTimeMillis()
                     ? qCasts.getOrDefault(c.getUniqueId(),0) : 0;
             // LoL : coup d'estoc en ligne. 20/45/70/95/120 + 100% AD (peut critiquer)
-            double[] base=fr.lolmc.util.Balance.base("q_yasuo",new double[]{20,45,70,95,120});double dmg=base[getLevel()-1]+s.getFinalAD()*fr.lolmc.util.Balance.ratio("q_yasuo","ad",1.05);
+            double[] base=fr.lolmc.util.Balance.base("q_yasuo",new double[]{20,45,70,95,120});
+            // Peut critiquer : 105 % AD × dégâts critiques (données du jeu)
+            double adPart=s.getFinalAD()*fr.lolmc.util.Balance.ratio("q_yasuo","ad",1.05);
+            if(Math.random()<s.getFinalCritChance()) adPart*=s.getFinalCritDamage();
+            double dmg=base[getLevel()-1]+adPart;
             boolean tornado = qStacks>=2;
             // E-Q (wiki) : un Q lancé pendant le bond de Lame Déferlante frappe en cercle autour de
             // Yasuo à l'arrivée ; avec 2 charges, il projette les ennemis touchés en l'air. Manquait.
@@ -155,7 +166,7 @@ public final class Yasuo extends BaseChampion implements fr.lolmc.champion.base.
                 // Tornade : skillshot plus long qui projette en l'air
                 // Projectile réel : tornade de 1150 unités à 1200/s qui traverse
                 var ccQ = LolPlugin.getInstance().getCCManager();
-                TargetingUtil.launchSkillshot(c, c.getLocation().add(0,0.6,0), c.getEyeLocation().getDirection().setY(0), 11.5, 1.5, true, 12.0,
+                TargetingUtil.launchSkillshot(c, c.getLocation().add(0,0.6,0), c.getEyeLocation().getDirection().setY(0), 11.0, 1.5, true, 12.0, // 1100 unités
                         new org.bukkit.inventory.ItemStack(Material.WHITE_STAINED_GLASS), 1.6f, Material.WHITE_STAINED_GLASS,
                         __t -> {
                             TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.PHYSICAL);
@@ -166,7 +177,7 @@ public final class Yasuo extends BaseChampion implements fr.lolmc.champion.base.
                 c.getWorld().playSound(c.getLocation(), Sound.ENTITY_ENDER_DRAGON_FLAP, 1f, 1.2f);
             } else {
                 // Estoc en ligne droite
-                var hits=TargetingUtil.skillshot(c, 5.0, 1.0, true);
+                var hits=TargetingUtil.skillshot(c, 4.5, 1.0, true); // 450 unités
                 for(var __t : hits) TargetingUtil.dealDamage(c, __t, dmg, TargetingUtil.DmgType.PHYSICAL);
                 if(!hits.isEmpty()){
                     qCasts.put(c.getUniqueId(), Math.min(2, qStacks+1));
@@ -192,19 +203,28 @@ public final class Yasuo extends BaseChampion implements fr.lolmc.champion.base.
             org.bukkit.util.Vector fwd=base.getDirection().setY(0);
             if(fwd.lengthSquared()<1e-6) fwd=new org.bukkit.util.Vector(1,0,0);
             fwd.normalize();
-            Location center=base.clone().add(fwd.clone().multiply(2.0));
+            // Données du jeu : le mur part de Yasuo à 850 unités/s et ralentit de 1200 unités/s²
+            // (10 unités/s minimum), sur 450 unités au plus ; il dure 4 s
+            final Location origin=base.clone();
+            final org.bukkit.util.Vector ffwd=fwd.clone();
             double[] widths={3.2,3.9,4.6,5.3,6.0}; // 320-600 unités (wiki)
-            double half=widths[getLevel()-1]/2.0;
-            double ax=-fwd.getZ(), az=fwd.getX();
-            walls.add(new WindWall(LolPlugin.getInstance().getTeamManager().getTeam(c), c.getWorld(),
-                    center.getX(), center.getY(), center.getZ(), ax, az, half, System.currentTimeMillis()+4000L));
-            new BukkitRunnable(){ int n=0;
+            final double half=widths[getLevel()-1]/2.0;
+            final double ax=-fwd.getZ(), az=fwd.getX();
+            final var team=LolPlugin.getInstance().getTeamManager().getTeam(c);
+            final long until=System.currentTimeMillis()+4000L;
+            new BukkitRunnable(){ int n=0; double dist=0; WindWall cur=null;
                 @Override public void run(){
-                    if(n++>=16){cancel();return;}
-                    for(double d=-half; d<=half; d+=0.8)
+                    if(cur!=null) walls.remove(cur);
+                    if(n++>=80){cancel();return;}
+                    double v=Math.max(10, 850-1200*(n/20.0)); // unités/s
+                    dist=Math.min(450, dist+v/20.0);
+                    Location center=origin.clone().add(ffwd.clone().multiply(dist/100.0));
+                    cur=new WindWall(team, c.getWorld(), center.getX(), center.getY(), center.getZ(), ax, az, half, until);
+                    walls.add(cur);
+                    if(n%5==0) for(double d=-half; d<=half; d+=0.8)
                         fr.lolmc.util.VisualEffectUtil.impact(center.getWorld(),
                                 center.clone().add(ax*d, 1.2, az*d), Material.WHITE_STAINED_GLASS, 0.25f, 5L);
-                }}.runTaskTimer(LolPlugin.getInstance(),0L,5L);
+                }}.runTaskTimer(LolPlugin.getInstance(),0L,1L);
             c.sendActionBar(Component.text("💨 Mur du Vent 4s!",NamedTextColor.WHITE));
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_PHANTOM_FLAP, 1f, 0.6f);
         }
@@ -233,8 +253,12 @@ public final class Yasuo extends BaseChampion implements fr.lolmc.champion.base.
             int stacks=Math.min(eStacks.getOrDefault(c.getUniqueId(),0),4);
             double[] base=fr.lolmc.util.Balance.base("e_yasuo",new double[]{70,85,100,115,130});
             double dmg=(base[getLevel()-1]+s.getBonusAD()*0.20+s.getFinalAP()*0.60)*(1.0+0.25*stacks); // AD bonus (wiki)
-            // Dash à travers la cible (direction Yasuo → cible, sans traverser les murs)
-            dashTo(c, tgt, 1.5);
+            // Wiki : ruée d'une distance fixe (475) vers et à travers la cible, à 750 + 60 % de la vitesse
+            Vector dirE=tgt.getLocation().toVector().subtract(c.getLocation().toVector()).setY(0);
+            if(dirE.lengthSquared()<1e-6) dirE=c.getLocation().getDirection().setY(0);
+            dirE.normalize();
+            double dashSpeed=750+0.6*s.getFinalMovementSpeed();
+            dashToward(c, c.getLocation().add(dirE.multiply(4.75)), dashSpeed, null);
             TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.MAGICAL);
             eStacks.merge(c.getUniqueId(),1,Integer::sum);
             // Reset des stacks 6s après le DERNIER E (avant : le reset du 1er E effaçait les suivants)
@@ -243,7 +267,7 @@ public final class Yasuo extends BaseChampion implements fr.lolmc.champion.base.
             new BukkitRunnable(){@Override public void run(){
                 if(eLastCast.getOrDefault(c.getUniqueId(),0L)==castAt) eStacks.put(c.getUniqueId(),0);
             }}.runTaskLater(LolPlugin.getInstance(),100L); // 5 s (wiki)
-            eDashUntil.put(c.getUniqueId(), System.currentTimeMillis()+500L); // Q pendant le bond : E-Q
+            eDashUntil.put(c.getUniqueId(), System.currentTimeMillis()+(long)(475/dashSpeed*1000)+50L); // Q pendant la ruée : E-Q
             fr.lolmc.util.VisualEffectUtil.impact(c.getWorld(),
                     c.getLocation().add(0,1,0), Material.WHITE_STAINED_GLASS, 0.3f, 4L);
             c.getWorld().playSound(c.getLocation(), Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 1.4f);
