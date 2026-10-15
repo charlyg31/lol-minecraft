@@ -38,7 +38,7 @@ public class SummonerSpellManager {
         BARRIER("Barrière", 180, "Bouclier de 100-460 pendant 2,5 s."),
         EXHAUST("Fatigue", 240, "Ralentit un ennemi de 40% et réduit ses dégâts de 35% pendant 3 s."),
         TELEPORT("Téléportation", 300, "Après 3 s, vous rejoignez une tourelle, un sbire ou une balise alliés."),
-        SMITE("Châtiment", 15, "600 dégâts bruts à un monstre ou un sbire. 2 charges (recharge 90 s)."),
+        SMITE("Châtiment", 15, "600 dégâts bruts à un monstre ou un sbire (1000 déchaîné, 1400 primitif). 2 charges (recharge 90 s)."),
         CLEANSE("Purge", 240, "Retire les contrôles et +75% de ténacité pendant 3 s."),
         GHOST("Fantôme", 240, "+24-48% de vitesse de déplacement pendant 10 s.");
 
@@ -454,9 +454,11 @@ public class SummonerSpellManager {
         var inv = LolPlugin.getInstance().getShopListener().getOrCreate(caster);
         // Objets de jungle (ids du registre : Mosstomper = pickaxe_jungle, Gustwalker = smite_stalker,
         // Scorchclaw = blue_smite) : Châtiment déchaîné, utilisable sur les champions
-        // Châtiment déchaîné quand le compagnon atteint 20 cumuls (données du jeu ; avant : dès l'achat)
-        boolean unleashed = (inv.hasItem("pickaxe_jungle") || inv.hasItem("smite_stalker") || inv.hasItem("blue_smite"))
-                && fr.lolmc.item.ItemEffects.companionStacks(caster) >= 20;
+        // Châtiment déchaîné à 15 friandises du compagnon, primitif à 35 (wiki ; avant : dès l'achat)
+        boolean pet = inv.hasItem("pickaxe_jungle") || inv.hasItem("smite_stalker") || inv.hasItem("blue_smite");
+        int treats = pet ? fr.lolmc.item.ItemEffects.companionStacks(caster) : 0;
+        boolean unleashed = treats >= 15;
+        boolean primal = treats >= 35;
 
         // Cible : l'unité visée, sinon le monstre puis le sbire ennemi le plus proche.
         // (Avant : un champion ennemi à portée passait AVANT le monstre, même en visant le dragon.)
@@ -482,7 +484,12 @@ public class SummonerSpellManager {
             return true;
         }
 
-        double smiteDamage = 600;
+        // 600 bruts ; Châtiment déchaîné 1000 ; primitif 1400, aussi aux monstres proches
+        double smiteDamage = primal ? 1400 : unleashed ? 1000 : 600;
+        if (primal && JungleManager.isJungleMonster(target))
+            for (var e : target.getNearbyEntities(5, 3, 5))
+                if (e instanceof LivingEntity m && !m.equals(target) && JungleManager.isJungleMonster(m) && !m.isDead())
+                    fr.lolmc.util.VirtualHP.damage(m, Math.min(smiteDamage, fr.lolmc.util.VirtualHP.getCurrent(m)), caster);
         // HP réels (virtuels si Baron/Elder/canon, sinon vanilla)
         double cur = fr.lolmc.util.VirtualHP.has(target)
             ? fr.lolmc.util.VirtualHP.getCurrent(target) : target.getHealth();

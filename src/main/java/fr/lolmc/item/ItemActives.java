@@ -120,7 +120,10 @@ public final class ItemActives {
                 if (!use(p, f, "locket", 90)) return;
                 double shield = bp(290, 9, 7, l);
                 for (Player a : allies(p, 8.5)) {
-                    tempShield(a, shield, 50, false);
+                    // Effet réduit à 25 % sur un allié protégé par un autre Médaillon dans les 20 s
+                    double s = marked(a.getUniqueId(), "locketRecent") ? shield * 0.25 : shield;
+                    mark(a.getUniqueId(), "locketRecent", 20);
+                    tempShield(a, s, 50, false);
                     if (!a.equals(p)) onAllyHealShield(p, a, 0, shield);
                 }
             }
@@ -149,7 +152,10 @@ public final class ItemActives {
                     for (Player o : at.getWorld().getPlayers()) {
                         if (!isChampion(o) || o.getLocation().distanceSquared(at) > 5.5 * 5.5) continue;
                         if (o.equals(p) || pl().getTeamManager().areAllies(p, o)) {
-                            champ(o).getHPSystem().heal(heal);
+                            // Effet réduit de moitié sur un allié soigné par une autre Rédemption dans les 8 s
+                            double h = marked(o.getUniqueId(), "redemptionRecent") ? heal * 0.5 : heal;
+                            mark(o.getUniqueId(), "redemptionRecent", 8);
+                            champ(o).getHPSystem().heal(h);
                             if (!o.equals(p)) onAllyHealShield(p, o, heal, 0);
                         } else if (pl().getTeamManager().areEnemies(p, o)) {
                             itemDamage(p, o, champ(o).getHPSystem().getMaxHP() * 0.10, DamageUtil.Type.TRUE, false);

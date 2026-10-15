@@ -66,6 +66,7 @@ public class EntityDeathListener implements Listener {
         Player killer = le.getKiller();
         if (killer != null && !championManager.hasChampion(killer)) killer = null;
         fr.lolmc.item.ItemEffects.onMinionKill(killer); // Abatteur
+        fr.lolmc.item.ItemEffects.desolate(killer, le.getLocation()); // Rayonnement du vide
         var earners = minionXpEarners(le, minionTeam);
         double xp = RewardManager.sharedXP(fr.lolmc.util.MobCombat.getXP(le,
                 minionXP(fr.lolmc.game.MinionManager.getMinionTypeTag(le))), xpShareCount(earners, killer));

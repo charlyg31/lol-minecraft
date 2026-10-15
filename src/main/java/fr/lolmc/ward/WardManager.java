@@ -146,9 +146,37 @@ public class WardManager {
         }
     }
 
-    /** Ward désactivée : une Control Ward ennemie la couvre (elle ne donne plus de vision). */
+    /** Neutralisations temporaires (Glaive d'ombre) : ward → fin. */
+    private final Map<Ward, Long> disabledUntil = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** Neutralise (et rend visibles) les wards camouflées ennemies dans le rayon pendant {@code ms}. */
+    public void disableEnemyWards(Player player, Location center, double radius, long ms) {
+        Team myTeam = teamManager.getTeam(player);
+        if (myTeam == null) return;
+        long until = System.currentTimeMillis() + ms;
+        for (Ward w : wards) {
+            if (w.team == myTeam || w.type != WardType.STEALTH) continue;
+            if (w.location.getWorld() == null || !w.location.getWorld().equals(center.getWorld())) continue;
+            if (w.location.distance(center) <= radius) disabledUntil.merge(w, until, Math::max);
+        }
+    }
+
+    /** Le joueur est-il dans le champ de vision d'une ward camouflée ennemie (Glaive d'ombre, Black-out) ? */
+    public boolean isSpottedByEnemyStealthWard(Player player) {
+        Team myTeam = teamManager.getTeam(player);
+        for (Ward w : wards) {
+            if (w.team == myTeam || w.type != WardType.STEALTH || isDisabled(w)) continue;
+            if (w.location.getWorld() == null || !w.location.getWorld().equals(player.getWorld())) continue;
+            if (w.location.distanceSquared(player.getLocation()) <= w.type.radius * w.type.radius) return true;
+        }
+        return false;
+    }
+
+    /** Ward désactivée : une Control Ward ennemie la couvre ou un Glaive d'ombre la neutralise. */
     public boolean isDisabled(Ward w) {
         if (w.type == WardType.CONTROL) return false; // une Control Ward ne peut pas être désactivée
+        Long until = disabledUntil.get(w);
+        if (until != null) { if (until > System.currentTimeMillis()) return true; disabledUntil.remove(w); }
         for (Ward c : wards) {
             if (c.type != WardType.CONTROL || c.team == w.team) continue;
             if (!c.location.getWorld().equals(w.location.getWorld())) continue;

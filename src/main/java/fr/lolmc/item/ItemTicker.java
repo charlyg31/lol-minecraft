@@ -35,6 +35,8 @@ public final class ItemTicker {
 
     /** Bonus dynamiques appliqués : joueur → (clé → montant). */
     private static final Map<UUID, Map<String, Double>> DYN = new ConcurrentHashMap<>();
+    /** Sillage de l'Élixir de fer : porteur → points {position, instant}. */
+    private static final Map<UUID, java.util.ArrayDeque<Object[]>> TRAILS = new ConcurrentHashMap<>();
     /** Cœur gelé : porteur → (ennemi → multiplicateur appliqué). */
     private static final Map<UUID, Map<UUID, Double>> FROZEN = new ConcurrentHashMap<>();
 
@@ -64,6 +66,14 @@ public final class ItemTicker {
     }
 
     public static void reset(UUID id) { DYN.remove(id); FROZEN.remove(id); }
+
+    /** Taille bonus donnée par les objets (agrandit l'immolation). */
+    static double itemScale(Player p) {
+        var attr = p.getAttribute(fr.lolmc.util.Compat.scale());
+        if (attr == null) return 0;
+        var mod = attr.getModifier(new org.bukkit.NamespacedKey(pl(), "lol_item_scale"));
+        return mod != null ? mod.getAmount() : 0;
+    }
 
     private static void tick() {
         tickCount++;
@@ -104,7 +114,7 @@ public final class ItemTicker {
         if (!dead && has(p, "statikk_shiv", "rapid_firecannon", "stormrazor", "voltaic_cyclosword"))
             f.energize = Math.min(100, f.energize + moved * 100 / 24.0);
         if (has(p, "dead_man_s_plate")) {
-            if (moved > 0.2) f.deadManMomentum = Math.min(100, f.deadManMomentum + 12.5); // max en 4 s
+            if (moved > 0.2) f.deadManMomentum = Math.min(100, f.deadManMomentum + 14); // 7 cumuls par 0.25 s
         } else f.deadManMomentum = 0;
         dyn(p, "deadManMS", f.deadManMomentum / 100.0 * 20, ChampionStats::addBonusMoveSpeed, st);
 
@@ -144,9 +154,12 @@ public final class ItemTicker {
             else if (has(p, "hollow_radiance")) { dmg = 15 + st.getBonusHP() * 0.01; minionMod = 0.25; monsterMod = 0.25; }
             else if (has(p, "bamis_cinder")) { dmg = 15; minionMod = 0.5; monsterMod = 1.0; }
             else dmg = minionMod = monsterMod = 0;
-            if (dmg > 0) for (var e : TargetingUtil.enemiesAround(p, 3.0)) {
-                double d = fr.lolmc.game.MinionManager.isMinion(e) ? dmg * (1 + minionMod)
-                        : isMonster(e) ? dmg * (1 + monsterMod) : dmg;
+            double radius = 3.25 * (1 + itemScale(p));
+            if (dmg > 0) for (var e : TargetingUtil.enemiesAround(p, radius)) {
+                boolean minion = fr.lolmc.game.MinionManager.isMinion(e);
+                double d = minion ? dmg * (1 + minionMod) : isMonster(e) ? dmg * (1 + monsterMod) : dmg;
+                // Égide solaire : exécute les sbires qu'un tick de plus tuerait
+                if (minion && has(p, "sunfire_aegis") && curHp(e) <= d) d = curHp(e) + 1;
                 itemDamage(p, e, d, DamageUtil.Type.MAGICAL, false);
             }
         }
@@ -247,9 +260,9 @@ public final class ItemTicker {
 
         // ── Brise-coques : sbires de siège et super-sbires alliés proches, +70 (+6/niv dès 9) armure et RM ──
         if (has(p, "hullbreaker") && !dead) {
-            double bonus = bp(70, 9, 6, l) * (rng ? 0.5 : 1.0);
+            double bonus = interp(70, 130, l) * (rng ? 0.5 : 1.0);
             var team = pl().getTeamManager().getTeam(p);
-            for (var e : p.getNearbyEntities(14, 6, 14)) {
+            for (var e : p.getNearbyEntities(10.5, 6, 10.5)) {
                 if (!(e instanceof org.bukkit.entity.LivingEntity le) || !fr.lolmc.game.MinionManager.isMinion(le)) continue;
                 String t = fr.lolmc.game.MinionManager.getMinionTypeTag(le);
                 if (fr.lolmc.game.MinionManager.getMinionTeam(le) == team && ("cannon".equals(t) || "super".equals(t)))
@@ -260,22 +273,40 @@ public final class ItemTicker {
         var cons = pl().getConsumableManager();
         String elixir = cons != null ? cons.getActiveElixir(p) : null;
         dyn(p, "sorceryRegen", mana && "sorcery".equals(elixir) ? res.getBaseRegenPer5s() * 0.15 : 0, (s, v) -> res.addRegen(v), st);
-        if ("iron".equals(elixir) && !dead)
-            for (Player o : p.getWorld().getPlayers())
-                if (!o.equals(p) && isChampion(o) && pl().getTeamManager().areAllies(p, o) && o.getLocation().distanceSquared(p.getLocation()) <= 9)
-                    pl().getCCManager().speedPct(o, 0.15, 12);
+        // Élixir de fer : en se déplaçant, le porteur laisse brièvement un sillage au sol ; les alliés
+        // dedans gagnent 15 % de vitesse. La durée et la largeur du sillage ne sont publiées nulle part
+        // (wiki, données du jeu : logique de script interne) : 1.5 s et 1 bloc de part et d'autre ici.
+        var trail = TRAILS.computeIfAbsent(p.getUniqueId(), _ -> new java.util.ArrayDeque<>());
+        if ("iron".equals(elixir) && !dead && moved > 0.1) trail.addLast(new Object[]{loc.clone(), now});
+        while (!trail.isEmpty() && now - (Long) trail.peekFirst()[1] > 1500) trail.pollFirst();
+        if (!trail.isEmpty())
+            for (Player o : p.getWorld().getPlayers()) {
+                if (o.equals(p) || !isChampion(o) || !pl().getTeamManager().areAllies(p, o)) continue;
+                for (Object[] pt : trail)
+                    if (((org.bukkit.Location) pt[0]).getWorld().equals(o.getWorld())
+                            && ((org.bukkit.Location) pt[0]).distanceSquared(o.getLocation()) <= 1.0) {
+                        pl().getCCManager().speedPct(o, 0.15, 12); break;
+                    }
+            }
 
         // ── Glaive d'ombre (Black-out) : révèle les balises ennemies proches ──
-        if (has(p, "umbral_glaive") && !dead) {
-            var wm = pl().getWardManager();
-            if (wm != null) wm.revealEnemyWards(p, p.getLocation(), 10.0, 1500L);
+        var wmB = pl().getWardManager();
+        if (has(p, "umbral_glaive") && !dead && wmB != null) {
+            if (f.blackoutUntil < now && ready(f.cd, "blackout") && wmB.isSpottedByEnemyStealthWard(p)) {
+                f.blackoutUntil = now + 8000;
+                cooldown(f.cd, "blackout", 90);
+            }
+            if (f.blackoutUntil > now) {
+                wmB.revealEnemyWards(p, p.getLocation(), 4.0, 2000L);
+                wmB.disableEnemyWards(p, p.getLocation(), 4.0, 2000L); // la neutralisation persiste 2 s
+            }
         }
 
         // ── Taille : Cœuracier (+3 % par tranche de 1000 PV max, max 30 %), Harnais protoplasmique (+15 %), Élixir de fer ──
         double size = 0;
         if (has(p, "heartsteel")) size += Math.min(0.30, 0.03 * Math.floor(hp.getMaxHP() / 1000));
         if (marked(p.getUniqueId(), "protoplasm")) size += 0.15;
-        if ("iron".equals(elixir)) size += 0.10;
+        if ("iron".equals(elixir)) size += 0.15;
         var scaleAttr = p.getAttribute(fr.lolmc.util.Compat.scale());
         if (scaleAttr != null) {
             var key = new org.bukkit.NamespacedKey(pl(), "lol_item_scale");
@@ -287,12 +318,35 @@ public final class ItemTicker {
             }
         }
 
+        // ── Volonté cosmique : +20 vitesse pendant 4 s ──
+        dyn(p, "cosmicMS", has(p, "cosmic_drive") && f.cosmicUntil > now ? 20 : 0, ChampionStats::addBonusMoveSpeed, st);
+        // ── Opposition céleste : fin de « Béni » → ralentit de 50 % 1.5 s à 500 unités, puis 18 s de recharge ──
+        if (f.blessedActive && f.blessedUntil <= now) {
+            f.blessedActive = false;
+            cooldown(f.cd, "celestial", 18);
+            for (var e : TargetingUtil.enemiesAround(p, 5.0)) pl().getCCManager().slowPct(e, 0.50, 30);
+        }
+        // ── Torche noire : +4 % de puissance par champion, monstre épique ou grand monstre en feu ──
+        int burning = has(p, "blackfire_torch") ? blackfireTargets(p) : 0;
+        dyn(p, "blackfireAP", (st.getFinalAP() - dynValue(p, "blackfireAP")) * 0.04 * burning, ChampionStats::addBonusAP, st);
+
+        // ── Compagnons : friandise bonus stockée toutes les 60 s (90 s une fois adulte) ──
+        if (has(p, "smite_stalker", "pickaxe_jungle", "blue_smite")) {
+            if (f.nextBonusTreat == 0) f.nextBonusTreat = now + 60_000;
+            if (now >= f.nextBonusTreat) { f.bonusTreats++; f.nextBonusTreat = now + (f.companion >= 35 ? 90_000 : 60_000); }
+        } else { f.bonusTreats = 0; f.nextBonusTreat = 0; }
+
         // ── Compagnons de jungle adultes ──
         if (f.companion >= 35 && !dead) {
-            // Saute-nuages : entrer dans un buisson donne +30 % de vitesse qui décroît en 1.5 s
+            // Saute-nuages : +30 % de vitesse dans un buisson (45 % après un grand monstre tué dedans),
+            // qui décroît en 1.5 s une fois sorti
             var bush = pl().getBushManager();
             boolean inBush = bush != null && bush.isInBush(p);
-            if (inBush && !f.wasInBush && has(p, "smite_stalker")) pl().getCCManager().speedDecaying(p, 0.30, 30);
+            if (has(p, "smite_stalker")) {
+                double pct = f.gaitInBush ? 0.45 : 0.30;
+                if (inBush) pl().getCCManager().speedPct(p, pct, 12);
+                else if (f.wasInBush) { pl().getCCManager().speedDecaying(p, pct, 30); f.gaitInBush = false; }
+            }
             f.wasInBush = inBush;
             // Ixamandre : bouclier rechargé après 10 s hors combat
             if (has(p, "pickaxe_jungle") && hp.msSinceLastDamage() >= 10_000) mossShield(p);
@@ -367,7 +421,7 @@ public final class ItemTicker {
         dyn(p, "jakArmor", jak ? (st.getBonusArmor() - dynValue(p, "jakArmor")) * 0.30 : 0, ChampionStats::addBonusArmor, st);
         dyn(p, "jakMR", jak ? (st.getBonusMagicResistValue() - dynValue(p, "jakMR")) * 0.30 : 0, ChampionStats::addBonusMR, st);
         // Force de la nature : 8 cumuls (perdus 7 s sans nouveau cumul) → +70 RM, +6 % de vitesse
-        if (now - f.fonLastStack > 7000) f.fonStacks = 0;
+        if (now > f.fonUntil) f.fonStacks = 0;
         boolean fon = has(p, "force_of_nature") && f.fonStacks >= 8;
         dyn(p, "fonMR", fon ? 70 : 0, ChampionStats::addBonusMR, st);
         if (fon) pl().getCCManager().speedPct(p, 0.06, 12);
@@ -379,7 +433,7 @@ public final class ItemTicker {
         for (Player o : p.getWorld().getPlayers()) {
             if (champ(o) == null || !(o.equals(p) || pl().getTeamManager().areAllies(p, o))) continue;
             if (fx(o).fanfareUntil > now && has(o, "bandlepipes") && o.getLocation().distanceSquared(p.getLocation()) <= 9 * 9) {
-                fanfareAS = rng ? 0.30 * 0.667 : 0.30; break;
+                fanfareAS = ranged(o) ? 0.20 : 0.30; break;
             }
         }
         dyn(p, "fanfareAS", fanfareAS, ChampionStats::addBonusAttackSpeed, st);

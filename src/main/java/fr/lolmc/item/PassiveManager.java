@@ -438,6 +438,7 @@ public class PassiveManager {
 
     /** Appelé quand un joueur tue un monstre de jungle : compagnon de jungle. */
     public void onJungleKill(Player killer, org.bukkit.entity.LivingEntity monster) {
+        if (monster != null) ItemEffects.desolate(killer, monster.getLocation()); // Rayonnement du vide
         ItemEffects.onJungleKill(killer, monster);
     }
 

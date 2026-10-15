@@ -118,6 +118,7 @@ public class DamageUtil {
             if (rm != null) rawAmount *= rm.getDamageMultiplier(attacker, victim);
         }
 
+        if (attacker != null && !itemDmg) fr.lolmc.item.ItemEffects.notePreMitigation(attacker, rawAmount); // Échos d'Helia
         // 1. Résistance (armure/MR avec pénétration de l'attaquant)
         double afterResist;
         if (type == Type.TRUE) {

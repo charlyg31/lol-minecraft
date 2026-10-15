@@ -79,6 +79,13 @@ public final class ItemEffects {
         return base + per * Math.max(0, lvl - from + 1);
     }
 
+    /** Niveau moyen des champions de la partie (camps de la jungle, compagnons). */
+    static double avgChampionLevel(Player ref) {
+        double sum = 0; int n = 0;
+        for (Player o : ref.getWorld().getPlayers()) if (champ(o) != null) { sum += lvl(o); n++; }
+        return n > 0 ? sum / n : lvl(ref);
+    }
+
     /** Interpolation linéaire du niveau 1 au niveau 18. */
     static double interp(double a, double b, int lvl) {
         return a + (b - a) * Math.max(0, Math.min(17, lvl - 1)) / 17.0;
@@ -209,7 +216,13 @@ public final class ItemEffects {
         int rodStacks; long rodNext; int lastLevel;
         // Compagnon de jungle
         int companion; double scorchStacks; boolean scorchReady; boolean wasInBush; double mossShield;
+        int bonusTreats; long nextBonusTreat; boolean gaitInBush;
         double ichorShield; long ichorAt;
+        int krakenStacks; long krakenUntil; int hullStacks; long hullUntil;
+        long blessedUntil; boolean blessedActive; long blackoutUntil;
+        long fonUntil;
+        final Map<UUID, Long> fonLastBy = new HashMap<>();
+        double dreamDR, dreamDmg; long dreamUntil;
     }
 
     static final Map<UUID, Fx> FX = new ConcurrentHashMap<>();
@@ -359,11 +372,15 @@ public final class ItemEffects {
             if (crit && has(victim, "randuin_s_omen")) dmg *= 0.70;
         }
         // Opposition céleste : -35 % (25 % à distance) des dégâts de champions pendant 2 s
-        if (attacker != null && fx(victim).celestialUntil > System.currentTimeMillis())
+        if (attacker != null && fx(victim).blessedActive && fx(victim).blessedUntil > System.currentTimeMillis())
             dmg *= 1 - (ranged(victim) ? 0.25 : 0.35);
         // Rêve éveillé : la prochaine source de dégâts est réduite (bulle reçue d'un allié)
-        if (attacker != null && MARKS.remove(victim.getUniqueId() + ":dreamDR") != null)
-            dmg = Math.max(0, dmg - bp(50, 7, 12, lvl(victim)));
+        // Rêve éveillé (bulle bleue) : la prochaine attaque ou le prochain sort reçu d'un champion est réduit
+        Fx vf = fx(victim);
+        if (attacker != null && vf.dreamDR > 0 && vf.dreamUntil > System.currentTimeMillis()) {
+            dmg = Math.max(0, dmg - vf.dreamDR);
+            vf.dreamDR = 0;
+        }
         // Vœu du chevalier : 14 % des dégâts subis par l'allié digne vont au porteur proche
         if (attacker != null) {
             for (Player knight : victim.getWorld().getPlayers()) {
@@ -398,12 +415,11 @@ public final class ItemEffects {
         if (has(victim, "steraks_gage") && ready(f.cd, "sterak")) {
             cooldown(f.cd, "sterak", 90);
             double shield = st.getBonusHP() * 0.60;
-            if (rng) shield *= 0.6;
             // Se désagrège sur 4.5 s : retiré par quarts
             st.addShield(shield);
-            for (int i = 1; i <= 4; i++) {
-                final double part = shield / 4;
-                later((long) (i * 22.5), () -> { var c = champ(victim); if (c != null) c.getStats().addShield(-Math.min(part, c.getStats().getShield())); });
+            for (int i = 1; i <= 9; i++) {
+                final double part = shield / 9;
+                later(i * 10L, () -> { var c = champ(victim); if (c != null) c.getStats().addShield(-Math.min(part, c.getStats().getShield())); });
             }
             victim.sendActionBar(Component.text("🛡 Gage de Sterak : +" + (int) shield, NamedTextColor.GREEN));
         } else if (has(victim, "immortal_shieldbow") && ready(f.cd, "shieldbow")) {
@@ -587,18 +603,20 @@ public final class ItemEffects {
 
         // ── Effets propres à l'attaque principale ──
         // Tueur de krakens : une attaque sur trois, 150 (+5/niveau dès 9) ×0.8 à distance, jusqu'à +75 % selon les PV manquants
-        if (has(a, "kraken_slayer") && ++f.krakenCount >= 3) {
-            f.krakenCount = 0;
+        if (has(a, "kraken_slayer") && krakenProc(f, now)) {
             double base = bp(150, 9, 5, l) * (rng ? 0.8 : 1.0);
             double missing = 1 - curHp(t) / Math.max(1, maxHp(t));
             itemDamage(a, t, base * (1 + 0.75 * missing), DamageUtil.Type.PHYSICAL, true);
             t.getWorld().strikeLightningEffect(t.getLocation());
         }
         // Brise-coques : une attaque sur cinq contre un champion ou un monstre épique
-        if (has(a, "hullbreaker") && (champT || isEpicMonster(t)) && ++f.hullbreakerCount >= 5) {
-            f.hullbreakerCount = 0;
-            double d = (st.getBaseAD() * 1.2 + st.getFinalMaxHP() * 0.05) * (rng ? 0.7 : 1.0);
-            itemDamage(a, t, d, DamageUtil.Type.PHYSICAL, true);
+        if (has(a, "hullbreaker")) {
+            if (f.hullUntil < now) f.hullStacks = 0;
+            if ((champT || isEpicMonster(t)) && f.hullStacks >= 4) {
+                f.hullStacks = 0;
+                double d = rng ? st.getBaseAD() * 0.84 + st.getFinalMaxHP() * 0.035 : st.getBaseAD() * 1.2 + st.getFinalMaxHP() * 0.05;
+                itemDamage(a, t, d, DamageUtil.Type.PHYSICAL, true);
+            } else { f.hullStacks = Math.min(5, f.hullStacks + 1); f.hullUntil = now + 10_000; }
         }
         // Plaque du mort : l'élan accumulé (max 100) est consommé : (100 % AD de base + 40) × élan
         if (has(a, "dead_man_s_plate") && f.deadManMomentum > 0) {
@@ -615,9 +633,8 @@ public final class ItemEffects {
             fx(a).cd.merge("heartsteelHP", (long) Math.round(d * 0.10), Long::sum);
         }
         // Glaive d'ombre : après 1 s hors de vue, 50 + 1.5 × létalité en dégâts bruts (4 s pour attaquer)
-        if (champT && has(a, "umbral_glaive") && f.umbralReadyUntil > now && ready(f.cd, "umbral")) {
+        if (champT && has(a, "umbral_glaive") && f.umbralReadyUntil > now) {
             f.umbralReadyUntil = 0;
-            cooldown(f.cd, "umbral", 90);
             itemDamage(a, t, 50 + st.getFinalLethality() * 1.5, DamageUtil.Type.TRUE, true);
         }
         // Flèches des Yun Tal : +0.4 % (0.2 % à distance) de chances de critique par attaque, max 25 %
@@ -658,7 +675,7 @@ public final class ItemEffects {
         // Encensoir ardent (buff reçu) : +20 dégâts magiques à l'impact
         if (marked(a.getUniqueId(), "ardent")) itemDamage(a, t, 20, DamageUtil.Type.MAGICAL, true);
         // Rêve éveillé (bulle reçue) : la prochaine attaque inflige des dégâts magiques bonus
-        if (MARKS.remove(a.getUniqueId() + ":dreamDmg") != null) itemDamage(a, t, bp(40, 7, 10, l), DamageUtil.Type.MAGICAL, true);
+        dreamProc(a, t);
         // Ouragan de Runaan : 2 projectiles sur des ennemis proches (60 % AD, effets à l'impact)
         if (has(a, "runaan_s_hurricane") && rng) {
             int n = 0;
@@ -699,6 +716,24 @@ public final class ItemEffects {
         // Abatteur : +3 PV par attaque ; Arc de Doran : +3 PV
         if (has(a, "cull")) ac.getHPSystem().heal(3);
         if (has(a, "doran_s_bow")) ac.getHPSystem().heal(3);
+    }
+
+    /** Tueur de krakens : chaque attaque donne un cumul (4 s, 2 max) ; avec 2 cumuls, l'attaque suivante frappe. */
+    private static boolean krakenProc(Fx f, long now) {
+        if (f.krakenUntil < now) f.krakenStacks = 0;
+        if (f.krakenStacks >= 2) { f.krakenStacks = 0; return true; }
+        f.krakenStacks++;
+        f.krakenUntil = now + 4000;
+        return false;
+    }
+
+    /** Rêve éveillé (bulle violette) : la prochaine attaque ou le prochain sort de l'allié inflige des dégâts magiques bonus. */
+    private static void dreamProc(Player a, LivingEntity t) {
+        Fx f = fx(a);
+        if (f.dreamDmg <= 0 || f.dreamUntil < System.currentTimeMillis()) return;
+        double d = f.dreamDmg;
+        f.dreamDmg = 0;
+        itemDamage(a, t, isChampion(t) ? d : d * 0.333, DamageUtil.Type.MAGICAL, false);
     }
 
     /** Effets « à l'impact » proprement dits (doublés par Guinsoo et Aube et crépuscule). */
@@ -781,12 +816,14 @@ public final class ItemEffects {
         BaseChampion ac = champ(a);
         var st = ac.getStats();
         if (has(a, "statikk_shiv")) {
-            int bounces = 4;
+            int lv = lvl(a);
+            int bounces = lv >= 14 ? 7 : lv >= 10 ? 6 : lv >= 6 ? 5 : 4;
             var hit = new java.util.HashSet<UUID>();
             LivingEntity cur = t;
             for (int i = 0; i < bounces && cur != null; i++) {
                 hit.add(cur.getUniqueId());
                 itemDamage(a, cur, isChampion(cur) ? 60 : 90, DamageUtil.Type.MAGICAL, false);
+                if (i > 0) onAttackHit(a, cur, st.getFinalAD(), false, false); // effets à l'impact aux cibles secondaires
                 cur.getWorld().strikeLightningEffect(cur.getLocation());
                 LivingEntity next = null; double best = 25;
                 for (var e : TargetingUtil.entitiesInRadius(a, cur.getLocation(), 5.0)) {
@@ -953,7 +990,8 @@ public final class ItemEffects {
             }
         }
         if (champV) {
-            chargeHelia(a, dmg);
+            Double pre = LAST_PRE_MITIGATION.remove(a.getUniqueId());
+            chargeHelia(a, pre != null ? pre : dmg);
             // Percepteur : exécute les champions sous 5 % de leurs PV
             if (has(a, "the_collector") && curHp(v) > 0 && curHp(v) < maxHp(v) * 0.05)
                 itemDamage(a, v, curHp(v) + 1, DamageUtil.Type.TRUE, false);
@@ -972,8 +1010,9 @@ public final class ItemEffects {
             // Crochet de serpent : boucliers réduits de 50 % 3 s ; réduit de 50 % les boucliers actuels à la 1re application
             if (has(a, "serpent_s_fang")) {
                 var vs = champ((Player) v).getStats();
-                if (!vs.hasSerpentVenom()) vs.reduceShield(0.50);
-                vs.applySerpentVenom(0.50, 3000L);
+                double pct = rng ? 0.35 : 0.50;
+                if (!vs.hasSerpentVenom()) vs.reduceShield(pct);
+                vs.applySerpentVenom(pct, 3000L);
             }
             // Éclipse : 2 attaques ou sorts distincts en 2 s → 8 % des PV max (×0.625 à distance) et bouclier (6 s)
             if (has(a, "eclipse") && ready(f.cd, "eclipse")) {
@@ -990,11 +1029,7 @@ public final class ItemEffects {
             // Anneau de Doran : régénération de mana doublée 5 s après avoir blessé un champion
             if (has(a, "doran_s_ring")) f.doranRingUntil = now + 5000;
             // Volonté cosmique : dégâts magiques ou bruts → +20 vitesse 4 s (3 cumuls)
-            if (type != DamageUtil.Type.PHYSICAL && has(a, "cosmic_drive")) {
-                if (f.cosmicUntil < now) f.cosmicStacks = 0;
-                if (f.cosmicStacks < 3) { f.cosmicStacks++; st.addBonusMoveSpeed(20); later(80, () -> { st.addBonusMoveSpeed(-20); Fx f2 = fx(a); f2.cosmicStacks = Math.max(0, f2.cosmicStacks - 1); }); }
-                f.cosmicUntil = now + 4000;
-            }
+            if (type != DamageUtil.Type.PHYSICAL && has(a, "cosmic_drive")) f.cosmicUntil = now + 4000; // +20 vitesse 4 s (ItemTicker)
             // Onde orageuse : 25 % des PV max infligés en 2.5 s → Rafale 2 s plus tard (125 + 10 % AP), 30 s
             if (has(a, "stormsurge") && ready(f.cd, "stormsurge")) {
                 double[] w = f.stormsurgeWindow.computeIfAbsent(v.getUniqueId(), _ -> new double[2]);
@@ -1004,10 +1039,10 @@ public final class ItemEffects {
                     cooldown(f.cd, "stormsurge", 30);
                     f.stormsurgeWindow.remove(v.getUniqueId());
                     double sq = 125 + st.getFinalAP() * 0.10;
-                    pl().getCCManager().speedPct(a, 0.25, 30);
                     later(40, () -> {
-                        if (!v.isDead() && v.isValid()) itemDamage(a, v, sq, DamageUtil.Type.MAGICAL, false);
-                        else for (var e : TargetingUtil.entitiesInRadius(a, v.getLocation(), 5.0)) itemDamage(a, e, sq, DamageUtil.Type.MAGICAL, false);
+                        if (!v.isDead() && v.isValid() && !(v instanceof Player vp && vp.getGameMode() == org.bukkit.GameMode.SPECTATOR))
+                            itemDamage(a, v, sq, DamageUtil.Type.MAGICAL, false);
+                        else for (var e : TargetingUtil.entitiesInRadius(a, v.getLocation(), 6.0)) if (isChampion(e)) itemDamage(a, e, sq, DamageUtil.Type.MAGICAL, false);
                         v.getWorld().strikeLightningEffect(v.getLocation());
                     });
                 }
@@ -1020,6 +1055,16 @@ public final class ItemEffects {
         }
         manaflow(a, v, champV, true);
         scorchclaw(a, v);
+        dreamProc(a, v);
+        // Cyclosabre voltaïque (Galvanisation) : un sort sur un champion déclenche l'attaque énergisée si elle est prête
+        if (champV && has(a, "voltaic_cyclosword") && f.energize >= 100) {
+            f.energize = 0;
+            double d = curHp(v) * (rng ? 0.07 : 0.09);
+            itemDamage(a, v, d, DamageUtil.Type.PHYSICAL, true);
+            double leth = rng ? 12 : 15;
+            st.addBonusLethality(leth);
+            later(80, () -> st.addBonusLethality(-leth));
+        }
         int castId = f.castId;
         boolean ult = f.lastCastSlot == 4 && now - f.lastCastTime < 4000;
         // Sceptre de Rylai : -30 % 1 s ; Rancune de Serylda : -30 % 1 s sous 50 % des PV
@@ -1035,7 +1080,7 @@ public final class ItemEffects {
         // Tourment de Liandry : 2 % des PV max par seconde pendant 3 s (max 40 par tick contre les monstres)
         if (has(a, "liandry_anguish")) burn(a, v, "liandry", 3, () -> {
             double d = maxHp(v) * 0.02 / 2;
-            return isMonster(v) ? Math.min(40, d) : d;
+            return isMonster(v) ? Math.min(20, d) : d;
         });
         // Torche noire : 20 + 2 % AP par seconde (40 + 2 % AP contre les monstres) pendant 3 s
         if (has(a, "blackfire_torch")) burn(a, v, "blackfire", 3, () -> (isMonster(v) ? 40 : 20) / 2.0 + st.getFinalAP() * 0.02 / 2);
@@ -1047,7 +1092,7 @@ public final class ItemEffects {
             double d = 75 + st.getFinalAP() * 0.05;
             itemDamage(a, v, d, DamageUtil.Type.MAGICAL, false);
             int used = 1;
-            for (var e : TargetingUtil.entitiesInRadius(a, v.getLocation(), 6.5)) {
+            for (var e : TargetingUtil.entitiesInRadius(a, v.getLocation(), 6.0)) {
                 if (used >= 6 || e.equals(v)) continue;
                 used++;
                 itemDamage(a, e, d, DamageUtil.Type.MAGICAL, false);
@@ -1123,16 +1168,22 @@ public final class ItemEffects {
             tempShield(v, bp(90, 9, 10, l) + st.getBonusHP() * 0.08, 100, true);
         }
         // Force de la nature : 8 cumuls de dégâts magiques de champions (1 par seconde) → +70 RM et +6 % de vitesse
-        if (type == DamageUtil.Type.MAGICAL && has(v, "force_of_nature") && now - f.fonLastStack >= 1000) {
-            f.fonLastStack = now;
+        if (type == DamageUtil.Type.MAGICAL && has(v, "force_of_nature") && now - f.fonLastBy.getOrDefault(a.getUniqueId(), 0L) >= 1000) {
+            f.fonLastBy.put(a.getUniqueId(), now);
             f.fonStacks = Math.min(8, f.fonStacks + 1);
+            f.fonUntil = now + 7000;
         }
         // Opposition céleste : 2 s de réduction des dégâts de champions, puis ralentissement de 50 % (18 s)
-        if (has(v, "celestial_opposition") && ready(f.cd, "celestial")) {
-            cooldown(f.cd, "celestial", 18);
-            f.celestialUntil = now + 2000;
-            later(40, () -> { for (var e : TargetingUtil.enemiesAround(v, 5.0)) pl().getCCManager().slowPct(e, 0.50, 30); });
+        if (has(v, "celestial_opposition")) {
+            if (f.blessedActive) f.blessedUntil = now + 2000;
+            else if (ready(f.cd, "celestial")) { f.blessedActive = true; f.blessedUntil = now + 2000; }
+            else cooldown(f.cd, "celestial", 18); // le délai repart à chaque coup de champion
         }
+        // Annul (Voile de la banshee, Manteau de la nuit, Barrière verdoyante) : le délai repart
+        f.cd.computeIfPresent("bansheePop", (k, x) -> now);
+        f.cd.computeIfPresent("eonPop", (k, x) -> now);
+        // Force de la nature : les dégâts de champions rafraîchissent les cumuls
+        f.fonUntil = now + 7000;
         // Épines (Armure roncière, Cotte épineuse) : touché par une attaque → dégâts magiques et 40 % d'Hémorragie
         if (!isAbility && has(v, "thornmail", "bramble_vest")) {
             double thorns = has(v, "thornmail") ? 20 + st.getBonusArmor() * 0.10 : 10;
@@ -1160,8 +1211,28 @@ public final class ItemEffects {
     }
 
     /** Brûlure d'objet : {@code perTick} dégâts magiques toutes les 0.5 s pendant {@code seconds} (rafraîchie). */
+    /** Propriétaire de chaque brûlure : clé « cible:objet » → lanceur. */
+    static final Map<String, UUID> BURN_OWNER = new ConcurrentHashMap<>();
+
+    /** Torche noire : champions, monstres épiques et grands monstres qui brûlent sous le Feu funeste de {@code p}. */
+    static int blackfireTargets(Player p) {
+        long now = System.currentTimeMillis();
+        int n = 0;
+        for (var e : BURNS.entrySet()) {
+            if (!e.getKey().endsWith(":blackfire") || e.getValue() <= now || !p.getUniqueId().equals(BURN_OWNER.get(e.getKey()))) continue;
+            var ent = Bukkit.getEntity(UUID.fromString(e.getKey().substring(0, 36)));
+            if (!(ent instanceof LivingEntity le)) continue;
+            var t = fr.lolmc.game.JungleManager.getMonsterType(le);
+            boolean large = t != null && (t.isEpic() || t.groupCount == 1 || le.getPersistentDataContainer().has(
+                    new org.bukkit.NamespacedKey(pl(), "camp_large"), org.bukkit.persistence.PersistentDataType.BYTE));
+            if (isChampion(le) || large) n++;
+        }
+        return n;
+    }
+
     private static void burn(Player a, LivingEntity v, String key, int seconds, java.util.function.Supplier<Double> perTick) {
         String k = v.getUniqueId() + ":" + key;
+        BURN_OWNER.put(k, a.getUniqueId());
         boolean running = BURNS.getOrDefault(k, 0L) > System.currentTimeMillis();
         BURNS.put(k, System.currentTimeMillis() + seconds * 1000L);
         if (running) return;
@@ -1258,14 +1329,24 @@ public final class ItemEffects {
         if (has(caster, "bandlepipes")) {
             f.fanfareUntil = System.currentTimeMillis() + (ranged(caster) ? 4000 : 8000);
         }
+        // Traîneau du solstice (30 s) : vous et l'allié le plus blessé à 1500 unités gagnez 50-230 PV
+        // bonus (selon votre niveau) et 20 % de vitesse qui décroît, pendant 2.5 s
         if (has(caster, "solstice_sleigh") && ready(f.cd, "sleigh")) {
-            Player ally = nearestAlly(caster, 15);
+            Player ally = null; double worst = 2;
+            for (Player o : caster.getWorld().getPlayers()) {
+                if (o.equals(caster) || !isChampion(o) || !pl().getTeamManager().areAllies(caster, o)) continue;
+                if (o.getLocation().distanceSquared(caster.getLocation()) > 15 * 15) continue;
+                double r = champ(o).getHPSystem().getHPRatio();
+                if (r < worst) { worst = r; ally = o; }
+            }
             if (ally != null) {
                 cooldown(f.cd, "sleigh", 30);
-                double heal = bp(50, 7, 15, l) + st.getBonusHP() * 0.07;
+                double bonus = bp(50, 7, 15, l);
                 for (Player p : new Player[]{caster, ally}) {
-                    var c = champ(p);
-                    if (c != null) c.getHPSystem().heal(heal);
+                    var hp = champ(p).getHPSystem();
+                    hp.addBonusHP(bonus);
+                    hp.heal(bonus);
+                    later(50, () -> { var c2 = champ(p); if (c2 != null) c2.getHPSystem().addBonusHP(-bonus); });
                     pl().getCCManager().speedDecaying(p, 0.20, 50);
                 }
             }
@@ -1273,6 +1354,7 @@ public final class ItemEffects {
         if (immobilize && has((Player) target, "force_of_nature")) {
             Fx tf = fx((Player) target);
             tf.fonStacks = Math.min(8, tf.fonStacks + 2);
+            tf.fonUntil = System.currentTimeMillis() + 7000;
         }
     }
 
@@ -1332,8 +1414,11 @@ public final class ItemEffects {
         // Rêve éveillé : bulles 3 s sur l'allié (prochaine attaque renforcée, prochains dégâts réduits)
         if (has(caster, "dream_maker") && ready(f.cd, "dream")) {
             cooldown(f.cd, "dream", 8);
-            mark(ally.getUniqueId(), "dreamDmg", 3);
-            mark(ally.getUniqueId(), "dreamDR", 3);
+            Fx af = fx(ally);
+            int cl = lvl(caster);
+            af.dreamDR = bp(50, 7, 12, cl);
+            af.dreamDmg = bp(40, 7, 10, cl);
+            af.dreamUntil = System.currentTimeMillis() + 3000;
         }
     }
 
@@ -1368,8 +1453,12 @@ public final class ItemEffects {
     public static void chargeHelia(Player a, double raw) {
         if (a == null || !has(a, "echoes_of_helia")) return;
         Fx f = fx(a);
-        f.heliaCharges = Math.min(80, f.heliaCharges + raw * 0.30);
+        f.heliaCharges = Math.min(interp(80, 250, lvl(a)), f.heliaCharges + raw * 0.30);
     }
+
+    /** Dégâts avant réduction du dernier coup porté à un champion (Échos d'Helia). */
+    static final Map<UUID, Double> LAST_PRE_MITIGATION = new ConcurrentHashMap<>();
+    public static void notePreMitigation(Player a, double raw) { if (a != null) LAST_PRE_MITIGATION.put(a.getUniqueId(), raw); }
 
     // ══════════════════════════════════════════════════════════════
     // ÉLIMINATIONS
@@ -1400,8 +1489,6 @@ public final class ItemEffects {
             else if (has(p, "dark_seal")) f.glory = Math.min(10, f.glory + (kill ? 2 : 1));
             // Jambières gloutonnes / Voie immortelle : +0.6 % d'omnivampirisme par élimination (10 max)
             if (has(p, "gluttonous_greaves", "immortal_path") && f.carnage < 10) { f.carnage++; st.addBonusOmnivamp(0.006); }
-            // Compagnon de jungle : une élimination de champion le fait grandir
-            if (has(p, "smite_stalker", "pickaxe_jungle", "blue_smite")) growCompanion(p);
             // Percepteur : 25 PO bonus par élimination
             if (kill && has(p, "the_collector")) pl().getGoldManager().addGold(p.getUniqueId(), 25);
         }
@@ -1426,14 +1513,27 @@ public final class ItemEffects {
                 st.addBonusOmnivamp(0.15);
                 later(160, () -> st.addBonusOmnivamp(-0.15));
             }
-            // Fleur de crypte : nova sur le corps, soigne les alliés de 100 + 20 % AP (60 s)
-            if (has(p, "cryptbloom") && ready(f.cd, "cryptbloom")) {
+            // Fleur de crypte (60 s, porteur en vie) : une nova part du corps et s'étend sur 1.75 s
+            // (projectiles à 700 unités/s, 70 de large : jusqu'à 1225 unités, données du sort
+            // 3137_Heal_Missile) ; elle soigne une fois chaque allié atteint, porteur compris, de 100 + 20 % AP
+            if (has(p, "cryptbloom") && ready(f.cd, "cryptbloom") && p.getGameMode() != org.bukkit.GameMode.SPECTATOR) {
                 cooldown(f.cd, "cryptbloom", 60);
-                Location body = victim.getLocation();
-                for (Player o : body.getWorld().getPlayers())
-                    if (isChampion(o) && (o.equals(p) || pl().getTeamManager().areAllies(p, o)) && o.getLocation().distanceSquared(body) <= 6 * 6)
-                        champ(o).getHPSystem().heal(100 + st.getFinalAP() * 0.20);
-                VisualEffectUtil.impactBurst(body.getWorld(), body.clone().add(0, 1, 0), Material.LIME_STAINED_GLASS, 0.3f, 2.0, 10, 10L);
+                Location body = victim.getLocation().clone();
+                double heal = 100 + st.getFinalAP() * 0.20;
+                var healed = new java.util.HashSet<UUID>();
+                new BukkitRunnable() {
+                    int ticks = 0;
+                    @Override public void run() {
+                        ticks += 2;
+                        double radius = 7.0 * ticks / 20.0 + 0.35; // 700 unités/s + demi-largeur
+                        for (Player o : body.getWorld().getPlayers())
+                            if (isChampion(o) && (o.equals(p) || pl().getTeamManager().areAllies(p, o))
+                                    && o.getLocation().distanceSquared(body) <= radius * radius && healed.add(o.getUniqueId()))
+                                champ(o).getHPSystem().heal(heal);
+                        VisualEffectUtil.groundRing(body.getWorld(), body.clone().add(0, 0.2, 0), radius, Material.LIME_STAINED_GLASS, 24, 0.25f, 0.05f, 3L);
+                        if (ticks >= 35) cancel();
+                    }
+                }.runTaskTimer(pl(), 0L, 2L);
             }
             // Danse de la mort : purge les dégâts différés et soigne 75 % de l'AD bonus en 2 s
             if (has(p, "death_s_dance")) {
@@ -1446,7 +1546,7 @@ public final class ItemEffects {
             if (has(p, "bastionbreaker")) f.sabotageUntil = now + 90_000;
             // Rayonnement du vide : Désolation, explosion autour de la victime (4 × l'immolation)
             if (has(p, "hollow_radiance")) {
-                double d = (15 + st.getBonusHP() * 0.01) * 4;
+                double d = 60 + st.getBonusHP() * 0.04 + (15 + st.getBonusHP() * 0.01) * 4;
                 for (var e : TargetingUtil.entitiesInRadius(p, victim.getLocation(), 5.0)) itemDamage(p, e, d, DamageUtil.Type.MAGICAL, false);
             }
         }
@@ -1456,7 +1556,18 @@ public final class ItemEffects {
             if (has(victim, "mejai_s_soulstealer")) vf.glory = Math.max(0, vf.glory - 10);
             else if (has(victim, "dark_seal")) vf.glory = Math.max(0, vf.glory - 5);
             vf.ddPending = 0; vf.ddTicksLeft = 0;
+            var vs = champ(victim).getStats();
+            if (vs.isBansheeShieldReady()) { vs.setBansheeShieldReady(false); vf.cd.put("bansheePop", now); }
+            if (vs.isEonShieldReady()) { vs.setEonShieldReady(false); vf.cd.put("eonPop", now); }
         }
+    }
+
+    /** Rayonnement du vide (Désolation) : une unité non-championne tuée éclate (30 + 2 % PV bonus + 2 × l'immolation, 350 unités). */
+    public static void desolate(Player killer, Location at) {
+        if (killer == null || at == null || !has(killer, "hollow_radiance")) return;
+        var st = champ(killer).getStats();
+        double d = 30 + st.getBonusHP() * 0.02 + (15 + st.getBonusHP() * 0.01) * 2;
+        for (var e : TargetingUtil.entitiesInRadius(killer, at, 3.5)) itemDamage(killer, e, d, DamageUtil.Type.MAGICAL, false);
     }
 
     /** Sbire tué par {@code killer} : Abatteur (1 PO, 350 PO à 100 sbires). */
@@ -1482,14 +1593,19 @@ public final class ItemEffects {
         return (300 + champ(a).getStats().getFinalLethality() * 25) * (ranged(a) ? 0.8 : 1.0);
     }
 
-    /** Brise-coques contre les bâtiments : multiplicateur de la 5e attaque (300 % AD de base + 10 % PV max). */
+    /**
+     * Brise-coques (Pilote) contre un bâtiment : à 4 cumuls ou plus, l'attaque les consomme et inflige
+     * 300 % (210 % à distance) de l'AD de base + 10 % (7 %) des PV max ; sinon elle donne un cumul.
+     */
     public static double hullbreakerStructureBonus(Player a) {
         if (a == null || champ(a) == null || !has(a, "hullbreaker")) return 0;
         Fx f = fx(a);
-        if (++f.hullbreakerCount < 5) return 0;
-        f.hullbreakerCount = 0;
+        long now = System.currentTimeMillis();
+        if (f.hullUntil < now) f.hullStacks = 0;
+        if (f.hullStacks < 4) { f.hullStacks = Math.min(5, f.hullStacks + 1); f.hullUntil = now + 10_000; return 0; }
+        f.hullStacks = 0;
         var st = champ(a).getStats();
-        return (st.getBaseAD() * 3 + st.getFinalMaxHP() * 0.10) * (ranged(a) ? 0.7 : 1.0);
+        return ranged(a) ? st.getBaseAD() * 2.1 + st.getFinalMaxHP() * 0.07 : st.getBaseAD() * 3 + st.getFinalMaxHP() * 0.10;
     }
 
     static void sound(Player p, Sound s) { p.getWorld().playSound(p.getLocation(), s, 1f, 1f); }
@@ -1498,15 +1614,18 @@ public final class ItemEffects {
     // COMPAGNONS DE JUNGLE (Bébé Saute-nuages, Ixamandre, Chardent)
     // ══════════════════════════════════════════════════════════════
 
-    /** Cumuls du compagnon de jungle (35 max) ; le Châtiment est déchaîné à 20. */
+    /** Friandises du compagnon de jungle (35 max) : Châtiment déchaîné à 15, primitif à 35. */
     public static int companionStacks(Player p) { return p == null ? 0 : fx(p).companion; }
 
     private static void growCompanion(Player p) {
         Fx f = fx(p);
         if (f.companion >= 35) return;
         f.companion++;
-        if (f.companion == 20) p.sendActionBar(Component.text("🐾 Compagnon : Châtiment déchaîné !", NamedTextColor.GOLD));
-        if (f.companion == 35) p.sendActionBar(Component.text("🐾 Compagnon adulte : quête de jungle terminée !", NamedTextColor.GOLD));
+        if (f.companion == 15) p.sendActionBar(Component.text("🐾 Compagnon : Châtiment déchaîné !", NamedTextColor.GOLD));
+        if (f.companion == 35) {
+            p.sendActionBar(Component.text("🐾 Compagnon adulte : Châtiment primitif !", NamedTextColor.GOLD));
+            if (has(p, "pickaxe_jungle")) mossShield(p);
+        }
     }
 
     /**
@@ -1515,35 +1634,51 @@ public final class ItemEffects {
      */
     public static void onJungleKill(Player killer, LivingEntity monster) {
         if (killer == null || champ(killer) == null || !has(killer, "smite_stalker", "pickaxe_jungle", "blue_smite")) return;
-        growCompanion(killer);
         Fx f = fx(killer);
         if (monster == null) return;
         var type = fr.lolmc.game.JungleManager.getMonsterType(monster);
         boolean large = type != null && (type.groupCount == 1 || monster.getPersistentDataContainer().has(
                 new org.bukkit.NamespacedKey(pl(), "camp_large"), org.bukkit.persistence.PersistentDataType.BYTE));
         if (!large) return;
+        // Une friandise par grand monstre ; une friandise bonus stockée (1 par minute, 90 s une fois adulte)
+        // est consommée (2 une fois adulte) et rapporte 20 PO
+        growCompanion(killer);
+        int cost = f.companion >= 35 ? 2 : 1;
+        if (f.bonusTreats >= cost) { f.bonusTreats -= cost; pl().getGoldManager().addGold(killer.getUniqueId(), 20); }
         // Tout compagnon (wiki) : un grand monstre rend des PV (0 à 250 selon le niveau, plus avec les PV
         // manquants) et du mana (19 à 87, 15 énergie), et rapporte 80 XP (+150 pour le premier)
         BaseChampion kc = champ(killer);
-        int l = lvl(killer);
+        double avg = avgChampionLevel(killer);
+        int avgLvl = (int) Math.round(avg);
+        // Soin : 0 à 90-250 (selon le niveau moyen), +1.25 % par 1 % de PV manquants ; mana : 19-87,
+        // +1.25 % par 1 % de mana manquant ; 15 énergie (après 0.3 s)
         later(6, () -> {
             var hp = kc.getHPSystem();
-            double missing = 1 - hp.getHPRatio();
-            hp.heal(interp(0, 250, l) * (0.5 + 0.5 * missing));
+            double maxHeal = interp(90, 250, avgLvl);
+            hp.heal(Math.min(maxHeal, maxHeal * 1.25 * (1 - hp.getHPRatio())));
             var res = kc.getResourceSystem();
-            if (res.getType() == fr.lolmc.stats.ResourceSystem.ResourceType.MANA) res.addCurrent(interp(19, 87, l));
+            if (res.getType() == fr.lolmc.stats.ResourceSystem.ResourceType.MANA)
+                res.addCurrent(interp(19, 87, avgLvl) * (1 + 1.25 * (1 - res.getCurrent() / Math.max(1, res.getMax()))));
             else if (res.getType() == fr.lolmc.stats.ResourceSystem.ResourceType.ENERGY) res.addCurrent(15);
         });
-        double xp = 80 + (f.cd.putIfAbsent("largeMonsterDone", 1L) == null ? 150 : 0); // +150 pour le premier
+        // XP : 80 (+150 pour le premier), +50 par niveau de retard au-delà de 1.1 sur la moyenne
+        double xp = 80 + (f.cd.putIfAbsent("largeMonsterDone", 1L) == null ? 150 : 0);
+        double behind = avg - lvl(killer);
+        if (behind > 1.1) xp += 50 * Math.floor(behind);
         fr.lolmc.instance.InstanceHelper.rewardManager(killer).grantProximityXP(killer, xp);
         if (f.companion < 35) return;
-        // Saute-nuages : +45 % de vitesse qui décroît en 1.5 s ; Ixamandre : bouclier rechargé ; Chardent : prêt
-        if (has(killer, "smite_stalker")) pl().getCCManager().speedDecaying(killer, 0.45, 30);
+        // Saute-nuages : +45 % de vitesse qui décroît en 1.5 s (dans un buisson : 45 % jusqu'à en sortir) ;
+        // Ixamandre : bouclier rechargé ; Chardent : prêt
+        if (has(killer, "smite_stalker")) {
+            var bush = pl().getBushManager();
+            if (bush != null && bush.isInBush(killer)) f.gaitInBush = true;
+            else pl().getCCManager().speedDecaying(killer, 0.45, 30);
+        }
         if (has(killer, "pickaxe_jungle")) mossShield(killer);
         if (has(killer, "blue_smite")) f.scorchReady = true;
     }
 
-    /** Ixamandre adulte : bouclier de 200 (+20 par niveau dès 11), rechargé hors combat. */
+    /** Ixamandre adulte : bouclier de 200-360 (selon le niveau) jusqu'à être brisé, rechargé après un camp ou 10 s hors combat. */
     static void mossShield(Player p) {
         Fx f = fx(p);
         var st = champ(p).getStats();
