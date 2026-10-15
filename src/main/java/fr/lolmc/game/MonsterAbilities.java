@@ -199,7 +199,8 @@ public class MonsterAbilities {
 
     /** Attaque de base : coup au corps à corps, ou projectile à tête chercheuse (dégâts à l'impact). */
     private static void basicAttack(LivingEntity mob, MonsterType type, Player t) {
-        double ad = fr.lolmc.util.MobCombat.getAD(mob);
+        // Compagnon de jungle : -50 % des dégâts des monstres non épiques
+        double ad = fr.lolmc.util.MobCombat.getAD(mob) * fr.lolmc.item.ItemEffects.monsterDamageTakenMultiplier(t, type.isEpic());
         if (ad <= 0) return;
         if (type == MonsterType.BARON) { baronAttack(mob, t, ad); return; }
         fr.lolmc.util.MobAnimator.triggerAttack(mob.getUniqueId());

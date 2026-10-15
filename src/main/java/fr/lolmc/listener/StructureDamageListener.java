@@ -60,6 +60,8 @@ public class StructureDamageListener implements Listener {
 
         BaseChampion champ = championManager.getChampion(player);
         double damage = champ.getStats().getFinalAD();
+        // Brise-coques : la 5e attaque inflige 300 % de l'AD de base + 10 % des PV max aux bâtiments
+        damage += fr.lolmc.item.ItemEffects.hullbreakerStructureBonus(player);
 
         voidgrubEffects(player, structure, playerTeam, champ.getAutoAttackRange() <= 3.0);
 
@@ -79,6 +81,10 @@ public class StructureDamageListener implements Listener {
             // Armure 60 (baisse 11:00-15:00 pour les extérieures, Rempart), pénétration comprise
             damage = champ.getStats().calcPhysicalDamageVs(damage, tm.getArmor(structure));
         }
+
+        // Élixir de sorcellerie : +25 dégâts bruts sur les tourelles
+        var consE = LolPlugin.getInstance().getConsumableManager();
+        if (structure.getType() == Type.TURRET && consE != null && "sorcery".equals(consE.getActiveElixir(player))) damage += 25;
 
         // Armure renforcée (LoL, tourelles) : -80 % de dégâts sans sbire de l'attaquant à proximité.
         // (L'ancienne « fortification » des 5 premières minutes n'existe plus sur la Faille.)
@@ -106,6 +112,17 @@ public class StructureDamageListener implements Listener {
 
         double hpBefore = structure.getCurrentHP();
         boolean phaseChanged = structure.takeDamage(damage);
+        // Briseur de bastion (Sabotage) : 300 + 25 × létalité en dégâts bruts sur 3 s
+        double sabotage = structure.getType() == Type.TURRET ? fr.lolmc.item.ItemEffects.consumeSabotage(player) : 0;
+        if (sabotage > 0) for (int i = 1; i <= 3; i++)
+            org.bukkit.Bukkit.getScheduler().runTaskLater(LolPlugin.getInstance(), () -> {
+                if (structure.isDestroyed()) return;
+                structure.takeDamage(sabotage / 3);
+                if (structure.isDestroyed()) {
+                    if (player.isOnline()) onStructureDestroyed(structure, player);
+                    else onStructureDestroyedByMinions(structure, structure.getCenter().getWorld());
+                }
+            }, i * 20L);
         if (structure.getType() == Type.TURRET) tm.onTurretDamaged(structure, hpBefore, playerTeam);
         if (plated) breakPlates(player, structure, structKey, tm);
         player.playSound(player.getLocation(), Sound.BLOCK_ANVIL_HIT, 0.5f, 1.2f);

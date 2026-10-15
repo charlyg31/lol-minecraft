@@ -188,7 +188,7 @@ public final class LeeSin extends BaseChampion implements fr.lolmc.champion.base
             double[] shieldBase={60,105,150,195,240};
             double shield=shieldBase[getLevel()-1]+s.getFinalAP()*0.80;
             if(cm.hasChampion(c)) cm.getChampion(c).getStats().addShield(shield);
-            if(!dest.equals(c) && cm.hasChampion(dest)) cm.getChampion(dest).getStats().addShield(shield);
+            if(!dest.equals(c) && cm.hasChampion(dest)) { cm.getChampion(dest).getStats().addShield(shield); fr.lolmc.item.ItemEffects.onAllyHealShield(c, dest, 0, shield); }
             final Player fdest=dest; final double fsh=shield; final Player fc=c;
             new BukkitRunnable(){@Override public void run(){
                 if(cm.hasChampion(fc)) cm.getChampion(fc).getStats().addShield(-fsh);

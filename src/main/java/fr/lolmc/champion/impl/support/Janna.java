@@ -130,6 +130,7 @@ public final class Janna extends BaseChampion {
             if(cm.hasChampion(dest)) {
                 var destStats = cm.getChampion(dest).getStats();
                 destStats.addShield(shield);
+                fr.lolmc.item.ItemEffects.onAllyHealShield(c, dest, 0, shield); // objets de soin/bouclier
                 // Wiki : bouclier 4 s, +10-30 (+10 % AP) AD tant qu'il tient
                 double bonusAD=new double[]{10,15,20,25,30}[getLevel()-1]+s.getFinalAP()*0.10;
                 destStats.addBonusAD(bonusAD);
@@ -180,7 +181,7 @@ public final class Janna extends BaseChampion {
                     for(var ent : c.getWorld().getNearbyLivingEntities(c.getLocation(),7)){
                         if(ent instanceof Player ally && !ally.equals(c) && cm.hasChampion(ally)
                                 && LolPlugin.getInstance().getTeamManager().areAllies(c, ally)) // pas les ennemis
-                            cm.getChampion(ally).getHPSystem().heal(healPerTick);
+                            { cm.getChampion(ally).getHPSystem().heal(healPerTick); fr.lolmc.item.ItemEffects.onAllyHealShield(c, ally, healPerTick, 0); }
                     }
                     fr.lolmc.util.VisualEffectUtil.impactBurst(c.getWorld(),
                             c.getLocation().add(0,1,0), Material.PINK_STAINED_GLASS, 0.25f, 2.0, 5, 8L);

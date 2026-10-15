@@ -373,6 +373,8 @@ public class LolItem {
     public double getBonusAD()       { return bonusAD; }
     public double getBonusAP()       { return bonusAP; }
     public double getBonusHP()       { return bonusHP; }
+    public double getBonusMana()     { return bonusMana; }
+    public double getManaRegenPct()  { return manaRegenPct; }
     public Tier getTier()            { return tier; }
     public boolean isPurchasable()   { return purchasable; }
     public double getGoldPer10()     { return goldPer10; }

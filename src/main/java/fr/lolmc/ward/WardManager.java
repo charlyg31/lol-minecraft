@@ -224,7 +224,8 @@ public class WardManager {
             Long last = lastHit.get(hitKey);
             if (last != null && now - last < 400) return false;
             lastHit.put(hitKey, now);
-            if (--w.hitsLeft > 0) {
+            w.hitsLeft -= fr.lolmc.item.ItemEffects.wardHitDamage(attacker); // Glaive d'ombre : coups bonus
+            if (w.hitsLeft > 0) {
                 attacker.sendActionBar(Component.text("🔨 Ward : " + w.hitsLeft + " coup(s) restant(s)", NamedTextColor.YELLOW));
                 attacker.getWorld().playSound(w.location, Sound.BLOCK_WOOD_HIT, 1f, 1.2f);
                 return true;

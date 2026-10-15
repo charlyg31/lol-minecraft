@@ -380,7 +380,11 @@ public final class TargetingUtil {
                 case MAGICAL -> DamageUtil.Type.MAGICAL;
                 case TRUE -> DamageUtil.Type.TRUE;
             };
-            if (MobCombat.damage(caster, target, amount, dt)) return;
+            boolean killed = MobCombat.damage(caster, target, amount, dt);
+            // Effets d'objets des sorts sur les sbires et monstres (Rylai, Tourment de Liandry, Flux de mana…)
+            if (!fr.lolmc.item.ItemEffects.inItemDamage())
+                fr.lolmc.item.ItemEffects.afterDamage(caster, target, amount, dt, true);
+            if (killed) return;
             VisualEffectUtil.impact(target.getWorld(),
                     target.getLocation().add(0, 1, 0), Material.WHITE_STAINED_GLASS, 0.28f, 4L);
         }

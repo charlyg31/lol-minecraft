@@ -314,6 +314,7 @@ public final class Annie extends BaseChampion implements fr.lolmc.champion.base.
             double shield=shieldBase[getLevel()-1]+s.getFinalAP()*0.40;
             var cm=LolPlugin.getInstance().getChampionManager();
             if(cm.hasChampion(dest)) cm.getChampion(dest).getStats().addShield(shield);
+            fr.lolmc.item.ItemEffects.onAllyHealShield(c, dest, 0, shield); // objets de soin/bouclier
             // Vitesse 20-50 % (selon le niveau) qui décroît sur 1.5 s (wiki)
             int alvl=cm.hasChampion(c)?cm.getChampion(c).getLevelSystem().getLevel():1;
             fr.lolmc.LolPlugin.getInstance().getCCManager().speedDecaying(dest, 0.20+0.30*(alvl-1)/17.0, 30);

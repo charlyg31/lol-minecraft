@@ -120,6 +120,7 @@ public final class Morgana extends BaseChampion {
             if (cm.hasChampion(dest)) {
                 var destStats = cm.getChampion(dest).getStats();
                 destStats.addMagicShield(shield);
+                fr.lolmc.item.ItemEffects.onAllyHealShield(c, dest, 0, shield); // objets de soin/bouclier
                 // Immunité aux contrôles tant que le bouclier tient (avant : annoncée, non appliquée)
                 LolPlugin.getInstance().getCCManager().grantSpellShieldImmunity(dest, 5000L);
                 new org.bukkit.scheduler.BukkitRunnable(){@Override public void run(){ destStats.addMagicShield(-shield); }}

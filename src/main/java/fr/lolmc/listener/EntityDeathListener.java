@@ -65,6 +65,7 @@ public class EntityDeathListener implements Listener {
         // killer reçoit sa part via onMinionKill. Avant : XP entière pour chacun (et pour les morts).
         Player killer = le.getKiller();
         if (killer != null && !championManager.hasChampion(killer)) killer = null;
+        fr.lolmc.item.ItemEffects.onMinionKill(killer); // Abatteur
         var earners = minionXpEarners(le, minionTeam);
         double xp = RewardManager.sharedXP(fr.lolmc.util.MobCombat.getXP(le,
                 minionXP(fr.lolmc.game.MinionManager.getMinionTypeTag(le))), xpShareCount(earners, killer));
@@ -158,6 +159,8 @@ public class EntityDeathListener implements Listener {
         }
         // Exécution (aucun champion ennemi récent) : ni prime ni assistance (LoL)
         if (killer == null) validAssists.clear();
+        // Objets : éliminations (Gloire, Orgueil, Arc axiomatique, Danse de la mort…) et pertes de la victime
+        fr.lolmc.item.ItemEffects.onChampionDeath(victim, killer, validAssists);
         // Avant le kill : la prime de la victime n'a pas encore baissé
         int assistGold = rewards.getAssistGoldEach(victim.getUniqueId(), validAssists.size());
         // XP du kill : tueur, assistants et alliés vivants à moins de 16 blocs (1600 unités, LoL)

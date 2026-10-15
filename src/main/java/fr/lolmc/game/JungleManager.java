@@ -703,7 +703,7 @@ public class JungleManager {
             }
             // Passifs items de jungle (Gustwalker, Mosstomper, Scorchclaw)
             var pm = gameInstance != null ? gameInstance.getPassiveManager() : LolPlugin.getInstance().getPassiveManager();
-            if (pm != null) pm.onJungleKill(killer);
+            if (pm != null) pm.onJungleKill(killer, deadMob);
 
             // Buffs d'objectifs : les épiques buffent TOUTE l'équipe (Dragon/Baron),
             // les camps rouge/bleu restent des buffs personnels.

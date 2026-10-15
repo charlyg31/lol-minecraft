@@ -76,10 +76,10 @@ public class ItemRegistry {
                 .recipe("boots_speed"));
         reg(new LolItem("spellslingers_shoes", "Chaussures de lanceur de sorts", 1100, Material.GOLDEN_BOOTS, MAGE).tier(LolItem.Tier.BOOTS).sell(770).flatMagicPen(20).magicPen(0.08).ms(45)
                 .recipe("sorcerers_shoes"));
-        reg(new LolItem("armored_advance", "Avancée blindée", 1200, Material.IRON_BOOTS, TANK).tier(LolItem.Tier.BOOTS).sell(840).armor(35).ms(45)
+        reg(new LolItem("armored_advance", "Avancée blindée", 1200, Material.IRON_BOOTS, TANK).tier(LolItem.Tier.BOOTS).sell(840).armor(35).ms(45).aaReduction(0.10)
                 .passive("Placage / Endurance noxienne", "Placage Les dégâts que vous infligent les attaques sont réduits de 10%. Endurance noxienne (0 sec) Quand vous subissez des dégâts physiques d'un champion, vous gagnez un bouclier anti-dégâts physiques de 0 PV pendant 5 sec.")
                 .recipe("plated_steelcaps"));
-        reg(new LolItem("plated_steelcaps", "Coques en acier", 1200, Material.IRON_BOOTS, TANK).tier(LolItem.Tier.BOOTS).sell(840).armor(25).ms(45)
+        reg(new LolItem("plated_steelcaps", "Coques en acier", 1200, Material.IRON_BOOTS, TANK).tier(LolItem.Tier.BOOTS).sell(840).armor(25).ms(45).aaReduction(0.10)
                 .passive("Placage", "Placage Les dégâts que vous infligent les attaques sont réduits de 10%.")
                 .recipe("boots_speed", "cloth_armor"));
         reg(new LolItem("chainlaced_crushers", "Broyeuses à chaînes", 1250, Material.CHAINMAIL_BOOTS, TANK).tier(LolItem.Tier.BOOTS).sell(875).mr(25).ms(45).tenacity(0.3)

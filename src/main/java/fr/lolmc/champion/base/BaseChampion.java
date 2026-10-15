@@ -188,6 +188,12 @@ public abstract class BaseChampion {
 // Déclencher passifs post-sort (Spellblade, Shojin, etc.)
         var pm = LolPlugin.getInstance().getPassiveManager();
         if (pm != null) pm.onAbilityCast(caster, slot);
+        // Effets d'objets au lancer (Lame enchantée, Catalyseur, Hexplaque, Zeke…), hors attaque de base
+        if (slot >= 1) {
+            double manaCost = resourceSystem != null && resourceSystem.getType() == ResourceSystem.ResourceType.MANA
+                    ? ability.getResourceCost() : 0;
+            fr.lolmc.item.ItemEffects.onCast(caster, slot, manaCost);
+        }
         if (slot == 4) fr.lolmc.game.JungleBuffs.onUltimate(caster); // âme des Nuages
         // Refresh tooltip après le cast
         refreshSlot(caster, slot);

@@ -214,4 +214,6 @@ public class ItemState {
         liandryDotActive.clear();
         demonicDotActive.clear();
     }
+    /** Rune Impact soudain : fin de l'effet en cours. */
+    public long suddenImpactUntil = 0;
 }

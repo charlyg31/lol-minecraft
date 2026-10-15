@@ -65,6 +65,7 @@ public class CCManager {
             long now = now();
             slows.computeIfAbsent(target.getUniqueId(), _ -> new java.util.concurrent.CopyOnWriteArrayList<>())
                  .add(new SpeedEffect(Math.min(0.99, pct), now, now + ticks * 50L, decays));
+            notifyCC(target, false);
         } else {
             // Sbire / monstre : potion approchante (15 % par niveau)
             int amp = (int) Math.max(0, Math.round(pct / 0.15) - 1);
@@ -174,40 +175,22 @@ public class CCManager {
     // ── Application ──
 
     /**
-     * Imperial Mandate : si l'attaquant porte l'objet, marque la cible (marque expirant après 4s).
-     * À appeler en plus de stun/root/slow quand ces derniers immobilisent ou ralentissent un ennemi.
+     * Contrôle posé par {@code attacker} sur {@code target} : effets d'objets (Mandat impérial,
+     * Fimbulvetr, Flûtes de Bandle, Traîneau du solstice…). Avant : ancienne version du Mandat
+     * (« Tir coordonné ») et de Zeke (« Conduit »), retirées de LoL.
      */
     public void markCoordinatedFire(Player attacker, LivingEntity target) {
-        var pm = LolPlugin.getInstance().getPassiveManager();
-        if (pm == null || !pm.hasAnyItem(attacker, "imperial_mandate")) return;
-        if (!(target instanceof Player)) return; // ne marque que les champions
-        pm.getState((Player) target).coordinatedFireMarkExpire = System.currentTimeMillis() + 4000L;
-        fr.lolmc.util.VisualEffectUtil.impact(target.getWorld(), target.getLocation().add(0, 2.3, 0),
-                Material.PURPLE_STAINED_GLASS, 0.2f, 8L);
+        fr.lolmc.item.ItemEffects.onCrowdControl(attacker, target, true);
     }
 
-    /**
-     * Zeke's Convergence : si le porteur immobilise/ralentit un ennemi, l'allié champion le plus
-     * proche du porteur (hors lui-même) reçoit +30% dégâts pendant 6s.
-     */
-    public void applyZekeConduit(Player caster, LivingEntity ccTarget) {
-        var pm = LolPlugin.getInstance().getPassiveManager();
-        if (pm == null || !pm.hasAnyItem(caster, "zekess_convergence")) return;
-        var cm = LolPlugin.getInstance().getChampionManager();
-        var tm = LolPlugin.getInstance().getTeamManager();
-        if (cm == null || tm == null) return;
-        Player nearestAlly = null;
-        double nearestDist = Double.MAX_VALUE;
-        for (Player p : fr.lolmc.util.WorldContext.getGamePlayers()) {
-            if (p.equals(caster) || !cm.hasChampion(p) || !tm.areAllies(caster, p)) continue;
-            if (!p.getWorld().equals(caster.getWorld())) continue;
-            double d = p.getLocation().distanceSquared(caster.getLocation());
-            if (d < nearestDist) { nearestDist = d; nearestAlly = p; }
-        }
-        if (nearestAlly != null && nearestDist <= 10.0*10.0) { // portée de proximité, cohérente avec les autres auras du projet
-            cm.getChampion(nearestAlly).getStats().applyZekeBuff(6000L);
-            nearestAlly.sendActionBar(Component.text("⚡ Conduit ! +30% dégâts (6s)", NamedTextColor.AQUA));
-        }
+    /** Ancien « Conduit » de Zeke (retiré de LoL) : la Convergence de Zeke agit au lancer de l'ultime. */
+    public void applyZekeConduit(Player caster, LivingEntity ccTarget) { }
+
+    /** Attribue un contrôle au sort qui vient de toucher la cible, pour les effets d'objets. */
+    private void notifyCC(LivingEntity target, boolean immobilize) {
+        Player src = fr.lolmc.item.ItemEffects.recentAbilitySource(target);
+        if (src != null) fr.lolmc.item.ItemEffects.onCrowdControl(src, target, immobilize);
+        else fr.lolmc.item.ItemEffects.pendingCrowdControl(target, immobilize); // dégâts du sort juste après
     }
 
     /**
@@ -238,7 +221,7 @@ public class CCManager {
                 for (var e : caster.getWorld().getNearbyEntities(caster.getLocation(), 6, 3, 6)) {
                     if (e instanceof Player enemyP && !enemyP.equals(caster) && cm.hasChampion(enemyP)
                             && LolPlugin.getInstance().getTeamManager().areEnemies(caster, enemyP)) {
-                        cm.getChampion(enemyP).getHPSystem().takeDamage(shockDmg);
+                        fr.lolmc.util.DamageUtil.damage(caster, enemyP, shockDmg, true, fr.lolmc.util.DamageUtil.Type.MAGICAL);
                     }
                 }
                 fr.lolmc.util.VisualEffectUtil.impactBurst(caster.getWorld(), caster.getLocation().add(0,1,0),
@@ -252,6 +235,7 @@ public class CCManager {
         ticks = withTenacity(target, ticks);
         long until = now() + ticks * 50L;
         stunUntil.merge(target.getUniqueId(), until, Math::max);
+        notifyCC(target, true);
         silenceUntil.merge(target.getUniqueId(), until, Math::max); // un stun empêche aussi les sorts
         immobilize(target, ticks);
         fr.lolmc.util.VisualEffectUtil.impact(target.getWorld(),
@@ -264,6 +248,7 @@ public class CCManager {
         if (isCcImmune(target)) return;
         ticks = withTenacity(target, ticks);
         rootUntil.merge(target.getUniqueId(), now() + ticks * 50L, Math::max);
+        notifyCC(target, true);
         immobilize(target, ticks);
         if (target instanceof Player p)
             p.sendActionBar(Component.text("🌿 Enraciné!", NamedTextColor.GREEN));
@@ -299,6 +284,7 @@ public class CCManager {
         ticks = withTenacity(target, ticks);
         long until = now() + ticks * 50L;
         airborneUntil.merge(target.getUniqueId(), until, Math::max);
+        notifyCC(target, true);
         target.setVelocity(new org.bukkit.util.Vector(0, 0.7, 0));
         if (target instanceof org.bukkit.entity.Player p)
             p.sendActionBar(net.kyori.adventure.text.Component.text(

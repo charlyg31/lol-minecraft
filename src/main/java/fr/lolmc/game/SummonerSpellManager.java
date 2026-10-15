@@ -454,8 +454,9 @@ public class SummonerSpellManager {
         var inv = LolPlugin.getInstance().getShopListener().getOrCreate(caster);
         // Objets de jungle (ids du registre : Mosstomper = pickaxe_jungle, Gustwalker = smite_stalker,
         // Scorchclaw = blue_smite) : Châtiment déchaîné, utilisable sur les champions
-        boolean hasGustwalker = inv.hasItem("smite_stalker");
-        boolean unleashed = inv.hasItem("pickaxe_jungle") || hasGustwalker || inv.hasItem("blue_smite");
+        // Châtiment déchaîné quand le compagnon atteint 20 cumuls (données du jeu ; avant : dès l'achat)
+        boolean unleashed = (inv.hasItem("pickaxe_jungle") || inv.hasItem("smite_stalker") || inv.hasItem("blue_smite"))
+                && fr.lolmc.item.ItemEffects.companionStacks(caster) >= 20;
 
         // Cible : l'unité visée, sinon le monstre puis le sbire ennemi le plus proche.
         // (Avant : un champion ennemi à portée passait AVANT le monstre, même en visant le dragon.)
@@ -482,16 +483,6 @@ public class SummonerSpellManager {
         }
 
         double smiteDamage = 600;
-        // Gustwalker : +20 vitesse 2 s après un châtiment
-        if (hasGustwalker) {
-            var sc = LolPlugin.getInstance().getChampionManager().getChampion(caster);
-            if (sc != null) {
-                sc.getStats().addBonusMoveSpeed(20);
-                new org.bukkit.scheduler.BukkitRunnable(){@Override public void run(){
-                    sc.getStats().addBonusMoveSpeed(-20);
-                }}.runTaskLater(LolPlugin.getInstance(), 40L);
-            }
-        }
         // HP réels (virtuels si Baron/Elder/canon, sinon vanilla)
         double cur = fr.lolmc.util.VirtualHP.has(target)
             ? fr.lolmc.util.VirtualHP.getCurrent(target) : target.getHealth();

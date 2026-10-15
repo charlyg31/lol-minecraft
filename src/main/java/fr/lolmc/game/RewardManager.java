@@ -349,9 +349,7 @@ public class RewardManager {
         var healerStats = cm.getChampion(healer).getStats();
         double healPower = 1.0 + healerStats.getHealShieldPower(); // ex: 1.15 si +15%
         double finalHeal = baseHeal * healPower;
-        // Anti-heal (Grievous Wounds) côté cible
-        var pm = LolPlugin.getInstance().getPassiveManager();
-        if (pm != null && pm.hasGrievousWounds(target)) finalHeal *= 0.50;
+        // (l'Hémorragie de la cible est appliquée par heal() via son multiplicateur de soins)
         cm.getChampion(target).getHPSystem().heal(finalHeal);
         return finalHeal;
     }

@@ -264,7 +264,7 @@ public class AutoAttackManager {
                     if (!attacker.canSee(target)) continue;
                     if (fr.lolmc.util.Untargetable.is(target)) continue; // intouchable : on attend
 
-                    double range = cm.getChampion(attacker).getAutoAttackRange();
+                    double range = cm.getChampion(attacker).getAutoAttackRange() + fr.lolmc.item.ItemEffects.bonusAttackRange(attacker);
                     double dist = attacker.getLocation().distance(target.getLocation());
                     if (dist > LOCK_MAX_DISTANCE) { it.remove(); continue; } // trop loin : lock perdu
                     if (dist > range) continue;      // hors de portée : le lock reste, on attend de se rapprocher
@@ -291,8 +291,8 @@ public class AutoAttackManager {
 
         BaseChampion champ = cm.getChampion(attacker);
 
-        // Vérifier portée
-        double range = champ.getAutoAttackRange();
+        // Vérifier portée (+ portée bonus des objets : Canon ultrarapide, Lunettes Hextech C44)
+        double range = champ.getAutoAttackRange() + fr.lolmc.item.ItemEffects.bonusAttackRange(attacker);
         double dist = attacker.getLocation().distance(target.getLocation());
         if (dist > range) {
             attacker.sendActionBar(Component.text("⚔ Hors de portée", NamedTextColor.GRAY));
@@ -300,8 +300,11 @@ public class AutoAttackManager {
         }
         if (!checkRangeAndCooldown(attacker, champ)) return false;
 
-        boolean crit = Math.random() < champ.getStats().getFinalCritChance();
-        double rawDamage = champ.basicAttackDamage(attacker, target, champ.getStats().getFinalAD(), crit);
+        boolean[] critRef = {Math.random() < champ.getStats().getFinalCritChance()};
+        double rawDamage = champ.basicAttackDamage(attacker, target, champ.getStats().getFinalAD(), critRef[0]);
+        // Objets : Ciel éventré, Chasseur de monstres (critiques forcés), Lunettes Hextech C44
+        rawDamage = fr.lolmc.item.ItemEffects.modifyAttack(attacker, target, rawDamage, critRef);
+        final boolean crit = critRef[0];
 
         AAType type = getAAType(champ);
         final double dmg = rawDamage;
@@ -311,8 +314,13 @@ public class AutoAttackManager {
             if (!cm.hasChampion(attacker) || !cm.hasChampion(target)
                     || target.getGameMode() == GameMode.SPECTATOR) return;
             // Dégâts (les attaques de base sont physiques dans LoL, même celles des mages)
-            if (empowered == null || !empowered.apply(attacker, target, dmg))
-                DamageUtil.damage(attacker, target, dmg, false, DamageUtil.Type.PHYSICAL);
+            fr.lolmc.item.ItemEffects.currentAttackCrit = crit; // Présage de Randuin
+            try {
+                if (empowered == null || !empowered.apply(attacker, target, dmg))
+                    DamageUtil.damage(attacker, target, dmg, false, DamageUtil.Type.PHYSICAL);
+            } finally {
+                fr.lolmc.item.ItemEffects.currentAttackCrit = false;
+            }
             // Passif d'attaque du champion (onHit), puis passifs d'objets
             if (champ.getAbility(0) instanceof fr.lolmc.ability.base.BasicAttackAbility baa)
                 baa.applyOnHit(attacker, champ.getStats(), target, dmg);
@@ -321,6 +329,7 @@ public class AutoAttackManager {
             fr.lolmc.champion.impl.mid.Annie.onShieldedAttacked(target, attacker);
             var pm = LolPlugin.getInstance().getPassiveManager();
             if (pm != null) pm.onAutoAttack(attacker, target);
+            fr.lolmc.item.ItemEffects.onAttackHit(attacker, target, dmg, crit); // effets à l'impact des objets
             JungleBuffs.onBasicAttack(attacker, target); // Crête de braises
         };
         fireBasicAttack(attacker, champ, target, type, crit, hit);
@@ -361,8 +370,8 @@ public class AutoAttackManager {
         if (!cm.hasChampion(attacker)) return false;
         BaseChampion champ = cm.getChampion(attacker);
 
-        // Vérifier portée
-        double range = champ.getAutoAttackRange();
+        // Vérifier portée (+ portée bonus des objets : Canon ultrarapide, Lunettes Hextech C44)
+        double range = champ.getAutoAttackRange() + fr.lolmc.item.ItemEffects.bonusAttackRange(attacker);
         double dist = attacker.getLocation().distance(target.getLocation());
         if (dist > range) {
             attacker.sendActionBar(Component.text("⚔ Hors de portée", NamedTextColor.GRAY));
@@ -370,8 +379,11 @@ public class AutoAttackManager {
         }
         if (!checkRangeAndCooldown(attacker, champ)) return false;
 
-        boolean crit = Math.random() < champ.getStats().getFinalCritChance();
-        double rawDamage = champ.basicAttackDamage(attacker, target, champ.getStats().getFinalAD(), crit);
+        boolean[] critRef = {Math.random() < champ.getStats().getFinalCritChance()};
+        double rawDamage = champ.basicAttackDamage(attacker, target, champ.getStats().getFinalAD(), critRef[0]);
+        // Objets : Ciel éventré, Chasseur de monstres (critiques forcés), Lunettes Hextech C44
+        rawDamage = fr.lolmc.item.ItemEffects.modifyAttack(attacker, target, rawDamage, critRef);
+        final boolean crit = critRef[0];
 
         AAType type = getAAType(champ);
         final double dmg = rawDamage;
@@ -384,8 +396,8 @@ public class AutoAttackManager {
                 fr.lolmc.util.MobCombat.damage(attacker, target, dmg, fr.lolmc.util.DamageUtil.Type.PHYSICAL);
             if (champ.getAbility(0) instanceof fr.lolmc.ability.base.BasicAttackAbility baa)
                 baa.applyOnHit(attacker, champ.getStats(), target, dmg);
-            var pm = LolPlugin.getInstance().getPassiveManager();
-            if (pm != null) pm.onAutoAttackEntity(attacker, target);
+            // Effets à l'impact des objets, aussi sur les sbires et monstres (avant : champions seulement)
+            fr.lolmc.item.ItemEffects.onAttackHit(attacker, target, dmg, crit);
             MonsterAbilities.onChampionBasicAttack(attacker, target); // œil du Héraut
             JungleBuffs.onBasicAttack(attacker, target); // Crête de braises
         };

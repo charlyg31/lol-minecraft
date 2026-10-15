@@ -43,8 +43,19 @@ public final class MobCombat {
     public static void setAttackSpeedMult(LivingEntity e, double m) {
         e.getPersistentDataContainer().set(key("mob_as_mult"), PersistentDataType.DOUBLE, m);
     }
-    public static double getArmor(LivingEntity e)       { return getDouble(e, "mob_armor", 0); }
-    public static double getMR(LivingEntity e)          { return getDouble(e, "mob_mr", 0); }
+    public static double getArmor(LivingEntity e)       { return getDouble(e, "mob_armor", 0) + boardingBonus(e); }
+    public static double getMR(LivingEntity e)          { return getDouble(e, "mob_mr", 0) + boardingBonus(e); }
+
+    /** Brise-coques (Section d'abordage) : armure et RM bonus d'un sbire de siège ou super-sbire allié proche. */
+    public static void setBoardingBonus(LivingEntity e, double amount) {
+        e.getPersistentDataContainer().set(key("boarding"), PersistentDataType.DOUBLE, amount);
+        e.getPersistentDataContainer().set(key("boarding_until"), PersistentDataType.LONG, System.currentTimeMillis() + 1200L);
+    }
+
+    private static double boardingBonus(LivingEntity e) {
+        Long until = e.getPersistentDataContainer().get(key("boarding_until"), PersistentDataType.LONG);
+        return until != null && until > System.currentTimeMillis() ? getDouble(e, "boarding", 0) : 0;
+    }
     public static double getXP(LivingEntity e, double def) { return getDouble(e, "mob_xp", def); }
     public static int getGold(LivingEntity e, int def) {
         Integer v = e.getPersistentDataContainer().get(key("mob_gold"), PersistentDataType.INTEGER);
@@ -79,6 +90,7 @@ public final class MobCombat {
         amount *= fr.lolmc.game.JungleBuffs.dragonDamageMultiplier(target, attacker);
         amount *= fr.lolmc.game.JungleBuffs.minionDamageMultiplier(target, attacker);
         amount *= fr.lolmc.game.MonsterAbilities.incomingMultiplier(target, attacker);
+        if (attacker != null) amount *= fr.lolmc.item.ItemEffects.outgoingMultiplier(attacker, target, type, false); // objets
         if (attacker != null) fr.lolmc.game.JungleBuffs.onDamageDealtUnit(attacker); // âme Océanique (30 %)
         if (type == DamageUtil.Type.PHYSICAL) {
             amount = stats != null ? stats.calcPhysicalDamageVs(amount, getArmor(target))

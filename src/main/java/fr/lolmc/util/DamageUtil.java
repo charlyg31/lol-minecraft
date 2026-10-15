@@ -81,31 +81,9 @@ public class DamageUtil {
         ChampionStats as = (attacker != null && cm.hasChampion(attacker))
                 ? cm.getChampion(attacker).getStats() : null;
 
-        // ── Anathema's Chains: le premier ennemi qui frappe le porteur devient son Némésis (-20% de ses dégâts) ──
-        var pmAnathema = LolPlugin.getInstance().getPassiveManager();
-        if (attacker != null && pmAnathema != null && pmAnathema.hasAnyItem(victim,"anathema_chains")) {
-            var vState = pmAnathema.getState(victim);
-            if (vState.anathemaNemesis == null) vState.anathemaNemesis = attacker.getUniqueId();
-        }
-
-        // ── Imperial Mandate: un allié (autre que le porteur) qui frappe une cible marquée détonne Coordinated Fire ──
-        if (attacker != null && pmAnathema != null) {
-            var teamMgr = LolPlugin.getInstance().getTeamManager();
-            if (teamMgr != null && !teamMgr.areAllies(attacker, victim) && !pmAnathema.hasAnyItem(attacker,"imperial_mandate")) {
-                var victimState2 = pmAnathema.getState(victim);
-                if (victimState2.coordinatedFireMarkExpire > System.currentTimeMillis()) {
-                    victimState2.coordinatedFireMarkExpire = 0; // marque consommée
-                    ChampionStats attackerStats = cm.hasChampion(attacker) ? cm.getChampion(attacker).getStats() : null;
-                    if (attackerStats != null) {
-                        double markDmg = 90.0 + attackerStats.getFinalAP() * 0.30;
-                        vc.getHPSystem().takeDamage(markDmg); // dégât brut, comme le vrai objet (pas repassé par les résistances)
-                        attacker.sendActionBar(net.kyori.adventure.text.Component.text(
-                                "⚡ Coordinated Fire !", net.kyori.adventure.text.format.NamedTextColor.GOLD));
-                    }
-                }
-            }
-        }
-        if (isAbility && attacker != null) {
+        boolean itemDmg = fr.lolmc.item.ItemEffects.inItemDamage();
+        // Boucliers anti-sorts : bloquent les sorts, pas les dégâts d'objets (Lame enchantée, brûlures…)
+        if (isAbility && attacker != null && !itemDmg) {
             if (vs.consumeSpellShield()) {
                 vc.onSpellShieldBlock(victim);
                 victim.sendActionBar(net.kyori.adventure.text.Component.text(
@@ -130,10 +108,8 @@ public class DamageUtil {
             }
         }
 
-        // Zeke's Convergence : +30% dégâts si l'attaquant a le buff (allié proche qui a posé un CC)
-        if (as != null) {
-            rawAmount *= as.getZekeDamageMultiplier();
-        }
+        // Objets : Tourment de Liandry, Dominik, Flamme-ombre, Mandat impérial, Shojin, Actualisateur…
+        if (attacker != null) rawAmount *= fr.lolmc.item.ItemEffects.outgoingMultiplier(attacker, victim, type, isAbility);
 
         // Runes : Coup de grâce, Abattage, Baroud d'honneur, Attaque soutenue, Premier coup
         // (avant : seul Abattage était appliqué, getDamageMultiplier n'était jamais appelé)
@@ -169,13 +145,6 @@ public class DamageUtil {
             // (avant : seulement pour les sorts d'Amumu, en un second coup)
             if (type == Type.MAGICAL && fr.lolmc.champion.impl.jungle.Amumu.isCursed(victim.getUniqueId()))
                 finalDmg += finalDmg * 0.10;
-            // Anathema's Chains : le PORTEUR (victim) prend -20% des dégâts venant de son Némésis désigné
-            if (attacker != null) {
-                var victimState = pmAnathema != null ? pmAnathema.getState(victim) : null;
-                if (victimState != null && attacker.getUniqueId().equals(victimState.anathemaNemesis)) {
-                    finalDmg *= 0.80;
-                }
-            }
         }
 
         // 2. Boucliers (les vrais dégâts passent à travers ? Non, les boucliers absorbent tout en LoL)
@@ -186,7 +155,14 @@ public class DamageUtil {
             finalDmg *= fr.lolmc.game.JungleBuffs.outgoingMultiplier(attacker); // âme Chimtech
         }
         finalDmg *= fr.lolmc.game.JungleBuffs.incomingMultiplier(victim); // âme Chimtech
+        // Objets de la victime : Masque abyssal, Mailles du gardien, Randuin, Opposition céleste, Vœu du chevalier
+        finalDmg = fr.lolmc.item.ItemEffects.incoming(victim, attacker, finalDmg, type, !isAbility,
+                fr.lolmc.item.ItemEffects.currentAttackCrit);
+        // Lien vital : le bouclier arrive AVANT le coup qui ferait passer sous 30 % des PV
+        fr.lolmc.item.ItemEffects.beforeHealthLoss(victim, finalDmg, type);
         double afterShield = vs.absorbWithShield(finalDmg, type == Type.MAGICAL);
+        // Danse de la mort : une partie des dégâts est différée
+        afterShield = fr.lolmc.item.ItemEffects.deferDamage(victim, afterShield);
 
         // 3. HP
         vc.getHPSystem().takeDamage(afterShield);
@@ -227,9 +203,10 @@ public class DamageUtil {
         if (attacker != null) {
             var rm = LolPlugin.getInstance().getRuneManager();
             if (rm != null) {
-                rm.onDamageToChampion(attacker, victim, isAbility);
+                // Les dégâts d'objets ne comptent pas comme des coups supplémentaires pour les runes
+                if (!itemDmg) rm.onDamageToChampion(attacker, victim, isAbility);
                 rm.onConquerorHeal(attacker, afterShield);
-                rm.onHitEffects(attacker, victim, afterShield, isAbility);
+                if (!itemDmg) rm.onHitEffects(attacker, victim, afterShield, isAbility);
             }
             fr.lolmc.game.JungleBuffs.onDamageDealt(attacker, victim); // âmes Infernale, Océanique, Hextech
         }
@@ -240,14 +217,18 @@ public class DamageUtil {
             double vamp = isAbility
                 ? ac.getStats().getFinalOmnivamp()
                 : ac.getStats().getFinalLifeSteal() + ac.getStats().getFinalOmnivamp();
-            if (vamp > 0) ac.getHPSystem().heal(afterShield * vamp);
+            if (vamp > 0) {
+                if (!isAbility) fr.lolmc.item.ItemEffects.onLifesteal(attacker, afterShield * vamp); // Soif-de-sang
+                ac.getHPSystem().heal(afterShield * vamp);
+            }
         }
 
-        // 5. Passifs défensifs + DoT
+        // 5. Effets d'objets (attaquant et victime), puis runes
+        fr.lolmc.item.ItemEffects.afterDamage(attacker, victim, afterShield, type, isAbility);
         var pm = LolPlugin.getInstance().getPassiveManager();
         if (pm != null) {
             pm.onDamageTaken(victim);
-            if (isAbility && attacker != null && cm.hasChampion(attacker)) {
+            if (isAbility && !itemDmg && attacker != null && cm.hasChampion(attacker)) {
                 pm.onAbilityDamage(attacker, victim, afterShield, type == Type.MAGICAL);
             }
         }
@@ -262,7 +243,8 @@ public class DamageUtil {
 
         // 7. Vérifier la mort
         if (vc.getHPSystem().isDead() && hud != null) {
-            hud.triggerDeath(victim, attacker);
+            // Ange gardien : renaissance au lieu de la mort
+            if (!fr.lolmc.item.ItemEffects.tryRevive(victim)) hud.triggerDeath(victim, attacker);
         }
     }
 
