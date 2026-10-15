@@ -28,8 +28,10 @@ public class RankedManager {
      * Les compteurs de parties/victoires sont déjà mis à jour par {@link PlayerStats#recordMatch}.
      * @param winners équipe gagnante
      * @param losers  équipe perdante
+     * @param leavers joueurs signalés absents (AFK) : aucun gain, et {@code leaverPenalty} points en moins
      */
-    public void updateEloAfterRanked(List<UUID> winners, List<UUID> losers) {
+    public void updateEloAfterRanked(List<UUID> winners, List<UUID> losers,
+                                     java.util.Set<UUID> leavers, int leaverPenalty) {
         double avgWinner = averageElo(winners);
         double avgLoser = averageElo(losers);
 
@@ -41,12 +43,14 @@ public class RankedManager {
 
         for (UUID id : winners) {
             PlayerStats s = database.getStats(id);
-            s.elo += (int) Math.round(K * (1.0 - expectedWinner));
+            if (leavers.contains(id)) s.elo = Math.max(0, s.elo - leaverPenalty);
+            else s.elo += (int) Math.round(K * (1.0 - expectedWinner));
             database.saveStats(s);
         }
         for (UUID id : losers) {
             PlayerStats s = database.getStats(id);
             s.elo += (int) Math.round(K * (0.0 - expectedLoser));
+            if (leavers.contains(id)) s.elo -= leaverPenalty;
             if (s.elo < 0) s.elo = 0;
             database.saveStats(s);
         }

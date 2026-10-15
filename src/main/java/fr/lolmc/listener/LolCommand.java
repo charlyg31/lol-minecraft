@@ -93,6 +93,17 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
                     }
                 }
                 case "shop" -> LolPlugin.getInstance().getShopListener().openShop(player);
+                case "recap", "recapitulatif" -> {
+                    if (!LolPlugin.getInstance().getEndGameRecap().open(player))
+                        player.sendMessage(Component.text("❌ Aucun récapitulatif de fin de partie en cours.", NamedTextColor.RED));
+                }
+                case "honor", "honorer", "honneur" -> {
+                    if (args.length < 2) {
+                        player.sendMessage(Component.text("§e/l honor <pseudo> §7— Honorer un allié en fin de partie"));
+                        break;
+                    }
+                    LolPlugin.getInstance().getEndGameRecap().honor(player, args[1]);
+                }
                 case "grimoire", "spellbook" -> {
                     if (args.length < 3) {
                         player.sendMessage(Component.text("§e/l grimoire <sort possédé> <nouveau sort> §7— Grimoire déchaîné "
@@ -108,6 +119,8 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
                     player.sendMessage(Component.text("§e/l ff §7— Vote d'abandon"));
                     player.sendMessage(Component.text("§e/l stats §7— Statistiques de la partie"));
                     player.sendMessage(Component.text("§e/l shop §7— Ouvrir la boutique"));
+                    player.sendMessage(Component.text("§e/l recap §7— Récapitulatif de fin de partie"));
+                    player.sendMessage(Component.text("§e/l honor <pseudo> §7— Honorer un allié en fin de partie"));
                     player.sendMessage(Component.text("§e/l grimoire <sort> <nouveau> §7— Échanger un sort (Grimoire déchaîné)"));
                     player.sendMessage(Component.text("§7File d'attente, groupes et rôles : §e/lol <top|mid|adc|jungle|support|all>", NamedTextColor.GRAY));
                 }
@@ -900,6 +913,7 @@ private void handleSolo(Player player, String[] args) {
             case "ff", "forfait" -> "lolmc.player.ff";
             case "stats" -> "lolmc.player.stats";
             case "shop" -> "lolmc.player.shop";
+            case "recap", "recapitulatif", "honor", "honorer", "honneur" -> "lolmc.player.honor";
             case "grimoire", "spellbook" -> "lolmc.player.grimoire";
             default -> null;
         };
@@ -910,11 +924,19 @@ private void handleSolo(Player player, String[] args) {
         if (cmd.getName().equalsIgnoreCase("l")) {
             if (args.length == 1) {
                 List<String> subs = new java.util.ArrayList<>();
-                for (String s : List.of("runes", "ping", "ff", "stats", "shop", "grimoire"))
+                for (String s : List.of("runes", "ping", "ff", "stats", "shop", "recap", "honor", "grimoire"))
                     if (s.startsWith(args[0].toLowerCase()) && sender.hasPermission(playerPermission(s))) subs.add(s);
                 return subs;
             }
             if (args.length == 2 && args[0].equalsIgnoreCase("ping")) return List.of("danger", "omw", "miss", "assist", "enemy");
+            if (args.length == 2 && args[0].equalsIgnoreCase("honor") && sender instanceof Player hp) {
+                List<String> allies = new java.util.ArrayList<>();
+                var tm = LolPlugin.getInstance().getTeamManager();
+                for (Player q : org.bukkit.Bukkit.getOnlinePlayers())
+                    if (q != hp && tm.areAllies(q, hp) && q.getName().toLowerCase().startsWith(args[1].toLowerCase()))
+                        allies.add(q.getName());
+                return allies;
+            }
             return List.of();
         }
         if (!(sender instanceof Player tp) || !hasAnyAdmin(tp)) return List.of();

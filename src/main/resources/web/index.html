@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LolMC — Statistiques</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#/">Lol<span>MC</span></a>
+    <nav>
+      <a href="#/">Accueil</a>
+      <a href="#/leaderboard">Classement</a>
+      <a href="#/champions">Champions</a>
+    </nav>
+    <form id="search" class="search" autocomplete="off">
+      <input id="search-input" type="search" placeholder="Pseudo du joueur…" aria-label="Rechercher un joueur">
+    </form>
+  </header>
+
+  <main id="app" aria-live="polite"></main>
+
+  <dialog id="key-dialog">
+    <form method="dialog" id="key-form">
+      <h2>Clé d'API requise</h2>
+      <p>Ce serveur protège ses statistiques par une clé (<code>api.key</code>).</p>
+      <input id="key-input" type="password" placeholder="Clé d'API" required>
+      <menu>
+        <button type="submit">Valider</button>
+      </menu>
+    </form>
+  </dialog>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -7,7 +7,7 @@ description: League of Legends en Minecraft — 20 champions
 commands:
   l:
     description: Commandes joueur LoL (en partie)
-    usage: /l <runes|ping|ff|stats|shop|grimoire>
+    usage: /l <runes|ping|ff|stats|shop|recap|honor|grimoire>
   lola:
     description: Commandes admin LoL
     usage: /lola <start|stop|select|join|instance|reload|permcheck|set|position|center|schem|road|jungle|plant|baronpit|shopnpc|mode|template|solo|testgame|give|level|gold|hp|resetcd|buff|spawn|wave|team|debug|help>
@@ -171,6 +171,7 @@ permissions:
       lolmc.player.ff: true
       lolmc.player.stats: true
       lolmc.player.grimoire: true
+      lolmc.player.honor: true
   lolmc.player:
     description: Ancien nom de lolmc.player.*
     default: true
@@ -191,6 +192,7 @@ permissions:
   lolmc.player.ff:       {description: "Voter l'abandon (/l ff)", default: true}
   lolmc.player.stats:    {description: "Statistiques de la partie (/l stats)", default: true}
   lolmc.player.grimoire: {description: "Grimoire déchaîné (/l grimoire)", default: true}
+  lolmc.player.honor:    {description: "Récapitulatif et vote d'honneur de fin de partie (/l recap, /l honor)", default: true}
 
   # ── Champions : il faut POSSÉDER un champion pour le jouer : lolmc.champion.<id>, tous : lolmc.champion.* ──
   # (les opérateurs les ont tous ; rotation gratuite pour tout le monde : champions.free-rotation dans config.yml)

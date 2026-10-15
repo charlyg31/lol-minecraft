@@ -26,6 +26,10 @@ public class PlayerStats {
     public long normalDamageDealt = 0;
     public int normalTotalCS = 0;
 
+    // ── Comportement ──────────────────────────────────────────────
+    public int honors = 0;     // honneurs reçus (fin de partie)
+    public int afkGames = 0;   // parties où le joueur a été signalé absent
+
     // ── Stats par champion (champion_id → ChampionStats) ──────────
     public final Map<String, ChampionStats> champStats = new HashMap<>();
 
@@ -72,6 +76,7 @@ public class PlayerStats {
             normalDamageDealt += mr.damageDealt;
             normalTotalCS += mr.cs;
         }
+        if (mr.afk) afkGames++;
         if (mr.champion != null && !mr.champion.isEmpty()) {
             champStats.computeIfAbsent(mr.champion, ChampionStats::new).record(mr);
         }
@@ -98,6 +103,7 @@ public class PlayerStats {
             "\"wards_placed\":%d,\"wards_killed\":%d}," +
             "\"normal\":{\"games\":%d,\"wins\":%d,\"losses\":%d," +
             "\"kills\":%d,\"deaths\":%d,\"assists\":%d,\"winrate\":%.1f}," +
+            "\"honors\":%d,\"afk_games\":%d," +
             "\"top_champions\":%s}",
             uuid, Json.esc(name), elo, getTier(),
             rankedGames, rankedWins, rankedGames - rankedWins,
@@ -106,7 +112,7 @@ public class PlayerStats {
             rankedWardsPlaced, rankedWardsKilled,
             normalGames, normalWins, normalGames - normalWins,
             normalKills, normalDeaths, normalAssists, normalWinrate(),
-            champJson);
+            honors, afkGames, champJson);
     }
 
     // ── Stats par champion ─────────────────────────────────────────

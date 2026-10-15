@@ -1,0 +1,40 @@
+name: Build
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches:
+      - main
+      - 'releases/*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Java 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+
+      # Deux pom.xml indépendants : serveur de jeu (racine) et proxy BungeeCord
+      - name: Compilation LolMC.jar
+        run: mvn -B package
+
+      - name: Compilation LolMC-Bungee.jar
+        run: mvn -B -f bungee-plugin/pom.xml package
+
+      - name: JAR
+        uses: actions/upload-artifact@v4
+        with:
+          name: lolmc-jars
+          path: |
+            target/lol-minecraft-*.jar
+            !target/original-*.jar
+            bungee-plugin/target/*.jar
+            !bungee-plugin/target/original-*.jar
+          if-no-files-found: error

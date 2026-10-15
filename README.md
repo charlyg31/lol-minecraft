@@ -105,6 +105,23 @@ Les monstres dorment jusqu'au premier coup, puis tout le camp attaque le champio
 - **Objets** : catalogue complet avec passifs et actifs, élixirs dès le niveau 9 ; boutique à la fontaine, hotbar à deux pages.
 - **Sorts d'invocateur** : Flash, Embrasement, Soin, Barrière, Fatigue, Téléportation, Châtiment, Purge, Fantôme.
 
+### Inactivité (AFK)
+
+Toute action compte : déplacement, caméra, clic, changement de slot, boutique. Un champion mort n'est jamais inactif.
+
+- Après 2 min sans action (`afk.warn-seconds`), le joueur est averti. Après 3 min (`afk.flag-seconds`), il est **signalé absent** à son équipe.
+- Tant qu'un allié est absent ou déconnecté, l'abandon (`/l ff`) est possible dès **5 min** au lieu de 15 (`afk.early-ff-minutes`), et les absents ne comptent pas dans les votes.
+- En classé, un joueur signalé absent pendant la partie ne gagne pas d'Elo et en perd 15 (`afk.elo-penalty`). La partie est marquée AFK dans son historique.
+
+### Fin de partie
+
+Après le titre de victoire, chaque joueur voit un **récapitulatif** (menu) avec les 10 joueurs :
+- KDA, CS par minute, or, dégâts infligés et subis, soins, balises ;
+- objets, keystone et sorts d'invocateur ;
+- le meilleur joueur (★) de l'équipe gagnante.
+
+Pendant les 30 s avant le retour au lobby, chacun peut **honorer un allié** : un clic sur sa tête, ou `/l honor <pseudo>`. `/l recap` rouvre le menu. Les honneurs reçus s'ajoutent au profil et à l'historique.
+
 ---
 
 ## Configuration
@@ -435,6 +452,7 @@ Avec `use-instances: true`, chaque match copie le monde template dans un monde i
 | `/recall` | Retour à la base |
 | `/ping <danger\|omw\|missing\|assist\|enemy>` | Ping d'équipe |
 | `/l <runes\|ping\|ff\|stats\|shop>` | Raccourcis en partie (`ff` = vote d'abandon) |
+| `/l recap` · `/l honor <pseudo>` | Fin de partie : rouvrir le récapitulatif, honorer un allié |
 | `/l grimoire <sort possédé> <nouveau>` | Grimoire déchaîné : échanger un sort d'invocateur |
 
 ### Admin — `/lola` (alias `/lolAdmin`)
@@ -481,7 +499,7 @@ Déclarées dans `plugin.yml`, compatibles **LuckPerms**. Chaque famille a un jo
 
 `lolmc.admin.give` permet aussi de changer de champion pendant une partie ou une sélection.
 
-**Joueur** : `lolmc.player.<commande>`, toutes : `lolmc.player.*` (défaut : tout le monde ; `lolmc.player` = ancien nom). Commandes : `shop`, `team`, `party`, `queue`, `recall`, `ping`, `pick` (aussi `/champion`), `runes`, `spell`, `lock`, `roles`, `lobby`, et pour `/l` : `ff`, `stats`, `grimoire` (`/l runes`, `/l ping` et `/l shop` utilisent `runes`, `ping` et `shop`).
+**Joueur** : `lolmc.player.<commande>`, toutes : `lolmc.player.*` (défaut : tout le monde ; `lolmc.player` = ancien nom). Commandes : `shop`, `team`, `party`, `queue`, `recall`, `ping`, `pick` (aussi `/champion`), `runes`, `spell`, `lock`, `roles`, `lobby`, et pour `/l` : `ff`, `stats`, `grimoire`, `honor` (`/l recap` et `/l honor` ; `/l runes`, `/l ping` et `/l shop` utilisent `runes`, `ping` et `shop`).
 
 **Champions** : il faut **posséder** un champion pour le jouer : `lolmc.champion.<id>`, tous : `lolmc.champion.*` (défaut : op ; `lolmc.champion.use` = ancien nom). Identifiants : `garen`, `darius`, `malphite`, `nasus`, `warwick`, `amumu`, `masteryi`, `leesin`, `annie`, `veigar`, `zed`, `yasuo`, `morgana`, `leona`, `blitzcrank`, `janna`, `ashe`, `sivir`, `jinx`, `missfortune`.
 - Les champions de la **rotation gratuite** (`champions.free-rotation` dans `config.yml`, vide par défaut) sont jouables par tout le monde.
@@ -519,14 +537,23 @@ Serveur HTTP en lecture seule, activé par `api.enabled: true`.
 
 | Route | Description |
 |-------|-------------|
-| `GET /api/player/{uuid}` · `GET /api/player/name/{pseudo}` | Fiche d'un joueur |
+| `GET /api/player/{uuid}` · `GET /api/player/name/{pseudo}` | Fiche d'un joueur (avec honneurs et parties AFK) |
 | `GET /api/player-champions/{uuid}` | Statistiques par champion |
-| `GET /api/match/history/{uuid}` | Historique des parties |
-| `GET /api/match/detail/{id}` | Détail d'une partie |
-| `GET /api/leaderboard` | Classement |
+| `GET /api/match/history/{uuid}` | Historique des parties (`?limit=20&offset=0&mode=ranked\|normal`) |
+| `GET /api/match/detail/{id}` | Détail d'une partie : 10 joueurs (objets, keystone, runes, sorts, honneurs, AFK), vainqueur, frise |
+| `GET /api/matches/recent` | Dernières parties du serveur (`?limit=20&offset=0`) |
+| `GET /api/leaderboard` · `/normal` | Classement Elo, ou victoires en normal |
+| `GET /api/leaderboard/season/{n}` | Classement d'une saison (victoires en classé) |
+| `GET /api/seasons` | Saison en cours et saisons jouées |
 | `GET /api/champions` | Liste des champions |
+| `GET /api/champions/stats` | Victoires, sélection, KDA, CS et dégâts par minute par champion (`?season=n`) |
+| `GET /api/items` · `GET /api/runes` | Noms des objets et des runes |
 | `GET /api/online` | Joueurs en ligne, statut et instance |
 | `GET /api/status` | Statut du serveur et de chaque instance |
+
+La **frise** d'une partie liste les éliminations, structures détruites et monstres épiques (dragons, Ancien, Baron, Héraut, larves) avec leur minute. La **saison** en cours (`stats.season`) est enregistrée avec chaque partie : il suffit de l'incrémenter pour ouvrir une nouvelle saison.
+
+**Tableau de bord** : `http://<api.bind>:<api.port>/` sert une page web (accueil, profils et historique, détail des parties avec frise, classements par saison, statistiques des champions). Si `api.key` est défini, la page demande la clé une fois. Désactivable par `api.dashboard: false` ; les fichiers de `plugins/LolMC/web/` (`index.html`, `app.js`, `style.css`) remplacent ceux du plugin.
 
 Écoute par défaut sur `127.0.0.1`. Pour un site externe : `api.bind: "0.0.0.0"`, port ouvert et clé `api.key` (en-tête `X-Api-Key`).
 
@@ -545,7 +572,7 @@ Les JAR embarquent leurs dépendances (maven-shade-plugin). L'API BungeeCord est
 
 `./release.sh <version> [token_github]` compile les deux projets, pousse le tag `v<version>` et publie la release GitHub avec les deux JAR (token lu aussi dans `GITHUB_TOKEN` ou `git config github.token`).
 
-Une analyse Qodana tourne sur chaque push et pull request vers `main` (`.github/workflows/qodana_code_quality.yml`).
+Sur chaque push et pull request vers `main`, GitHub Actions compile les deux projets et publie les JAR en artefact (`.github/workflows/build.yml`), et une analyse Qodana tourne (`.github/workflows/qodana_code_quality.yml`).
 
 ---
 

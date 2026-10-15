@@ -695,6 +695,16 @@ public class JungleManager {
             int gold = deadMob != null ? fr.lolmc.util.MobCombat.getGold(deadMob, type.gold) : type.gold;
             double xp = deadMob != null ? fr.lolmc.util.MobCombat.getXP(deadMob, type.xp) : type.xp;
             var rewards = siblingRewardManager();
+            String epic = switch (type) {
+                case DRAGON_INFERNAL, DRAGON_OCEAN, DRAGON_MOUNTAIN, DRAGON_CLOUD, DRAGON_CHEMTECH, DRAGON_HEXTECH -> "DRAGON";
+                case DRAGON_ELDER -> "ELDER";
+                case BARON -> "BARON";
+                case HERALD -> "HERALD";
+                case VOIDGRUB -> "VOIDGRUB";
+                default -> null;
+            };
+            if (epic != null) fr.lolmc.instance.InstanceHelper.gameManager(killer).logEvent(epic,
+                    LolPlugin.getInstance().getTeamManager().getTeam(killer), killer.getName(), type.displayName);
             switch (type) {
                 // Dragons : or au tueur, XP partagée entre les alliés proches
                 case DRAGON_INFERNAL, DRAGON_OCEAN, DRAGON_MOUNTAIN, DRAGON_CLOUD, DRAGON_CHEMTECH, DRAGON_HEXTECH ->

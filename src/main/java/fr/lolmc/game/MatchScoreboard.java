@@ -121,15 +121,17 @@ public class MatchScoreboard {
     }
 
     /** Affiche le tableau de score à tous les joueurs et persiste en base. */
-    public void showEndScreen(Team winner) {
-        showEndScreen(winner, null, null);
+    public EndGameRecap.Summary showEndScreen(Team winner) {
+        return showEndScreen(winner, null, null);
     }
 
     /**
      * Fin de partie pour un groupe : n'affiche et ne persiste que les joueurs de {@code players}
      * (null = tous), avec le chrono et les feats de {@code gm} (null = partie globale).
+     *
+     * @return le résultat de la partie (écran de récapitulatif et vote d'honneur)
      */
-    public void showEndScreen(Team winner, Collection<? extends Player> players, GameManager gm) {
+    public EndGameRecap.Summary showEndScreen(Team winner, Collection<? extends Player> players, GameManager gm) {
         var tm = LolPlugin.getInstance().getTeamManager();
         Set<UUID> group = null;
         if (players != null) {
@@ -164,7 +166,8 @@ public class MatchScoreboard {
             for (Component line : lines) p.sendMessage(line);
         }
 
-        persistResults(winner, tm, group, timeSrc);
+        EndGameRecap.Summary summary = persistResults(winner, tm, group, timeSrc,
+                feat != null ? feat.getSummary() : "");
 
         // Notifier le lobby (BungeeCord) de la fin de partie
         var bridge = LolPlugin.getInstance().getBridgeManager();
@@ -177,13 +180,15 @@ public class MatchScoreboard {
             }
             bridge.notifyGameEnd(winner.name(), duration, endStats);
         }
+        return summary;
     }
 
-    private void persistResults(Team winner, fr.lolmc.team.TeamManager tm, Set<UUID> group, GameManager timeSrc) {
+    private EndGameRecap.Summary persistResults(Team winner, fr.lolmc.team.TeamManager tm, Set<UUID> group,
+                                                GameManager timeSrc, String feats) {
         var plugin = LolPlugin.getInstance();
         var db = plugin.getDatabaseManager();
         var ranked = plugin.getRankedManager();
-        if (db == null || ranked == null) return;
+        if (db == null || ranked == null) return null;
 
         List<UUID> winners = new ArrayList<>(tm.getTeamMembers(winner));
         List<UUID> losers = new ArrayList<>(tm.getTeamMembers(winner.opposite()));
@@ -194,6 +199,10 @@ public class MatchScoreboard {
         String matchId = java.util.UUID.randomUUID().toString(); // ID unique pour cette partie
         long now = System.currentTimeMillis();
         var cm = plugin.getChampionManager();
+        var afk = plugin.getAfkManager();
+        var runes = plugin.getRuneManager();
+        var spells = plugin.getSummonerSpellManager();
+        int season = plugin.getConfig().getInt("stats.season", 1);
         List<fr.lolmc.stats.persistence.MatchRecord> records = new ArrayList<>();
         Map<UUID, String> names = new HashMap<>();
         for (var entry : stats.entrySet()) {
@@ -217,6 +226,21 @@ public class MatchScoreboard {
             mr.wardsPlaced  = s.wardsPlaced;
             mr.wardsKilled  = s.wardsKilled;
             mr.durationSeconds = (int) duration;
+            mr.name    = s.name;
+            mr.season  = season;
+            mr.afk     = afk != null && afk.wasAfk(entry.getKey());
+            if (runes != null) {
+                var page = runes.getPage(entry.getKey());
+                mr.keystone = page.keystone != null ? page.keystone : "";
+                mr.runes = fr.lolmc.stats.persistence.MatchRecord.toJsonArray(page.allActiveRunes());
+            }
+            if (mp != null && spells != null) {
+                List<String> chosen = new ArrayList<>();
+                if (spells.hasFlash(mp)) chosen.add("FLASH");
+                var sp = spells.getSpells(mp);
+                if (sp != null) for (var spell : sp) chosen.add(spell.name());
+                mr.spells = fr.lolmc.stats.persistence.MatchRecord.toJsonArray(chosen);
+            }
             // Items équipés
             if (mp != null) {
                 var inv = plugin.getShopListener().getOrCreate(mp);
@@ -241,6 +265,11 @@ public class MatchScoreboard {
             for (UUID id : group) if (isRanked(id)) { groupRanked = true; break; }
         }
         final boolean eloUpdate = groupRanked;
+        Set<UUID> leavers = new HashSet<>();
+        for (var mr : records) if (mr.afk) leavers.add(mr.uuid);
+        int leaverPenalty = fr.lolmc.game.AfkManager.eloPenalty();
+        var events = new ArrayList<>(timeSrc.getEvents());
+        if (afk != null) afk.endGame(names.keySet());
 
         // Écritures en base hors du thread principal (MySQL = latence réseau)
         Runnable write = () -> {
@@ -250,10 +279,18 @@ public class MatchScoreboard {
                 ps.recordMatch(mr);
                 db.saveStats(ps);
             }
-            if (eloUpdate) ranked.updateEloAfterRanked(winners, losers);
+            db.saveEvents(matchId, events);
+            if (eloUpdate) ranked.updateEloAfterRanked(winners, losers, leavers, leaverPenalty);
         };
-        if (plugin.isEnabled()) org.bukkit.Bukkit.getScheduler().runTaskAsynchronously(plugin, write);
-        else write.run();
+        java.util.concurrent.CompletableFuture<Void> saved;
+        if (plugin.isEnabled()) {
+            saved = java.util.concurrent.CompletableFuture.runAsync(write,
+                    r -> org.bukkit.Bukkit.getScheduler().runTaskAsynchronously(plugin, r));
+        } else {
+            write.run();
+            saved = java.util.concurrent.CompletableFuture.completedFuture(null);
+        }
+        return new EndGameRecap.Summary(matchId, winner, (int) duration, feats, records, saved);
     }
 
     public Map<UUID, MatchStats> getStats() { return stats; }

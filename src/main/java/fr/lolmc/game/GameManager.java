@@ -78,6 +78,8 @@ public class GameManager {
     // Participants de la partie en cours (pour la reconnexion)
     private final java.util.Set<UUID> participants = new java.util.HashSet<>();
     private final Map<UUID, fr.lolmc.team.TeamManager.Team> participantTeam = new HashMap<>();
+    // Frise de la partie en cours (kills, structures, monstres épiques), enregistrée en fin de partie
+    private final java.util.List<fr.lolmc.stats.persistence.MatchEvent> events = new java.util.ArrayList<>();
 
     // Or passif LoL : 20.4 or / 10s, démarre à 1:50, distribué toutes les 0.5s
     // 20.4 / 20 ticks-de-0.5s = 1.02 or par demi-seconde
@@ -144,6 +146,7 @@ public class GameManager {
     public void startGame() {
         gameRunning = true;
         gameStartTime = System.currentTimeMillis();
+        events.clear();
         // Horloges de partie : plaques de tourelles (14 min), or croissant des sbires, séries de kills
         var lp = LolPlugin.getInstance();
         var rewards = gameInstance != null ? gameInstance.getRewardManager() : lp.getRewardManager();
@@ -155,6 +158,8 @@ public class GameManager {
         var __pm = LolPlugin.getInstance().getPassiveManager();
         if (__pm != null) __pm.startTasks();
         captureParticipants();
+        var afk = LolPlugin.getInstance().getAfkManager();
+        if (afk != null) afk.startGame(participants);
         timerBar = BossBar.bossBar(Component.text("Partie — 00:00"),
                 1.0f, BossBar.Color.WHITE, BossBar.Overlay.PROGRESS);
         for (Player p : players()) {
@@ -261,6 +266,16 @@ public class GameManager {
     public boolean isRunning() { return gameRunning; }
     public boolean isGameRunning() { return isRunning(); }
     public java.util.Set<java.util.UUID> getParticipants() { return participants; }
+
+    /** Ajoute un événement à la frise de la partie en cours (ignoré hors partie). */
+    public void logEvent(String type, fr.lolmc.team.TeamManager.Team team, String actor, String target) {
+        if (!gameRunning) return;
+        events.add(new fr.lolmc.stats.persistence.MatchEvent((int) getElapsedSeconds(), type,
+                team != null ? team.name() : "", actor != null ? actor : "", target != null ? target : ""));
+    }
+
+    /** Frise de la partie en cours (ou de la dernière partie, jusqu'au prochain démarrage). */
+    public java.util.List<fr.lolmc.stats.persistence.MatchEvent> getEvents() { return events; }
 
     public long getElapsedSeconds() {
         if (!gameRunning) return 0;

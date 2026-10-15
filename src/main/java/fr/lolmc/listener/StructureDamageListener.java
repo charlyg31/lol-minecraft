@@ -284,6 +284,11 @@ public class StructureDamageListener implements Listener {
             fr.lolmc.instance.InstanceHelper.rewardManager(destroyer).onInhibitorDestroyed(destroyer, playerTeam);
         }
 
+        // Frise de la partie
+        fr.lolmc.instance.InstanceHelper.gameManager(destroyer).logEvent(
+                structure.getType() == Type.NEXUS_BASE ? "NEXUS" : structure.getType().name(),
+                playerTeam, destroyer.getName(), name + " (" + enemyTeam.name() + ")");
+
         // Annonce
         fr.lolmc.util.WorldContext.broadcast(destroyer.getWorld(), Component.text(
                 "💥 " + name + " (" + enemyTeam.name() + ") détruit par " + destroyer.getName() + "!",
@@ -335,8 +340,10 @@ public class StructureDamageListener implements Listener {
         }
         final java.util.List<java.util.UUID> groupIds = new java.util.ArrayList<>();
         for (Player gp : group) groupIds.add(gp.getUniqueId());
-        // Tableau de score de fin de partie (et persistance des résultats)
-        LolPlugin.getInstance().getMatchScoreboard().showEndScreen(winner, group, gm);
+        // Tableau de score de fin de partie (et persistance des résultats), puis écran de récapitulatif
+        var summary = LolPlugin.getInstance().getMatchScoreboard().showEndScreen(winner, group, gm);
+        var recap = LolPlugin.getInstance().getEndGameRecap();
+        recap.start(summary, groupIds);
         // Arrêter la partie
         fr.lolmc.instance.InstanceHelper.minionManager(ref).stopWaves();
         fr.lolmc.instance.InstanceHelper.jungleManager(ref).stopJungle();
@@ -349,6 +356,7 @@ public class StructureDamageListener implements Listener {
             @Override public void run() {
                 if (countdown <= 0) {
                     cancel();
+                    recap.finish(groupIds);
                     returnPlayers(groupIds, mm);
                     // Mode partie unique : nettoyer toutes les positions mémorisées
                     if (mm != null && inst == null) mm.returnAllToPreGameLocations();

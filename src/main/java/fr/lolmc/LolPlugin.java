@@ -79,6 +79,8 @@ public class LolPlugin extends JavaPlugin {
     private DeathRecapManager deathRecapManager;
     private TabScoreboardManager tabScoreboardManager;
     private ForfeitManager forfeitManager;
+    private fr.lolmc.game.AfkManager afkManager;
+    private fr.lolmc.game.EndGameRecap endGameRecap;
     private fr.lolmc.game.AggroManager aggroManager;
     private FeatManager featManager;
     private RewardManager rewardManager;
@@ -178,6 +180,8 @@ public class LolPlugin extends JavaPlugin {
         deathRecapManager = new DeathRecapManager();
         tabScoreboardManager = new TabScoreboardManager();
         forfeitManager = new ForfeitManager();
+        afkManager = new fr.lolmc.game.AfkManager();
+        getServer().getPluginManager().registerEvents(afkManager, this);
         aggroManager = new fr.lolmc.game.AggroManager();
         featManager = new FeatManager();
         rewardManager = new RewardManager(championManager, goldManager);
@@ -207,6 +211,8 @@ public class LolPlugin extends JavaPlugin {
         preGameGUI = new PreGameGUI();
         getServer().getPluginManager().registerEvents(preGameGUI, this);
         matchScoreboard = new MatchScoreboard();
+        endGameRecap = new fr.lolmc.game.EndGameRecap();
+        getServer().getPluginManager().registerEvents(endGameRecap, this);
         getServer().getPluginManager().registerEvents(new fr.lolmc.listener.MonsterPassiveListener(), this);
         getServer().getPluginManager().registerEvents(new fr.lolmc.game.HeraldRodeo(), this);
         getServer().getPluginManager().registerEvents(bushManager, this);
@@ -333,6 +339,7 @@ public class LolPlugin extends JavaPlugin {
         if (turretManager != null) turretManager.stopTasks();
         if (passiveManager != null) passiveManager.stopTasks();
         if (gameManager != null) gameManager.stopSystems();
+        if (afkManager != null) afkManager.stop();
         // ── 2. Nettoyage des états par joueur ────────────────────────────────
         if (passiveManager != null) passiveManager.cleanupAll();
         if (shopListener != null) shopListener.cleanupAll();
@@ -371,6 +378,8 @@ public class LolPlugin extends JavaPlugin {
     public DeathRecapManager getDeathRecapManager()  { return deathRecapManager; }
     public TabScoreboardManager getTabScoreboard()    { return tabScoreboardManager; }
     public ForfeitManager getForfeitManager()          { return forfeitManager; }
+    public fr.lolmc.game.AfkManager getAfkManager()    { return afkManager; }
+    public fr.lolmc.game.EndGameRecap getEndGameRecap() { return endGameRecap; }
     public fr.lolmc.game.AggroManager getAggroManager() { return aggroManager; }
     public FeatManager getFeatManager()          { return featManager; }
     public RewardManager getRewardManager()     { return rewardManager; }

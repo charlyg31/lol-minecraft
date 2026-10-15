@@ -155,6 +155,30 @@ api:
   key: ""
   # En-tête Access-Control-Allow-Origin ("" = pas d'en-tête CORS)
   cors-origin: "*"
+  # Tableau de bord web (profils, historique, classement) servi sur http://<bind>:<port>/
+  # Les fichiers de plugins/LolMC/web/ (index.html, app.js, style.css) remplacent ceux du plugin.
+  dashboard: true
+
+# ═══════════════════════════════════════════════════════
+# STATISTIQUES
+# ═══════════════════════════════════════════════════════
+stats:
+  # Saison en cours : enregistrée avec chaque partie (classement par saison de l'API)
+  season: 1
+
+# ═══════════════════════════════════════════════════════
+# INACTIVITÉ (AFK)
+# ═══════════════════════════════════════════════════════
+afk:
+  enabled: true
+  # Avertissement après N secondes sans action (déplacement, caméra, clic, sort...)
+  warn-seconds: 120
+  # Signalé absent à son équipe après N secondes sans action
+  flag-seconds: 180
+  # Abandon possible dès N minutes si un allié est absent ou déconnecté (15 sinon)
+  early-ff-minutes: 5
+  # Points d'Elo retirés en classé à un joueur signalé absent (et aucun gain en cas de victoire)
+  elo-penalty: 15
 
 # ═══════════════════════════════════════════════════════
 # FOG OF WAR (brouillard de guerre)

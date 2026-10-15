@@ -13,7 +13,8 @@ import java.util.*;
  * Système de vote d'abandon (FF) façon LoL.
  *
  * Règles :
- *  - Disponible à partir de 15 minutes (configurable)
+ *  - Disponible à partir de 15 minutes, ou dès afk.early-ff-minutes si un allié est
+ *    absent (AFK) ou déconnecté ; les absents ne comptent pas dans les votes
  *  - 3/5 votes FOR dans les 60s → l'équipe abandonne
  *  - Une seule vote en cours par équipe à la fois
  *  - Timeout 60s si pas de majorité
@@ -76,19 +77,24 @@ public class ForfeitManager {
             return false;
         }
 
-        // Vérifier le temps minimum
-        long elapsed = gm.getElapsedSeconds() * 1000L;
-        if (elapsed < MIN_FF_TIME_MS) {
-            long remaining = (MIN_FF_TIME_MS - elapsed) / 60000L + 1;
-            player.sendMessage(Component.text(
-                String.format("❌ L'abandon n'est disponible qu'à partir de 15min (encore %dmin).", remaining),
-                NamedTextColor.RED));
-            return false;
-        }
-
         var tm = LolPlugin.getInstance().getTeamManager();
         Team team = tm.getTeam(player);
         if (team == null) { player.sendMessage(Component.text("❌ Equipe inconnue.", NamedTextColor.RED)); return false; }
+
+        // Vérifier le temps minimum (avancé si un allié est absent ou déconnecté)
+        var afk = LolPlugin.getInstance().getAfkManager();
+        long minMs = afk != null && afk.teamHasAbsent(player, team)
+                ? Math.min(MIN_FF_TIME_MS, fr.lolmc.game.AfkManager.earlyForfeitMinutes() * 60_000L)
+                : MIN_FF_TIME_MS;
+        long elapsed = gm.getElapsedSeconds() * 1000L;
+        if (elapsed < minMs) {
+            long remaining = (minMs - elapsed) / 60000L + 1;
+            player.sendMessage(Component.text(
+                String.format("❌ L'abandon n'est disponible qu'à partir de %dmin (encore %dmin).",
+                        minMs / 60000L, remaining),
+                NamedTextColor.RED));
+            return false;
+        }
 
         final int game = gameKey(player);
         final String k = key(game, team);
@@ -121,8 +127,10 @@ public class ForfeitManager {
 
         teamVotes.add(player.getUniqueId());
 
-        // Compter les membres de l'équipe en ligne
-        int total = teamMembers(ref, team).size();
+        // Compter les membres de l'équipe en ligne et présents (les absents ne votent pas)
+        int total = 0;
+        for (Player q : teamMembers(ref, team)) if (afk == null || !afk.isAfk(q.getUniqueId())) total++;
+        total = Math.max(1, total);
         int needed = (int) Math.ceil(total * VOTE_RATIO);
 
         broadcastTeam(ref, team, Component.text(

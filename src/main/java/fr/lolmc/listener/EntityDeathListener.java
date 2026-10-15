@@ -206,6 +206,13 @@ public class EntityDeathListener implements Listener {
         if ("annie".equals(championManager.getChampion(victim).getId()))
             fr.lolmc.champion.impl.mid.Annie.onAnnieDeath(victim);
 
+        // Frise de la partie
+        var victimTeam = plugin.getTeamManager().getTeam(victim);
+        fr.lolmc.instance.InstanceHelper.gameManager(victim).logEvent("KILL",
+                killer != null ? plugin.getTeamManager().getTeam(killer)
+                        : (victimTeam != null ? victimTeam.opposite() : null),
+                killer != null ? killer.getName() : "", victim.getName());
+
         // Exécution : la prime de la victime ne bouge pas (LoL)
         if (killer == null) return;
 
