@@ -1,147 +1,50 @@
 # LolMC — League of Legends dans Minecraft
 
-Plugin Paper qui recrée un MOBA inspiré de **League of Legends** dans Minecraft, sans mod client. 20 champions jouables, boutique, jungle, tourelles, brouillard de guerre, système de runes, API web de statistiques.
+Plugin Paper qui recrée la Faille de l'invocateur dans Minecraft, **sans mod client** : 20 champions jouables, sbires, jungle, tourelles, brouillard de guerre, boutique, runes, sorts d'invocateur, file d'attente avec groupes et API web de statistiques.
 
-> **Stack :** Paper 26.1.2 · Java 25 · BungeeCord (optionnel)
+Les valeurs de jeu (stats, dégâts, timers, règles de ciblage) suivent le wiki officiel de League of Legends, **patch 26**.
 
----
-
-## Deux projets Maven distincts
-
-```
-bungee-plugin/   → LolMC-Bungee.jar  (proxy : file d'attente, groupes, retour serveur d'origine)
-.  (racine)      → LolMC.jar         (serveur de jeu : la partie complète)
-```
-
-Ce sont deux `pom.xml` séparés, à compiler indépendamment (pas de module Maven parent). Sans BungeeCord, `LolMC.jar` fonctionne seul en serveur autonome ; les commandes joueur passent alors par `/roles`, `/queue`, `/party` plutôt que par le proxy.
+> **Stack :** Paper 26.3 · Java 25 · Maven · BungeeCord (optionnel)
 
 ---
 
-## LolMC-Bungee.jar — Plugin proxy (optionnel)
+## Sommaire
 
-### Installation
-
-Placer dans `/plugins/` du **proxy BungeeCord uniquement**.
-
-### Configuration (`config.yml`)
-
-```yaml
-game-server: "lolmc-01"     # nom exact du serveur de jeu dans la config BungeeCord
-lobby-server: "lobby"       # serveur lobby (optionnel)
-fallback-server: "survie"   # serveur de repli si l'origine du joueur est inconnue
-players-per-game: 10        # joueurs nécessaires pour lancer une partie normale
-max-party-size: 5           # taille maximale d'un groupe
-```
-
-### Commandes
-
-**File normale — `/lol`**
-
-| Commande | Description |
-|----------|--------------|
-| `/lol <rôle1> <rôle2> ...` | Rejoindre la file avec les rôles souhaités (min. 2, ou 1 seul en groupe de 5) |
-| `/lol all` | Accepter tous les rôles |
-| `/lol leave` · `/lol stop` (alias `/lol quitter`) | Quitter la file (arrêter la recherche) |
-| `/lol accept` / `/lol refuse` | Accepter ou refuser une proposition de partie |
-| `/lol party invite/accept/decline/leave/kick/promote/disband/liste` | Gestion du groupe |
-| `/lol start` | Chef de groupe : lancer la recherche quand tous les membres ont choisi leurs rôles |
-
-**En groupe** : chaque membre choisit ses rôles avec `/lol <rôles>` (statut « prêt ») ; c'est le **chef** qui lance la recherche (`/lol start`, ou en choisissant ses propres rôles) une fois que tout le monde est prêt et que les postes sont compatibles. Le groupe reste toujours dans la même équipe. Si un membre quitte ou est exclu pendant la recherche, elle est annulée pour tout le groupe.
-
-Rôles valides : `top` · `jungle` · `mid` · `adc` · `support`
-
-**Test solo — `/lols [rôle]`** (par défaut `mid`, permission `lolmc.admin`) : simule une « partie trouvée » en solo pour tester l'enchaînement file → sélection de champion → partie, sans attendre d'autres joueurs.
-
-**File classée — `/lolr`**
-
-Mêmes règles de rôles que `/lol`, mais avec bans et pick en début de partie. La file classée est séparée de la file normale : un joueur de `/lol` n'est jamais placé dans une partie classée. `/lolr stop` quitte la file classée, `/lolr start` lance la recherche classée du groupe (chef). Une sous-commande admin (`/lolr on` / `/lolr off`) active ou coupe les parties classées côté proxy.
-
-### Fonctionnalités
-
-- File d'attente et groupes fonctionnant à travers plusieurs serveurs du réseau
-- Le premier joueur qui invite dans un groupe en devient le chef
-- Rôles souhaités sauvegardés par joueur dans `roles_data.yml`
-- Retour automatique au serveur (et à la position) d'origine à la fin de la partie
+- [Démarrage rapide](#démarrage-rapide)
+- [Architecture](#architecture)
+- [Gameplay](#gameplay)
+- [Configuration](#configuration)
+- [Configurer la carte](#configurer-la-carte)
+- [Mode multi-instances (expérimental)](#mode-multi-instances-expérimental)
+- [Commandes](#commandes)
+- [Permissions](#permissions)
+- [API web des statistiques](#api-web-des-statistiques)
+- [Compilation et release](#compilation-et-release)
+- [Stack technique](#stack-technique)
+- [État du projet](#état-du-projet)
 
 ---
 
-## LolMC.jar — Plugin de jeu
+## Démarrage rapide
 
-### Installation
+1. Compiler (voir [Compilation](#compilation-et-release)) ou récupérer les JAR d'une release.
+2. Déposer `LolMC.jar` dans `plugins/` d'un serveur **Paper 26.3** tournant sous **Java 25**.
+3. Démarrer le serveur une fois pour générer `plugins/LolMC/config.yml`.
+4. Construire la carte dans le monde `lolmc_template`, puis la configurer avec `/lola` (voir [Configurer la carte](#configurer-la-carte)).
+5. Tester seul avec `/lola solo` ou `/lola testgame`.
 
-Placer dans `/plugins/` du serveur de jeu.
-
-Dépendance optionnelle : **Multiverse-Core** (chargement de mondes ; fonctionne aussi sans, via `WorldCreator` natif Paper).
-
-### Configuration (`config.yml`) — extraits principaux
-
-```yaml
-world:
-  template: "lolmc_template"     # monde de référence, configuré une fois via /lola
-  use-instances: false           # EXPÉRIMENTAL — voir la section dédiée plus bas
-  max-instances: 4               # parties simultanées max (0 = illimité)
-  name: "lolmc_template"         # monde de jeu réellement utilisé quand use-instances=false
-  lobby: "lobby"                 # monde lobby optionnel
-
-bridge:
-  enabled: false                 # true si utilisé derrière le proxy BungeeCord
-  game-server: "lolmc-01"
-  lobby-server: "lobby"
-
-scale:
-  lol-units-per-block: 65        # conversion unités LoL → blocs Minecraft (portées, etc.)
-
-shop:
-  base-only: true                # achat uniquement à la fontaine (false = achat partout)
-  base-radius: 15.0
-
-combat:
-  aa-lock-on: true                # un clic verrouille la cible, l'AA s'enchaîne à portée
-
-fog:
-  enabled: true
-  vision-range: 30
-
-minimap:
-  center-x: 0
-  center-z: 0
-  scale: CLOSE                    # CLOSEST=128b CLOSE=256 NORMAL=512 FAR=1024 FARTHEST=2048
-
-database:
-  type: sqlite                    # sqlite | mysql
-  mysql: { host: localhost, port: 3306, database: lolmc, user: root, password: "", ssl: false }
-
-api:
-  enabled: false                  # API web REST des statistiques (voir plus bas)
-  bind: "127.0.0.1"               # "0.0.0.0" pour écouter sur toutes les interfaces
-  port: 8080
-  key: ""                         # clé exigée dans l'en-tête X-Api-Key (vide = pas d'auth)
-  cors-origin: "*"
-```
-
-Un bloc `heads:` liste les 20 champions avec un champ `PASTE_VALUE_HERE` à remplir avec la valeur base64 d'une tête custom (ex. minecraft-heads.com).
+Optionnel : `LolMC-Bungee.jar` sur le proxy BungeeCord pour une file d'attente réseau, et Multiverse-Core pour gérer les mondes.
 
 ---
 
-## Mode multi-instances (expérimental)
+## Architecture
 
-Par défaut (`use-instances: false`), une seule vraie partie tourne à la fois, directement dans le monde `world.name`. C'est le mode stable et le plus testé.
+```
+.  (racine)      → LolMC.jar         serveur de jeu : la partie complète
+bungee-plugin/   → LolMC-Bungee.jar  proxy : file d'attente, groupes, retour au serveur d'origine
+```
 
-En activant `use-instances: true`, chaque match copie le monde `world.template` dans un nouveau monde isolé (`lolmc_game_1`, `lolmc_game_2`…, préfixe fixe). `world.max-instances` limite le nombre de parties simultanées (une création au-delà est refusée).
-
-**Ce qui est propre à chaque instance :** `GameManager`, `MinionManager`, `JungleManager`, `TurretManager`, `FogOfWarManager`, `RewardManager`, `AnnouncementManager`, `FeatManager`, `PassiveManager`, `BaseManager`, ainsi que la sélection de champion (chrono, bans, choix), le vote d'abandon, le tab et les stats de fin de partie (écran de score et sauvegarde en base limités aux joueurs de la partie).
-
-**Monde template :** les instances sont copiées depuis `plugins/LolMC/template/` si ce dossier contient un monde (`level.dat` ou `region/`). Sinon, le plugin retombe sur le dossier du monde `world.template` à la racine du serveur (ancien comportement). `/lola template save` enregistre le monde **où tu te trouves** dans `plugins/LolMC/template/` (le monde est sauvegardé puis copié), le définit comme `world.template` et rattache `map.yml` (tours, nexus, spawns), `roads.yml` (chemins) et `jungle.yml` (camps) à ce monde (refusé dans un monde d'instance ou pendant une partie) ; `/lola template` affiche la source utilisée. On peut aussi y déposer à la main un dossier de monde.
-
-**Plantes :** chaque instance a ses propres plantes (positions copiées du template) ; leur chunk est maintenu chargé par un ticket de chunk du plugin tant que la partie dure, pour qu'elles poussent et repoussent même sans joueur à proximité.
-
-**Équipes :** `TeamManager` garde une table joueur → équipe unique, mais chaque lecture est limitée au monde du joueur : `areAllies`/`areEnemies` sont faux entre deux mondes, l'auto-équilibrage ne compte que les joueurs du même monde, et les listes d'équipiers (pings, buffs, chat d'équipe, wards…) filtrent par monde. Les deux parties ne se mélangent donc pas.
-
-**Commandes de test `/lola` :** `start`, `stop`, `solo`, `testgame`, `spawn`, `wave` et `mode` agissent sur la partie de l'admin : son instance s'il en est dans une, sinon le monde template. Les plantes (miel, cône, voyant) sont aussi recréées dans chaque instance.
-
-**BungeeTabListPlus :** si BTLP (avec son bridge Bukkit) est installé, LolMC enregistre les variables `lolmc_team`, `lolmc_champion`, `lolmc_kills`, `lolmc_deaths`, `lolmc_assists`, `lolmc_kda`, `lolmc_cs`, `lolmc_gold` et `lolmc_game` (à utiliser par ex. avec `${player lolmc_kda}`). Les valeurs sont propres à chaque joueur, donc à chaque instance. Les classes de l'API BTLP présentes dans `src/main/java/codecrafter47` sont de simples stubs de compilation, exclus du jar.
-
-**Nettoyage automatique :** un monde d'instance sans aucun joueur est supprimé (après 60 s pour une partie en cours, immédiatement pour un monde sans partie). Les mondes `lolmc_game_*` laissés par un crash sont supprimés au démarrage. Le monde template n'est jamais touché. Ce mode n'a jamais été testé sur un vrai serveur en conditions réelles.
+Deux `pom.xml` indépendants (pas de module Maven parent), à compiler séparément. Sans BungeeCord, `LolMC.jar` fonctionne seul : les joueurs passent alors par `/roles`, `/queue` et `/party` au lieu du proxy (`bridge.enabled: false`).
 
 ---
 
@@ -157,153 +60,267 @@ En activant `use-instances: true`, chaque match copie le monde `world.template` 
 | Support | Morgana, Leona, Blitzcrank, Janna |
 | ADC | Ashe, Sivir, Jinx, Miss Fortune |
 
-Chaque champion a ses 4 sorts (Q/W/E/R) plus passif, avec scaling AP/AD, prévisualisation directionnelle des sorts (visible du seul lanceur), et indicateurs de recharge dans la hotbar.
+Chaque champion a son passif et ses 4 sorts (Q/W/E/R) avec scaling AD/AP, une prévisualisation des sorts visible du seul lanceur et des recharges affichées dans la hotbar.
 
-### Systèmes de jeu
+### Sbires
 
-- **Dégâts** : résistances, pénétration plate et en %, boucliers (physiques et magiques séparés), réduction de soins (Grievous Wounds), vrais dégâts, critiques, vol de vie et omnivamp
-- **Contrôles de foule** : étourdissement, immobilisation, silence, ralentissement, projection aérienne, avec ténacité et résistance au ralentissement séparées
-- **Sbires** : vagues toutes les 30s, mêlée/casters/canon selon le temps de jeu, super-sbires après destruction d'un inhibiteur
-- **Jungle** : camps classiques, buffs Bleu/Rouge, Héraut (invoqué, puis monté par un allié qui dirige sa charge d'un clic droit), Baron (3 formes, sbires renforcés plus grands), dragons élémentaires avec âme au 4ᵉ et Dragon Ancien au 5ᵉ
-- **Tourelles et structures** : priorité d'aggro fidèle, plaques de tourelle, or au dernier coup et à l'équipe
-- **Économie** : or passif, or de sbires progressif, primes de série de kills, assistances
-- **Runes** : les 5 voies complètes (Précision, Domination, Sorcellerie, Résolution, Inspiration), keystones et runes mineures
-- **Objets** : catalogue complet avec passifs actifs et statiques, élixirs à partir du niveau 9
-- **Sorts d'invocateur** : Flash, Ignite, Heal, Barrier, Exhaust, Téléport, Smite, Cleanse, Ghost
-- **Boutique** : achat/vente, hotbar à deux pages (sorts + objets), fiole rechargeable
-- **Brouillard de guerre et vision** : buissons, wards (furtive, de contrôle, lointaine), révélation au combat
+- Première vague à 0:30, puis toutes les 30 s (25 s dès 14:00, 20 s dès 30:00).
+- Vague : 3 mêlées, un canon (toutes les 3 vagues, puis 2 dès 14:00, puis chaque vague dès 25:00), 3 casters ; super-sbire en queue de vague après un inhibiteur détruit (2 quand les 3 sont tombés).
+- Stats améliorées toutes les 90 s selon les formules du wiki ; or et XP par type.
+- Ciblage LoL : appel à l'aide quand un champion allié est attaqué, sinon le **sbire ennemi le plus proche**, et un champion seulement s'il n'y a aucun sbire. La cible est gardée tant qu'elle reste valide et à portée.
+- Casters et canons tirent des projectiles, y compris sur les structures, depuis leur portée.
+- Les sbires ne voient pas un champion caché dans un buisson, sauf s'ils sont dans le même buisson ou que leur équipe y a de la vision.
 
-### Commandes joueur
+### Tourelles et structures
 
-| Commande | Description |
-|----------|--------------|
-| `/roles` (alias `/lobby`, `/play`) | Menu de préparation (rôles, file) |
-| `/queue` | Rejoindre ou quitter la file locale |
-| `/party` | Gérer son groupe |
-| `/champion` | Choisir ou lister les champions |
-| `/pick` · `/spell` · `/lock` | Sélection de champion et de sorts |
-| `/runes` | Configurer sa page de runes |
-| `/shop` | Ouvrir la boutique |
-| `/team` | Choisir son équipe / chat d'équipe |
-| `/recall` | Retour à la base |
-| `/ping` | Ping d'équipe (danger, omw, missing, assist, enemy) |
-| `/l runes\|ping\|ff\|stats` | Raccourcis regroupés |
+- 0,833 attaque/s, portée 750, projectile à 1200 unités/s imblocable, dégâts selon le niveau de la tourelle et la minute.
+- Priorité : appel à l'aide (champion qui blesse un champion allié), puis canon/super-sbire, mêlée, caster, champion. La cible est gardée tant qu'elle est valide.
+- Montée en puissance (+50 % par tir sur un champion, max +150 %), 30 % de pénétration d'armure.
+- **Armure renforcée** : −80 % de tous les dégâts sans sbire attaquant à proximité, réactivée 3 s après leur départ.
+- Plaques (patch 26.1), Rempart, Croissance cristalline, baisse d'armure des tourelles extérieures de 11:00 à 15:00.
+- Vision vraie des tourelles (1100 unités) : les buissons à portée ne cachent rien à leur équipe.
+- Régénération des inhibiteurs, du Nexus et des tourelles de base ; réapparition des tourelles de Nexus.
+- Protection anti-backdoor : chaque structure n'est attaquable qu'après celle qui la précède.
 
-### Commandes admin — `/lola`
+### Jungle
 
-`/lola <start|stop|instance|set|position|center|lane|solo|give|level|gold|hp|resetcd|buff|spawn|wave|select|reload|debug|testgame|schem|road|jungle|baronpit|shopnpc|mode|team|permcheck|help>` (alias `/lolAdmin`)
+Camps classiques, buffs Bleu et Rouge, Larves du Néant, Héraut (invoqué puis monté par un allié qui dirige sa charge), Baron Nashor (3 formes de fosse, Main du Baron qui renforce les sbires), dragons élémentaires avec âme au 4ᵉ et Dragon Ancien.
 
-Les sous-commandes de configuration de carte (`set`, `position`, `center`, `lane`, `jungle`, `baronpit`, `schem`, `road`, `shopnpc`, `mode`) s'appliquent au monde template, avant toute partie. `/lola template [save]` gère le monde template (voir plus bas). `/lola instance` liste les instances actives ; `/lola instance <n>` téléporte l'admin dans l'instance n, `/lola instance template` dans le monde template. Les sous-commandes de test (`solo`, `give`, `buff`, `wave`, `hp`, `gold`, `level`, `resetcd`) agissent sur la partie en cours.
+### Vision
 
-**Fosse du Baron** : les formes Territoriale (petit mur devant la fosse) et Omnisciente (long tunnel sur le côté) modifient le terrain, qui dépend de la carte. Pour chaque forme : sélectionner la fosse avec `/lola schem pos1` et `pos2`, faire `/lola baronpit <territorial|omniscient> start`, construire la variante, puis `/lola baronpit <forme> save`. Seuls les blocs modifiés sont gardés (`jungle.yml`) et le terrain normal est remis. En partie, la variante est posée à l'apparition du Baron et retirée en fin de partie. `preview` pose une variante, `clear` la supprime, `/lola baronpit reset` remet le terrain normal.
+- Brouillard de guerre : champions, sbires, tourelles et wards donnent la vision de leur équipe.
+- Buissons : un champion dedans est invisible pour les ennemis, sauf si ceux-ci ont un champion ou une ward dans le même buisson.
+- Attaquer ou lancer un sort **révèle 2 s**, même depuis un buisson, si un champion ou un sbire ennemi est à 10 blocs ou moins (les monstres de la jungle ne comptent pas).
+- Wards furtives, de contrôle et lointaines.
 
----
+### Autres systèmes
 
-## API web des statistiques (optionnelle)
-
-Activable via `api.enabled: true` dans `config.yml`. Expose un serveur HTTP local en lecture seule :
-
-| Route | Description |
-|-------|--------------|
-| `GET /api/player/{uuid}` | Fiche d'un joueur |
-| `GET /api/player/name/{pseudo}` | Fiche d'un joueur par pseudo |
-| `GET /api/player-champions/{uuid}` | Statistiques par champion |
-| `GET /api/match/history/{uuid}` | Historique de parties |
-| `GET /api/match/detail/{id}` | Détail d'une partie |
-| `GET /api/leaderboard` | Classement |
-| `GET /api/champions` | Liste des champions |
-| `GET /api/online` | Joueurs en ligne, statut de partie et numéro d'instance |
-| `GET /api/status` | Statut général du serveur, avec le détail de chaque instance (`instances`) |
-
-Par défaut l'API n'écoute que sur `127.0.0.1`. Pour un accès depuis un site externe : `api.bind: "0.0.0.0"`, un port ouvert côté hébergeur, et de préférence une clé `api.key` (envoyée dans l'en-tête `X-Api-Key`).
+- **Dégâts** : armure/RM, pénétration plate et en %, boucliers, réduction de soins, vrais dégâts, critiques, vol de vie, omnivamp.
+- **Contrôles** : étourdissement, immobilisation, silence, ralentissement, projection, avec ténacité.
+- **Économie** : or passif, or des sbires, primes de série, assistances, plaques.
+- **Runes** : les 5 voies complètes, keystones et runes mineures.
+- **Objets** : catalogue complet avec passifs et actifs, élixirs dès le niveau 9 ; boutique à la fontaine, hotbar à deux pages.
+- **Sorts d'invocateur** : Flash, Embrasement, Soin, Barrière, Fatigue, Téléportation, Châtiment, Purge, Fantôme.
 
 ---
 
-## Persistance
+## Configuration
 
-Deux backends au choix (`database.type` dans `config.yml`) : `sqlite` (par défaut, local) ou `mysql`. Les colonnes ajoutées par les mises à jour sont créées automatiquement dans une base existante.
+### Serveur de jeu — `plugins/LolMC/config.yml` (extraits)
 
----
+```yaml
+bridge:
+  enabled: false                 # true derrière le proxy BungeeCord
+  game-server: "lolmc-01"
+  lobby-server: "lobby"
 
-## Permissions
+world:
+  template: "lolmc_template"     # monde de référence, configuré une fois via /lola
+  use-instances: false           # EXPÉRIMENTAL (voir plus bas)
+  max-instances: 4               # parties simultanées max (0 = illimité)
+  name: "lolmc_template"         # monde de jeu utilisé quand use-instances=false
+  lobby: "lobby"
 
-Les permissions sont déclarées dans `plugin.yml` du serveur de jeu et fonctionnent avec **LuckPerms** (ou tout autre plugin de permissions). Sans plugin de permissions, les valeurs par défaut s'appliquent : tout le monde joue, seuls les opérateurs administrent.
+bushes:
+  blocks: [TALL_GRASS, LARGE_FERN, FERN, SWEET_BERRY_BUSH]   # blocs qui forment un buisson
 
-### Serveur de jeu (Paper)
+scale:
+  lol-units-per-block: 65        # conversion des portées de sorts (unités LoL → blocs)
 
-| Permission | Défaut | Rôle |
-|------------|--------|------|
-| `lolmc.admin` | op | Toutes les commandes `/lola` (donne `lolmc.admin.config` et `lolmc.admin.test`) |
-| `lolmc.admin.config` | op | Configurer la carte : `set`, `position`, `center`, `lane`, `schem`, `road`, `jungle`, `baronpit`, `shopnpc`, `mode` |
-| `lolmc.admin.test` | op | Commandes de test : `solo`, `give`, `level`, `gold`, `team`, `testgame`, `debug`, `spawn`, `buff`, `resetcd`, `hp`, `wave` |
-| `lolmc.player` | true | Toutes les commandes joueur (donne les 12 permissions ci-dessous) |
-| `lolmc.player.shop` | true | `/shop` |
-| `lolmc.player.team` | true | `/team` |
-| `lolmc.player.party` | true | `/party` |
-| `lolmc.player.queue` | true | `/queue` |
-| `lolmc.player.recall` | true | `/recall` |
-| `lolmc.player.ping` | true | `/ping` |
-| `lolmc.player.pick` | true | `/pick` et `/champion` |
-| `lolmc.player.runes` | true | `/runes` |
-| `lolmc.player.spell` | true | `/spell` |
-| `lolmc.player.lock` | true | `/lock` |
-| `lolmc.player.roles` | true | `/roles` (alias `/lobby`, `/play`) |
-| `lolmc.player.lobby` | true | Menu de préparation |
-| `lolmc.champion.use` | true | Jouer tous les champions (donne les 20 permissions suivantes) |
-| `lolmc.champion.<id>` | true | Jouer un champion précis (voir les identifiants ci-dessous) |
-| `lolmc.skin` | false | Tous les skins (donne les 32 permissions de skin) |
-| `lolmc.skin.<champion>.<skin>` | false | Un skin précis, par exemple `lolmc.skin.jinx.arcane` |
+shop:
+  base-only: true                # achat uniquement à la fontaine
+  base-radius: 15.0
 
-Les commandes `/lola` utilisent la permission fine de leur catégorie : un modérateur peut avoir `lolmc.admin.test` sans pouvoir modifier la carte. Les sous-commandes `start`, `stop`, `select`, `reload`, `permcheck` et `help` demandent `lolmc.admin`. Les opérateurs passent toujours.
+combat:
+  aa-lock-on: true               # un clic verrouille la cible, l'AA s'enchaîne à portée
 
-**Identifiants de champion** (`lolmc.champion.<id>`) : `garen`, `darius`, `malphite`, `nasus`, `warwick`, `amumu`, `masteryi`, `leesin`, `annie`, `veigar`, `zed`, `yasuo`, `morgana`, `leona`, `blitzcrank`, `janna`, `ashe`, `sivir`, `jinx`, `missfortune`.
+turrets:
+  attack-radius: 7.5             # 750 unités
+  detection-height: 6
+  beam-height: 6
 
-La liste des skins est dans `plugin.yml` ; `/lola permcheck` vérifie que chaque skin du code a bien sa permission déclarée.
+fog:
+  enabled: true
+  vision-range: 13.5             # 1350 unités (vision d'un champion)
 
-### Proxy (BungeeCord)
+minimap:
+  center-x: 0
+  center-z: 0
+  scale: CLOSE                   # CLOSEST=128 CLOSE=256 NORMAL=512 FAR=1024 FARTHEST=2048 blocs
 
-| Permission | Rôle |
-|------------|------|
-| `lolmc.play` | Utiliser `/lol` et `/lolr` (file et groupes) |
-| `lolmc.admin` | Activer ou couper les parties classées (`/lolr on` / `/lolr off`) |
+database:
+  type: sqlite                   # sqlite | mysql
+  mysql: { host: localhost, port: 3306, database: lolmc, user: root, password: "", ssl: false }
 
-BungeeCord n'a pas de système `default: true` comme Bukkit : une permission jamais accordée renvoie toujours faux. `DefaultPermissionsListener` accorde donc `lolmc.play` à la connexion, mais seulement si aucun plugin de permissions n'a déjà pris une décision pour ce joueur, pour ne jamais écraser une restriction posée ailleurs.
-
-### Exemples LuckPerms
-
-LuckPerms s'installe sur chaque serveur Paper **et** sur le proxy (version Bungee, commandes `/lpb`). Pour partager les groupes entre les deux, utilise la même base de données de stockage.
-
+api:
+  enabled: false
+  bind: "127.0.0.1"
+  port: 8080
+  key: ""                        # clé exigée dans l'en-tête X-Api-Key (vide = sans auth)
+  cors-origin: "*"
 ```
-# Proxy : autoriser la file à tout le monde (explicite, recommandé avec LuckPerms)
-/lpb group default permission set lolmc.play true
 
-# Proxy : réserver les parties classées aux admins
-/lpb group admin permission set lolmc.admin true
+Le bloc `heads:` liste les 20 champions avec un champ `PASTE_VALUE_HERE` à remplacer par la valeur base64 d'une tête personnalisée (par exemple depuis minecraft-heads.com).
 
-# Jeu : administrateur complet
-/lp group admin permission set lolmc.admin true
+### Proxy — `plugins/LolMC-Bungee/config.yml`
 
-# Jeu : modérateur qui teste sans toucher à la carte
-/lp group moderateur permission set lolmc.admin.test true
-
-# Jeu : tous les skins pour les VIP, un seul skin pour un joueur
-/lp group vip permission set lolmc.skin true
-/lp user Pseudo permission set lolmc.skin.jinx.arcane true
-
-# Jeu : interdire un champion à un groupe (ex. champion du mois ou en test)
-/lp group default permission set lolmc.champion.zed false
+```yaml
+game-server: "lolmc-01"     # nom exact du serveur de jeu dans la config BungeeCord
+lobby-server: "lobby"
+fallback-server: "survie"   # repli si le serveur d'origine du joueur est inconnu
+players-per-game: 10
+max-party-size: 5
 ```
+
+### Persistance
+
+`database.type` : `sqlite` (par défaut, fichier local) ou `mysql`. Les colonnes ajoutées par les mises à jour sont créées automatiquement dans une base existante.
 
 ---
 
 ## Configurer la carte
 
-1. Créer et construire le monde `lolmc_template` (le nom exact vient de `world.template`)
-2. Poser les structures, spawns, routes de sbires et camps de jungle avec les sous-commandes `/lola` correspondantes
-3. Tester avec `/lola testgame` ou `/lola solo`
-4. En mode instances, le dossier de ce monde est copié pour chaque nouvelle partie (Multiverse n'est pas obligatoire) ; en mode par défaut, c'est le monde `world.name` qui est utilisé directement
+1. Créer et construire le monde `lolmc_template` (nom défini par `world.template`).
+2. Poser structures, spawns, routes des sbires (`/lola road`), camps de jungle (`/lola jungle`) et PNJ de boutique (`/lola shopnpc`).
+3. Tester avec `/lola testgame` ou `/lola solo`.
 
-En mode instances, sauvegarde et **décharge** `lolmc_template` avant de lancer des parties (`/mv unload lolmc_template` avec Multiverse), pour que la copie soit complète. Ne configure jamais la carte dans une copie `lolmc_game_N` : elle est supprimée à la fin de la partie.
+**Fosse du Baron** : les formes Territoriale et Omnisciente modifient le terrain. Pour chacune : sélectionner la fosse (`/lola schem pos1` / `pos2`), lancer `/lola baronpit <territorial|omniscient> start`, construire la variante, puis `/lola baronpit <forme> save`. Seuls les blocs modifiés sont enregistrés (`jungle.yml`). `preview` pose une variante, `clear` la retire, `/lola baronpit reset` remet le terrain normal.
+
+En mode instances, sauvegarder et **décharger** `lolmc_template` avant de lancer des parties (`/mv unload lolmc_template` avec Multiverse), et ne jamais configurer la carte dans une copie `lolmc_game_N` : elle est supprimée en fin de partie.
+
+---
+
+## Mode multi-instances (expérimental)
+
+Par défaut (`use-instances: false`), une seule partie tourne, directement dans le monde `world.name`. C'est le mode le plus testé.
+
+Avec `use-instances: true`, chaque match copie le monde template dans un monde isolé (`lolmc_game_1`, `lolmc_game_2`…), dans la limite de `world.max-instances`.
+
+- **Isolé par instance :** partie, sbires, jungle, tourelles, brouillard, récompenses, annonces, hauts faits, passifs, base, sélection des champions, vote d'abandon, tab et statistiques de fin de partie.
+- **Équipes :** une seule table joueur → équipe, mais toutes les lectures sont limitées au monde du joueur ; deux parties ne se mélangent jamais.
+- **Template :** copié depuis `plugins/LolMC/template/` s'il contient un monde, sinon depuis le dossier `world.template`. `/lola template save` enregistre le monde courant comme template et y rattache `map.yml`, `roads.yml` et `jungle.yml`.
+- **Plantes :** chaque instance a les siennes, dont les chunks restent chargés pendant la partie.
+- **Nettoyage :** un monde d'instance vide est supprimé (60 s après pour une partie en cours) ; les mondes `lolmc_game_*` laissés par un crash sont supprimés au démarrage.
+- **BungeeTabListPlus :** variables `lolmc_team`, `lolmc_champion`, `lolmc_kills`, `lolmc_deaths`, `lolmc_assists`, `lolmc_kda`, `lolmc_cs`, `lolmc_gold`, `lolmc_game` (ex. `${player lolmc_kda}`). Les classes BTLP de `src/main/java/codecrafter47` sont des stubs de compilation exclus du JAR.
+
+---
+
+## Commandes
+
+### Joueur (serveur de jeu)
+
+| Commande | Description |
+|----------|-------------|
+| `/roles` (alias `/lobby`, `/play`) | Menu de préparation (rôles, file) |
+| `/queue [leave]` | Rejoindre ou quitter la file locale |
+| `/party <invite\|accept\|leave\|info>` | Gérer son groupe |
+| `/champion <pick <nom>\|list>` · `/pick <champion>` | Choisir son champion |
+| `/spell <sort1> <sort2>` · `/lock` | Sorts d'invocateur, verrouiller la sélection |
+| `/runes` | Page de runes |
+| `/shop` | Boutique |
+| `/team <bleu\|rouge\|auto>` · `/t <message>` | Équipe, chat d'équipe |
+| `/recall` | Retour à la base |
+| `/ping <danger\|omw\|missing\|assist\|enemy>` | Ping d'équipe |
+| `/l <runes\|ping\|ff\|stats>` | Raccourcis en partie (`ff` = vote d'abandon) |
+
+### Admin — `/lola` (alias `/lolAdmin`)
+
+| Catégorie | Sous-commandes |
+|-----------|----------------|
+| Partie | `start`, `stop`, `select`, `reload`, `help`, `permcheck` |
+| Carte (monde template) | `set`, `position`, `center`, `lane`, `schem`, `road`, `jungle`, `baronpit`, `shopnpc`, `mode`, `template [save]` |
+| Test (partie en cours) | `solo`, `testgame`, `give`, `level`, `gold`, `hp`, `resetcd`, `buff`, `spawn`, `wave`, `team`, `debug` |
+| Instances | `instance` (liste), `instance <n>`, `instance template` (téléportation) |
+
+### Proxy — `/lol`, `/lols`, `/lolr`
+
+| Commande | Description |
+|----------|-------------|
+| `/lol <rôle1> <rôle2> …` | Rejoindre la file normale (min. 2 rôles, ou 1 en groupe de 5) |
+| `/lol all` | Accepter tous les rôles |
+| `/lol leave` · `/lol stop` · `/lol quitter` | Quitter la file |
+| `/lol accept` · `/lol refuse` | Répondre à une partie trouvée |
+| `/lol party invite\|accept\|decline\|leave\|kick\|promote\|disband\|liste` | Gérer le groupe |
+| `/lol start` | Chef de groupe : lancer la recherche |
+| `/lolr …` | File classée (mêmes règles, avec bans et picks) ; `/lolr on\|off` pour les admins |
+| `/lols [rôle]` | Test solo de l'enchaînement file → sélection → partie (`lolmc.admin`) |
+
+Rôles : `top`, `jungle`, `mid`, `adc`, `support`. En groupe, chaque membre choisit ses rôles, puis le chef lance la recherche une fois tout le monde prêt ; le groupe reste dans la même équipe. Les rôles sont sauvegardés par joueur (`roles_data.yml`) et chacun retourne à son serveur et à sa position d'origine en fin de partie.
+
+---
+
+## Permissions
+
+Déclarées dans `plugin.yml`, compatibles **LuckPerms**. Sans plugin de permissions : tout le monde joue, seuls les opérateurs administrent.
+
+### Serveur de jeu
+
+| Permission | Défaut | Rôle |
+|------------|--------|------|
+| `lolmc.admin` | op | Tout `/lola` (inclut `.config` et `.test`) |
+| `lolmc.admin.config` | op | Configuration de la carte |
+| `lolmc.admin.test` | op | Commandes de test |
+| `lolmc.player` | true | Toutes les commandes joueur (`lolmc.player.<commande>`) |
+| `lolmc.champion.use` | true | Tous les champions |
+| `lolmc.champion.<id>` | true | Un champion : `garen`, `darius`, `malphite`, `nasus`, `warwick`, `amumu`, `masteryi`, `leesin`, `annie`, `veigar`, `zed`, `yasuo`, `morgana`, `leona`, `blitzcrank`, `janna`, `ashe`, `sivir`, `jinx`, `missfortune` |
+| `lolmc.skin` | false | Tous les skins |
+| `lolmc.skin.<champion>.<skin>` | false | Un skin, par ex. `lolmc.skin.jinx.arcane` |
+
+Permissions joueur fines : `shop`, `team`, `party`, `queue`, `recall`, `ping`, `pick` (aussi `/champion`), `runes`, `spell`, `lock`, `roles`, `lobby`. `/lola permcheck` vérifie que chaque skin du code a sa permission déclarée.
+
+### Proxy
+
+| Permission | Rôle |
+|------------|------|
+| `lolmc.play` | `/lol` et `/lolr` (accordée à la connexion si aucun plugin de permissions n'a décidé) |
+| `lolmc.admin` | `/lolr on\|off`, `/lols` |
+
+### Exemples LuckPerms
+
+```
+/lpb group default permission set lolmc.play true      # proxy : file pour tous
+/lpb group admin permission set lolmc.admin true       # proxy : gestion du classé
+/lp group admin permission set lolmc.admin true        # jeu : admin complet
+/lp group moderateur permission set lolmc.admin.test true
+/lp group vip permission set lolmc.skin true
+/lp group default permission set lolmc.champion.zed false
+```
+
+---
+
+## API web des statistiques
+
+Serveur HTTP en lecture seule, activé par `api.enabled: true`.
+
+| Route | Description |
+|-------|-------------|
+| `GET /api/player/{uuid}` · `GET /api/player/name/{pseudo}` | Fiche d'un joueur |
+| `GET /api/player-champions/{uuid}` | Statistiques par champion |
+| `GET /api/match/history/{uuid}` | Historique des parties |
+| `GET /api/match/detail/{id}` | Détail d'une partie |
+| `GET /api/leaderboard` | Classement |
+| `GET /api/champions` | Liste des champions |
+| `GET /api/online` | Joueurs en ligne, statut et instance |
+| `GET /api/status` | Statut du serveur et de chaque instance |
+
+Écoute par défaut sur `127.0.0.1`. Pour un site externe : `api.bind: "0.0.0.0"`, port ouvert et clé `api.key` (en-tête `X-Api-Key`).
+
+---
+
+## Compilation et release
+
+Prérequis : **JDK 25** et **Maven 3.6.3+**.
+
+```bash
+mvn package                      # → target/lol-minecraft-1.0.0.jar
+cd bungee-plugin && mvn package  # → bungee-plugin/target/LolMC-Bungee-1.0.0.jar
+```
+
+Les JAR embarquent leurs dépendances (maven-shade-plugin). L'API BungeeCord est téléchargée depuis le dépôt SpigotMC.
+
+`./release.sh <version> [token_github]` compile les deux projets, pousse le tag `v<version>` et publie la release GitHub avec les deux JAR (token lu aussi dans `GITHUB_TOKEN` ou `git config github.token`).
+
+Une analyse Qodana tourne sur chaque push et pull request vers `main` (`.github/workflows/qodana_code_quality.yml`).
 
 ---
 
@@ -311,16 +328,18 @@ En mode instances, sauvegarde et **décharge** `lolmc_template` avant de lancer 
 
 | Composant | Version |
 |-----------|---------|
-| Paper API | 26.2 (build 111, compatible api-version 26.1) |
+| Paper API | 26.3 build 190 (api-version 26.3) |
 | Java | 25 |
-| SQLite JDBC | 3.53.2.1 |
+| SQLite JDBC | 3.53.4.0 |
 | MySQL Connector/J | 26.7.0 |
 | Multiverse-Core | 4.3.12 (soft-depend) |
+| BungeeCord API | 1.21-R0.4 |
+| maven-compiler-plugin / maven-shade-plugin | 3.16.0 / 3.6.2 |
 
-Build avec Maven (`mvn package`), un `pom.xml` par projet. Le JAR final embarque ses dépendances (maven-shade-plugin).
+Les dépendances transitives vulnérables de paper-api (plexus-utils, commons-lang3, log4j-api) et de l'API BungeeCord (netty-codec-compression) sont épinglées dans `dependencyManagement`.
 
 ---
 
 ## État du projet
 
-Ce dépôt est en développement actif. Le mode partie unique est le chemin le plus testé. Le mode multi-instances est expérimental (voir la section dédiée plus haut) : l'isolation entre parties est implémentée mais n'a pas encore été validée par une partie à deux instances simultanées. Aucun de ces deux modes n'a été validé par une vraie session de jeu prolongée ; les retours et rapports de bugs sont les bienvenus via les issues.
+En développement actif. Le mode partie unique est le plus testé ; le mode multi-instances est expérimental et n'a pas encore été validé avec deux parties simultanées. Aucun mode n'a encore été éprouvé par une longue session de jeu réelle : retours et rapports de bugs bienvenus dans les issues.

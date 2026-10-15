@@ -202,22 +202,23 @@ public class AbilityListener implements Listener {
         player.getWorld().playSound(player.getLocation(), org.bukkit.Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1f, 1.2f);
     }
 
-    // ── CLIC GAUCHE FIABLE via PlayerAnimationEvent ──
+    // ── CLIC GAUCHE FIABLE via PlayerArmSwingEvent ──
     // LEFT_CLICK_AIR n'est pas toujours envoyé par le client ; l'animation
     // de balancement du bras (arm swing) l'est à chaque clic gauche.
+    // (PlayerAnimationEvent est déprécié depuis Paper 26.3 au profit de PlayerArmSwingEvent)
     @EventHandler
-    public void onArmSwing(PlayerAnimationEvent e) {
+    public void onArmSwing(io.papermc.paper.event.player.PlayerArmSwingEvent e) {
         Player caster = e.getPlayer();
         // Log AVANT le filtre hasChampion : confirme que l'event se déclenche
         fr.lolmc.util.DebugLogger.log("ArmSwing-RAW", caster.getName()
-            + " a déclenché PlayerAnimationEvent (hasChampion="
+            + " a déclenché PlayerArmSwingEvent (hasChampion="
             + manager.hasChampion(caster) + ")");
         if (!manager.hasChampion(caster)) return;
         if (!WorldContext.isInGameWorld(caster)) return;
 
-        // Ignorer l'animation de la main secondaire (Paper envoie ARM_SWING
-        // ET OFF_ARM_SWING pour un seul clic → double déclenchement des sorts)
-        if (e.getAnimationType() != PlayerAnimationType.ARM_SWING) return;
+        // Ignorer la main secondaire (Paper envoie les deux mains pour un seul
+        // clic → double déclenchement des sorts)
+        if (e.getHand() != org.bukkit.inventory.EquipmentSlot.HAND) return;
 
         fr.lolmc.util.DebugLogger.log("ArmSwing", caster.getName()
             + " animation=" + e.getAnimationType());

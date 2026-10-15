@@ -1,27 +1,15 @@
 #!/bin/bash
 # LolMC — Script de release GitHub
-# Usage : ./release.sh <version> [BungeeCord.jar] [github_token]
+# Usage : ./release.sh <version> [github_token]
+# (l'API BungeeCord est téléchargée par Maven : plus besoin de BungeeCord.jar)
 
 VERSION=${1:-""}
-BUNGEE_PATH=${2:-""}
-ARG_TOKEN=${3:-""}
+ARG_TOKEN=${2:-""}
 
 if [ -z "$VERSION" ]; then
-    echo "❌ Usage : ./release.sh <version> [BungeeCord.jar] [token]"
+    echo "❌ Usage : ./release.sh <version> [token]"
     exit 1
 fi
-
-# Chercher BungeeCord.jar
-if [ -z "$BUNGEE_PATH" ] || [ ! -f "$BUNGEE_PATH" ]; then
-    for c in /sdcard/Download/BungeeCord.jar /root/proxy/BungeeCord.jar /opt/proxy/BungeeCord.jar; do
-        [ -f "$c" ] && BUNGEE_PATH="$c" && break
-    done
-fi
-if [ ! -f "$BUNGEE_PATH" ]; then
-    echo "❌ BungeeCord.jar introuvable. Précise le chemin en 2ème argument."
-    exit 1
-fi
-echo "📦 BungeeCord.jar : $BUNGEE_PATH"
 
 TAG="v$VERSION"
 REPO="charlyg31/lol-minecraft"
@@ -35,7 +23,7 @@ if [ $? -ne 0 ]; then
     echo "❌ Echec compilation LolMC"
     exit 1
 fi
-LOLMC_JAR=$(find target -name "lol-minecraft-*.jar" ! -name "*-original*" 2>/dev/null | head -1)
+LOLMC_JAR=$(find target -name "lol-minecraft-*.jar" ! -name "original-*" 2>/dev/null | head -1)
 [ -z "$LOLMC_JAR" ] && echo "❌ LolMC.jar introuvable" && exit 1
 cp "$LOLMC_JAR" "LolMC-$VERSION.jar"
 echo "✅ LolMC-$VERSION.jar"
@@ -43,13 +31,13 @@ echo "✅ LolMC-$VERSION.jar"
 # ── Compilation LolMC-Bungee.jar ─────────────────────────────────────
 echo "🔨 Compilation de LolMC-Bungee.jar..."
 cd bungee-plugin
-mvn package -q -DskipTests -Dbungee.jar.path="$BUNGEE_PATH"
+mvn package -q -DskipTests
 if [ $? -ne 0 ]; then
     echo "❌ Echec compilation Bungee"
     cd ..
     exit 1
 fi
-BUNGEE_JAR=$(find target -name "LolMC-Bungee-*.jar" ! -name "*-original*" 2>/dev/null | head -1)
+BUNGEE_JAR=$(find target -name "LolMC-Bungee-*.jar" ! -name "original-*" 2>/dev/null | head -1)
 [ -z "$BUNGEE_JAR" ] && echo "❌ LolMC-Bungee.jar introuvable" && cd .. && exit 1
 cp "$BUNGEE_JAR" "../LolMC-Bungee-$VERSION.jar"
 cd ..
@@ -64,7 +52,7 @@ git push origin "$TAG"
 echo "✅ Tag $TAG poussé"
 
 # ── Token GitHub ──────────────────────────────────────────────────────
-# Priorité : argument $3 > variable GITHUB_TOKEN > git config
+# Priorité : argument $2 > variable GITHUB_TOKEN > git config
 GH_TOKEN="$ARG_TOKEN"
 [ -z "$GH_TOKEN" ] && GH_TOKEN="$GITHUB_TOKEN"
 [ -z "$GH_TOKEN" ] && GH_TOKEN="$(git config github.token 2>/dev/null || true)"
@@ -78,7 +66,7 @@ if [ -z "$GH_TOKEN" ]; then
     echo "   2. Uploade LolMC-$VERSION.jar et LolMC-Bungee-$VERSION.jar"
     echo ""
     echo "   Ou relance avec le token :"
-    echo "   ./release.sh $VERSION $BUNGEE_PATH TON_TOKEN"
+    echo "   ./release.sh $VERSION TON_TOKEN"
     exit 0
 fi
 
