@@ -168,6 +168,9 @@ public abstract class BaseChampion {
             return;
         }
         fr.lolmc.instance.InstanceHelper.baseManager(caster).onAction(caster); // un sort interrompt le recall
+        // Lancer un sort révèle le lanceur, même depuis un bush, si un ennemi est proche
+        var bush = fr.lolmc.LolPlugin.getInstance().getBushManager();
+        if (bush != null) bush.revealOnAttack(caster);
         boolean deferred = ability.consumeDeferred();
 
 // Cas particulier : Zed W gère son cooldown lui-même.

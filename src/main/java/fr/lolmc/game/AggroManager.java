@@ -38,10 +38,13 @@ public class AggroManager {
         if (victimTeam == null) return;
 
         // ── Aggro des sbires ennemis proches de la victime ──
+        var bush = LolPlugin.getInstance().getBushManager();
         for (var entity : victim.getNearbyEntities(MINION_AGGRO_RANGE, 5, MINION_AGGRO_RANGE)) {
             if (!(entity instanceof org.bukkit.entity.Mob mob)) continue;
             if (!MinionManager.isMinion(mob)) continue;
             if (MinionManager.getMinionTeam(mob) != victimTeam) continue;
+            // Un sbire ne peut pas viser un attaquant qu'il ne voit pas (bush sans vision)
+            if (bush != null && bush.hidesFromMinion(mob, victimTeam, attacker)) continue;
             // Le sbire allié de la victime cible l'attaquant
             mob.setTarget(attacker);
             // Marquer l'aggro pour que la boucle IA ne l'écrase pas pendant 3s

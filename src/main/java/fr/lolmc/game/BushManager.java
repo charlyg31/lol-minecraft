@@ -150,9 +150,24 @@ public class BushManager implements Listener {
      */
     public boolean hidesFrom(Player viewer, Player target) {
         if (!teamManager.areEnemies(viewer, target)) return false;
+        return hidesFromTeam(teamManager.getTeam(viewer), target);
+    }
+
+    /**
+     * Le bush cache-t-il {@code target} au sbire {@code viewer} ? Mêmes règles que pour un
+     * champion, et un sbire dans le même bush que sa cible la voit (LoL).
+     */
+    public boolean hidesFromMinion(org.bukkit.entity.LivingEntity viewer, TeamManager.Team viewerTeam, Player target) {
+        if (viewerTeam == null || viewerTeam == teamManager.getTeam(target)) return false;
+        String targetBush = playerBush.get(target.getUniqueId());
+        if (targetBush == null) return false;
+        if (targetBush.equals(bushIdAt(viewer.getLocation()))) return false;
+        return hidesFromTeam(viewerTeam, target);
+    }
+
+    private boolean hidesFromTeam(TeamManager.Team viewerTeam, Player target) {
         String targetBush = playerBush.get(target.getUniqueId());
         if (targetBush == null || isRevealed(target)) return false;
-        var viewerTeam = teamManager.getTeam(viewer);
         for (var e : playerBush.entrySet()) {
             if (!targetBush.equals(e.getValue())) continue;
             Player p = org.bukkit.Bukkit.getPlayer(e.getKey());
@@ -291,12 +306,41 @@ public class BushManager implements Listener {
     // ══════════════════════════════════════════════════════════════
 
     /**
-     * Le joueur attaque ou lance un sort ciblé : il est révélé 2 secondes (wiki LoL : rayon de
-     * 300 unités autour de lui pendant 2 s). Avant, c'était la VICTIME qui était révélée 5 s.
+     * Le joueur attaque (champion, sbire, monstre) ou lance un sort : il est révélé 2 secondes,
+     * même dans un bush, si un champion ou un sbire ennemi est à proximité. Avant, c'était la
+     * VICTIME qui était révélée 5 s, puis l'attaquant même sans aucun ennemi autour.
      */
     public void revealOnAttack(Player player) {
+        if (!hasEnemyWitness(player)) return;
         revealedUntil.put(player.getUniqueId(),
                 System.currentTimeMillis() + REVEAL_AFTER_ATTACK_MS);
+    }
+
+    // Rayon dans lequel un champion ou un sbire ennemi voit l'attaquant sortir du bush (blocs)
+    private static final double REVEAL_WITNESS_RANGE = 10.0;
+
+    /**
+     * Un champion vivant ou un sbire ennemi est-il assez proche pour voir l'attaque ? Les
+     * monstres de la jungle ne comptent pas : attaquer près d'eux ne révèle pas.
+     */
+    private boolean hasEnemyWitness(Player player) {
+        var team = teamManager.getTeam(player);
+        if (team == null) return false;
+        var cm = LolPlugin.getInstance().getChampionManager();
+        double r = REVEAL_WITNESS_RANGE;
+        for (var e : player.getNearbyEntities(r, r, r)) {
+            if (e.getLocation().distanceSquared(player.getLocation()) > r * r) continue;
+            if (e instanceof Player p) {
+                if (cm.hasChampion(p) && p.getGameMode() != org.bukkit.GameMode.SPECTATOR
+                        && teamManager.getTeam(p) != null && teamManager.getTeam(p) != team) return true;
+            } else if (e instanceof org.bukkit.entity.LivingEntity le && !le.isDead()
+                    && fr.lolmc.game.MinionManager.isMinion(le)
+                    && !fr.lolmc.game.JungleManager.isJungleMonster(le)) { // un monstre ne révèle pas
+                var mt = fr.lolmc.game.MinionManager.getMinionTeam(le);
+                if (mt != null && mt != team) return true;
+            }
+        }
+        return false;
     }
 
     public boolean isRevealed(Player player) {

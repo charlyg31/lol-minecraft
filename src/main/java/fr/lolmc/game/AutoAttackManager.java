@@ -330,6 +330,9 @@ public class AutoAttackManager {
      */
     private void fireBasicAttack(Player attacker, BaseChampion champ, LivingEntity target, AAType type,
                                  boolean crit, Runnable hit) {
+        // Attaquer révèle l'attaquant dès le coup lancé (même depuis un bush, ennemi proche)
+        var bush = LolPlugin.getInstance().getBushManager();
+        if (bush != null) bush.revealOnAttack(attacker);
         if (type == AAType.MELEE) {
             playAnimation(attacker, target, type, crit);
             hit.run();

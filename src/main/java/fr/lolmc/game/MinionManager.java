@@ -203,6 +203,10 @@ public class MinionManager {
         waveCount = 0;
         superMinionLanes.clear();
         minionDeco.clear();
+        lockedTarget.clear();
+        nextShot.clear();
+        aggroFoe.clear();
+        lastTurretHit.clear();
     }
 
 
@@ -354,13 +358,9 @@ public class MinionManager {
                         && roadPoint.getWorld().equals(z.getLocation().getWorld())
                         && roadPoint.distance(z.getLocation()) > MAX_DEVIATION;
 
-                // Couper toute cible vanilla parasite (zombie qui cible un joueur tout seul)
-                if (z.getTarget() instanceof Player tp) {
-                    var tmCheck = LolPlugin.getInstance().getTeamManager();
-                    // Si la cible n'est pas un ennemi valide, l'annuler
-                    if (tmCheck.getTeam(tp) == null || tmCheck.getTeam(tp) == team) {
-                        z.setTarget(null);
-                    }
+                // Couper toute cible vanilla parasite : allié, mort ou caché dans un bush
+                if (z.getTarget() instanceof Player tp && !canSeeChampion(z, team, tp)) {
+                    z.setTarget(null);
                 }
 
                 // Mage / canon : attaque à distance (projectile), sans la frappe vanilla au contact
@@ -453,9 +453,18 @@ public class MinionManager {
         if (z.getTarget() instanceof Player ap) aggroFoe.put(z.getUniqueId(), ap.getUniqueId());
         UUID id = aggroFoe.get(z.getUniqueId());
         Player p = id != null ? org.bukkit.Bukkit.getPlayer(id) : null;
-        if (p == null || p.getGameMode() == org.bukkit.GameMode.SPECTATOR || !p.getWorld().equals(z.getWorld())
+        if (p == null || !canSeeChampion(z, getMinionTeam(z), p)
                 || p.getLocation().distanceSquared(z.getLocation()) > 100) return null;
         return p;
+    }
+
+    /**
+     * Portée d'un sbire à distance en blocs (mage 550, canon 300, plus les rayons de collision).
+     * Main du Baron : portée bonus des sbires à distance renforcés (mage +100, canon +750).
+     */
+    private static double rangedRange(LivingEntity m) {
+        boolean cannon = "cannon".equals(getMinionTypeTag(m));
+        return (cannon ? 4.3 : 6.8) + JungleBuffs.rangedMinionBonus(m)[1];
     }
 
     /**
@@ -465,9 +474,8 @@ public class MinionManager {
      */
     private void rangedAttack(Zombie z, Team team, LivingEntity foe) {
         boolean cannon = "cannon".equals(getMinionTypeTag(z));
-        // Main du Baron : portée et AD bonus des sbires à distance renforcés (mage +100 / +20, canon +750 / +50)
         double[] empower = JungleBuffs.rangedMinionBonus(z);
-        double range = (cannon ? 4.3 : 6.8) + empower[1];
+        double range = rangedRange(z);
         z.setTarget(null);
         Location from = z.getLocation(), to = foe.getLocation();
         if (from.distanceSquared(to) > range * range) { z.getPathfinder().moveTo(to, 1.0); return; }
@@ -541,69 +549,135 @@ public class MinionManager {
     /** Cherche une structure ENNEMIE à portée d'un sbire. */
     private GameStructure findNearbyEnemyStructure(Zombie minion, Team team) {
         var mapManager = siblingMapManager();
-        GameStructure s = mapManager.getStructureAt(minion.getLocation(), MINION_TURRET_RANGE);
+        double range = isRangedMinion(minion) ? Math.max(MINION_TURRET_RANGE, rangedRange(minion)) : MINION_TURRET_RANGE;
+        GameStructure s = mapManager.getStructureAt(minion.getLocation(), range);
         if (s == null) return null;
         // La structure doit appartenir à l'équipe ADVERSE et ne pas être protégée (anti-backdoor)
         if (s.getTeam() == team || mapManager.isInvulnerable(s)) return null;
         return s;
     }
 
-    /** Le sbire s'approche et inflige des dégâts à la structure (tourelle). */
+    /**
+     * Le sbire attaque la structure (tourelle) : la mêlée s'en approche au contact, le mage et
+     * le canon s'arrêtent à leur portée et tirent un projectile (avant, ils allaient au contact).
+     */
     private void attackStructure(Zombie minion, GameStructure structure) {
         // Même règle que pour les champions : structure protégée (anti-backdoor)
         if (siblingMapManager().isInvulnerable(structure)) return;
-        // Se déplacer vers la structure si pas assez proche
         Location target = structure.getCenter();
-        double dist = minion.getLocation().distance(target);
-        if (dist > 2.5) {
+        boolean ranged = isRangedMinion(minion);
+        double reach = ranged ? rangedRange(minion) : 2.5;
+        Location from = minion.getLocation();
+        if (from.distance(target) > reach) {
             minion.getPathfinder().moveTo(target, 1.0);
+        } else if (ranged) {
+            minion.getPathfinder().stopPathfinding();
+            minion.setRotation((float) Math.toDegrees(Math.atan2(-(target.getX() - from.getX()),
+                    target.getZ() - from.getZ())), 0f);
         }
-        // Infliger des dégâts à cadence limitée
+        // Infliger des dégâts à cadence limitée (à portée seulement pour les sbires à distance)
+        if (ranged && from.distance(target) > reach) return;
         long now = System.currentTimeMillis();
         Long last = lastTurretHit.get(minion.getUniqueId());
-        if (last == null || (now - last) >= TURRET_HIT_COOLDOWN) {
-            lastTurretHit.put(minion.getUniqueId(), now);
-            MobAnimator.triggerAttack(minion.getUniqueId());
-            // Animation : le sbire "frappe" + particule
+        if (last != null && (now - last) < TURRET_HIT_COOLDOWN) return;
+        lastTurretHit.put(minion.getUniqueId(), now);
+        MobAnimator.triggerAttack(minion.getUniqueId());
+        // Une frappe par seconde : AD × vitesse d'attaque × 60 % (canon : 84 %, patch 26.1)
+        boolean cannon = "cannon".equals(getMinionTypeTag(minion));
+        double vsStructure = cannon ? 0.84 : MINION_DAMAGE_VS_CHAMPIONS_STRUCTURES;
+        double ad = fr.lolmc.util.MobCombat.getAD(minion) + (ranged ? JungleBuffs.rangedMinionBonus(minion)[0] : 0);
+        double dmg = ad * fr.lolmc.util.MobCombat.getAttackSpeed(minion) * vsStructure;
+        org.bukkit.World world = minion.getWorld();
+        Location hit = target.clone().add(0.5, 1, 0.5);
+        if (!ranged) {
             minion.swingMainHand();
-            fr.lolmc.util.VisualEffectUtil.impact(target.getWorld(),
-                    target.clone().add(0.5, 1, 0.5), Material.WHITE_STAINED_GLASS, 0.26f, 3L);
-            boolean wasDestroyed = structure.isDestroyed();
-            // Une frappe par seconde : AD × vitesse d'attaque × 60 % (canon : 84 %, patch 26.1)
-            double vsStructure = "cannon".equals(getMinionTypeTag(minion)) ? 0.84 : MINION_DAMAGE_VS_CHAMPIONS_STRUCTURES;
-            double dmg = fr.lolmc.util.MobCombat.getAD(minion) * fr.lolmc.util.MobCombat.getAttackSpeed(minion) * vsStructure;
-            var turrets = gameInstance != null ? gameInstance.getTurretManager() : LolPlugin.getInstance().getTurretManager();
-            boolean phaseChanged = structure.takeDamage(dmg);
-            // Plaques tombées sous les coups des sbires : perdues sans or (aucun champion)
-            if (turrets != null && TurretManager.hasPlatesTier(structure)) turrets.dropPlatesSilently(structure);
-            if (phaseChanged) {
-                siblingMapManager().updateStructurePhase(structure);
-            }
-            // Si détruite par ce coup : récompenses, super-sbires, victoire (comme pour un champion)
-            if (!wasDestroyed && structure.isDestroyed()) {
-                siblingMapManager().updateStructurePhase(structure);
-                var sdl = LolPlugin.getInstance().getStructureDamageListener();
-                if (sdl != null) sdl.onStructureDestroyedByMinions(structure, minion.getWorld());
-            }
+            fr.lolmc.util.VisualEffectUtil.impact(world, hit, Material.WHITE_STAINED_GLASS, 0.26f, 3L);
+            damageStructure(structure, dmg, world);
+            return;
+        }
+        Material shot = cannon ? Material.FIRE_CHARGE
+                : getMinionTeam(minion) == Team.BLUE ? Material.LIGHT_BLUE_STAINED_GLASS : Material.ORANGE_STAINED_GLASS;
+        fr.lolmc.util.VisualEffectUtil.travelingProjectile(world, from.clone().add(0, cannon ? 0.6 : 0.9, 0), hit,
+                shot, cannon ? 0.5f : 0.4f, cannon ? 0.6 : 0.33, () -> damageStructure(structure, dmg, world));
+        world.playSound(from, cannon ? org.bukkit.Sound.ENTITY_GENERIC_EXPLODE : org.bukkit.Sound.ENTITY_BLAZE_SHOOT,
+                cannon ? 0.3f : 0.4f, cannon ? 1.6f : 1.8f);
+    }
+
+    /** Dégâts d'un sbire sur une structure : phases, plaques, destruction. */
+    private void damageStructure(GameStructure structure, double dmg, org.bukkit.World world) {
+        if (structure.isDestroyed() || siblingMapManager().isInvulnerable(structure)) return;
+        var turrets = gameInstance != null ? gameInstance.getTurretManager() : LolPlugin.getInstance().getTurretManager();
+        boolean phaseChanged = structure.takeDamage(dmg);
+        // Plaques tombées sous les coups des sbires : perdues sans or (aucun champion)
+        if (turrets != null && TurretManager.hasPlatesTier(structure)) turrets.dropPlatesSilently(structure);
+        if (phaseChanged) {
+            siblingMapManager().updateStructurePhase(structure);
+        }
+        // Si détruite par ce coup : récompenses, super-sbires, victoire (comme pour un champion)
+        if (structure.isDestroyed()) {
+            siblingMapManager().updateStructurePhase(structure);
+            var sdl = LolPlugin.getInstance().getStructureDamageListener();
+            if (sdl != null) sdl.onStructureDestroyedByMinions(structure, world);
         }
     }
 
+    // Rayon d'acquisition d'une cible, et distance au-delà de laquelle le sbire la lâche (blocs)
+    private static final double ACQUIRE_RANGE = 6.0;
+    private static final double LEASH_RANGE = 7.5;
+    // Cible verrouillée de chaque sbire (gardée jusqu'à sa mort ou sa sortie de portée)
+    private final Map<UUID, UUID> lockedTarget = new HashMap<>();
+
+    /** Champion ennemi vivant que ce sbire peut viser : pas mort, pas caché dans un bush. */
+    private static boolean canSeeChampion(LivingEntity minion, Team team, Player p) {
+        var cm = LolPlugin.getInstance().getChampionManager();
+        var tm = LolPlugin.getInstance().getTeamManager();
+        if (!cm.hasChampion(p) || p.getGameMode() == org.bukkit.GameMode.SPECTATOR
+                || !p.getWorld().equals(minion.getWorld())) return false;
+        Team pt = tm.getTeam(p);
+        if (pt == null || pt == team) return false;
+        var bush = LolPlugin.getInstance().getBushManager();
+        return bush == null || !bush.hidesFromMinion(minion, team, p);
+    }
+
+    private static boolean isValidEnemyMinion(LivingEntity m, Team team) {
+        if (!m.isValid() || m.isDead() || !isMinion(m) || fr.lolmc.util.VirtualHP.isDying(m)) return false;
+        Team mt = getMinionTeam(m);
+        return mt != null && mt != team;
+    }
+
+    /**
+     * Cible d'un sbire, façon LoL : il garde sa cible tant qu'elle est valide et à portée ;
+     * sinon il prend le sbire ennemi le PLUS PROCHE, et un champion seulement s'il n'y a aucun
+     * sbire ennemi. Un champion visé faute de sbire est lâché dès qu'un sbire ennemi arrive
+     * (l'appel à l'aide d'un champion attaqué passe par AggroManager). Avant, le premier ennemi
+     * trouvé (ordre arbitraire) était pris et la cible changeait toutes les 0,5 s.
+     */
     private LivingEntity findNearbyEnemy(Zombie minion, Team team) {
-        for (Entity e : minion.getNearbyEntities(6, 4, 6)) {
-            if (e instanceof Zombie z && isMinion(z)) {
-                if (getMinionTeam(z) != team) return z;
-            }
-            if (e instanceof Player p) {
-                var cm = LolPlugin.getInstance().getChampionManager();
-                var tm = LolPlugin.getInstance().getTeamManager();
-                // Pas les champions morts (spectateurs en attente de respawn)
-                if (cm.hasChampion(p) && p.getGameMode() != org.bukkit.GameMode.SPECTATOR
-                        && tm.getTeam(p) != null && tm.getTeam(p) != team) {
-                    return p;
-                }
+        Location here = minion.getLocation();
+        LivingEntity closestMinion = null, closestChamp = null;
+        double dMinion = Double.MAX_VALUE, dChamp = Double.MAX_VALUE;
+        for (Entity e : minion.getNearbyEntities(ACQUIRE_RANGE, 4, ACQUIRE_RANGE)) {
+            if (!(e instanceof LivingEntity le)) continue;
+            double d = le.getLocation().distanceSquared(here);
+            if (le instanceof Player p) {
+                if (d < dChamp && canSeeChampion(minion, team, p)) { dChamp = d; closestChamp = p; }
+            } else if (d < dMinion && isValidEnemyMinion(le, team)) {
+                dMinion = d; closestMinion = le;
             }
         }
-        return null;
+        UUID lockedId = lockedTarget.get(minion.getUniqueId());
+        if (lockedId != null && org.bukkit.Bukkit.getEntity(lockedId) instanceof LivingEntity cur
+                && cur.getWorld().equals(minion.getWorld())
+                && cur.getLocation().distanceSquared(here) <= LEASH_RANGE * LEASH_RANGE
+                && (cur instanceof Player p
+                    ? closestMinion == null && canSeeChampion(minion, team, p)
+                    : isValidEnemyMinion(cur, team))) {
+            return cur;
+        }
+        LivingEntity pick = closestMinion != null ? closestMinion : closestChamp;
+        if (pick != null) lockedTarget.put(minion.getUniqueId(), pick.getUniqueId());
+        else lockedTarget.remove(minion.getUniqueId());
+        return pick;
     }
 
     // ── Waypoints (chemin des lanes) ──────────────────────────────
@@ -707,6 +781,8 @@ public class MinionManager {
         LIVE.remove(minionId);
         nextShot.remove(minionId);
         aggroFoe.remove(minionId);
+        lockedTarget.remove(minionId);
+        lastTurretHit.remove(minionId);
         List<UUID> parts = minionDeco.remove(minionId);
         if (parts != null) {
             for (UUID pid : parts) {
