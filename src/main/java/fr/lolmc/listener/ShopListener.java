@@ -271,6 +271,25 @@ public class ShopListener implements Listener {
                         NamedTextColor.RED));
                 return false;
             }
+            // Reliques : une seule à la fois (en acheter une autre l'échange) ; Altération au niveau 9
+            if (ConsumableManager.isTrinket(item.getId())) {
+                var owned = hb.getConsumables(player);
+                if (owned.contains(item.getId())) {
+                    player.sendActionBar(Component.text("❌ Tu as déjà cette relique.", NamedTextColor.RED));
+                    return false;
+                }
+                if (item.getId().startsWith("farsight") && champ.getLevelSystem().getLevel() < 9) {
+                    player.sendActionBar(Component.text("❌ Altération divinatoire : niveau 9 requis.", NamedTextColor.RED));
+                    return false;
+                }
+                for (String o : new java.util.ArrayList<>(owned))
+                    if (ConsumableManager.isTrinket(o)) hb.removeConsumable(player, o);
+                hb.addConsumable(player, item.getId());
+                cm.giveTrinket(player, item.getId());
+                hb.showPage2(player, champ);
+                player.sendActionBar(Component.text("🔮 Relique : " + item.getDisplayName(), NamedTextColor.GREEN));
+                return true;
+            }
             // Limites LoL : 5 potions de soin, 2 balises de contrôle
             int max = switch (item.getId()) { case "health_potion" -> 5; case "control_ward" -> 2; default -> 99; };
             if (java.util.Collections.frequency(hb.getConsumables(player), item.getId()) >= max) {
@@ -479,16 +498,13 @@ public class ShopListener implements Listener {
             case "elixir_wrath", "elixir_wrath2"            -> !isElixirLevelTooLow(player) && cm.useElixirWrath(player);
             case "elixir_iron", "elixir_iron2"              -> !isElixirLevelTooLow(player) && cm.useElixirIron(player);
             case "elixir_sorcery", "elixir_sorcery2"        -> !isElixirLevelTooLow(player) && cm.useElixirSorcery(player);
-            case "stealth_ward", "stealth_ward2"            -> cm.placeWard(player, false);
+            case "stealth_ward", "stealth_ward2"            -> cm.useTrinket(player, id, () -> cm.placeWard(player, false));
             case "control_ward", "control_ward2" -> {
                 cm.placeControlWard(player);
                 yield true;
             }
-            case "farsight", "farsight2"                    -> cm.placeWard(player, true);
-            case "oracle_lens", "oracle_lens2" -> {
-                LolPlugin.getInstance().getAbilityListener().revealNearbyWards(player);
-                yield true;
-            }
+            case "farsight", "farsight2"                    -> cm.useTrinket(player, id, () -> cm.placeWard(player, true));
+            case "oracle_lens", "oracle_lens2"              -> cm.useTrinket(player, id, () -> cm.oracleSweep(player));
             default -> {
                 player.sendActionBar(net.kyori.adventure.text.Component.text(
                         "Consommable: " + id, net.kyori.adventure.text.format.NamedTextColor.GRAY));

@@ -98,7 +98,7 @@ public final class MasterYi extends BaseChampion implements fr.lolmc.champion.ba
     static class Q extends BaseAbility {
         Q(){super("q_masteryi","Frappe Alpha",Material.ENDER_PEARL,AbilitySlot.Q,
             new double[]{20,19.5,19,18.5,18},15,0,DamageType.TRUE);
-            resourceCost = 0;}
+            resourceCost = 50; resourceCosts = new double[]{50,55,60,65,70};}
         @Override public void cast(Player c,ChampionStats s,Player t){
             org.bukkit.entity.LivingEntity tgt = (t!=null && TargetingUtil.isEnemy(c,t))?t:TargetingUtil.getTargetedEnemy(c,6.65); if(tgt==null){cancelCast();return;}
             // Wiki : 4 marques, une toutes les 0.231 s : la cible, puis l'ennemi non marqué le plus

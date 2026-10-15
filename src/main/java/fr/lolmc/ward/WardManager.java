@@ -150,6 +150,13 @@ public class WardManager {
         }
     }
 
+    /** Altération divinatoire : instant où elle a repéré un champion (vision 800, puis détruite). */
+    private final Map<Ward, Long> farsightTriggered = new java.util.concurrent.ConcurrentHashMap<>();
+    /** Rayon de vision d'une balise : l'Altération passe de 500 à 800 après avoir repéré un champion. */
+    private double sightRadius(Ward w) {
+        return w.type == WardType.FARSIGHT && farsightTriggered.containsKey(w) ? 8.0 : w.type.radius;
+    }
+
     /** Neutralisations temporaires (Glaive d'ombre) : ward → fin. */
     private final Map<Ward, Long> disabledUntil = new java.util.concurrent.ConcurrentHashMap<>();
 
@@ -257,6 +264,9 @@ public class WardManager {
             if (last != null && now - last < 400) return false;
             lastHit.put(hitKey, now);
             w.hitsLeft -= fr.lolmc.item.ItemEffects.wardHitDamage(attacker); // Glaive d'ombre : coups bonus
+            var cmO = LolPlugin.getInstance().getConsumableManager();
+            if (cmO != null && cmO.isOracleActive(attacker) && w.entityId != null) // Brouilleur : révélée 2 s (wiki)
+                revealedWards.merge(w.entityId, now + 2000L, Math::max);
             if (w.hitsLeft > 0) {
                 attacker.sendActionBar(Component.text("🔨 Ward : " + w.hitsLeft + " coup(s) restant(s)", NamedTextColor.YELLOW));
                 attacker.getWorld().playSound(w.location, Sound.BLOCK_WOOD_HIT, 1f, 1.2f);
@@ -306,6 +316,15 @@ public class WardManager {
                 for (Ward ward : wards)
                     if (ward.entityId != null) applyWardVisibility(ward, isVisibleToEnemies(ward));
 
+                // Altération divinatoire (wiki) : détruite 3 s après avoir repéré un champion ennemi
+                wards.removeIf(w -> {
+                    Long trig = farsightTriggered.get(w);
+                    if (trig == null || now - trig < 3000L) return false;
+                    farsightTriggered.remove(w);
+                    removeWardEntity(w);
+                    return true;
+                });
+
                 // Détecter les ennemis vus par les wards
                 for (Ward ward : wards) {
                     if (ward.location.getWorld() == null || isDisabled(ward)) continue;
@@ -319,6 +338,7 @@ public class WardManager {
                         revealedUntil.put(p.getUniqueId(), now + REVEAL_DURATION_MS);
                         revealedToTeam.put(p.getUniqueId(), ward.team);
                         if (!wasRevealed) playDetectionSound(ward.team, ward.location.getWorld());
+                        if (ward.type == WardType.FARSIGHT) farsightTriggered.putIfAbsent(ward, now);
                     }
                 }
                 revealedUntil.entrySet().removeIf(e -> now > e.getValue());
@@ -332,7 +352,8 @@ public class WardManager {
      */
     private boolean wardSees(Ward ward, Location loc) {
         if (!ward.location.getWorld().equals(loc.getWorld())) return false;
-        if (ward.location.distanceSquared(loc) > ward.type.radius * ward.type.radius) return false;
+        double r = sightRadius(ward);
+        if (ward.location.distanceSquared(loc) > r * r) return false;
         var bush = LolPlugin.getInstance().getBushManager();
         if (bush == null) return true;
         String locBush = bush.bushIdAt(loc);

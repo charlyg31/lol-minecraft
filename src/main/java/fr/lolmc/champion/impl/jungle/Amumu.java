@@ -164,7 +164,7 @@ public final class Amumu extends BaseChampion implements fr.lolmc.champion.base.
     static class R extends BaseAbility {
         R(){super("r_amumu","Malédiction de la Momie",Material.IRON_NUGGET,AbilitySlot.R,
                 new double[]{150,125,100},5,5,DamageType.MAGICAL);
-            resourceCost = 100;}
+            resourceCost = 100; resourceCosts = new double[]{100,150,200};}
         @Override public void cast(Player c,ChampionStats s,Player t){
             double[] base=fr.lolmc.util.Balance.base("r_amumu",new double[]{200,300,400});int rr=Math.min(getLevel()-1,2);double dmg=base[rr]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("r_amumu","ap",0.8);
             for(var __t : TargetingUtil.enemiesAround(c, 6.15)){ // rayon 550 + collision (65)

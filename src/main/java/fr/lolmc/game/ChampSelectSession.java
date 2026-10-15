@@ -582,6 +582,10 @@ public class ChampSelectSession {
             LolPlugin.getInstance().getShopListener().initPlayer(p);
             // Consommables (potions, balises…) : sinon gardés d'une partie à l'autre
             LolPlugin.getInstance().getHotbarManager().cleanup(p.getUniqueId());
+            // Relique de départ (wiki) : Balise camouflée, 2 charges
+            LolPlugin.getInstance().getHotbarManager().addConsumable(p, "stealth_ward");
+            var consumables = LolPlugin.getInstance().getConsumableManager();
+            if (consumables != null) consumables.giveTrinket(p, "stealth_ward");
 
             // Position de départ selon le rôle (fontaine : positions 1-5 configurées par /lola position)
             var role = LolPlugin.getInstance().getRoleQueueManager().getAssignedRole(id);

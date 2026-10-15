@@ -47,7 +47,7 @@ public final class Morgana extends BaseChampion {
     static class Q extends BaseAbility {
         Q(){super("q_morgana","Filet des Ombres",Material.LEAD,AbilitySlot.Q,
                 new double[]{10,10,10,10,10},20,0,DamageType.MAGICAL);
-            resourceCost = 50;}
+            resourceCost = 50; resourceCosts = new double[]{50,55,60,65,70};}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // Wiki : skillshot de 1300 unités, enracine 2-3 s (avant : sort ciblé à 6.5 blocs, 2 s)
             // Projectile réel : 1300 unités à 1200/s
@@ -76,7 +76,7 @@ public final class Morgana extends BaseChampion {
     static class W extends BaseAbility {
         W(){super("w_morgana","Emprisonnement Torturé",Material.NETHERRACK,AbilitySlot.W,
                 new double[]{12,12,12,12,12},20,4,DamageType.MAGICAL);
-            resourceCost = 25;}
+            resourceCost = 70; resourceCosts = new double[]{70,80,90,100,110};}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // Zone au sol visée (avant : il fallait viser un ennemi)
             Location loc=TargetingUtil.getAimedGroundLocation(c, 9.0);

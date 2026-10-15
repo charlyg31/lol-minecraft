@@ -120,7 +120,7 @@ public final class Darius extends BaseChampion implements fr.lolmc.champion.base
     static class Q extends BaseAbility {
         Q(){super("q_darius","Décimation",Material.NETHERITE_AXE,AbilitySlot.Q,
             new double[]{9,8,7,6,5},5,5,DamageType.PHYSICAL);
-            resourceCost = 0;}
+            resourceCost = 25; resourceCosts = new double[]{25,30,35,40,45};}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : bord 14/24.5/35/45.5/56 + 35-49% AD (plein), centre (manche) = 35% des dégâts
             // LoL : bord 20/35/50/65/80 + 100/110/120/130/140% AD, manche = 66%
@@ -202,7 +202,7 @@ public final class Darius extends BaseChampion implements fr.lolmc.champion.base
     static class E extends BaseAbility {
         E(){super("e_darius","Appréhension",Material.TRIPWIRE_HOOK,AbilitySlot.E,
             new double[]{26,23.5,21,18.5,16},5,5,DamageType.PHYSICAL);
-            resourceCost = 0;}
+            resourceCost = 70; resourceCosts = new double[]{70,60,50,40,30};}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : cône devant, tire les ennemis vers Darius + ralentit 40% 1s
             var targets=TargetingUtil.enemiesInCone(c, 6.0, 50); // 535 unités + collision (65), 50° (wiki)
@@ -228,7 +228,7 @@ public final class Darius extends BaseChampion implements fr.lolmc.champion.base
     static class R extends BaseAbility {
         R(){super("r_darius","Guillotine Noxienne",Material.NETHERITE_AXE,AbilitySlot.R,
             new double[]{120,100,80},5,0,DamageType.TRUE);
-            resourceCost = 0;}
+            resourceCost = 100; resourceCosts = new double[]{100,100,0};}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : exécution, bond sur la cible, dégâts vrais 100/200/300 + 75% AD bonus
             org.bukkit.entity.LivingEntity tgt = (t!=null && TargetingUtil.isEnemy(c,t))?t:TargetingUtil.getTargetedEnemy(c,5.5); if(tgt==null){cancelCast();c.sendActionBar(Component.text("☠ Aucune cible visée",NamedTextColor.GRAY));return;}

@@ -401,14 +401,14 @@ public class MinionManager {
         }
     }
 
-    private static NamespacedKey BARON_MS, BARON_SCALE;
+    private static NamespacedKey BARON_MS, BARON_SCALE, BARON_MIN;
 
     /**
      * Main du Baron (wiki) : sbires de mêlée et super-sbires renforcés +50 % de vitesse de
      * déplacement (super-sbires : +25 % de vitesse d'attaque en plus). Taille : mêlée et canon
      * +30 %, super-sbire +15 %, mage inchangé (hitbox et modèle). Retiré hors de l'aura.
      */
-    private static void baronAura(LivingEntity m) {
+    private void baronAura(LivingEntity m) {
         if (BARON_MS == null) {
             BARON_MS = new NamespacedKey(LolPlugin.getInstance(), "baron_aura_ms");
             BARON_SCALE = new NamespacedKey(LolPlugin.getInstance(), "baron_aura_scale");
@@ -418,13 +418,39 @@ public class MinionManager {
         var attr = m.getAttribute(Compat.movementSpeed());
         if (attr != null && ("melee".equals(t) || "super".equals(t))) {
             var cur = attr.getModifier(BARON_MS);
-            if (emp && cur == null) {
+            // Wiki : +50 % seulement à 500 unités (super-sbires : 800) d'un sbire ou d'une tourelle ennemis
+            boolean near = emp && nearEnemyMinionOrTurret(m, "super".equals(t) ? 8.0 : 5.0);
+            if (near && cur == null) {
                 attr.addTransientModifier(new org.bukkit.attribute.AttributeModifier(BARON_MS, 0.5,
                         org.bukkit.attribute.AttributeModifier.Operation.ADD_SCALAR));
                 if ("super".equals(t)) fr.lolmc.util.MobCombat.setAttackSpeedMult(m, 1.25);
-            } else if (!emp && cur != null) {
+            } else if (!near && cur != null) {
                 attr.removeModifier(BARON_MS);
                 if ("super".equals(t)) fr.lolmc.util.MobCombat.setAttackSpeedMult(m, 1.0);
+            }
+        }
+        // Wiki : vitesse minimale = 92.5 % de la vitesse moyenne des champions alliés proches (rayon
+        // de l'aura, 12 blocs), 500 au plus ; vitesse de base des sbires 350 (= attribut 0.25)
+        if (attr != null) {
+            if (BARON_MIN == null) BARON_MIN = new NamespacedKey(LolPlugin.getInstance(), "baron_aura_min");
+            var minMod = attr.getModifier(BARON_MIN);
+            if (minMod != null) attr.removeModifier(BARON_MIN);
+            if (emp) {
+                var cmM = LolPlugin.getInstance().getChampionManager();
+                var tmM = LolPlugin.getInstance().getTeamManager();
+                Team mt = getMinionTeam(m);
+                double sum = 0; int n = 0;
+                for (Player p : m.getWorld().getPlayers()) {
+                    if (!cmM.hasChampion(p) || tmM.getTeam(p) != mt || p.getLocation().distanceSquared(m.getLocation()) > 144) continue;
+                    sum += cmM.getChampion(p).getStats().getFinalMovementSpeed(); n++;
+                }
+                if (n > 0) {
+                    double floor = Math.min(500, 0.925 * sum / n);
+                    double boost = attr.getModifier(BARON_MS) != null ? 0.5 : 0;
+                    double extra = floor / 350.0 - 1 - boost;
+                    if (extra > 0) attr.addTransientModifier(new org.bukkit.attribute.AttributeModifier(BARON_MIN, extra,
+                            org.bukkit.attribute.AttributeModifier.Operation.ADD_SCALAR));
+                }
             }
         }
         double grow = switch (t) { case "melee", "cannon" -> 0.30; case "super" -> 0.15; default -> 0; };
@@ -436,6 +462,17 @@ public class MinionManager {
                 org.bukkit.attribute.AttributeModifier.Operation.ADD_SCALAR));
         else sc.removeModifier(BARON_SCALE);
         fr.lolmc.util.MobAnimator.setScale(m.getUniqueId(), emp ? (float) (1 + grow) : 1f);
+    }
+
+    /** Sbire ou tourelle ennemis à moins de {@code blocks} (Main du Baron). */
+    private boolean nearEnemyMinionOrTurret(LivingEntity m, double blocks) {
+        Team team = getMinionTeam(m);
+        for (var e : m.getWorld().getNearbyLivingEntities(m.getLocation(), blocks))
+            if (!e.equals(m) && isMinion(e) && getMinionTeam(e) != team) return true;
+        var mm = siblingMapManager();
+        if (mm == null) return false;
+        var s = mm.getStructureAt(m.getLocation(), blocks);
+        return s != null && s.getTeam() != team && !s.isDestroyed();
     }
 
     // Prochain tir et cible d'aggro (champion qui a frappé un allié) des sbires à distance
@@ -484,15 +521,38 @@ public class MinionManager {
         long now = System.currentTimeMillis();
         Long next = nextShot.get(z.getUniqueId());
         if (next != null && now < next) return;
-        nextShot.put(z.getUniqueId(), now + (long) (1000 / Math.max(0.1, fr.lolmc.util.MobCombat.getAttackSpeed(z))));
+        boolean emp = JungleBuffs.isEmpowered(z);
+        // Main du Baron (wiki) : canon renforcé 50 % plus lent à attaquer
+        double as = fr.lolmc.util.MobCombat.getAttackSpeed(z) * (emp && cannon ? 0.5 : 1.0);
+        nextShot.put(z.getUniqueId(), now + (long) (1000 / Math.max(0.1, as)));
         MobAnimator.triggerAttack(z.getUniqueId());
         Material glass = team == Team.BLUE ? Material.LIGHT_BLUE_STAINED_GLASS : Material.ORANGE_STAINED_GLASS;
-        double ad = fr.lolmc.util.MobCombat.getAD(z) + empower[0], onHit = getOnHitPct(z);
+        double baseAD = fr.lolmc.util.MobCombat.getAD(z);
+        // Canon renforcé (wiki) : 100 % AD de base + 200 % AD bonus, explosion de 200 unités
+        double ad = emp && cannon ? baseAD + 2 * empower[0] : baseAD + empower[0], onHit = getOnHitPct(z);
+        // Projectiles : mage 650 → 900, canon 1200 → 1600 sous la Main du Baron (wiki)
+        double speed = cannon ? (emp ? 16.0 : 12.0) : (emp ? 9.0 : 6.5);
+        final Team shooterTeam = team;
         fr.lolmc.util.TargetingUtil.launchHoming(null, from.clone().add(0, cannon ? 0.6 : 0.9, 0), foe,
-                cannon ? 12.0 : 6.5, new org.bukkit.inventory.ItemStack(cannon ? Material.FIRE_CHARGE : glass),
-                cannon ? 0.5f : 0.4f, glass, false, () -> minionShotHit(foe, ad, onHit));
+                speed, new org.bukkit.inventory.ItemStack(cannon ? Material.FIRE_CHARGE : glass),
+                cannon ? 0.5f : 0.4f, glass, false, () -> {
+                    minionShotHit(foe, ad, onHit);
+                    if (emp && cannon) cannonSplash(foe, shooterTeam, ad, onHit);
+                });
         z.getWorld().playSound(from, cannon ? org.bukkit.Sound.ENTITY_GENERIC_EXPLODE : org.bukkit.Sound.ENTITY_BLAZE_SHOOT,
                 cannon ? 0.3f : 0.4f, cannon ? 1.6f : 1.8f);
+    }
+
+    /** Explosion du canon renforcé (wiki) : 200 unités autour de la cible, ennemis seulement. */
+    private static void cannonSplash(LivingEntity center, Team team, double ad, double onHitPct) {
+        if (center.getWorld() == null) return;
+        var tm = LolPlugin.getInstance().getTeamManager();
+        for (var e : center.getWorld().getNearbyLivingEntities(center.getLocation(), 2.65)) {
+            if (e.equals(center) || e.isDead()) continue;
+            boolean enemy = e instanceof Player p ? tm != null && tm.getTeam(p) != null && tm.getTeam(p) != team
+                    : isMinion(e) && getMinionTeam(e) != team;
+            if (enemy) minionShotHit(e, ad, onHitPct);
+        }
     }
 
     /** Impact d'un tir de sbire : 60 % de l'AD contre un champion, AD + % des PV actuels contre un sbire. */
@@ -566,7 +626,9 @@ public class MinionManager {
         if (siblingMapManager().isInvulnerable(structure)) return;
         Location target = structure.getCenter();
         boolean ranged = isRangedMinion(minion);
-        double reach = ranged ? rangedRange(minion) : 2.5;
+        boolean empS = JungleBuffs.isEmpowered(minion);
+        // Main du Baron : +75 de portée pour la mêlée (wiki)
+        double reach = ranged ? rangedRange(minion) : 2.5 + (empS && "melee".equals(getMinionTypeTag(minion)) ? 0.75 : 0);
         Location from = minion.getLocation();
         if (from.distance(target) > reach) {
             minion.getPathfinder().moveTo(target, 1.0);
@@ -585,8 +647,11 @@ public class MinionManager {
         // Une frappe par seconde : AD × vitesse d'attaque × 60 % (canon : 84 %, patch 26.1)
         boolean cannon = "cannon".equals(getMinionTypeTag(minion));
         double vsStructure = cannon ? 0.84 : MINION_DAMAGE_VS_CHAMPIONS_STRUCTURES;
-        double ad = fr.lolmc.util.MobCombat.getAD(minion) + (ranged ? JungleBuffs.rangedMinionBonus(minion)[0] : 0);
-        double dmg = ad * fr.lolmc.util.MobCombat.getAttackSpeed(minion) * vsStructure;
+        double baseAD = fr.lolmc.util.MobCombat.getAD(minion);
+        double bonusAD = ranged ? JungleBuffs.rangedMinionBonus(minion)[0] : 0;
+        // Canon renforcé contre les structures (wiki) : 200 % AD de base + 300 % AD bonus, 50 % plus lent
+        double ad = empS && cannon ? 2 * baseAD + 3 * bonusAD : baseAD + bonusAD;
+        double dmg = ad * fr.lolmc.util.MobCombat.getAttackSpeed(minion) * (empS && cannon ? 0.5 : 1.0) * vsStructure;
         org.bukkit.World world = minion.getWorld();
         Location hit = target.clone().add(0.5, 1, 0.5);
         if (!ranged) {

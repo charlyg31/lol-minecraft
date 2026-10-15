@@ -135,7 +135,7 @@ public final class Jinx extends BaseChampion implements fr.lolmc.champion.base.S
     static class W extends BaseAbility {
         W(){super("w_jinx","Zap!",Material.LIGHTNING_ROD,AbilitySlot.W,
                 new double[]{8,7,6,5,4},25,0,DamageType.PHYSICAL);
-            resourceCost = 20;}
+            resourceCost = 40; resourceCosts = new double[]{40,45,50,55,60};}
         @Override public void cast(Player c,ChampionStats s,Player t){
             double[] base=fr.lolmc.util.Balance.base("w_jinx",new double[]{10,60,110,160,210});double dmg=base[getLevel()-1]+s.getFinalAD()*fr.lolmc.util.Balance.ratio("w_jinx","ad",1.4);
             // Projectile réel : 1500 unités à 3300/s

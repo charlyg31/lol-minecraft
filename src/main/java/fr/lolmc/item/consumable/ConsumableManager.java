@@ -297,10 +297,12 @@ public class ConsumableManager {
      * (visible, durée illimitée). Durées, limites et coups : WardManager (wiki LoL).
      */
     public boolean placeWard(Player player, boolean visible) {
-        var targetBlock = player.getTargetBlockExact(20);
-        Location target = targetBlock != null
+        // Portée de pose (wiki) : Balise camouflée 625 unités, Altération divinatoire 4000
+        double reach = visible ? 40.0 : 6.25;
+        var targetBlock = player.getTargetBlockExact((int) Math.ceil(reach));
+        Location target = targetBlock != null && targetBlock.getLocation().distance(player.getLocation()) <= reach + 0.5
                 ? targetBlock.getLocation()
-                : player.getLocation().add(player.getLocation().getDirection().multiply(20));
+                : player.getLocation().add(player.getLocation().getDirection().setY(0).normalize().multiply(reach));
 
         // Pose sur la surface (au-dessus du sol visé) sans détruire de bloc.
         final Location wardLoc = surfaceLocation(target);
@@ -323,6 +325,105 @@ public class ConsumableManager {
     }
 
     /** Niveau moyen des champions de la partie du joueur. */
+    // ════════════════════════════════════════════════════════
+    // RELIQUES (wiki) : charges et recharge selon le niveau moyen des champions
+    //   Balise camouflée : 2 charges, 210 → 90 s, 2 s entre deux poses
+    //   Brouilleur oraculaire : 2 charges, 160 → 100 s, 5 s entre deux usages
+    //   Altération divinatoire : 1 charge, 198 → 99 s
+    // Avant : consommables gratuits consommés à chaque usage et rachetables à volonté.
+    // ════════════════════════════════════════════════════════
+    private static final class Trinket { String id; int charges; long nextCharge; long nextUse; }
+    private final Map<UUID, Trinket> trinkets = new HashMap<>();
+
+    public static boolean isTrinket(String id) {
+        return id != null && (id.startsWith("stealth_ward") || id.startsWith("oracle_lens") || id.startsWith("farsight"));
+    }
+    private static String trinketKind(String id) {
+        return id.startsWith("stealth_ward") ? "stealth" : id.startsWith("oracle_lens") ? "oracle" : "farsight";
+    }
+    private static int trinketMaxCharges(String kind) { return "farsight".equals(kind) ? 1 : 2; }
+    private double trinketRechargeMs(Player p, String kind) {
+        double t = Math.max(0, Math.min(1, (averageLevel(p) - 1) / 17.0));
+        double sec = switch (kind) {
+            case "stealth" -> 210 - 120 * t;
+            case "oracle" -> 160 - 60 * t;
+            default -> 198 - 99 * t;
+        };
+        return sec * 1000;
+    }
+
+    /** Nouvelle relique (achat ou échange) : charges pleines. */
+    public void giveTrinket(Player p, String id) {
+        Trinket tr = new Trinket();
+        tr.id = id;
+        tr.charges = trinketMaxCharges(trinketKind(id));
+        trinkets.put(p.getUniqueId(), tr);
+    }
+
+    /** Charges actuelles de la relique (recharges terminées comptées). */
+    private Trinket refreshTrinket(Player p, String id) {
+        Trinket tr = trinkets.get(p.getUniqueId());
+        if (tr == null || !tr.id.equals(id)) { giveTrinket(p, id); tr = trinkets.get(p.getUniqueId()); }
+        String kind = trinketKind(id);
+        long now = System.currentTimeMillis();
+        while (tr.charges < trinketMaxCharges(kind) && tr.nextCharge > 0 && now >= tr.nextCharge) {
+            tr.charges++;
+            tr.nextCharge = tr.charges < trinketMaxCharges(kind) ? tr.nextCharge + (long) trinketRechargeMs(p, kind) : 0;
+        }
+        return tr;
+    }
+
+    /**
+     * Utilise la relique {@code id} : {@code action} renvoie vrai si l'effet a eu lieu. La relique
+     * n'est jamais consommée (renvoie toujours faux pour la barre d'action).
+     */
+    public boolean useTrinket(Player p, String id, java.util.function.BooleanSupplier action) {
+        Trinket tr = refreshTrinket(p, id);
+        long now = System.currentTimeMillis();
+        String kind = trinketKind(id);
+        if (tr.charges <= 0) {
+            p.sendActionBar(Component.text(String.format("⏳ Relique en recharge — %.0f s", (tr.nextCharge - now) / 1000.0), NamedTextColor.RED));
+            return false;
+        }
+        if (now < tr.nextUse) return false;
+        if (!action.getAsBoolean()) return false;
+        boolean wasFull = tr.charges >= trinketMaxCharges(kind);
+        tr.charges--;
+        tr.nextUse = now + ("stealth".equals(kind) ? 2000L : "oracle".equals(kind) ? 5000L : 0L);
+        if (wasFull || tr.nextCharge == 0) tr.nextCharge = now + (long) trinketRechargeMs(p, kind);
+        p.sendActionBar(Component.text("🔮 Relique : " + tr.charges + " charge(s) restante(s)", NamedTextColor.YELLOW));
+        return false;
+    }
+
+    /**
+     * Brouilleur oraculaire (wiki) : un drone accompagne le champion 8 s et révèle les balises
+     * et pièges ennemis dans un rayon de 600 à 750 unités (selon le niveau).
+     */
+    public boolean oracleSweep(Player p) {
+        var cmc = LolPlugin.getInstance().getChampionManager();
+        int lvl = cmc.hasChampion(p) ? cmc.getChampion(p).getLevelSystem().getLevel() : 1;
+        double radius = 6.0 + 1.5 * (lvl - 1) / 17.0;
+        var wm = LolPlugin.getInstance().getWardManager();
+        oracleUntil.put(p.getUniqueId(), System.currentTimeMillis() + 8000L);
+        new BukkitRunnable() { int t = 0;
+            @Override public void run() {
+                if (t >= 160 || !p.isOnline() || p.getGameMode() == org.bukkit.GameMode.SPECTATOR) { cancel(); return; }
+                // Révélées tant que le drone est là, et neutralisées 2 s de plus (wiki)
+                if (wm != null) {
+                    wm.revealEnemyWards(p, p.getLocation(), radius, 1000L);
+                    wm.disableEnemyWards(p, p.getLocation(), radius, 3000L);
+                }
+                t += 10;
+            }
+        }.runTaskTimer(LolPlugin.getInstance(), 0L, 10L);
+        p.sendActionBar(Component.text("🔍 Brouilleur oraculaire (8 s)", NamedTextColor.YELLOW));
+        return true;
+    }
+
+    /** Brouilleur oraculaire actif : fin du drone, par joueur. */
+    private final Map<UUID, Long> oracleUntil = new HashMap<>();
+    public boolean isOracleActive(Player p) { return oracleUntil.getOrDefault(p.getUniqueId(), 0L) > System.currentTimeMillis(); }
+
     private double averageLevel(Player player) {
         var cm = LolPlugin.getInstance().getChampionManager();
         double sum = 0; int n = 0;
@@ -406,10 +507,10 @@ public class ConsumableManager {
             case "elixir_wrath", "elixir_wrath2"         -> buildItem(Material.DRAGON_BREATH,    "⚔ Élixir de Fureur",      "+30 AD + vol de vie 3 minutes.",         NamedTextColor.RED,    500);
             case "elixir_iron", "elixir_iron2"           -> buildItem(Material.FERMENTED_SPIDER_EYE,"🛡 Élixir de Fer",   "+300 HP + Ténacité 3 minutes.",          NamedTextColor.GRAY,   500);
             case "elixir_sorcery", "elixir_sorcery2"     -> buildItem(Material.MAGENTA_DYE,      "✨ Élixir de Sorcellerie","+50 AP 3 minutes.",                      NamedTextColor.BLUE,   500);
-            case "stealth_ward", "stealth_ward2"         -> buildItem(Material.SOUL_TORCH,        "👁 Totem furtif",         "Place une ward furtive (90-120s).",          NamedTextColor.YELLOW, 0);
+            case "stealth_ward", "stealth_ward2"         -> buildItem(Material.SOUL_TORCH,        "👁 Balise camouflée",      "Relique : pose une balise (90-120 s, 2 charges).", NamedTextColor.YELLOW, 0);
             case "control_ward", "control_ward2"         -> buildItem(Material.PINK_CANDLE,       "🔮 Control Ward",         "Révèle et détruit wards ennemies (75g).",NamedTextColor.AQUA,   75);
-            case "oracle_lens", "oracle_lens2"           -> buildItem(Material.SPYGLASS,          "🔍 Lentille Oracle",      "Révèle wards proches 10s.",              NamedTextColor.YELLOW, 0);
-            case "farsight", "farsight2"                 -> buildItem(Material.COMPASS,           "🔭 Vision Lointaine",     "Place ward révélatrice à longue portée.",NamedTextColor.YELLOW, 0);
+            case "oracle_lens", "oracle_lens2"           -> buildItem(Material.SPYGLASS,          "🔍 Brouilleur oraculaire", "Relique : révèle les balises ennemies autour de toi 8 s (2 charges).", NamedTextColor.YELLOW, 0);
+            case "farsight", "farsight2"                 -> buildItem(Material.COMPASS,           "🔭 Altération divinatoire", "Relique : balise visible à longue portée (niveau 9).", NamedTextColor.YELLOW, 0);
             case "cappa_juice", "cappa_juice2"           -> buildItem(Material.HONEY_BOTTLE,      "🍯 Jus chapi-chapo",      "Ce jus ne fait rien.",                   NamedTextColor.GOLD,   300);
             default -> new ItemStack(Material.BARRIER);
         };

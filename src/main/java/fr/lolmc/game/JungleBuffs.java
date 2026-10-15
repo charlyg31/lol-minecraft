@@ -158,9 +158,9 @@ public final class JungleBuffs {
         var cm = LolPlugin.getInstance().getChampionManager();
         if (!cm.hasChampion(attacker)) return;
         int lvl = level(attacker);
-        double perHit = (15 + 45 * (lvl - 1) / 17.0) / 3.0; // 15-60 bruts en 3 fois sur 2 s
-        DamageUtil.damageEntity(attacker, target, perHit, false, DamageUtil.Type.TRUE);
-        for (int i = 1; i <= 2; i++) {
+        // Données du jeu : 15, +3 par niveau dès le 6 (54 au 18), en dégâts bruts sur 3 s
+        double perHit = (15 + 3.0 * Math.max(0, lvl - 5)) / 3.0;
+        for (int i = 1; i <= 3; i++) {
             Bukkit.getScheduler().runTaskLater(LolPlugin.getInstance(), () -> {
                 if (target.isValid() && !target.isDead() && attacker.isOnline())
                     DamageUtil.damageEntity(attacker, target, perHit, false, DamageUtil.Type.TRUE);
@@ -189,7 +189,7 @@ public final class JungleBuffs {
                 if (!cooldown(id + ":soul", 3000)) return;
                 double dmg = 100 + 0.225 * st.getBonusAD() + 0.135 * st.getFinalAP() + 0.0275 * bonusHP;
                 var type = st.getBonusAD() > st.getFinalAP() ? DamageUtil.Type.PHYSICAL : DamageUtil.Type.MAGICAL;
-                for (var e : fr.lolmc.util.TargetingUtil.entitiesInRadius(attacker, victim.getLocation(), 3.0))
+                for (var e : fr.lolmc.util.TargetingUtil.entitiesInRadius(attacker, victim.getLocation(), 3.15)) // rayon 250 + collision
                     DamageUtil.damageEntity(null, e, dmg, false, type);
                 fr.lolmc.util.VisualEffectUtil.impactBurst(victim.getWorld(), victim.getLocation().add(0, 1, 0),
                         org.bukkit.Material.ORANGE_STAINED_GLASS, 0.3f, 1.5, 8, 6L);
@@ -197,14 +197,17 @@ public final class JungleBuffs {
             case "ocean" -> oceanTrigger(attacker, 1.0);
             case "hextech" -> {
                 if (!cooldown(id + ":soul", 8000)) return;
-                double dmg = 25 + (52.94 - 25) * (level(attacker) - 1) / 17.0;
-                double slow = ranged(champ) ? 0.35 : 0.45;
+                // Données du jeu : 25-50 bruts ; ralentissement 45 % (35 % à distance) +0.5 % par
+                // 100 PV bonus, +1 % par 100 AP, +3 % par 100 AD bonus, 2 s, rebonds à 600 unités
+                double dmg = 25 + 25.0 * (level(attacker) - 1) / 17.0;
+                double slow = ((ranged(champ) ? 35 : 45) + 0.005 * st.getBonusHP() + 0.01 * st.getFinalAP()
+                        + 0.03 * st.getBonusAD()) / 100.0;
                 var cc = LolPlugin.getInstance().getCCManager();
                 int chained = 0;
-                for (var e : fr.lolmc.util.TargetingUtil.entitiesInRadius(attacker, victim.getLocation(), 5.0)) {
+                for (var e : fr.lolmc.util.TargetingUtil.entitiesInRadius(attacker, victim.getLocation(), 6.65)) {
                     if (chained++ >= 4) break; // la cible + 3 rebonds
                     DamageUtil.damageEntity(null, e, dmg, false, DamageUtil.Type.TRUE);
-                    if (cc != null) cc.slowDecaying(e, slow, 30);
+                    if (cc != null) cc.slowDecaying(e, Math.min(0.99, slow), 40);
                 }
             }
             default -> {}
@@ -285,7 +288,13 @@ public final class JungleBuffs {
         double minutes = gm != null ? gm.getElapsedSeconds() / 60.0 : 20;
         double m = baronMinutes(minutes);
         double reduction = 0.50 + 0.006 * m + 0.0002 * m * m;
-        return ("melee".equals(t) || "caster".equals(t)) ? 1.0 - reduction : 1.0;
+        double mult = ("melee".equals(t) || "caster".equals(t)) ? 1.0 - reduction : 1.0;
+        // Mêlée et mages renforcés : -15 % contre les dégâts de zone et les effets d'objets/runes
+        // (« area, persistent and proc damage », wiki), cumulé multiplicativement
+        if (("melee".equals(t) || "caster".equals(t))
+                && (fr.lolmc.util.TargetingUtil.isAreaHit(attacker, target) || fr.lolmc.item.ItemEffects.inItemDamage()))
+            mult *= 0.85;
+        return mult;
     }
 
     /** Bonus d'un sbire à distance renforcé : {AD, portée en blocs} (mage +20 / +1, canon +50 / +7.5). */
@@ -308,7 +317,7 @@ public final class JungleBuffs {
     public static void onUltimate(Player p) {
         if (!"cloud".equals(soul.get(p.getUniqueId())) || !cooldown(p.getUniqueId() + ":cloudult", 30000)) return;
         var cc = LolPlugin.getInstance().getCCManager();
-        if (cc != null) cc.speedPct(p, 0.60, 120);
+        if (cc != null) cc.speedPct(p, 0.50, 120); // +50 % pendant 6 s (données du jeu)
     }
 
     /** Un champion tue un porteur de crête : la crête passe au tueur, durée pleine (wiki). */

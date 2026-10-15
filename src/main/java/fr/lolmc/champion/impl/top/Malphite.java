@@ -96,7 +96,7 @@ public final class Malphite extends BaseChampion implements fr.lolmc.champion.ba
     static class Q extends BaseAbility {
         Q(){super("q_malphite","Éclat de Pierre",Material.COBBLESTONE,AbilitySlot.Q,
             new double[]{8,8,8,8,8},20,0,DamageType.MAGICAL);
-            resourceCost = 70;}
+            resourceCost = 70; resourceCosts = new double[]{70,75,80,85,90};}
         @Override public void cast(Player c,ChampionStats s,Player t){
             org.bukkit.entity.LivingEntity tgt = (t!=null && TargetingUtil.isEnemy(c,t))?t:TargetingUtil.getTargetedEnemy(c,6.9); if(tgt==null){cancelCast();c.sendActionBar(Component.text("🪨 Aucune cible",NamedTextColor.GRAY));return;}
             double[] base=fr.lolmc.util.Balance.base("q_malphite",new double[]{70,120,170,220,270});
@@ -132,7 +132,7 @@ public final class Malphite extends BaseChampion implements fr.lolmc.champion.ba
     static class W extends BaseAbility {
         W(){super("w_malphite","Coup de Tonnerre",Material.IRON_CHESTPLATE,AbilitySlot.W,
             new double[]{10,9.5,9,8.5,8},0,3,DamageType.PHYSICAL);
-            resourceCost = 25;}
+            resourceCost = 30; resourceCosts = new double[]{30,35,40,45,50};}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // Active : la prochaine attaque dans les 5 s est renforcée (wiki)
             thunderclapUntil.put(c.getUniqueId(), System.currentTimeMillis()+5000L);
@@ -152,7 +152,7 @@ public final class Malphite extends BaseChampion implements fr.lolmc.champion.ba
     static class E extends BaseAbility {
         E(){super("e_malphite","Sol Fracturé",Material.CRACKED_STONE_BRICKS,AbilitySlot.E,
             new double[]{7,7,7,7,7},5,4,DamageType.MAGICAL);
-            resourceCost = 50;}
+            resourceCost = 50; resourceCosts = new double[]{50,55,60,65,70};}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : 60/95/130/165/200 + 60% AP + 40% armure, slow AS 30-50% sur 3s
             double[] eBase={60,95,130,165,200};

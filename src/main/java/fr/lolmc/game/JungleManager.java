@@ -200,7 +200,7 @@ public class JungleManager {
             case RAPTOR -> size == Size.LARGE ? flat(1200, 2820, 17, 51, 42, 35, 20, 30)
                                               : flat(500, 1175, 7, 21, 20, 8, 10, 15);
             case KRUG -> switch (size) {
-                case LARGE  -> flat(1350, 3172.5, 57, 171, 42, 15, 15, 22.5); // Ancien Krug
+                case LARGE  -> flat(1400, 3290, 57, 171, 42, 15, 15, 22.5); // Ancien Krug (1400 PV, données du jeu)
                 case MEDIUM -> flat(650, 1527.5, 20, 60, 20, 10, 10, 15);     // Krug
                 case SMALL  -> flat(60, 141, 13, 39, 20, 14, 16, 24);         // Mini Krug
             };
@@ -208,20 +208,22 @@ public class JungleManager {
             case SCUTTLE_CRAB -> new MStats(1550, 5270, 0, 0, 42, 42, 42, 42, 55, 121, 100, 150, 1);
             // Dragons élémentaires : niveau de départ 6 (wiki ; avant : 1). AD propre à chaque élément,
             // Montagne +15 % de PV (données du jeu)
-            case DRAGON_INFERNAL, DRAGON_OCEAN -> drake(70, 1.0);
-            case DRAGON_MOUNTAIN -> drake(105, 1.15);
-            case DRAGON_CLOUD -> drake(35, 1.0);
-            case DRAGON_CHEMTECH, DRAGON_HEXTECH -> drake(47, 1.0);
-            case DRAGON_ELDER -> new MStats(17796.25, 21275, 105, 105, 121.6, 170, 75.8, 100, 150, 150, 650, 650, 13);
+            // Données du jeu : PV de base + par niveau (courbe de croissance), Montagne 4200 + 430
+            case DRAGON_INFERNAL, DRAGON_OCEAN -> drake(70, 3625, 375);
+            case DRAGON_MOUNTAIN -> drake(105, 4200, 430);
+            case DRAGON_CLOUD -> drake(35, 3625, 375);
+            case DRAGON_CHEMTECH, DRAGON_HEXTECH -> drake(47, 3625, 375);
+            case DRAGON_ELDER -> new MStats(17796.25, 21275, 150, 150, 121.6, 170, 75.8, 100, 150, 150, 650, 650, 13);
             case VOIDGRUB -> new MStats(2269, 4700, 21.69, 46, 72.76, 170, 51.38, 100, 30, 30, 65, 65, 7);
             // Niveaux de départ 9 et 11 (wiki ; avant : 1, donc des PV et des dégâts trop faibles)
-            case HERALD -> new MStats(11718, 18900, 99.5, 250, 87.92, 170, 58.96, 100, 100, 100, 240, 240, 9);
+            case HERALD -> new MStats(11718, 18900, 127.4, 230, 87.92, 170, 58.96, 100, 100, 100, 240, 240, 9); // AD 60 +10/niveau
             case BARON -> new MStats(17791.75, 19190, 350.5, 515, 104.2, 170, 67.1, 100, 150, 150, 650, 650, 11);
         };
     }
 
-    private static MStats drake(double ad, double hpMult) {
-        return new MStats(5106.25 * hpMult, 10000 * hpMult, ad, ad, 65.6, 170, 47.8, 100, 75, 75, 160, 400, 6);
+    /** Dragon élémentaire (niveau de départ 6) : PV = base + parNiveau × croissance (données du jeu). */
+    private static MStats drake(double ad, double baseHP, double hpPerLevel) {
+        return new MStats(baseHP + hpPerLevel * growth(6), baseHP + hpPerLevel * growth(18), ad, ad, 65.6, 170, 47.8, 100, 75, 75, 160, 400, 6);
     }
 
     /** Vitesse d'attaque LoL du monstre (wiki). */
@@ -266,7 +268,11 @@ public class JungleManager {
     private void applyMonsterStats(LivingEntity mob, MonsterType type, Size size, int levelOffset, boolean firstScuttle) {
         MStats st = statsFor(type, size);
         double lvl = Math.max(1, averageChampionLevel() + levelOffset);
-        double f = Math.max(0, Math.min(1, (lvl - st.startLevel()) / (18.0 - st.startLevel())));
+        // Monstres épiques (niveau de départ > 1) : courbe de croissance des stats du jeu ;
+        // camps : progression linéaire du niveau 1 au niveau 18
+        double f = st.startLevel() > 1
+                ? Math.max(0, Math.min(1, (growth(Math.min(18, lvl)) - growth(st.startLevel())) / (growth(18) - growth(st.startLevel()))))
+                : Math.max(0, Math.min(1, (lvl - st.startLevel()) / (18.0 - st.startLevel())));
         double hp   = st.hp0()   + (st.hp1()   - st.hp0())   * f;
         double ad   = st.ad0()   + (st.ad1()   - st.ad0())   * f;
         double ar   = st.ar0()   + (st.ar1()   - st.ar0())   * f;

@@ -374,9 +374,14 @@ public abstract class BaseAbility {
     protected void overrideCost(double cost) { costOverride = cost; }
     protected void clearCostOverride() { costOverride = -1; }
 
+    /** Coût par rang (données du jeu) ; null = coût fixe {@code resourceCost}. */
+    protected double[] resourceCosts;
+
     public double getResourceCost() {
         if (costOverride >= 0) return costOverride;
-        double[] byRank = fr.lolmc.util.Balance.costs(id); // coût par rang (LoL)
+        // champions.yml (surcharge facultative) en priorité, puis les valeurs du code
+        double[] byRank = fr.lolmc.util.Balance.costs(id);
+        if (byRank == null) byRank = resourceCosts;
         if (byRank != null) return byRank[Math.max(0, Math.min(level - 1, byRank.length - 1))];
         return fr.lolmc.util.Balance.cost(id, resourceCost);
     }

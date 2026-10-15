@@ -63,7 +63,7 @@ public final class Leona extends BaseChampion implements fr.lolmc.champion.base.
     static class Q extends BaseAbility {
         Q(){super("q_leona","Bouclier de l'Aube",Material.GOLD_INGOT,AbilitySlot.Q,
             new double[]{5,5,5,5,5},5,0,DamageType.MAGICAL);
-            resourceCost = 45;}
+            resourceCost = 30; resourceCosts = new double[]{30,35,40,45,50};}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // Wiki : la prochaine attaque (6 s, remise à zéro de l'attaque) inflige en plus 10-110
             // (+30 % AP) dégâts magiques et étourdit 1 s. Avant : frappe immédiate de la cible visée.
@@ -153,7 +153,7 @@ public final class Leona extends BaseChampion implements fr.lolmc.champion.base.
     static class E extends BaseAbility {
         E(){super("e_leona","Lame du Zénith",Material.BLAZE_ROD,AbilitySlot.E,
             new double[]{12,10.5,9,7.5,6},20,0,DamageType.MAGICAL);
-            resourceCost = 55;}
+            resourceCost = 40; resourceCosts = new double[]{40,45,50,55,60};}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : skillshot ligne 60-200 + 40% AP, dash sur le DERNIER ennemi touché + root 0.5s
             double[] base=fr.lolmc.util.Balance.base("e_leona",new double[]{50,90,130,170,210});double dmg=base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("e_leona","ap",0.4);

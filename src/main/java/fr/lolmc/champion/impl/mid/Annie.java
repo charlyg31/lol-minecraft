@@ -130,8 +130,8 @@ public final class Annie extends BaseChampion implements fr.lolmc.champion.base.
         if (lvl <= 15) return 1350 + 250 * (lvl - 10);
         return 2600 + 300 * (lvl - 15);
     }
-    /** Vitesse de Tibbers : 350 (+0/25/50 selon le rang du R), même échelle que les sbires (325 = 0.25). */
-    static double tibbersSpeed(int rankIndex) { return 0.25 * (350 + 25 * rankIndex) / 325.0; }
+    /** Vitesse de Tibbers : 350 (+0/25/50 selon le rang du R), même échelle que les sbires (350 = 0.25). */
+    static double tibbersSpeed(int rankIndex) { return 0.25 * (350 + 25 * rankIndex) / 350.0; }
     private static final Map<UUID, Double> tibbersSpeed = new java.util.concurrent.ConcurrentHashMap<>();
 
     public static int pyroStunTicks(int level) {
@@ -256,7 +256,7 @@ public final class Annie extends BaseChampion implements fr.lolmc.champion.base.
     static class Q extends BaseAbility {
         Q(){super("q_annie","Brasier",Material.BLAZE_POWDER,AbilitySlot.Q,
                 new double[]{4,4,4,4,4},20,0,DamageType.MAGICAL);
-            resourceCost = 60;}
+            resourceCost = 60; resourceCosts = new double[]{60,65,70,75,80};}
         @Override public void cast(Player c,ChampionStats s,Player t){
             var target = TargetingUtil.getTargetedEnemy(c, 6.9); // 625 unités
             if(target==null){cancelCast();c.sendActionBar(Component.text("Aucune cible",NamedTextColor.GRAY));return;}
@@ -292,7 +292,7 @@ public final class Annie extends BaseChampion implements fr.lolmc.champion.base.
     static class W extends BaseAbility {
         W(){super("w_annie","Incinération",Material.CAMPFIRE,AbilitySlot.W,
                 new double[]{7,7,7,7,7},6,4,DamageType.MAGICAL);
-            resourceCost = 70;}
+            resourceCost = 70; resourceCosts = new double[]{70,75,80,85,90};}
         @Override public void cast(Player c,ChampionStats s,Player t){
             double[] base=fr.lolmc.util.Balance.base("w_annie",new double[]{70,110,150,190,230});
             double dmg=base[getLevel()-1]+s.getFinalAP()*fr.lolmc.util.Balance.ratio("w_annie","ap",0.8);
@@ -318,7 +318,7 @@ public final class Annie extends BaseChampion implements fr.lolmc.champion.base.
     static class E extends BaseAbility {
         E(){super("e_annie","Molten Shield",Material.ORANGE_STAINED_GLASS,AbilitySlot.E,
                 new double[]{10,10,10,10,10},0,0,DamageType.MAGICAL);
-            resourceCost = 40;}
+            resourceCost = 60; resourceCosts = new double[]{60,65,70,75,80};}
         @Override public void cast(Player c,ChampionStats s,Player t){
             Player dest = (t!=null && LolPlugin.getInstance().getTeamManager().areAllies(c,t)) ? t : c; // allié visé, sinon soi
             double[] shieldBase={60,95,130,165,200};

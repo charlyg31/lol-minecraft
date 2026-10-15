@@ -228,6 +228,7 @@ public final class TargetingUtil {
                         if (hit.contains(e) || !isEnemy(caster, e) || (canHit != null && !canHit.test(e))) continue;
                         if (e.getLocation().add(0, 1, 0).distance(pos) > width + 0.5) continue;
                         hit.add(e);
+                        if (pierce) markArea(caster, e); // projectile perçant : dégâts de zone
                         if (onHit != null) onHit.accept(e);
                         if (!pierce) { finish(true); return; }
                     }
@@ -334,13 +335,35 @@ public final class TargetingUtil {
         return eye.clone().add(dir.clone().multiply(maxRange));
     }
 
-    /** Toutes les entités ennemies dans un rayon autour d'un point. */
+    /** Toutes les entités ennemies dans un rayon autour d'un point (dégâts de zone). */
     public static List<LivingEntity> entitiesInRadius(Player caster, Location center, double radius) {
         List<LivingEntity> hit = new ArrayList<>();
         for (var e : center.getWorld().getNearbyLivingEntities(center, radius)) {
-            if (isEnemy(caster, e)) hit.add(e);
+            if (isEnemy(caster, e)) { hit.add(e); markArea(caster, e); }
         }
         return hit;
+    }
+
+    // ── Dégâts de zone (LoL : « area damage ») ──
+    // Une cible renvoyée par une requête de zone (cercle, cône) ou touchée par un projectile perçant
+    // est marquée pour le tick en cours : les dégâts qu'elle reçoit de ce lanceur pendant ce tick
+    // sont des dégâts de zone (sbires renforcés par le Baron : -15 %).
+    private static final java.util.Map<java.util.UUID, java.util.Map<java.util.UUID, Integer>> AREA_MARKS =
+            new java.util.concurrent.ConcurrentHashMap<>();
+    static void markArea(Player caster, LivingEntity e) {
+        if (caster == null) return;
+        AREA_MARKS.computeIfAbsent(caster.getUniqueId(), _ -> new java.util.concurrent.ConcurrentHashMap<>())
+                .put(e.getUniqueId(), org.bukkit.Bukkit.getCurrentTick());
+    }
+    /** Vrai si {@code target} subit en ce moment des dégâts de zone de {@code caster}. */
+    public static boolean isAreaHit(Player caster, LivingEntity target) {
+        if (caster == null) return false;
+        var m = AREA_MARKS.get(caster.getUniqueId());
+        if (m == null) return false;
+        Integer tick = m.get(target.getUniqueId());
+        int now = org.bukkit.Bukkit.getCurrentTick();
+        m.values().removeIf(t -> t < now - 1);
+        return tick != null && tick >= now - 1;
     }
 
     // ══════════════════════════════════════════════════════════════
@@ -360,7 +383,7 @@ public final class TargetingUtil {
         for (var e : caster.getWorld().getNearbyLivingEntities(caster.getLocation(), range)) {
             if (!isEnemy(caster, e)) continue;
             Vector toTarget = e.getLocation().toVector().subtract(caster.getLocation().toVector()).normalize();
-            if (toTarget.dot(dir) >= cosLimit) hit.add(e);
+            if (toTarget.dot(dir) >= cosLimit) { hit.add(e); markArea(caster, e); }
         }
         return hit;
     }

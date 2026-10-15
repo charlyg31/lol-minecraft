@@ -126,7 +126,7 @@ public final class Zed extends BaseChampion implements fr.lolmc.champion.base.St
     static class Q extends BaseAbility {
         Q(){super("q_zed","Shuriken Tranchant",Material.ARROW,AbilitySlot.Q,
                 new double[]{6,6,6,6,6},20,0,DamageType.PHYSICAL);
-            resourceCost = 40;}
+            resourceCost = 75; resourceCosts = new double[]{75,70,65,60,55};}
         @Override public void cast(Player c,ChampionStats s,Player t){
             double[] baseFirst={80,120,160,200,240};
             double[] baseNext={48,72,96,120,144};

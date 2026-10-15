@@ -267,10 +267,12 @@ public class DamageUtil {
         java.util.UUID vid = victim.getUniqueId();
         long now = System.currentTimeMillis();
         Long until = elderBurnUntil.get(vid);
+        // Données du jeu : brûlure de 3 s, réappliquée au plus toutes les 2 s par cible ;
+        // 25 → 75 dégâts par seconde de 25 à 45 min de jeu (progression continue)
         if (until == null || now >= until) {
-            elderBurnUntil.put(vid, now + 3000L);
-            long mins = fr.lolmc.instance.InstanceHelper.gameManager(attacker).getElapsedSeconds() / 60;
-            double total = Math.min(225, 75 + 15 * Math.max(0, (mins - 25) / 2));
+            elderBurnUntil.put(vid, now + 2000L);
+            double mins = fr.lolmc.instance.InstanceHelper.gameManager(attacker).getElapsedSeconds() / 60.0;
+            double total = 3 * (25 + 50 * Math.max(0, Math.min(1, (mins - 25) / 20.0)));
             for (int i = 0; i < 3; i++) {
                 org.bukkit.Bukkit.getScheduler().runTaskLater(plugin, () -> {
                     if (victim.isOnline() && cm.hasChampion(victim)

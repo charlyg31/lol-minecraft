@@ -125,7 +125,7 @@ public final class Ashe extends BaseChampion {
     static class W extends BaseAbility {
         W(){super("w_ashe","Volée",Material.TIPPED_ARROW,AbilitySlot.W,
             new double[]{18,14.5,11,7.5,4},25,4,DamageType.PHYSICAL);
-            resourceCost = 50;}
+            resourceCost = 75; resourceCosts = new double[]{75,70,65,60,55};}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : tire des flèches en cône. 60/95/130/165/200 + 100% AD, applique Tir de Givre (ralentit)
             double[] base=fr.lolmc.util.Balance.base("w_ashe",new double[]{60,95,130,165,200});double dmg=base[getLevel()-1]+s.getBonusAD()*fr.lolmc.util.Balance.ratio("w_ashe","ad",1); // AD bonus (wiki)

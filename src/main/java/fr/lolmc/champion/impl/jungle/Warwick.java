@@ -106,7 +106,7 @@ public final class Warwick extends BaseChampion {
     static class Q extends BaseAbility {
         Q(){super("q_warwick","Crocs de la Bête",Material.BONE,AbilitySlot.Q,
                 new double[]{8,7.5,7,6.5,6},20,0,DamageType.MAGICAL);
-            resourceCost = 0;}
+            resourceCost = 80; resourceCosts = new double[]{80,85,90,95,100};}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : bond + morsure, 100% AD + 6-10% PV max de la cible, soigne 100% des dégâts post-mitigation
             org.bukkit.entity.LivingEntity tgt = (t!=null && TargetingUtil.isEnemy(c,t))?t:TargetingUtil.getTargetedEnemy(c,4.3); if(tgt==null){cancelCast();c.sendActionBar(Component.text("🐺 Aucune cible",NamedTextColor.GRAY));return;}

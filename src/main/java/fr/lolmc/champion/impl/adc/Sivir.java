@@ -142,7 +142,7 @@ public final class Sivir extends BaseChampion implements fr.lolmc.champion.base.
     static class Q extends BaseAbility {
         Q(){super("q_sivir","Lame Boomerang",Material.IRON_AXE,AbilitySlot.Q,
             new double[]{10,9.5,9,8.5,8},25,0,DamageType.PHYSICAL);
-            resourceCost = 70;}
+            resourceCost = 55; resourceCosts = new double[]{55,60,65,70,75};}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // Wiki : lame lancée en ligne (1250 unités) qui revient : 60-160 (+70 % AD bonus
             // +60 % AP) à l'aller et au retour. Avant : sort ciblé à 6.5 blocs.

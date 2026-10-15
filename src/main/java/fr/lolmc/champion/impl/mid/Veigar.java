@@ -69,7 +69,7 @@ public final class Veigar extends BaseChampion implements fr.lolmc.champion.base
     static class Q extends BaseAbility {
         Q(){super("q_veigar","Frappe Baleful",Material.AMETHYST_SHARD,AbilitySlot.Q,
                 new double[]{6,5.5,5,4.5,4},20,0,DamageType.MAGICAL);
-            resourceCost = 40;}
+            resourceCost = 30; resourceCosts = new double[]{30,35,40,45,50};}
         @Override public void cast(Player c,ChampionStats s,Player t){
             double[] base=fr.lolmc.util.Balance.base("q_veigar",new double[]{80,120,160,200,240});
             double[] apR={0.50,0.55,0.60,0.65,0.70};
@@ -106,7 +106,7 @@ public final class Veigar extends BaseChampion implements fr.lolmc.champion.base
     static class W extends BaseAbility {
         W(){super("w_veigar","Matière Noire",Material.OBSIDIAN,AbilitySlot.W,
                 new double[]{8,8,8,8,8},20,3,DamageType.MAGICAL);
-            resourceCost = 100;}
+            resourceCost = 60; resourceCosts = new double[]{60,65,70,75,80};}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // Passif : -10 % de recharge par tranche de 50 effets, en cumul multiplicatif (données du jeu)
             int stacks=apStacks.getOrDefault(c.getUniqueId(),0);
@@ -145,7 +145,7 @@ public final class Veigar extends BaseChampion implements fr.lolmc.champion.base
     static class E extends BaseAbility {
         E(){super("e_veigar","Cage Événementielle",Material.DARK_OAK_FENCE,AbilitySlot.E,
                 new double[]{20,18.5,17,15.5,14},0,4,DamageType.TRUE);
-            resourceCost = 80;}
+            resourceCost = 70; resourceCosts = new double[]{70,75,80,85,90};}
         @Override public void cast(Player c,ChampionStats s,Player t){
             Location center=TargetingUtil.getAimedGroundLocation(c, 7.0);
             final Location fcenter=center.clone();

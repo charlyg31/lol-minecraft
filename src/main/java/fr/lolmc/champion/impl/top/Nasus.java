@@ -146,7 +146,7 @@ public final class Nasus extends BaseChampion implements fr.lolmc.champion.base.
     static class E extends BaseAbility {
         E(){super("e_nasus","Feu Spirituel",Material.SOUL_LANTERN,AbilitySlot.E,
             new double[]{12,12,12,12,12},0,3,DamageType.MAGICAL);
-            resourceCost = 70;}
+            resourceCost = 60; resourceCosts = new double[]{60,70,80,90,100};}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : burst initial + dot/s pendant 5s + réduction armure 30-50%
             Location loc=TargetingUtil.getAimedGroundLocation(c, 6.5); // 650 unités

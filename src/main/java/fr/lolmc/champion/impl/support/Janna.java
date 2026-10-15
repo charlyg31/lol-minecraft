@@ -81,7 +81,7 @@ public final class Janna extends BaseChampion {
     static class Q extends BaseAbility {
         Q(){super("q_janna","Bourrasque Hurlante",Material.WHITE_DYE,AbilitySlot.Q,
             new double[]{14,14,14,14,14},20,2,DamageType.MAGICAL);
-            resourceCost = 60;}
+            resourceCost = 90; resourceCosts = new double[]{90,95,100,105,110};}
         /** Début de la charge en cours, par Janna. */
         private static final java.util.Map<java.util.UUID, Long> chargeStart = new java.util.concurrent.ConcurrentHashMap<>();
         @Override public void cast(Player c,ChampionStats s,Player t){
@@ -133,7 +133,7 @@ public final class Janna extends BaseChampion {
     static class W extends BaseAbility {
         W(){super("w_janna","Zéphyr",Material.CYAN_DYE,AbilitySlot.W,
             new double[]{8,7.5,7,6.5,6},20,0,DamageType.MAGICAL);
-            resourceCost = 40;}
+            resourceCost = 50; resourceCosts = new double[]{50,55,60,65,70};}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : envoie un élémentaire qui inflige des dégâts + ralentit. 60/105/150/195/240 + 60% AP
             org.bukkit.entity.LivingEntity tgt = (t!=null && TargetingUtil.isEnemy(c,t))?t:TargetingUtil.getTargetedEnemy(c,6.2); if(tgt==null){cancelCast();c.sendActionBar(Component.text("💨 Aucune cible",NamedTextColor.GRAY));return;} // 550 unités
@@ -161,7 +161,7 @@ public final class Janna extends BaseChampion {
     static class E extends BaseAbility {
         E(){super("e_janna","Oeil de la Tempête",Material.LIGHT_BLUE_DYE,AbilitySlot.E,
             new double[]{16,15,14,13,12},0,0,DamageType.TRUE);
-            resourceCost = 70;}
+            resourceCost = 70; resourceCosts = new double[]{70,75,80,85,90};}
         @Override public void cast(Player c,ChampionStats s,Player t){
             // LoL : bouclier sur allié (ou soi) 75-175 + 50% AP + AD bonus 5s
             Player dest = (t!=null && LolPlugin.getInstance().getTeamManager().areAllies(c,t)) ? t : c; // allié visé, sinon soi
