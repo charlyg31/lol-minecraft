@@ -70,19 +70,11 @@ public class ConsumableManager {
         player.sendActionBar(Component.text("🧪 Potion de soin (120 PV sur 15 s)", NamedTextColor.RED));
         double healPerTick = 120.0 / 15.0; // 8 PV/s
 
-        // Rune Time Warp Tonic : 30% du soin total instantané + 5% vitesse pendant l'effet
-        var rmTonic = LolPlugin.getInstance().getRuneManager();
-        boolean hasTonic = rmTonic != null && rmTonic.getPage(player.getUniqueId()).has("time_warp_tonic");
-        if (hasTonic) {
-            hp.heal(120.0 * 0.30);
-            double tonicBonus = champ.getStats().getFinalMovementSpeed() * 0.05;
-            champ.getStats().addBonusMoveSpeed(tonicBonus);
-            player.sendActionBar(Component.text("⏱ Tonique Temporel !", NamedTextColor.AQUA));
-            new BukkitRunnable() {
-                @Override public void run() {
-                    if (championManager.hasChampion(player)) champ.getStats().addBonusMoveSpeed(-tonicBonus);
-                }
-            }.runTaskLater(LolPlugin.getInstance(), 300L); // 15s
+        // Rune Philtre de chronodistorsion : 40 % du soin prévu rendus immédiatement, le reste sur la durée
+        if (hasTimeWarpTonic(player)) {
+            hp.heal(120.0 * 0.40);
+            healPerTick = 120.0 * 0.60 / 15.0;
+            player.sendActionBar(Component.text("⏱ Philtre de chronodistorsion : +48 PV", NamedTextColor.AQUA));
         }
 
         BukkitRunnable task = createHealthPotionTask(player, champ, hp, healPerTick);
@@ -124,7 +116,9 @@ public class ConsumableManager {
 
         BaseChampion champ = championManager.getChampion(player);
         HPSystem hp = champ.getHPSystem();
-        double healPerTick = 100.0 / 12.0; // patch 26.20
+        boolean tonic = hasTimeWarpTonic(player); // Philtre de chronodistorsion : 40 % immédiatement
+        if (tonic) hp.heal(100.0 * 0.40);
+        final double healPerTick = (tonic ? 100.0 * 0.60 : 100.0) / 12.0; // patch 26.20
 
         player.sendActionBar(Component.text(
             String.format("🧪 Fiole rechargeable (%d charge(s) restante(s))", charges - 1),
@@ -142,6 +136,53 @@ public class ConsumableManager {
         return true;
     }
 
+    private static boolean hasTimeWarpTonic(Player player) {
+        var rm = LolPlugin.getInstance().getRuneManager();
+        return rm != null && rm.getPage(player.getUniqueId()).has("time_warp_tonic");
+    }
+
+    // ════════════════════════════════════════════════════════
+    // ÉLIXIRS DU TRIPLE TONIQUE (rune, patch 26.20)
+    // Avarice : +5 bruts à l'impact contre les sbires 60 s, puis 60 PO
+    // Force : +25 force adaptative 60 s (15 AD ou 25 AP)
+    // Compétence : 1 point de compétence
+    // ════════════════════════════════════════════════════════
+    public boolean useElixirAvarice(Player player) {
+        if (!championManager.hasChampion(player)) return false;
+        fr.lolmc.item.ItemEffects.markPublic(player.getUniqueId(), "avarice", 60);
+        new BukkitRunnable() { @Override public void run() {
+            if (player.isOnline() && championManager.hasChampion(player)) {
+                LolPlugin.getInstance().getGoldManager().addGold(player.getUniqueId(), 60);
+                player.sendActionBar(Component.text("💰 Élixir d'avarice : +60 PO", NamedTextColor.GOLD));
+            }
+        }}.runTaskLater(LolPlugin.getInstance(), 1200L);
+        player.sendActionBar(Component.text("🧪 Élixir d'avarice : +5 dégâts bruts contre les sbires (60 s)", NamedTextColor.GOLD));
+        return true;
+    }
+
+    public boolean useElixirForce(Player player) {
+        if (!championManager.hasChampion(player)) return false;
+        var st = championManager.getChampion(player).getStats();
+        boolean ap = st.getBonusAP() > st.getBonusAD();
+        if (ap) st.addBonusAP(25); else st.addBonusAD(15);
+        BaseChampion champ = championManager.getChampion(player);
+        new BukkitRunnable() { @Override public void run() {
+            if (championManager.getChampion(player) != champ) return;
+            if (ap) st.addBonusAP(-25); else st.addBonusAD(-15);
+        }}.runTaskLater(LolPlugin.getInstance(), 1200L);
+        player.sendActionBar(Component.text(ap ? "🧪 Élixir de force : +25 puissance (60 s)"
+                : "🧪 Élixir de force : +15 dégâts d'attaque (60 s)", NamedTextColor.GOLD));
+        return true;
+    }
+
+    public boolean useElixirSkill(Player player) {
+        if (!championManager.hasChampion(player)) return false;
+        var lv = championManager.getChampion(player).getLevelSystem();
+        lv.setSkillPoints(lv.getSkillPoints() + 1);
+        player.sendActionBar(Component.text("🧪 Élixir de compétence : +1 point de compétence", NamedTextColor.GOLD));
+        return true;
+    }
+
     // ════════════════════════════════════════════════════════
     // BISCUIT DE LA VOLONTÉ INDESTRUCTIBLE (gratuit via rune)
     // Soigne 150 HP + 100 mana, +50 mana max permanent si mana plein
@@ -154,8 +195,11 @@ public class ConsumableManager {
 
         // Patch 26.20 : 20 (+1.5 % PV max) PV sur 5 s, jusqu'à ×2 selon les PV manquants, et +30 PV
         // max permanents (avant : 150 PV, 100 mana et +50 mana max, valeurs d'une ancienne version)
-        double missing = 1.0 - hp.getCurrentHP() / Math.max(1, hp.getMaxHP());
-        double total = (20 + hp.getMaxHP() * 0.015) * (1 + Math.max(0, Math.min(1, missing)));
+        // Données de l'objet 2010 : FlatHeal 20, MaxHPMultiplier 0.015, MaxHealIncrease 100 %,
+        // MinHPThreshold 0.30 → bonus proportionnel aux PV manquants, maximal à 30 % des PV ou moins
+        double ratio = hp.getCurrentHP() / Math.max(1, hp.getMaxHP());
+        double increase = Math.max(0, Math.min(1, (1.0 - ratio) / (1.0 - 0.30)));
+        double total = (20 + hp.getMaxHP() * 0.015) * (1 + increase);
         champ.getStats().addBonusHP(30);
         double hpPerTick = total / 10.0;
         new BukkitRunnable() {
@@ -356,6 +400,9 @@ public class ConsumableManager {
             case "health_potion", "health_potion2"      -> buildItem(Material.POTION,          "🧪 Potion de soin",       "Rend 120 PV en 15 s.",                   NamedTextColor.RED,    50);
             case "refillable_potion", "refillable_potion2" -> buildItem(Material.GLASS_BOTTLE,  "🧪 Potion rechargeable",  "2 charges — Rend 100 PV en 12 s. Se recharge à la boutique.", NamedTextColor.GREEN,  150);
             case "biscuit", "biscuit_will"               -> buildItem(Material.COOKIE,           "🍪 Biscuit de longévité", "Rend des PV en 5 s (plus si PV bas) et +30 PV max.", NamedTextColor.GOLD, 0);
+            case "elixir_avarice"                        -> buildItem(Material.GOLD_NUGGET,      "🧪 Élixir d'avarice",     "+5 dégâts bruts contre les sbires 60 s, puis 60 PO.", NamedTextColor.GOLD, 0);
+            case "elixir_force"                          -> buildItem(Material.BLAZE_POWDER,     "🧪 Élixir de force",      "+25 force adaptative pendant 60 s.",     NamedTextColor.GOLD,   0);
+            case "elixir_skill"                          -> buildItem(Material.EXPERIENCE_BOTTLE,"🧪 Élixir de compétence", "Octroie 1 point de compétence.",          NamedTextColor.GOLD,   0);
             case "elixir_wrath", "elixir_wrath2"         -> buildItem(Material.DRAGON_BREATH,    "⚔ Élixir de Fureur",      "+30 AD + vol de vie 3 minutes.",         NamedTextColor.RED,    500);
             case "elixir_iron", "elixir_iron2"           -> buildItem(Material.FERMENTED_SPIDER_EYE,"🛡 Élixir de Fer",   "+300 HP + Ténacité 3 minutes.",          NamedTextColor.GRAY,   500);
             case "elixir_sorcery", "elixir_sorcery2"     -> buildItem(Material.MAGENTA_DYE,      "✨ Élixir de Sorcellerie","+50 AP 3 minutes.",                      NamedTextColor.BLUE,   500);

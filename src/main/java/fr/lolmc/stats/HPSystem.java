@@ -53,7 +53,7 @@ public class HPSystem {
     }
 
     public void heal(double amount) {
-        double mult = (stats != null) ? stats.getHealMultiplier() : 1.0;
+        double mult = (stats != null) ? stats.getHealMultiplier(getHPRatio() < 0.40) : 1.0;
         double before = currentHP;
         currentHP = Math.min(getMaxHP(), currentHP + amount * mult);
         totalHealed += currentHP - before; // soins réellement appliqués (hors regen naturelle)

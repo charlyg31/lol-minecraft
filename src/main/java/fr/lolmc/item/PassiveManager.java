@@ -98,21 +98,9 @@ public class PassiveManager {
         if ("annie".equals(champ.getId())) {
             fr.lolmc.champion.impl.mid.Annie.onSpellCast(caster.getUniqueId(), slot);
         }
-        // ── Rune Impact soudain : +12 létalité / +9 pénétration magique 5 s (une instance) ──
+        // Runes : sort lancé (Électrocution, Conquérant, Arcaniste axiomatique)
         var rm = LolPlugin.getInstance().getRuneManager();
-        ItemState st = getState(caster);
-        if (rm != null && rm.getPage(caster.getUniqueId()).has("sudden_impact")
-                && System.currentTimeMillis() >= st.suddenImpactUntil) {
-            st.suddenImpactUntil = System.currentTimeMillis() + 5000L;
-            champ.getStats().addBonusLethality(12);
-            champ.getStats().addBonusFlatMagicPen(9);
-            new BukkitRunnable() { @Override public void run() {
-                if (championManager.hasChampion(caster)) {
-                    championManager.getChampion(caster).getStats().addBonusLethality(-12);
-                    championManager.getChampion(caster).getStats().addBonusFlatMagicPen(-9);
-                }
-            }}.runTaskLater(LolPlugin.getInstance(), 100L);
-        }
+        if (rm != null) rm.onAbilityCast(caster, slot);
     }
 
     // ════════════════════════════════════════════════════════
@@ -207,17 +195,6 @@ public class PassiveManager {
     public void onAutoAttack(Player attacker, Player victim) {
         if (!championManager.hasChampion(attacker) || !championManager.hasChampion(victim)) return;
         useSharedRiches(attacker, true); // attaque sur un champion ennemi
-        ChampionStats as = championManager.getChampion(attacker).getStats();
-
-        // ── Rune Coup de bouclier : avec un bouclier actif, l'attaque inflige des dégâts adaptatifs ──
-        var rmShieldBash = LolPlugin.getInstance().getRuneManager();
-        if (rmShieldBash != null && as.getShield() > 0
-                && rmShieldBash.getPage(attacker.getUniqueId()).has("shield_bash")) {
-            boolean ad = as.getFinalAD() > as.getFinalAP();
-            ItemEffects.itemDamage(attacker, victim, (ad ? as.getFinalAD() : as.getFinalAP()) * 0.10,
-                    ad ? DamageUtil.Type.PHYSICAL : DamageUtil.Type.MAGICAL, true);
-            attacker.sendActionBar(Component.text("🛡 Coup de Bouclier !", NamedTextColor.GREEN));
-        }
 
         // ── Leona, Lumière du Soleil : un allié frappe une cible marquée ──
         if (fr.lolmc.champion.impl.support.Leona.consumeMark(attacker, victim)) {
@@ -234,20 +211,7 @@ public class PassiveManager {
     public void onAbilityDamage(Player caster, Player victim, double rawDamage, boolean isMagical) {
         if (!championManager.hasChampion(caster) || !championManager.hasChampion(victim)) return;
         useSharedRiches(caster, true); // une charge par sort au plus
-        var rm = LolPlugin.getInstance().getRuneManager();
-        if (rm == null) return;
-        var page = rm.getPage(caster.getUniqueId());
-        int lvl = championManager.getChampion(caster).getLevelSystem().getLevel();
-        // ── Goût du sang : soin sur dégâts à un champion (20 s) ──
-        if (page.has("taste_blood") && rm.tryRuneCooldown(caster.getUniqueId(), "taste_blood", 20_000L))
-            championManager.getChampion(caster).getHPSystem().heal(16 + lvl * 1.5);
-        // ── Coup bas : 10 + niveau dégâts bruts sur une cible contrôlée ──
-        if (page.has("cheap_shot")) {
-            var cc = LolPlugin.getInstance().getCCManager();
-            if (cc != null && (cc.isStunned(victim.getUniqueId()) || cc.isRooted(victim.getUniqueId())
-                    || cc.isSilenced(victim.getUniqueId())))
-                DamageUtil.trueDamage(caster, victim, 10 + lvl * 1.0);
-        }
+        // Goût du sang et Coup bas : RuneManager.onHitEffects (attaques et sorts)
     }
 
     // ════════════════════════════════════════════════════════
@@ -256,43 +220,6 @@ public class PassiveManager {
     public void onDamageTaken(Player victim) {
         if (!championManager.hasChampion(victim)) return;
         BaseChampion champ = championManager.getChampion(victim);
-        ChampionStats stats = champ.getStats();
-        ItemState state = getState(victim);
-
-        // ── Rune Gardien : le porteur et l'allié le plus proche reçoivent un bouclier (45 s) ──
-        var guardianPage = LolPlugin.getInstance().getRuneManager() != null
-                ? LolPlugin.getInstance().getRuneManager().getPage(victim.getUniqueId()) : null;
-        if (guardianPage != null && "guardian".equals(guardianPage.keystone)
-                && !state.isOnCooldown(state.guardianLastUse, 45000L)) {
-            Player nearestAlly = null;
-            double nearestDist = Double.MAX_VALUE;
-            for (Player p : WorldContext.getGamePlayers()) {
-                if (p.equals(victim) || !championManager.hasChampion(p)
-                        || !LolPlugin.getInstance().getTeamManager().areAllies(victim, p)) continue;
-                if (!p.getWorld().equals(victim.getWorld())) continue;
-                double d = p.getLocation().distanceSquared(victim.getLocation());
-                if (d < nearestDist) { nearestDist = d; nearestAlly = p; }
-            }
-            if (nearestAlly != null && nearestDist <= 8.0*8.0) {
-                state.guardianLastUse = System.currentTimeMillis();
-                double guardShield = 45.0 + stats.getFinalAP() * 0.125 + stats.getBonusHP() * 0.08;
-                stats.addShield(guardShield);
-                championManager.getChampion(nearestAlly).getStats().addShield(guardShield);
-                victim.sendActionBar(Component.text("🛡 Gardien !", NamedTextColor.AQUA));
-                nearestAlly.sendActionBar(Component.text("🛡 Gardien (allié) !", NamedTextColor.AQUA));
-                final double gShield = guardShield;
-                final Player guardAlly = nearestAlly;
-                new BukkitRunnable() {
-                    @Override public void run() {
-                        stats.addShield(-Math.min(gShield, stats.getShield()));
-                        if (championManager.hasChampion(guardAlly)) {
-                            var as = championManager.getChampion(guardAlly).getStats();
-                            as.addShield(-Math.min(gShield, as.getShield()));
-                        }
-                    }
-                }.runTaskLater(LolPlugin.getInstance(), 40L);
-            }
-        }
         hudManager.updateHUD(victim, champ);
     }
 
@@ -300,20 +227,7 @@ public class PassiveManager {
     // ÉVÉNEMENT: KILL (runes)
     // ════════════════════════════════════════════════════════
     public void onKill(Player killer) {
-        var rm = LolPlugin.getInstance().getRuneManager();
-        if (rm == null) return;
-        var page = rm.getPage(killer.getUniqueId());
-        // ── Présence d'esprit : 15 % de la ressource max sur takedown (patch 26) ──
-        if (page.has("presence_mind") && championManager.hasChampion(killer)) {
-            var res = championManager.getChampion(killer).getResourceSystem();
-            res.addCurrent(res.getMax() * 0.15);
-            killer.sendActionBar(Component.text("✨ Présence d'Esprit", NamedTextColor.AQUA));
-        }
-        // ── Chaussures magiques : -45 s sur le délai des bottes gratuites ──
-        if (page.has("magical_footwear")) {
-            var footState = getState(killer);
-            footState.magicalFootwearThresholdMs = Math.max(0, footState.magicalFootwearThresholdMs - 45_000L);
-        }
+        // Présence d'esprit et Chaussures magiques : RuneManager.onTakedown (éliminations ET assistances)
     }
 
     // ════════════════════════════════════════════════════════
@@ -336,18 +250,6 @@ public class PassiveManager {
         if (rmGhostPoro == null) return;
         var page = rmGhostPoro.getPage(p.getUniqueId());
 
-        // ── Rune Marche sur l'eau : +25 vitesse de déplacement dans l'eau (rivière) ──
-        if (page.has("waterwalking")) {
-            boolean inWater = p.isInWater();
-            if (inWater != state.wasInWaterLastTick) {
-                stats.addBonusMoveSpeed(inWater ? 25 : -25);
-                state.wasInWaterLastTick = inWater;
-            }
-        } else if (state.wasInWaterLastTick) {
-            stats.addBonusMoveSpeed(-25);
-            state.wasInWaterLastTick = false;
-        }
-
         // ── Rune Chaussures magiques : bottes gratuites après un délai (12 min - 45 s par takedown) ──
         if (!state.magicalFootwearGiven && page.has("magical_footwear")) {
             var gm3 = fr.lolmc.instance.InstanceHelper.gameManager(p);
@@ -357,11 +259,12 @@ public class PassiveManager {
                     var bootsItem = ItemRegistry.get("boots_speed");
                     if (bootsItem != null && invMgr.equipItem(p, champ, bootsItem)) {
                         state.magicalFootwearGiven = true;
-                        p.sendActionBar(Component.text("👢 Chaussures Magiques reçues !", NamedTextColor.AQUA));
+                        p.sendActionBar(Component.text("👢 Chaussures légèrement magiques reçues ! (+10 vitesse)", NamedTextColor.AQUA));
                     }
                 } else {
-                    state.magicalFootwearGiven = true; // déjà des bottes, la rune n'a plus d'effet
+                    state.magicalFootwearGiven = true; // bottes données par un autre moyen
                 }
+                if (state.magicalFootwearGiven) LolPlugin.getInstance().getRuneManager().refresh(p); // +10 vitesse
             }
         }
 
@@ -379,43 +282,7 @@ public class PassiveManager {
             }
         }
 
-        // ── Rune Vitesse d'approche : +7.5 % de vitesse près d'un ennemi ralenti ou immobilisé ──
-        if (page.has("approach_velocity")) {
-            var cc2 = LolPlugin.getInstance().getCCManager();
-            var tm2 = LolPlugin.getInstance().getTeamManager();
-            boolean nearImpaired = false;
-            for (var e : p.getNearbyEntities(10, 10, 10)) {
-                if (e instanceof Player other && tm2 != null && tm2.areEnemies(p, other)
-                        && cc2 != null && (cc2.isSlowed(other) || cc2.isRooted(other.getUniqueId()) || cc2.isStunned(other.getUniqueId()))) {
-                    nearImpaired = true;
-                    break;
-                }
-            }
-            if (nearImpaired != state.approachVelocityActive) {
-                if (nearImpaired) {
-                    state.approachVelocityBonus = stats.getFinalMovementSpeed() * 0.075;
-                    stats.addBonusMoveSpeed(state.approachVelocityBonus);
-                } else {
-                    stats.addBonusMoveSpeed(-state.approachVelocityBonus);
-                    state.approachVelocityBonus = 0;
-                }
-                state.approachVelocityActive = nearImpaired;
-            }
-        }
-
-        // ── Rune Triple tonique : élixirs gratuits aux niveaux 3 (Avarice) et 6 (Force) ──
-        if (state.tripleTonicsGiven < 2 && page.has("triple_tonic")) {
-            int lvl2 = champ.getLevelSystem().getLevel();
-            if (state.tripleTonicsGiven == 0 && lvl2 >= 3) {
-                state.tripleTonicsGiven = 1;
-                stats.addBonusAD(5);
-                p.sendActionBar(Component.text("🧪 Élixir d'Avarice (niveau 3) !", NamedTextColor.GOLD));
-            } else if (state.tripleTonicsGiven == 1 && lvl2 >= 6) {
-                state.tripleTonicsGiven = 2;
-                if (stats.getFinalAP() > stats.getFinalAD()) stats.addBonusAP(25); else stats.addBonusAD(15);
-                p.sendActionBar(Component.text("🧪 Élixir de Force (niveau 6) !", NamedTextColor.GOLD));
-            }
-        }
+        // Marche sur l'eau, Vitesse d'approche, Triple tonique : RuneManager
     }
 
     // ════════════════════════════════════════════════════════

@@ -247,6 +247,15 @@ public class ShopListener implements Listener {
             player.sendActionBar(Component.text("❌ Cet objet s'obtient par transformation.", NamedTextColor.RED));
             return false;
         }
+        // Chaussures magiques : pas de bottes avant d'avoir reçu les Chaussures légèrement magiques
+        var rmBoots = LolPlugin.getInstance().getRuneManager();
+        var pmBoots = LolPlugin.getInstance().getPassiveManager();
+        if (item.getTier() == LolItem.Tier.BOOTS && rmBoots != null && pmBoots != null
+                && rmBoots.getPage(player.getUniqueId()).has("magical_footwear")
+                && !pmBoots.getState(player).magicalFootwearGiven) {
+            player.sendActionBar(Component.text("❌ Chaussures magiques : bottes interdites avant de recevoir les vôtres.", NamedTextColor.RED));
+            return false;
+        }
 
         BaseChampion champ = championManager.getChampion(player);
         PlayerInventoryManager inv = getOrCreate(player);
@@ -464,6 +473,9 @@ public class ShopListener implements Listener {
                 yield false;
             }
             case "biscuit", "biscuit_will"                  -> cm.useBiscuit(player);
+            case "elixir_avarice"                           -> cm.useElixirAvarice(player);
+            case "elixir_force"                             -> cm.useElixirForce(player);
+            case "elixir_skill"                             -> cm.useElixirSkill(player);
             case "elixir_wrath", "elixir_wrath2"            -> !isElixirLevelTooLow(player) && cm.useElixirWrath(player);
             case "elixir_iron", "elixir_iron2"              -> !isElixirLevelTooLow(player) && cm.useElixirIron(player);
             case "elixir_sorcery", "elixir_sorcery2"        -> !isElixirLevelTooLow(player) && cm.useElixirSorcery(player);

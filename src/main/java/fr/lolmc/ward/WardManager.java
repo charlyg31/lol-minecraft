@@ -111,8 +111,12 @@ public class WardManager {
         }
         // Rune Balise de profondeur : durée bonus pour les balises posées côté ennemi
         var rm = LolPlugin.getInstance().getRuneManager();
-        if (rm != null && durationSeconds > 0) durationSeconds += rm.deepWardBonusSeconds(owner, location);
+        // (balise camouflée de la relique : +45-150 s, sinon +30-45 s) et +1 PV
+        int deep = rm != null && durationSeconds > 0
+                ? rm.deepWardBonusSeconds(owner, location, type == WardType.STEALTH) : 0;
+        durationSeconds += deep;
         Ward ward = new Ward(location.clone(), team, owner.getUniqueId(), durationSeconds, entityId, type, true);
+        if (deep > 0) ward.hitsLeft++;
         wards.add(ward);
         if (entityId != null) applyWardVisibility(ward, type != WardType.STEALTH);
     }

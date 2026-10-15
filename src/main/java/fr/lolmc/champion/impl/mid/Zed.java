@@ -199,6 +199,7 @@ public final class Zed extends BaseChampion implements fr.lolmc.champion.base.St
                     dest.setYaw(c.getLocation().getYaw());
                     dest.setPitch(c.getLocation().getPitch());
                     c.teleport(dest);
+                    fr.lolmc.LolPlugin.getInstance().getRuneManager().onDash(c); // Impact soudain
                 }
             } else {
                 // Coût en énergie uniquement au placement de l'ombre (40/35/30/25/20, wiki)
@@ -350,6 +351,7 @@ public final class Zed extends BaseChampion implements fr.lolmc.champion.base.St
                 fr.lolmc.util.VisualEffectUtil.impactBurst(c.getWorld(),
                         c.getLocation(), Material.GRAY_STAINED_GLASS, 0.3f, 0.5, 6, 6L);
                 c.teleport(dest);
+                fr.lolmc.LolPlugin.getInstance().getRuneManager().onDash(c); // Impact soudain
                 triggerCooldown(c, s);
                 c.getWorld().playSound(c.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 1f, 1.2f);
                 return;

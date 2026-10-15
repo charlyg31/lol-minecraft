@@ -183,6 +183,7 @@ public final class LeeSin extends BaseChampion implements fr.lolmc.champion.base
             if(!dest.equals(c)){ // bond vers l'allié uniquement
                 Location safe=safeTeleport(c.getLocation(),dest.getLocation());
                 c.teleport(safe);
+                fr.lolmc.LolPlugin.getInstance().getRuneManager().onDash(c); // Impact soudain
             }
             // Bouclier 60/105/150/195/240 +80%AP pendant 2s (40 ticks) sur Lee Sin (et la cible si champion)
             double[] shieldBase={60,105,150,195,240};
@@ -279,7 +280,9 @@ public final class LeeSin extends BaseChampion implements fr.lolmc.champion.base
             var cmR=LolPlugin.getInstance().getChampionManager();
             if(tgt instanceof Player kp && cmR.hasChampion(kp)) kickedBonusHP=cmR.getChampion(kp).getStats().getBonusHP();
             double collideDmg=dmg+kickedBonusHP*new double[]{0.12,0.15,0.18}[r];
-            TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.PHYSICAL);
+            fr.lolmc.rune.RuneManager.beginSingleTarget(); // cible frappée : dégâts à cible unique
+            try { TargetingUtil.dealDamage(c, tgt, dmg, TargetingUtil.DmgType.PHYSICAL); }
+            finally { fr.lolmc.rune.RuneManager.endSingleTarget(); }
             Vector dir=tgt.getLocation().toVector().subtract(c.getLocation().toVector()).normalize();
             Vector kb=dir.clone().multiply(2.5); kb.setY(0.8);
             fr.lolmc.LolPlugin.getInstance().getCCManager().setAirborne(tgt, 20); // projeté 1 s (wiki)

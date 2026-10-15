@@ -286,6 +286,8 @@ public final class ItemEffects {
     static final Map<String, Long> MARKS = new ConcurrentHashMap<>();
 
     static boolean marked(UUID target, String key) { return MARKS.getOrDefault(target + ":" + key, 0L) > System.currentTimeMillis(); }
+    /** Marque {@code key} sur {@code target} pendant {@code seconds} (utilisable hors du paquet). */
+    public static void markPublic(UUID target, String key, double seconds) { mark(target, key, seconds); }
     static void mark(UUID target, String key, double seconds) { MARKS.put(target + ":" + key, System.currentTimeMillis() + (long) (seconds * 1000)); }
 
     static void enterChampionCombat(Player p) {
@@ -747,6 +749,9 @@ public final class ItemEffects {
         // Coup de main (Anneau, Bouclier, Casque de Doran, Larme) : +5 contre les sbires
         if (fr.lolmc.game.MinionManager.isMinion(t) && has(a, "doran_s_ring", "doran_s_shield", "doran_s_helm", "tear_of_goddess"))
             itemDamage(a, t, 5, DamageUtil.Type.PHYSICAL, true);
+        // Élixir d'avarice (Triple tonique) : +5 bruts à l'impact contre les sbires pendant 60 s
+        if (fr.lolmc.game.MinionManager.isMinion(t) && marked(a.getUniqueId(), "avarice"))
+            itemDamage(a, t, 5, DamageUtil.Type.TRUE, true);
         // Lame du roi déchu : 9 % (6 % à distance) des PV actuels, max 100 contre les monstres
         if (has(a, "botrk")) {
             double d = curHp(t) * (rng ? 0.06 : 0.09);
@@ -1313,6 +1318,9 @@ public final class ItemEffects {
      */
     public static void onCrowdControl(Player caster, LivingEntity target, boolean immobilize) {
         if (caster == null || champ(caster) == null || !isChampion(target)) return;
+        // Runes : Après-coup, Optimisation glaciale, Fontaine de vie, Vitesse d'approche
+        var rm = pl().getRuneManager();
+        if (rm != null && target instanceof Player tp) rm.onCrowdControl(caster, tp, immobilize);
         Fx f = fx(caster);
         int l = lvl(caster);
         var st = champ(caster).getStats();
@@ -1375,6 +1383,8 @@ public final class ItemEffects {
      */
     public static void onAllyHealShield(Player caster, Player ally, double heal, double shield) {
         if (caster == null || ally == null || caster.equals(ally) || champ(caster) == null || champ(ally) == null) return;
+        var rm = pl().getRuneManager();
+        if (rm != null) rm.onAllyBuffed(caster, ally); // Invocation d'Aery, Gardien
         Fx f = fx(caster);
         // Encensoir ardent : +25 % de vitesse d'attaque et +20 magiques à l'impact pendant 6 s, pour les deux
         if (has(caster, "ardent_censer")) for (Player p : new Player[]{caster, ally}) {

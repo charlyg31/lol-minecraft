@@ -223,7 +223,10 @@ public final class ItemActives {
             p.sendActionBar(Component.text(String.format("⏱ En recharge — %.1f s", left / 1000.0), NamedTextColor.RED));
             return false;
         }
-        f.cd.put("active:" + key, System.currentTimeMillis() + (long) (seconds * 1000));
+        // Savoir cosmique : +10 accélération d'objet
+        var rm = pl().getRuneManager();
+        double haste = rm != null ? rm.itemHaste(p) : 0;
+        f.cd.put("active:" + key, System.currentTimeMillis() + (long) (seconds * 1000 * 100 / (100 + haste)));
         return true;
     }
 

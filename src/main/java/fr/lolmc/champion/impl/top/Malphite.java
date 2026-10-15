@@ -188,6 +188,7 @@ public final class Malphite extends BaseChampion implements fr.lolmc.champion.ba
             Location dest=safeTeleport(c.getLocation(),aim);
             dest.setYaw(c.getLocation().getYaw()); dest.setPitch(c.getLocation().getPitch());
             c.teleport(dest);
+            fr.lolmc.LolPlugin.getInstance().getRuneManager().onDash(c); // Impact soudain
             // LoL : 200/300/400 + 90% AP, knockup + stun 1.5s (30 ticks)
             double[] baseR={200,300,400};int rr=Math.min(getLevel()-1,2);double dmg=baseR[rr]+s.getFinalAP()*0.9;
             var cc=LolPlugin.getInstance().getCCManager();

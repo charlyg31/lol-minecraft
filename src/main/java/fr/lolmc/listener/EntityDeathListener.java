@@ -226,6 +226,6 @@ public class EntityDeathListener implements Listener {
             fr.lolmc.instance.InstanceHelper.featManager(killer).claim(
                 fr.lolmc.game.FeatManager.Feat.FIRST_BLOOD, killerTeam, killer);
         // Runes : Triomphe, Absorption (soin/or sur takedown)
-        plugin.getRuneManager().onTakedown(killer, victim);
+        plugin.getRuneManager().onTakedown(killer, victim, true);
     }
 }

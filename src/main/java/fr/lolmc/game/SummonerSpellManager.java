@@ -156,7 +156,7 @@ public class SummonerSpellManager {
             triggerCooldown(caster, spell);
             fr.lolmc.instance.InstanceHelper.baseManager(caster).onAction(caster);
             var rm = LolPlugin.getInstance().getRuneManager();
-            if (rm != null) rm.applyNimbusCloak(caster);
+            if (rm != null) rm.applyNimbusCloak(caster, spell == Spell.TELEPORT ? Integer.MAX_VALUE : spell.cooldownSeconds);
         }
         return success;
     }
@@ -384,6 +384,7 @@ public class SummonerSpellManager {
         channelTeleport(caster, () -> {
             if (!caster.isOnline()) return;
             caster.teleport(dest);
+            fr.lolmc.LolPlugin.getInstance().getRuneManager().onDash(caster); // Impact soudain
             caster.playSound(dest, org.bukkit.Sound.ENTITY_ENDERMAN_TELEPORT, 1f, 1f);
             // LoL : le délai démarre à l'arrivée, pas au lancement
             triggerCooldown(caster, Spell.TELEPORT);
@@ -486,6 +487,8 @@ public class SummonerSpellManager {
 
         // 600 bruts ; Châtiment déchaîné 1000 ; primitif 1400, aussi aux monstres proches
         double smiteDamage = primal ? 1400 : unleashed ? 1000 : 600;
+        // Grimoire déchaîné : Châtiment échangé en 3e sort ou plus : 1000 dégâts
+        if (!primal && spellbookSmite.contains(caster.getUniqueId())) smiteDamage = Math.max(smiteDamage, 1000);
         if (primal && JungleManager.isJungleMonster(target))
             for (var e : target.getNearbyEntities(5, 3, 5))
                 if (e instanceof LivingEntity m && !m.equals(target) && JungleManager.isJungleMonster(m) && !m.isDead())
@@ -576,6 +579,7 @@ public class SummonerSpellManager {
         exhaustedUntil.remove(uuid);
         flashChosen.remove(uuid);
         smiteRecharges.remove(uuid);
+        spellbookSmite.remove(uuid);
         healedAt.remove(uuid);
         var burning = ignites.remove(uuid);
         if (burning != null) burning.forEach(org.bukkit.scheduler.BukkitTask::cancel);
@@ -601,6 +605,32 @@ public class SummonerSpellManager {
         if (chosen.contains(Spell.SMITE))
             smiteRecharges.put(player.getUniqueId(), new java.util.ArrayList<>(
                     java.util.List.of(System.currentTimeMillis() + 48_000L + SMITE_RECHARGE_MS)));
+    }
+
+    /**
+     * Échange un sort d'invocateur (Grimoire déchaîné) : {@code from} (sort possédé, FLASH compris)
+     * remplacé par {@code to}. Renvoie le message d'erreur, ou null si l'échange a eu lieu.
+     */
+    public String swapSpell(Player player, String from, String to) {
+        UUID id = player.getUniqueId();
+        boolean fromFlash = "FLASH".equalsIgnoreCase(from), toFlash = "FLASH".equalsIgnoreCase(to);
+        Spell fromSp = parseSpell(from), toSp = parseSpell(to);
+        if ((!fromFlash && fromSp == null) || (!toFlash && toSp == null)) return "Sort inconnu.";
+        java.util.List<Spell> cur = new java.util.ArrayList<>(java.util.Arrays.asList(
+                playerSpells.getOrDefault(id, new Spell[0])));
+        if (fromFlash ? !hasFlash(player) : !cur.contains(fromSp)) return "Tu n'as pas ce sort.";
+        if (toFlash ? hasFlash(player) : cur.contains(toSp)) return "Tu as déjà ce sort.";
+        if (fromFlash) flashChosen.put(id, false); else cur.remove(fromSp);
+        if (toFlash) flashChosen.put(id, true); else cur.add(toSp);
+        playerSpells.put(id, cur.toArray(new Spell[0]));
+        if (toSp == Spell.SMITE) smiteRecharges.remove(id);
+        return null;
+    }
+
+    /** Joueurs dont le Châtiment vient du Grimoire déchaîné, au 3e échange ou plus (1000 dégâts). */
+    private final java.util.Set<UUID> spellbookSmite = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    public void setSpellbookSmite(Player player, boolean empowered) {
+        if (empowered) spellbookSmite.add(player.getUniqueId()); else spellbookSmite.remove(player.getUniqueId());
     }
 
     /** Le joueur a-t-il pris Flash ? (vrai par défaut si aucun choix n'a été fait) */

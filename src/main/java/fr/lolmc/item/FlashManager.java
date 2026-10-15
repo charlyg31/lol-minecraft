@@ -40,6 +40,10 @@ public class FlashManager {
             return false;
         }
         if (isOnCooldown(player)) {
+            // Canaliportation Hextech : Saut Hextech remplace Flash quand il lui reste plus de 2 s
+            var rmHex = LolPlugin.getInstance().getRuneManager();
+            if (rmHex != null && rmHex.getPage(player.getUniqueId()).has("hextech_flashtraption")
+                    && getRemaining(player) > 2.0) return hexflash(player);
             player.sendActionBar(Component.text(
                     String.format("✦ Flash en recharge — %.0fs", getRemaining(player)),
                     NamedTextColor.RED));
@@ -65,6 +69,7 @@ public class FlashManager {
         fr.lolmc.util.VisualEffectUtil.impactBurst(from.getWorld(),
                 from.add(0, 1, 0), Material.LIGHT_BLUE_STAINED_GLASS, 0.28f, 0.4, 8, 6L);
         player.teleport(dest);
+        fr.lolmc.LolPlugin.getInstance().getRuneManager().onDash(player); // Impact soudain
         fr.lolmc.util.VisualEffectUtil.impactBurst(dest.getWorld(),
                 dest.clone().add(0, 1, 0), Material.LIGHT_BLUE_STAINED_GLASS, 0.28f, 0.4, 8, 6L);
         player.playSound(dest, Sound.ENTITY_ENDERMAN_TELEPORT, 1f, 1.2f);
@@ -80,8 +85,93 @@ public class FlashManager {
         org.bukkit.Bukkit.getScheduler().runTaskLater(LolPlugin.getInstance(), () -> {
             if (!isOnCooldown(player)) setFlashReady(player);
         }, cd / 50L + 1L);
-        if (rm != null) rm.applyNimbusCloak(player);
+        if (rm != null) rm.applyNimbusCloak(player, (int) (FLASH_COOLDOWN_MS / 1000));
         return true;
+    }
+
+    // ── Saut Hextech (rune Canaliportation Hextech) ──
+    private final Map<UUID, Long> hexflashReady = new HashMap<>();
+    private final java.util.Set<UUID> hexChanneling = new java.util.HashSet<>();
+    /** Relance demandée pendant la canalisation, et canalisations interrompues par un sort. */
+    private final java.util.Set<UUID> hexRecast = new java.util.HashSet<>(), hexInterrupted = new java.util.HashSet<>();
+    private static final long HEXFLASH_COOLDOWN_MS = 20_000L, HEXFLASH_COMBAT_COOLDOWN_MS = 10_000L;
+
+    /**
+     * Saut Hextech (wiki) : canalisation jusqu'à 2 s, immobile et sans attaquer ; la portée passe de
+     * 200 à 400 unités. Relance possible après 1 s (avant : annulé, 10 s de récupération), sinon
+     * départ automatique à 2 s. 20 s de récupération (accélération de sort d'invocateur comprise) ;
+     * entrer en combat contre un champion le met en récupération pendant 10 s. Les sorts, les
+     * étourdissements, entraves et projections l'interrompent.
+     */
+    private boolean hexflash(Player player) {
+        UUID id = player.getUniqueId();
+        if (hexChanneling.contains(id)) { hexRecast.add(id); return true; } // relance : saut anticipé
+        long left = hexflashReady.getOrDefault(id, 0L) - System.currentTimeMillis();
+        if (left > 0) {
+            player.sendActionBar(Component.text(String.format("✦ Saut Hextech en recharge — %.0fs", left / 1000.0), NamedTextColor.RED));
+            return false;
+        }
+        hexChanneling.add(id);
+        player.addPotionEffect(new org.bukkit.potion.PotionEffect(
+                org.bukkit.potion.PotionEffectType.SLOWNESS, 40, 6, false, false)); // vitesse à 0
+        player.sendActionBar(Component.text("✦ Saut Hextech : canalisation…", NamedTextColor.AQUA));
+        new org.bukkit.scheduler.BukkitRunnable() {
+            int t = 0;
+            @Override public void run() {
+                var cc = LolPlugin.getInstance().getCCManager();
+                boolean broken = !player.isOnline() || player.getGameMode() == org.bukkit.GameMode.SPECTATOR
+                        || hexInterrupted.remove(id)
+                        || (cc != null && (cc.isStunned(id) || cc.isRooted(id) || cc.isAirborne(id) || cc.isSilenced(id)));
+                boolean early = hexRecast.remove(id);
+                if (broken || (early && t < 20)) {
+                    hexChanneling.remove(id);
+                    player.removePotionEffect(org.bukkit.potion.PotionEffectType.SLOWNESS);
+                    // Relâché avant 1 s : 10 s de récupération
+                    if (early && !broken) hexflashReady.put(id, System.currentTimeMillis() + HEXFLASH_COMBAT_COOLDOWN_MS);
+                    cancel();
+                    return;
+                }
+                if (++t % 5 == 0) fr.lolmc.util.VisualEffectUtil.impact(player.getWorld(),
+                        player.getLocation().add(0, 1, 0), Material.LIGHT_BLUE_STAINED_GLASS, 0.2f, 4L);
+                if (t < 40 && !early) return;
+                double range = FLASH_DISTANCE * (200 + 200 * Math.min(1.0, t / 40.0)) / 400.0; // 200-400 unités
+                cancel();
+                hexChanneling.remove(id);
+                player.removePotionEffect(org.bukkit.potion.PotionEffectType.SLOWNESS);
+                Location from = player.getLocation();
+                Vector dir = from.getDirection().setY(0);
+                if (dir.lengthSquared() < 1e-6) return;
+                dir.normalize();
+                Location dest = from.clone();
+                for (double d = 0.5; d <= range; d += 0.5) {
+                    Location check = from.clone().add(dir.clone().multiply(d));
+                    check.setY(from.getY());
+                    if (!isSafe(check)) break;
+                    dest = check;
+                }
+                player.teleport(dest);
+                LolPlugin.getInstance().getRuneManager().onDash(player); // Impact soudain
+                player.playSound(dest, Sound.ENTITY_ENDERMAN_TELEPORT, 1f, 1.5f);
+                var rm = LolPlugin.getInstance().getRuneManager();
+                long cd = rm != null ? rm.summonerCooldownMs(player, HEXFLASH_COOLDOWN_MS) : HEXFLASH_COOLDOWN_MS;
+                hexflashReady.put(id, System.currentTimeMillis() + cd);
+                fr.lolmc.instance.InstanceHelper.baseManager(player).onAction(player);
+            }
+        }.runTaskTimer(LolPlugin.getInstance(), 1L, 1L);
+        return true;
+    }
+
+    /** Un sort lancé interrompt la canalisation du Saut Hextech. */
+    public void interruptHexflash(Player player) {
+        if (hexChanneling.contains(player.getUniqueId())) hexInterrupted.add(player.getUniqueId());
+    }
+
+    /** Canalisation du Saut Hextech en cours (pas d'attaque de base). */
+    public boolean isHexChanneling(Player player) { return hexChanneling.contains(player.getUniqueId()); }
+
+    /** Entrée en combat contre un champion : Saut Hextech en récupération pendant 10 s. */
+    public void onChampionCombat(Player player) {
+        hexflashReady.merge(player.getUniqueId(), System.currentTimeMillis() + HEXFLASH_COMBAT_COOLDOWN_MS, Math::max);
     }
 
     private boolean isSafe(Location loc) {
@@ -107,6 +197,10 @@ public class FlashManager {
 
     public void cleanup(UUID uuid) {
         cooldowns.remove(uuid);
+        hexflashReady.remove(uuid);
+        hexChanneling.remove(uuid);
+        hexRecast.remove(uuid);
+        hexInterrupted.remove(uuid);
     }
 
     /** Remet le cooldown de Flash à 0 (admin). */

@@ -115,8 +115,10 @@ public class CCManager {
             if (attr == null) continue;
             double amount = 0;
             if (cm.hasChampion(p) && p.getGameMode() != org.bukkit.GameMode.SPECTATOR) {
-                double ms = cm.getChampion(p).getStats().getFinalMovementSpeed();
-                double factor = ms / REFERENCE_MS * (1 + totalBoost(p.getUniqueId(), now))
+                var st = cm.getChampion(p).getStats();
+                double ms = st.getFinalMovementSpeed();
+                // Célérité : les accélérations en % sont aussi plus efficaces
+                double factor = ms / REFERENCE_MS * (1 + totalBoost(p.getUniqueId(), now) * st.getMsBonusEfficiency())
                         * (1 - strongestSlow(p.getUniqueId(), now));
                 amount = factor - 1;
             } else {
@@ -188,6 +190,8 @@ public class CCManager {
 
     /** Attribue un contrôle au sort qui vient de toucher la cible, pour les effets d'objets. */
     private void notifyCC(LivingEntity target, boolean immobilize) {
+        var rm = LolPlugin.getInstance().getRuneManager();
+        if (rm != null && target instanceof Player tp) rm.onCrowdControlled(tp); // Inébranlable
         Player src = fr.lolmc.item.ItemEffects.recentAbilitySource(target);
         if (src != null) fr.lolmc.item.ItemEffects.onCrowdControl(src, target, immobilize);
         else fr.lolmc.item.ItemEffects.pendingCrowdControl(target, immobilize); // dégâts du sort juste après
@@ -199,35 +203,20 @@ public class CCManager {
      */
     public void applyAftershock(Player caster, LivingEntity ccTarget) {
         var rm = LolPlugin.getInstance().getRuneManager();
-        var cm = LolPlugin.getInstance().getChampionManager();
-        if (rm == null || cm == null || !cm.hasChampion(caster)) return;
-        var page = rm.getPage(caster.getUniqueId());
-        if (page == null || !"aftershock".equals(page.keystone)) return;
-        var state = LolPlugin.getInstance().getPassiveManager().getState(caster);
-        if (state.isOnCooldown(state.aftershockLastUse, 20000L)) return;
-        state.aftershockLastUse = System.currentTimeMillis();
+        if (rm != null) rm.aftershock(caster);
+    }
 
-        var stats = cm.getChampion(caster).getStats();
-        double bonusRes = Math.min(35 + stats.getBonusArmor() * 0.80, 150);
-        stats.addBonusArmor(bonusRes);
-        stats.addBonusMR(bonusRes);
-        caster.sendActionBar(Component.text("🛡 Réplique ! +" + (int) bonusRes + " résistances", NamedTextColor.GOLD));
+    /** Temps restant d'immobilisation (étourdissement, entrave, projection) de {@code id}, en ms. */
+    public long immobileRemainingMs(UUID id) {
+        long end = Math.max(stunUntil.getOrDefault(id, 0L),
+                Math.max(rootUntil.getOrDefault(id, 0L), airborneUntil.getOrDefault(id, 0L)));
+        return Math.max(0, end - now());
+    }
 
-        new BukkitRunnable() {
-            @Override public void run() {
-                stats.addBonusArmor(-bonusRes);
-                stats.addBonusMR(-bonusRes);
-                double shockDmg = 25.0 + stats.getBonusHP() * 0.08;
-                for (var e : caster.getWorld().getNearbyEntities(caster.getLocation(), 6, 3, 6)) {
-                    if (e instanceof Player enemyP && !enemyP.equals(caster) && cm.hasChampion(enemyP)
-                            && LolPlugin.getInstance().getTeamManager().areEnemies(caster, enemyP)) {
-                        fr.lolmc.util.DamageUtil.damage(caster, enemyP, shockDmg, true, fr.lolmc.util.DamageUtil.Type.MAGICAL);
-                    }
-                }
-                fr.lolmc.util.VisualEffectUtil.impactBurst(caster.getWorld(), caster.getLocation().add(0,1,0),
-                        Material.STONE, 0.3f, 1.0, 8, 6L);
-            }
-        }.runTaskLater(LolPlugin.getInstance(), 50L);
+    /** Déplacements ou actions restreints : étourdi, entravé, projeté, réduit au silence ou ralenti. */
+    public boolean isImpaired(LivingEntity e) {
+        UUID id = e.getUniqueId();
+        return isStunned(id) || isRooted(id) || isAirborne(id) || isSilenced(id) || isSlowed(e);
     }
 
     public void stun(LivingEntity target, int ticks) {
@@ -321,7 +310,12 @@ public class CCManager {
         }
     }
     /** Peut auto-attaquer ? (bloqué par stun seulement ; le silence n'empêche pas l'AA) */
-    public boolean canAutoAttack(UUID id) { return !isStunned(id) && !HeraldRodeo.isRiding(id); }
+    public boolean canAutoAttack(UUID id) {
+        Player p = org.bukkit.Bukkit.getPlayer(id);
+        var fm = LolPlugin.getInstance().getFlashManager();
+        if (p != null && fm != null && fm.isHexChanneling(p)) return false; // Saut Hextech en canalisation
+        return !isStunned(id) && !HeraldRodeo.isRiding(id);
+    }
 
     public void clear(UUID id) {
         ccImmuneUntil.remove(id);

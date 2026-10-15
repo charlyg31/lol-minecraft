@@ -75,6 +75,7 @@ public final class MasterYi extends BaseChampion implements fr.lolmc.champion.ba
             fr.lolmc.util.Untargetable.apply(c, 18);
             Location dest=safeTeleport(c.getLocation(),tgt.getLocation());
             c.teleport(dest);
+            fr.lolmc.LolPlugin.getInstance().getRuneManager().onDash(c); // Impact soudain
             double[] base=fr.lolmc.util.Balance.base("q_masteryi",new double[]{20,40,60,80,100});double dmg=base[getLevel()-1]+s.getFinalAD()*0.70; // wiki
             // Wiki : Frappe Alpha touche jusqu'à 4 ennemis (la cible et 3 autres autour d'elle)
             var struck=new java.util.ArrayList<org.bukkit.entity.LivingEntity>(); struck.add(tgt);

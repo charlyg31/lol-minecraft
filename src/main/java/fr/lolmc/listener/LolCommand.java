@@ -91,6 +91,14 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
                     }
                 }
                 case "shop" -> LolPlugin.getInstance().getShopListener().openShop(player);
+                case "grimoire", "spellbook" -> {
+                    if (args.length < 3) {
+                        player.sendMessage(Component.text("§e/l grimoire <sort possédé> <nouveau sort> §7— Grimoire déchaîné "
+                                + "(flash, ignite, heal, barrier, exhaust, teleport, smite, cleanse, ghost)"));
+                        break;
+                    }
+                    LolPlugin.getInstance().getRuneManager().spellbookSwap(player, args[1], args[2]);
+                }
                 default -> {
                     player.sendMessage(Component.text("§6=== Commandes /l ===", NamedTextColor.GOLD));
                     player.sendMessage(Component.text("§e/l runes §7— Configurer ses runes"));
@@ -98,6 +106,7 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
                     player.sendMessage(Component.text("§e/l ff §7— Vote d'abandon"));
                     player.sendMessage(Component.text("§e/l stats §7— Statistiques de la partie"));
                     player.sendMessage(Component.text("§e/l shop §7— Ouvrir la boutique"));
+                    player.sendMessage(Component.text("§e/l grimoire <sort> <nouveau> §7— Échanger un sort (Grimoire déchaîné)"));
                     player.sendMessage(Component.text("§7File d'attente, groupes et rôles : §e/lol <top|mid|adc|jungle|support|all>", NamedTextColor.GRAY));
                 }
             }

@@ -115,7 +115,7 @@ public class DamageUtil {
         // (avant : seul Abattage était appliqué, getDamageMultiplier n'était jamais appelé)
         if (as != null) {
             var rm = LolPlugin.getInstance().getRuneManager();
-            if (rm != null) rawAmount *= rm.getDamageMultiplier(attacker, victim);
+            if (rm != null) rawAmount *= rm.getDamageMultiplier(attacker, victim, !itemDmg);
         }
 
         if (attacker != null && !itemDmg) fr.lolmc.item.ItemEffects.notePreMitigation(attacker, rawAmount); // Échos d'Helia
@@ -159,6 +159,9 @@ public class DamageUtil {
         // Objets de la victime : Masque abyssal, Mailles du gardien, Randuin, Opposition céleste, Vœu du chevalier
         finalDmg = fr.lolmc.item.ItemEffects.incoming(victim, attacker, finalDmg, type, !isAbility,
                 fr.lolmc.item.ItemEffects.currentAttackCrit);
+        // Runes : Plaque d'os (dégâts réduits) et Optimisation glaciale (ennemi refroidi contre vos alliés)
+        var rmIn = LolPlugin.getInstance().getRuneManager();
+        if (rmIn != null) finalDmg = rmIn.modifyIncoming(victim, attacker, finalDmg);
         // Lien vital : le bouclier arrive AVANT le coup qui ferait passer sous 30 % des PV
         fr.lolmc.item.ItemEffects.beforeHealthLoss(victim, finalDmg, type);
         double afterShield = vs.absorbWithShield(finalDmg, type == Type.MAGICAL);
@@ -199,7 +202,7 @@ public class DamageUtil {
         var baseMgr = fr.lolmc.instance.InstanceHelper.baseManager(victim);
         if (baseMgr != null) baseMgr.onDamage(victim);
         var runeMgr = LolPlugin.getInstance().getRuneManager();
-        if (runeMgr != null) runeMgr.onDamageTaken(victim, afterShield, type == Type.MAGICAL);
+        if (runeMgr != null) runeMgr.onDamageTaken(victim, attacker, finalDmg);
         // Effets de runes (keystones) si l'attaquant est un joueur
         if (attacker != null) {
             var rm = LolPlugin.getInstance().getRuneManager();

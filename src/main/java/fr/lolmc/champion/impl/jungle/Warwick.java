@@ -195,6 +195,7 @@ public final class Warwick extends BaseChampion {
                 Location end=safeTeleport(c.getLocation(), c.getLocation().add(dir.clone().multiply(leap)));
                 end.setYaw(c.getLocation().getYaw()); end.setPitch(c.getLocation().getPitch());
                 c.teleport(end);
+                fr.lolmc.LolPlugin.getInstance().getRuneManager().onDash(c); // Impact soudain
                 c.sendActionBar(Component.text("🐺 Emprise Infinie : aucun champion percuté",NamedTextColor.GRAY));
                 return;
             }

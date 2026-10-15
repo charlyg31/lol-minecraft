@@ -177,11 +177,13 @@ public final class Janna extends BaseChampion {
                         cancel();return;
                     } // 6 ticks de 0.5s = 3s
                     // Soigne Janna et les alliés proches
-                    if(cm.hasChampion(c)) cm.getChampion(c).getHPSystem().heal(healPerTick);
+                    // Arcaniste axiomatique : soins de l'ultime +12 % (zone : +8 %)
+                    double healR=healPerTick*LolPlugin.getInstance().getRuneManager().ultimateHealShieldMultiplier(c, true);
+                    if(cm.hasChampion(c)) cm.getChampion(c).getHPSystem().heal(healR);
                     for(var ent : c.getWorld().getNearbyLivingEntities(c.getLocation(),7)){
                         if(ent instanceof Player ally && !ally.equals(c) && cm.hasChampion(ally)
                                 && LolPlugin.getInstance().getTeamManager().areAllies(c, ally)) // pas les ennemis
-                            { cm.getChampion(ally).getHPSystem().heal(healPerTick); fr.lolmc.item.ItemEffects.onAllyHealShield(c, ally, healPerTick, 0); }
+                            { cm.getChampion(ally).getHPSystem().heal(healR); fr.lolmc.item.ItemEffects.onAllyHealShield(c, ally, healR, 0); }
                     }
                     fr.lolmc.util.VisualEffectUtil.impactBurst(c.getWorld(),
                             c.getLocation().add(0,1,0), Material.PINK_STAINED_GLASS, 0.25f, 2.0, 5, 8L);

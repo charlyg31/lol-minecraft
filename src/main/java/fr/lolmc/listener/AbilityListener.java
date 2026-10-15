@@ -591,7 +591,10 @@ public class AbilityListener implements Listener {
         // Une frappe vanilla par seconde : × la vitesse d'attaque de Tibbers (enragée ou non)
         double dmg = fr.lolmc.champion.impl.mid.Annie.getTibbersAttackDamage(bear)
                 * fr.lolmc.champion.impl.mid.Annie.consumeTibbersAttackSpeed(bear);
-        fr.lolmc.util.DamageUtil.damageEntity(annie, victim, dmg, false, fr.lolmc.util.DamageUtil.Type.MAGICAL);
+        // Attaques de Tibbers : dégâts de l'ultime d'Annie, à cible unique (Arcaniste axiomatique)
+        fr.lolmc.rune.RuneManager.beginUltimateSource(true);
+        try { fr.lolmc.util.DamageUtil.damageEntity(annie, victim, dmg, false, fr.lolmc.util.DamageUtil.Type.MAGICAL); }
+        finally { fr.lolmc.rune.RuneManager.endUltimateSource(); }
     }
 
     /**

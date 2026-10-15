@@ -232,7 +232,9 @@ public final class Ashe extends BaseChampion {
         private void arrowHit(Player c, ChampionStats s, org.bukkit.entity.LivingEntity main, double dmg, double dist){
             // Distance parcourue → durée du stun (1 à 3.5s = 20 à 70 ticks)
             int stunTicks=(int)Math.min(70, 20+dist*2.5);
-            TargetingUtil.dealDamage(c, main, dmg, TargetingUtil.DmgType.MAGICAL);
+            fr.lolmc.rune.RuneManager.beginSingleTarget(); // cible principale : dégâts à cible unique
+            try { TargetingUtil.dealDamage(c, main, dmg, TargetingUtil.DmgType.MAGICAL); }
+            finally { fr.lolmc.rune.RuneManager.endSingleTarget(); }
             // Vrai stun (immobilise + empêche d'agir, réduit par la ténacité)
             fr.lolmc.LolPlugin.getInstance().getCCManager().stun(main, stunTicks);
             fr.lolmc.LolPlugin.getInstance().getCCManager().markCoordinatedFire(c, main);

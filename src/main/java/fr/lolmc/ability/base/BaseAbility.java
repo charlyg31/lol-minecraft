@@ -103,6 +103,7 @@ public abstract class BaseAbility {
         Location safe = safeTeleport(from, dest);
         safe.setDirection(offset > 0 ? dir.clone().multiply(-1) : dir);
         caster.teleport(safe);
+        fr.lolmc.LolPlugin.getInstance().getRuneManager().onDash(caster); // Impact soudain
     }
 
     // ─── Cooldown ────────────────────────────────────────────────

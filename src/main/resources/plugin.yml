@@ -7,7 +7,7 @@ description: League of Legends en Minecraft — 20 champions
 commands:
   l:
     description: Commandes joueur LoL (en partie)
-    usage: /l <runes|ping|ff|stats>
+    usage: /l <runes|ping|ff|stats|shop|grimoire>
     permission: lolmc.player
   lola:
     description: Commandes admin LoL

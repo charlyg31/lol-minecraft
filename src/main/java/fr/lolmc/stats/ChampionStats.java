@@ -160,7 +160,15 @@ public final class ChampionStats {
     /** Échelle propre au champion (Yasuo : 95 %). */
     private double critDamageScale = 1.0;
     public void setCritDamageScale(double v) { critDamageScale = v; }
-    public double getFinalMovementSpeed(){ return (baseMovementSpeed + bonusMovementSpeed) * multMovementSpeed; }
+    public double getFinalMovementSpeed(){
+        // Célérité : les bonus de vitesse (fixes et en %) sont plus efficaces ; pas les ralentissements
+        double mult = multMovementSpeed > 1 ? 1 + (multMovementSpeed - 1) * msBonusEfficiency : multMovementSpeed;
+        return (baseMovementSpeed + bonusMovementSpeed * msBonusEfficiency) * mult;
+    }
+    /** Efficacité des bonus de vitesse de déplacement (1.07 avec Célérité). */
+    private double msBonusEfficiency = 1.0;
+    public double getMsBonusEfficiency() { return msBonusEfficiency; }
+    public void addMsBonusEfficiency(double v) { msBonusEfficiency += v; }
     public double getFinalRange()        { return baseRange + bonusRange; }
     public double getFinalHPRegen()      { return baseHPRegen + growthBonus(growthHPRegen) + bonusHPRegen; }
     /** Part de la régénération de PV due au niveau (croissance LoL). */
@@ -299,8 +307,13 @@ public final class ChampionStats {
     // BOUCLIERS (vrai système, se consument)
     // ══════════════════════════════════════════════
 
+    /** Appelé à chaque nouveau bouclier reçu (rune Coup de bouclier), ou null. */
+    private java.util.function.DoubleConsumer shieldListener;
+    public void setShieldListener(java.util.function.DoubleConsumer l) { shieldListener = l; }
+
     public void addShield(double amount)       {
         if (amount > 0 && hasSerpentVenom()) amount *= (1 - serpentVenomReduction);
+        if (amount > 0 && shieldListener != null) shieldListener.accept(amount);
         // Un montant négatif retire un bouclier expiré : borné à 0, sinon un bouclier déjà
         // consommé par des dégâts laisserait un solde négatif qui annulerait le suivant.
         shieldAmount = Math.max(0, shieldAmount + amount);
@@ -400,7 +413,7 @@ public final class ChampionStats {
         bonusArmorPenPercent=bonusFlatMagicPen=bonusMagicPenPercent=0;
         flatDamageReduction=percentDamageReduction=aaPercentReduction=tenacity=0;
         multAttackDamage=multAbilityPower=multMovementSpeed=multAttackSpeed=multMaxHP=1.0;
-        grievousWoundsReduction = 0; grievousWoundsExpire = 0; healAmpBonus = 0; runeHealAmp = 0; slowResist = 0;
+        grievousWoundsReduction = 0; grievousWoundsExpire = 0; healAmpBonus = 0; runeHealAmp = 0; lowHealthHealAmp = 0; msBonusEfficiency = 1.0; slowResist = 0;
     }
 
     // Getters de base (affichage + passifs)
@@ -433,13 +446,19 @@ public final class ChampionStats {
     // Rune Revitalize : +5% soin/bouclier, statique (contrairement à healAmpBonus, jamais recalculé).
     private double runeHealAmp = 0.0;
     public void addRuneHealAmp(double v) { runeHealAmp += v; }
+    // Rune Revitalisation : soins plus puissants sous 40 % des PV
+    private double lowHealthHealAmp = 0.0;
+    public void addLowHealthHealAmp(double v) { lowHealthHealAmp += v; }
 
     /** Retourne le multiplicateur de soin/bouclier effectif (blessures graves ET amplification cumulées). */
-    public double getHealMultiplier() {
+    public double getHealMultiplier() { return getHealMultiplier(false); }
+
+    /** Multiplicateur de soin ; {@code lowHealth} : la cible a moins de 40 % de ses PV (Revitalisation). */
+    public double getHealMultiplier(boolean lowHealth) {
         if (grievousWoundsExpire > 0 && System.currentTimeMillis() > grievousWoundsExpire) {
             grievousWoundsReduction = 0; grievousWoundsExpire = 0;
         }
-        return (1.0 - grievousWoundsReduction) * (1.0 + healAmpBonus + runeHealAmp);
+        return (1.0 - grievousWoundsReduction) * (1.0 + healAmpBonus + runeHealAmp + (lowHealth ? lowHealthHealAmp : 0));
     }
 
     public boolean hasGrievousWounds() {

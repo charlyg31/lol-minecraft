@@ -62,7 +62,7 @@ public class RuneRegistry {
 
         // ═══════════════ DOMINATION ═══════════════
         add("electrocute", "Électrocution", Path.DOMINATION, 0,
-            "Toucher un champion avec 3 attaques ou compétences en moins de 3 s inflige des dégâts adaptatifs.");
+            "Toucher un champion avec 3 attaques ou compétences différentes en moins de 3 s inflige des dégâts adaptatifs.");
         add("dark_harvest", "Moisson noire", Path.DOMINATION, 0,
             "Blesser un champion à qui il reste peu de PV lui inflige des dégâts adaptatifs et siphonne son âme.");
         add("hail_blades", "Déluge de lames", Path.DOMINATION, 0,
@@ -90,7 +90,7 @@ public class RuneRegistry {
         add("arcane_comet", "Comète arcanique", Path.SORCERY, 0,
             "Blesser un champion avec une compétence fait tomber une comète sur sa position.");
         add("phase_rush", "Assaut du maraudeur", Path.SORCERY, 0,
-            "Infliger 25% des PV max d'un champion en 4 s vous octroie une forte vitesse de déplacement.");
+            "Infliger 25% des PV max d'un champion en 3 s : +48% de vitesse (36% à distance) et 50% de résistance aux ralentissements 4 s.");
         add("deathfire_touch", "Toucher de feu mortel", Path.SORCERY, 0,
             "Blesser un champion avec une compétence le brûle (dégâts magiques par seconde, +75% après 3 s).");
         add("axiom_arcanist", "Arcaniste axiomatique", Path.SORCERY, 1,
@@ -101,11 +101,11 @@ public class RuneRegistry {
             "Après un sort d'invocateur, vous gagnez un bref bonus de vitesse de déplacement.");
         add("transcendence", "Transcendance", Path.SORCERY, 2,
             "Niveau 5 et 8 : +5 accélération de compétence. Niveau 11 : une élimination réduit vos délais de 20%.");
-        add("celerity", "Célérité", Path.SORCERY, 2, "+1% de vitesse de déplacement.");
+        add("celerity", "Célérité", Path.SORCERY, 2, "Bonus de vitesse de déplacement 7% plus efficaces, et +1% de vitesse de déplacement.");
         add("absolute_focus", "Concentration absolue", Path.SORCERY, 2,
             "Au-dessus de 70% de PV : jusqu'à +18 AD ou +30 AP (adaptatif, selon le niveau).");
         add("scorch", "Brûlure", Path.SORCERY, 3, "Toutes les 10 s, votre prochaine compétence brûle le champion touché.");
-        add("waterwalking", "Marche sur l'eau", Path.SORCERY, 3, "Dans la rivière, vous gagnez de la vitesse de déplacement.");
+        add("waterwalking", "Marche sur l'eau", Path.SORCERY, 3, "Dans la rivière : +10 vitesse de déplacement et +13 à 30 force adaptative.");
         add("gathering_storm", "Tempête menaçante", Path.SORCERY, 3,
             "Toutes les 10 min, vous gagnez des dégâts d'attaque ou de la puissance (adaptatif).");
 
@@ -115,11 +115,11 @@ public class RuneRegistry {
         add("aftershock", "Après-coup", Path.RESOLVE, 0,
             "Après avoir immobilisé un champion, vous augmentez vos défenses, puis infligez des dégâts autour de vous.");
         add("guardian", "Gardien", Path.RESOLVE, 0,
-            "Protège un allié proche : si lui ou vous subissez des dégâts, vous recevez tous les deux un bouclier.");
+            "Protège les alliés proches : si l'un d'eux ou vous subissez de gros dégâts, vous recevez tous les deux un bouclier.");
         add("demolish", "Démolition", Path.RESOLVE, 1, "Votre troisième attaque contre une tourelle inflige des dégâts bonus.");
-        add("font_life", "Fontaine de vie", Path.RESOLVE, 1, "Restreindre un champion ennemi soigne les alliés proches.");
+        add("font_life", "Fontaine de vie", Path.RESOLVE, 1, "Restreindre un champion ennemi vous soigne, ainsi que l'allié proche le plus blessé (20 s).");
         add("shield_bash", "Coup de bouclier", Path.RESOLVE, 1,
-            "Avec un bouclier, votre prochaine attaque contre un champion inflige des dégâts adaptatifs.");
+            "Après un nouveau bouclier, votre prochaine attaque contre un champion inflige des dégâts adaptatifs.");
         add("conditioning", "Conditionnement", Path.RESOLVE, 2,
             "Après 12 min : +8 armure et +8 résistance magique, puis +3% d'armure et de résistance magique.");
         add("second_wind", "Second souffle", Path.RESOLVE, 2,
@@ -128,25 +128,25 @@ public class RuneRegistry {
             "Après des dégâts d'un champion, ses 3 prochaines attaques vous infligent 30-60 dégâts de moins (55 s).");
         add("overgrowth", "Surcroissance", Path.RESOLVE, 3,
             "+3 PV max tous les 8 sbires ou monstres morts près de vous. À 120 : +3,5% PV max.");
-        add("revitalize", "Revitalisation", Path.RESOLVE, 3, "+5% d'efficacité des soins et boucliers.");
-        add("unflinching", "Inébranlable", Path.RESOLVE, 3, "Vous gagnez de la ténacité et de la résistance aux ralentissements.");
+        add("revitalize", "Revitalisation", Path.RESOLVE, 3, "+5% d'efficacité des soins et boucliers ; +10% sous 40% des PV.");
+        add("unflinching", "Inébranlable", Path.RESOLVE, 3, "+10 armure et résistance magique sous contrôle de foule, puis pendant 2 s.");
 
         // ═══════════════ INSPIRATION ═══════════════
         add("glacial_augment", "Optimisation glaciale", Path.INSPIRATION, 0,
-            "Vos attaques ralentissent les champions ennemis (par cible, 7 s de récupération).");
+            "Immobiliser un champion crée 3 rayons glacés qui ralentissent et affaiblissent les ennemis (25 s).");
         add("unsealed_spellbook", "Grimoire déchaîné", Path.INSPIRATION, 0,
-            "Changez vos sorts d'invocateur en dehors des combats.");
+            "Échangez vos sorts d'invocateur hors combat dès 6:00 : /l grimoire <sort> <nouveau>.");
         add("first_strike", "Premier coup", Path.INSPIRATION, 0,
             "En engageant un champion : +7% de dégâts pendant 3 s et des PO selon les dégâts infligés.");
         add("hextech_flashtraption", "Canaliportation Hextech", Path.INSPIRATION, 1,
             "Quand Saut éclair est en récupération, il est remplacé par un saut canalisé.");
         add("magical_footwear", "Chaussures magiques", Path.INSPIRATION, 1,
-            "Bottes gratuites après 12 min (45 s plus tôt par élimination).");
+            "Bottes (+10 vitesse) après 12 min, 45 s plus tôt par élimination ; pas de bottes avant.");
         add("cash_back", "Remise immédiate", Path.INSPIRATION, 1, "Vous récupérez 7,5% des PO dépensées en objets légendaires.");
         add("triple_tonic", "Triple tonique", Path.INSPIRATION, 2,
-            "Niveau 3 : élixir d'avidité. Niveau 6 : élixir de force. Niveau 9 : élixir de compétence.");
+            "Niveau 3 : élixir d'avarice. Niveau 6 : élixir de force. Niveau 9 : élixir de compétence.");
         add("time_warp_tonic", "Philtre de chronodistorsion", Path.INSPIRATION, 2,
-            "Les potions vous rendent immédiatement une partie des PV prévus.");
+            "Les potions vous rendent immédiatement 40% des PV prévus.");
         add("biscuit_delivery", "Livraison de biscuits", Path.INSPIRATION, 2,
             "Un biscuit gratuit toutes les 2 min, jusqu'à 6 min de jeu.");
         add("cosmic_insight", "Savoir cosmique", Path.INSPIRATION, 3,
