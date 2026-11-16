@@ -169,6 +169,7 @@ public class MinionManager {
         if (spawning) return;
         purgeWorld(myWorld());
         spawning = true;
+        holdSpawnChunks();
 
         scheduleNextWave(FIRST_WAVE_DELAY);
 
@@ -195,10 +196,52 @@ public class MinionManager {
         }.runTaskLater(LolPlugin.getInstance(), delayTicks);
     }
 
+    /**
+     * Garde chargés (3×3 chunks) les points d'apparition des deux équipes pendant la partie.
+     * Sans ça, un sbire qui apparaît loin de tout joueur voit son chunk se décharger avant le
+     * passage du ChunkLoaderManager (1 fois/s) : il reste figé dans sa base jusqu'à l'arrivée
+     * d'un joueur.
+     */
+    private void holdSpawnChunks() {
+        releaseSpawnChunks();
+        org.bukkit.World w = myWorld();
+        if (w == null) return;
+        for (String lane : List.of("top", "mid", "bot")) {
+            for (Team team : Team.values()) {
+                Location sp = getMinionSpawn(team, lane);
+                if (sp == null || !w.equals(sp.getWorld())) continue;
+                int cx = sp.getBlockX() >> 4, cz = sp.getBlockZ() >> 4;
+                for (int dx = -1; dx <= 1; dx++) {
+                    for (int dz = -1; dz <= 1; dz++) {
+                        long key = (((long) (cx + dx)) << 32) ^ ((cz + dz) & 0xffffffffL);
+                        if (heldSpawnChunks.add(key)) {
+                            w.addPluginChunkTicket(cx + dx, cz + dz, LolPlugin.getInstance());
+                        }
+                    }
+                }
+            }
+        }
+        heldSpawnWorld = w;
+    }
+
+    private void releaseSpawnChunks() {
+        if (heldSpawnWorld != null) {
+            for (long key : heldSpawnChunks) {
+                heldSpawnWorld.removePluginChunkTicket((int) (key >> 32), (int) key, LolPlugin.getInstance());
+            }
+        }
+        heldSpawnChunks.clear();
+        heldSpawnWorld = null;
+    }
+
+    private final java.util.Set<Long> heldSpawnChunks = new java.util.HashSet<>();
+    private org.bukkit.World heldSpawnWorld;
+
     public void stopWaves() {
         spawning = false;
         if (waveTask != null) { waveTask.cancel(); waveTask = null; }
         if (moveTask != null) { moveTask.cancel(); moveTask = null; }
+        releaseSpawnChunks();
         clearAllMinions();
         waveCount = 0;
         superMinionLanes.clear();
@@ -306,6 +349,9 @@ public class MinionManager {
     /** Rend le sbire invisible et lui pose un modèle custom anime (façon jungle). */
     private void applyMinionModel(LivingEntity minion, MinionType type, Team team, float hitboxScale) {
         LIVE.add(minion.getUniqueId());
+        // Un husk/zombie est un monstre hostile : sans ça, Minecraft le supprime dès qu'il est à
+        // plus de 128 blocs de tout joueur (les sbires rouges disparaissaient à l'apparition).
+        minion.setRemoveWhenFarAway(false);
         MobAppearance.makeInvisible(minion);
         MobAppearance.setSilent(minion, true);
         List<UUID> parts = minionModel(type, team).spawnOn(minion);

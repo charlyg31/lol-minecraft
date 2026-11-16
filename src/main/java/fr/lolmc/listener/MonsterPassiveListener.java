@@ -61,4 +61,14 @@ public class MonsterPassiveListener implements Listener {
             fr.lolmc.util.MobAnimator.triggerAttack(dmg.getUniqueId());
         }
     }
+
+    /**
+     * Le Gromp est un slime : à sa mort, Minecraft le divisait en petits slimes qui héritaient de
+     * son nom « Gromp » mais d'aucun marqueur du plugin. Ces orphelins restaient dans le monde
+     * pour toujours (ni récompense, ni nettoyage à /lola stop) et finissaient dans le template.
+     */
+    @EventHandler(ignoreCancelled = true)
+    public void onJungleSlimeSplit(org.bukkit.event.entity.SlimeSplitEvent e) {
+        if (JungleManager.isJungleMonster(e.getEntity())) e.setCancelled(true);
+    }
 }

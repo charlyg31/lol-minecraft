@@ -468,6 +468,13 @@ public class JungleManager {
 
             Entity entity = spawnLoc.getWorld().spawnEntity(spawnLoc, type.entity);
             if (!(entity instanceof LivingEntity mob)) { entity.remove(); continue; }
+            // Vex (raptors) : vanilla ne coupe sa gravité qu'APRÈS son 1er tick, et il traverse les
+            // blocs. Sans IA (setAware(false)) pour compenser, cette impulsion le faisait couler
+            // d'environ 4 blocs sous le sol du camp. On coupe la gravité dès l'apparition.
+            if (mob.getType() == EntityType.VEX) {
+                mob.setGravity(false);
+                mob.setVelocity(new org.bukkit.util.Vector());
+            }
 
             // Le premier mob du groupe est le grand ; les autres sont petits (le 2e Krug est moyen)
             boolean isLarge = (i == 0);
