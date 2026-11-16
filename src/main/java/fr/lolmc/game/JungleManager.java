@@ -448,9 +448,12 @@ public class JungleManager {
         hideAllRespawnTimers();
     }
 
-    private void spawnCamp(CampSpawn camp) {
+    private void spawnCamp(CampSpawn camp) { spawnCamp(camp, true); }
+
+    /** @param rotateDragon false pour un monstre de test : la rotation des dragons de la partie n'avance pas. */
+    private void spawnCamp(CampSpawn camp, boolean rotateDragon) {
         // Fosse du dragon : l'élément suit la rotation LoL
-        if (camp.type.isDragon()) camp.type = nextDragonType();
+        if (rotateDragon && camp.type.isDragon()) camp.type = nextDragonType();
         MonsterType type = camp.type;
         Location loc = camp.location;
         if (loc.getWorld() == null) return;
@@ -1399,19 +1402,22 @@ public class JungleManager {
     }
 
 
-    /** Spawn un monstre de jungle de test à la position donnée. */
-    public void spawnTestMonster(Location loc, String monsterTypeName) {
+    /**
+     * Spawn un monstre de jungle de test à la position donnée, comme un vrai camp (entité,
+     * modèle, stats, groupe, IA coupée), mais rattaché à aucun camp : il ne réapparaît pas.
+     * Avant : un zombie vanilla sans modèle, qui se déplaçait et brûlait au soleil.
+     * @return false si le type est inconnu
+     */
+    public boolean spawnTestMonster(Location loc, String monsterTypeName) {
+        MonsterType type;
         try {
-            MonsterType type = MonsterType.valueOf(monsterTypeName.toUpperCase());
-            var entity = loc.getWorld().spawn(loc, Zombie.class);
-            var pdc = entity.getPersistentDataContainer();
-            pdc.set(KEY_MONSTER, PersistentDataType.STRING, type.name());
-            applyMonsterStats(entity, type, Size.LARGE, 0, false);
-            liveMonsters.put(entity.getUniqueId(), type);
-            // Apparence appliquée par applyMonsterAppearance si configurée
+            type = MonsterType.valueOf(monsterTypeName.toUpperCase());
         } catch (IllegalArgumentException e) {
             LolPlugin.getInstance().getLogger().warning("Monster inconnu: " + monsterTypeName);
+            return false;
         }
+        spawnCamp(new CampSpawn("test_" + type.name().toLowerCase(), type, loc.clone()), false);
+        return true;
     }
 
     /** Expose applyBuff() en public pour les commandes admin. */

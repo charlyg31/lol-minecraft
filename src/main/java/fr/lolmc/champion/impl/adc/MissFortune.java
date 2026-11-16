@@ -124,7 +124,7 @@ public final class MissFortune extends BaseChampion implements fr.lolmc.champion
     }
 
     static class W extends BaseAbility {
-        W(){super("w_missfortune","Strut",Material.LEATHER_BOOTS,AbilitySlot.W,
+        W(){super("w_missfortune","Fanfaronnade",Material.LEATHER_BOOTS,AbilitySlot.W,
             new double[]{12,12,12,12,12},0,0,DamageType.TRUE);
             resourceCost = 45;}
         @Override public void cast(Player c,ChampionStats s,Player t){

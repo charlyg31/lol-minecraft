@@ -67,7 +67,7 @@ public final class Veigar extends BaseChampion implements fr.lolmc.champion.base
     }
 
     static class Q extends BaseAbility {
-        Q(){super("q_veigar","Frappe Baleful",Material.AMETHYST_SHARD,AbilitySlot.Q,
+        Q(){super("q_veigar","Frappe Maléfique",Material.AMETHYST_SHARD,AbilitySlot.Q,
                 new double[]{6,5.5,5,4.5,4},20,0,DamageType.MAGICAL);
             resourceCost = 30; resourceCosts = new double[]{30,35,40,45,50};}
         @Override public void cast(Player c,ChampionStats s,Player t){

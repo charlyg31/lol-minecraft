@@ -275,7 +275,7 @@ public final class LeeSin extends BaseChampion implements fr.lolmc.champion.base
     }
 
     static class R extends BaseAbility {
-        R(){super("r_leesin","Dragon's Rage",Material.DRAGON_EGG,AbilitySlot.R,
+        R(){super("r_leesin","Rage du Dragon",Material.DRAGON_EGG,AbilitySlot.R,
                 new double[]{110,85,60},5,0,DamageType.PHYSICAL);
             resourceCost = 0;}
         @Override public void cast(Player c,ChampionStats s,Player t){

@@ -316,7 +316,7 @@ public final class Annie extends BaseChampion implements fr.lolmc.champion.base.
     }
 
     static class E extends BaseAbility {
-        E(){super("e_annie","Molten Shield",Material.ORANGE_STAINED_GLASS,AbilitySlot.E,
+        E(){super("e_annie","Bouclier en Fusion",Material.ORANGE_STAINED_GLASS,AbilitySlot.E,
                 new double[]{10,10,10,10,10},0,0,DamageType.MAGICAL);
             resourceCost = 60; resourceCosts = new double[]{60,65,70,75,80};}
         @Override public void cast(Player c,ChampionStats s,Player t){

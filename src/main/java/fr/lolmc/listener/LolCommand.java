@@ -1029,17 +1029,26 @@ private void handleSolo(Player player, String[] args) {
             case "minion_caster" -> { fr.lolmc.instance.InstanceHelper.minionManager(player).spawnTestMinion(loc, team, "caster"); player.sendMessage(Component.text("✔ Sbire caster spawné", NamedTextColor.GREEN)); }
             case "minion_cannon" -> { fr.lolmc.instance.InstanceHelper.minionManager(player).spawnTestMinion(loc, team, "cannon"); player.sendMessage(Component.text("✔ Sbire canon spawné", NamedTextColor.GREEN)); }
             case "minion_super"  -> { fr.lolmc.instance.InstanceHelper.minionManager(player).spawnTestMinion(loc, team, "super");  player.sendMessage(Component.text("✔ Super-sbire spawné", NamedTextColor.GREEN)); }
-            case "dragon"        -> { fr.lolmc.instance.InstanceHelper.jungleManager(player).spawnTestMonster(loc, "DRAGON_INFERNAL"); player.sendMessage(Component.text("✔ Dragon spawné", NamedTextColor.RED)); }
-            case "baron"         -> { fr.lolmc.instance.InstanceHelper.jungleManager(player).spawnTestMonster(loc, "BARON");           player.sendMessage(Component.text("✔ Baron Nashor spawné", NamedTextColor.LIGHT_PURPLE)); }
-            case "herald"        -> { fr.lolmc.instance.InstanceHelper.jungleManager(player).spawnTestMonster(loc, "HERALD");          player.sendMessage(Component.text("✔ Héraut spawné", NamedTextColor.AQUA)); }
-            case "wolf"          -> { fr.lolmc.instance.InstanceHelper.jungleManager(player).spawnTestMonster(loc, "WOLF");            player.sendMessage(Component.text("✔ Loup spawné", NamedTextColor.GRAY)); }
-            case "blue"          -> { fr.lolmc.instance.InstanceHelper.jungleManager(player).spawnTestMonster(loc, "BLUE");            player.sendMessage(Component.text("✔ Blue Sentinel spawné", NamedTextColor.BLUE)); }
-            case "red"           -> { fr.lolmc.instance.InstanceHelper.jungleManager(player).spawnTestMonster(loc, "RED");             player.sendMessage(Component.text("✔ Red Brambleback spawné", NamedTextColor.RED)); }
-            case "gromp"         -> { fr.lolmc.instance.InstanceHelper.jungleManager(player).spawnTestMonster(loc, "GROMP");           player.sendMessage(Component.text("✔ Gromp spawné", NamedTextColor.GREEN)); }
-            case "raptor"        -> { fr.lolmc.instance.InstanceHelper.jungleManager(player).spawnTestMonster(loc, "RAPTOR");          player.sendMessage(Component.text("✔ Raptors spawnés", NamedTextColor.YELLOW)); }
-            case "krug"          -> { fr.lolmc.instance.InstanceHelper.jungleManager(player).spawnTestMonster(loc, "KRUG");            player.sendMessage(Component.text("✔ Krugs spawnés", NamedTextColor.GOLD)); }
+            // Noms de MonsterType exacts (avant : "WOLF", "BLUE" et "RED" n'existaient pas, rien n'apparaissait)
+            case "dragon"  -> spawnTestMonster(player, loc, "DRAGON_INFERNAL", "Dragon", NamedTextColor.RED);
+            case "baron"   -> spawnTestMonster(player, loc, "BARON", "Baron Nashor", NamedTextColor.LIGHT_PURPLE);
+            case "herald"  -> spawnTestMonster(player, loc, "HERALD", "Héraut", NamedTextColor.AQUA);
+            case "wolf"    -> spawnTestMonster(player, loc, "MURKWOLF", "Loups", NamedTextColor.GRAY);
+            case "blue"    -> spawnTestMonster(player, loc, "BLUE_BUFF", "Sentinelle bleue", NamedTextColor.BLUE);
+            case "red"     -> spawnTestMonster(player, loc, "RED_BUFF", "Sanglepince", NamedTextColor.RED);
+            case "gromp"   -> spawnTestMonster(player, loc, "GROMP", "Gromp", NamedTextColor.GREEN);
+            case "raptor"  -> spawnTestMonster(player, loc, "RAPTOR", "Raptors", NamedTextColor.YELLOW);
+            case "krug"    -> spawnTestMonster(player, loc, "KRUG", "Krugs", NamedTextColor.GOLD);
             default -> player.sendMessage(Component.text("§cEntité inconnue: " + type, NamedTextColor.RED));
         }
+    }
+
+    /** Monstre de jungle de test ; le message ne confirme que ce qui est vraiment apparu. */
+    private void spawnTestMonster(Player player, org.bukkit.Location loc, String monsterType, String label,
+                                  NamedTextColor color) {
+        boolean ok = fr.lolmc.instance.InstanceHelper.jungleManager(player).spawnTestMonster(loc, monsterType);
+        player.sendMessage(ok ? Component.text("✔ " + label + " : apparu(s)", color)
+                : Component.text("❌ Type de monstre inconnu : " + monsterType, NamedTextColor.RED));
     }
 
     // ── /lola buff <type> [joueur] ─────────────────────────────────────
