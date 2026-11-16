@@ -317,17 +317,22 @@ public class AbilityListener implements Listener {
             // Les auto-attaques partent ensuite toutes seules, uniquement quand la cible
             // verrouillée est dans la portée d'attaque (voir AutoAttackManager.startAutoFire).
 
+            // Structure ennemie sous le viseur (emprise réelle de la schématique)
+            GameStructure aimedStructure = getAimedEnemyStructure(caster);
+
             // 1. Champion ennemi visé
             Player aimed = (target != null && isLockableEnemy(caster, target))
                     ? target : getTargetedEnemyPlayer(caster);
-            if (aimed != null) {
+            if (aimed != null && (aimedStructure == null || fr.lolmc.game.StructureTargeting.crosshairOn(caster, aimed))) {
                 aam.toggleLock(caster, aimed);
                 return;
             }
 
-            // 2. Sbire ennemi / monstre de jungle visé
+            // 2. Sbire ennemi / monstre de jungle visé. Le cône de recherche est large (45°) :
+            //    si le viseur est posé sur une structure, seul un sbire réellement sous le viseur
+            //    passe devant elle (sinon les sbires autour de la tourelle « volaient » le clic).
             org.bukkit.entity.LivingEntity entity = getTargetedEntity(caster);
-            if (entity != null) {
+            if (entity != null && (aimedStructure == null || fr.lolmc.game.StructureTargeting.crosshairOn(caster, entity))) {
                 aam.toggleLock(caster, entity);
                 return;
             }
@@ -335,10 +340,21 @@ public class AbilityListener implements Listener {
             // 3. Plante de la jungle visée : une attaque la détruit
             if (LolPlugin.getInstance().getPlantManager().tryAttack(caster)) { aam.clearLock(caster); return; }
 
-            // 4. Structure ennemie dans la portée AA (annule le lock précédent)
-            if (tryAttackStructure(caster)) { aam.clearLock(caster); return; }
+            // 4. Structure ennemie visée : verrouillage, l'auto-fire attaque dès qu'elle est à portée
+            if (aimedStructure != null) {
+                var mm = fr.lolmc.instance.InstanceHelper.mapManager(caster);
+                if (mm != null && mm.isInvulnerable(aimedStructure)) {
+                    aam.clearLock(caster);
+                    caster.sendActionBar(net.kyori.adventure.text.Component.text(
+                        "🛡 Structure protégée : détruis d'abord celle qui la précède !",
+                        net.kyori.adventure.text.format.NamedTextColor.RED));
+                    return;
+                }
+                aam.toggleStructureLock(caster, aimedStructure);
+                return;
+            }
 
-            // 4. Rien de verrouillable : annule le lock (comme le Stop de LoL), aucune attaque
+            // 5. Rien de verrouillable : annule le lock (comme le Stop de LoL), aucune attaque
             aam.clearLock(caster);
 
         } else if (slot >= 1 && slot <= 4) {
@@ -377,46 +393,15 @@ public class AbilityListener implements Listener {
     }
 
     /**
-     * Cherche la structure ennemie visée dans la portée AA et l'attaque.
-     * @return true si une structure a été attaquée
+     * Structure ennemie sous le viseur (jusqu'à 30 blocs), d'après l'emprise réelle de sa
+     * schématique. Avant, la portée se mesurait jusqu'au four d'ancrage (souvent au milieu ou
+     * dans un coin de la tourelle) : les champions de mêlée ne pouvaient jamais l'atteindre.
      */
-    private boolean tryAttackStructure(Player caster) {
-        if (!manager.hasChampion(caster)) return false;
-        var champ = manager.getChampion(caster);
-        double range = champ.getAutoAttackRange();
+    private GameStructure getAimedEnemyStructure(Player caster) {
         var tm = LolPlugin.getInstance().getTeamManager();
         var mm = fr.lolmc.instance.InstanceHelper.mapManager(caster);
-        if (mm == null) return false;
-
-        GameStructure closest = null;
-        double closestDist = Double.MAX_VALUE;
-        var eye = caster.getEyeLocation();
-        var dir = eye.getDirection();
-
-        for (var structure : mm.getStructures()) {
-            if (structure.isDestroyed()) continue;
-            if (structure.getTeam() == tm.getTeam(caster)) continue; // structure alliée
-            if (mm.isInvulnerable(structure)) continue;               // protection anti-backdoor
-            var center = structure.getCenter().clone().add(0.5, 1, 0.5);
-            if (!center.getWorld().equals(caster.getWorld())) continue;
-            double dist = caster.getLocation().distance(center);
-            if (dist > range) continue;
-            // Vérifier que le joueur regarde vers la structure (angle ≤ 45°)
-            var toStruct = center.toVector().subtract(eye.toVector()).normalize();
-            double dot = dir.dot(toStruct);
-            if (dot < 0.7) continue; // cos(45°) ≈ 0.7
-            if (dist < closestDist) { closestDist = dist; closest = structure; }
-        }
-
-        if (closest == null) return false;
-
-        var aam = LolPlugin.getInstance().getAutoAttackManager();
-        if (!aam.canAutoAttack(caster)) return false;
-        aam.triggerCooldown(caster);
-
-        var sdl = LolPlugin.getInstance().getStructureDamageListener();
-        if (sdl != null) sdl.applyAutoAttackDamage(caster, closest);
-        return true;
+        var team = tm.getTeam(caster);
+        return fr.lolmc.game.StructureTargeting.aimed(caster, mm, s -> s.getTeam() != team);
     }
 
     /** Cible verrouillable : ennemi (champion, sbire adverse, monstre) et visible par le joueur. */

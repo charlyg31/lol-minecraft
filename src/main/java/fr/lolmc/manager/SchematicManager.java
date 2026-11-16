@@ -221,6 +221,49 @@ public class SchematicManager {
         });
     }
 
+    /** Emprise relative au four de chaque schématique : {minX, maxX, minY, maxY, minZ, maxZ, facingIdx}. */
+    private static final java.util.Map<String, int[]> RELATIVE_BOUNDS = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /**
+     * Boîte englobante, en coordonnées du monde, de la schématique {@code name} collée sur le four
+     * {@code groundFurnaceLoc} (même rotation et même décalage Y+1 que pasteSchematicAboveAnchor).
+     * @return null si la schématique est introuvable ou vide
+     */
+    public org.bukkit.util.BoundingBox getBounds(String name, Location groundFurnaceLoc) {
+        if (name == null || groundFurnaceLoc == null || groundFurnaceLoc.getWorld() == null) return null;
+        int[] rel = RELATIVE_BOUNDS.computeIfAbsent(name, n -> {
+            File file = new File(schematicsFolder, n + ".json");
+            if (!file.exists()) return new int[0];
+            try (FileReader reader = new FileReader(file)) {
+                List<SavedBlock> blocks = gson.fromJson(reader, new TypeToken<ArrayList<SavedBlock>>() {}.getType());
+                if (blocks == null || blocks.isEmpty()) return new int[0];
+                int[] b = {Integer.MAX_VALUE, Integer.MIN_VALUE, Integer.MAX_VALUE, Integer.MIN_VALUE,
+                           Integer.MAX_VALUE, Integer.MIN_VALUE, getFaceIndex(anchorFacing(blocks))};
+                for (SavedBlock sb : blocks) {
+                    b[0] = Math.min(b[0], sb.getRelX()); b[1] = Math.max(b[1], sb.getRelX());
+                    b[2] = Math.min(b[2], sb.getRelY()); b[3] = Math.max(b[3], sb.getRelY());
+                    b[4] = Math.min(b[4], sb.getRelZ()); b[5] = Math.max(b[5], sb.getRelZ());
+                }
+                return b;
+            } catch (Exception e) {
+                plugin.getLogger().warning("Emprise de la schématique '" + n + "' illisible : " + e.getMessage());
+                return new int[0];
+            }
+        });
+        if (rel.length == 0) return null;
+
+        BlockFace target = groundFurnaceLoc.getBlock().getBlockData() instanceof Directional d
+                ? d.getFacing() : BlockFace.NORTH;
+        BlockFace saved = switch (rel[6]) { case 1 -> BlockFace.EAST; case 2 -> BlockFace.SOUTH; case 3 -> BlockFace.WEST; default -> BlockFace.NORTH; };
+        StructureRotation rot = calculateRotation(saved, target);
+        int[] a = rotate(new SavedBlock(rel[0], 0, rel[4], ""), rot);
+        int[] c = rotate(new SavedBlock(rel[1], 0, rel[5], ""), rot);
+        int bx = groundFurnaceLoc.getBlockX(), by = groundFurnaceLoc.getBlockY(), bz = groundFurnaceLoc.getBlockZ();
+        return new org.bukkit.util.BoundingBox(
+                bx + Math.min(a[0], c[0]),     by + rel[2] + 1,     bz + Math.min(a[1], c[1]),
+                bx + Math.max(a[0], c[0]) + 1, by + rel[3] + 2,     bz + Math.max(a[1], c[1]) + 1);
+    }
+
     /** Orientation du four d'origine (0,0,0) d'une schématique (nord par défaut). */
     private static BlockFace anchorFacing(List<SavedBlock> blocks) {
         for (SavedBlock sb : blocks) {

@@ -51,6 +51,7 @@ public class AutoAttackManager {
     /** Verrouille la cible : les AA continueront automatiquement. */
     public void lockTarget(Player attacker, LivingEntity target) {
         if (!LolPlugin.getInstance().getConfig().getBoolean("combat.aa-lock-on", true)) return;
+        lockedStructures.remove(attacker.getUniqueId());
         lockedTargets.put(attacker.getUniqueId(), target.getUniqueId());
         lockSetAt.put(attacker.getUniqueId(), System.currentTimeMillis());
         String name = target instanceof Player p ? p.getName()
@@ -83,11 +84,105 @@ public class AutoAttackManager {
         } else lockTarget(attacker, target);
     }
 
-    /** Annule le verrouillage (re-clic, clic dans le vide, structure). */
+    /** Annule le verrouillage (re-clic, clic dans le vide). */
     public void clearLock(Player attacker) {
         lockSetAt.remove(attacker.getUniqueId());
-        if (lockedTargets.remove(attacker.getUniqueId()) != null)
-            attacker.sendActionBar(Component.text("🔓 Verrouillage annulé", NamedTextColor.GRAY));
+        boolean had = lockedTargets.remove(attacker.getUniqueId()) != null;
+        had |= lockedStructures.remove(attacker.getUniqueId()) != null;
+        if (had) attacker.sendActionBar(Component.text("🔓 Verrouillage annulé", NamedTextColor.GRAY));
+    }
+
+    // ── Lock sur une structure (tourelle, inhibiteur, nexus) ──
+    private final Map<UUID, GameStructure> lockedStructures = new HashMap<>();
+
+    /** Nom affiché d'une structure. */
+    private static String structureName(GameStructure s) {
+        return switch (s.getType()) {
+            case TURRET -> "Tourelle";
+            case INHIBITOR -> "Inhibiteur";
+            case NEXUS, NEXUS_BASE -> "Nexus";
+        };
+    }
+
+    /**
+     * Toggle du lock sur une structure, comme pour une entité : re-cliquer la même structure
+     * (hors fenêtre anti-spam) coupe l'auto-fire, une autre structure ou entité bascule.
+     */
+    public void toggleStructureLock(Player attacker, GameStructure structure) {
+        UUID id = attacker.getUniqueId();
+        long now = System.currentTimeMillis();
+        if (lockedStructures.get(id) == structure) {
+            Long since = lockSetAt.get(id);
+            if (since != null && now - since < TOGGLE_GRACE_MS) { lockSetAt.put(id, now); return; }
+            clearLock(attacker);
+            return;
+        }
+        lockedTargets.remove(id);
+        lockedStructures.put(id, structure);
+        lockSetAt.put(id, now);
+        attacker.sendActionBar(Component.text("🔒 " + structureName(structure), NamedTextColor.YELLOW));
+        startAutoFire();
+    }
+
+    /** Structure verrouillée par ce joueur (null si aucune). */
+    public GameStructure getLockedStructure(Player attacker) {
+        return lockedStructures.get(attacker.getUniqueId());
+    }
+
+    /**
+     * Auto-attaque sur une structure à portée (mesurée jusqu'à son bord).
+     * @return true si l'attaque est partie
+     */
+    private boolean attackStructure(Player attacker, BaseChampion champ, GameStructure s, MapManager mm) {
+        if (!checkRangeAndCooldown(attacker, champ)) return false;
+        AAType type = getAAType(champ);
+        Location point = StructureTargeting.nearestPoint(mm, s, attacker.getEyeLocation());
+        var bush = LolPlugin.getInstance().getBushManager();
+        if (bush != null) bush.revealOnAttack(attacker);
+        if (type == AAType.MELEE) {
+            attacker.swingMainHand();
+            attacker.getWorld().spawnParticle(Particle.SWEEP_ATTACK, point, 1);
+            attacker.getWorld().playSound(attacker.getLocation(), Sound.ENTITY_PLAYER_ATTACK_SWEEP, 0.7f, 1f);
+        } else {
+            playAnimationToLocation(attacker, point, type, false);
+            attacker.getWorld().playSound(attacker.getLocation(),
+                    type == AAType.MAGE ? Sound.ENTITY_BLAZE_SHOOT : Sound.ENTITY_ARROW_SHOOT, 0.6f, 1.2f);
+        }
+        var sdl = LolPlugin.getInstance().getStructureDamageListener();
+        if (sdl != null) sdl.applyAutoAttackDamage(attacker, s);
+        return true;
+    }
+
+    /** Un tick d'auto-fire pour les locks de structure. */
+    private void tickStructureLocks() {
+        if (lockedStructures.isEmpty()) return;
+        var cm = LolPlugin.getInstance().getChampionManager();
+        var tm = LolPlugin.getInstance().getTeamManager();
+        var it = lockedStructures.entrySet().iterator();
+        while (it.hasNext()) {
+            var e = it.next();
+            Player attacker = Bukkit.getPlayer(e.getKey());
+            GameStructure s = e.getValue();
+            if (attacker == null || !attacker.isOnline() || !cm.hasChampion(attacker)
+                    || s.isDestroyed() || s.getTeam() == tm.getTeam(attacker)
+                    || !s.getCenter().getWorld().equals(attacker.getWorld())) { it.remove(); continue; }
+            if (attacker.getGameMode() == GameMode.SPECTATOR) continue; // mort : lock en pause
+            MapManager mm = fr.lolmc.instance.InstanceHelper.mapManager(attacker);
+            if (mm == null || !mm.getStructures().contains(s)) { it.remove(); continue; }
+            if (mm.isInvulnerable(s)) {
+                it.remove();
+                attacker.sendActionBar(Component.text(
+                    "🛡 Structure protégée : détruis d'abord celle qui la précède !", NamedTextColor.RED));
+                continue;
+            }
+            BaseChampion champ = cm.getChampion(attacker);
+            double range = champ.getAutoAttackRange() + fr.lolmc.item.ItemEffects.bonusAttackRange(attacker);
+            double dist = StructureTargeting.edgeDistance(mm, s, attacker.getLocation());
+            if (dist > LOCK_MAX_DISTANCE) { it.remove(); continue; }
+            if (dist > range) continue;            // hors de portée : on attend de se rapprocher
+            if (!canAutoAttack(attacker)) continue; // cadence AS pas prête
+            attackStructure(attacker, champ, s, mm);
+        }
     }
 
     // ══════════════════════════════════════════════════════════
@@ -152,6 +247,7 @@ public class AutoAttackManager {
     public void stopVisuals() {
         if (visualsTask != null) { visualsTask.cancel(); visualsTask = null; }
         lockedTargets.clear();
+        lockedStructures.clear();
         for (UUID viewerId : new java.util.ArrayList<>(ringDisplays.keySet())) {
             var v = Bukkit.getPlayer(viewerId);
             if (v != null) clearRingsFor(v); else removeAllRingsRaw(viewerId);
@@ -244,6 +340,7 @@ public class AutoAttackManager {
         if (autoFireTask != null && !autoFireTask.isCancelled()) return;
         autoFireTask = new BukkitRunnable() {
             @Override public void run() {
+                tickStructureLocks();
                 if (lockedTargets.isEmpty()) return;
                 var cm = LolPlugin.getInstance().getChampionManager();
                 var it = lockedTargets.entrySet().iterator();
