@@ -557,8 +557,9 @@ public class AutoAttackManager {
 
         // Ligne de swing (poignet → cible) : petits blocs éphémères qui
         // apparaissent puis disparaissent en quelques ticks.
-        Vector dir = impactLoc.toVector()
-                .subtract(attacker.getEyeLocation().toVector()).normalize();
+        Vector dir = impactLoc.toVector().subtract(attacker.getEyeLocation().toVector());
+        // Cible confondue avec les yeux : normalize() d'un vecteur nul donnerait NaN
+        dir = dir.lengthSquared() < 1e-9 ? attacker.getEyeLocation().getDirection() : dir.normalize();
         Location start = attacker.getEyeLocation().add(dir.clone().multiply(0.5));
         double dist = start.distance(impactLoc);
         for (double d = 0; d < Math.min(dist, 2.5); d += 0.5) {
@@ -595,8 +596,8 @@ public class AutoAttackManager {
 
         double totalDist = start.distance(end);
         int totalSteps = Math.max(4, (int)(totalDist / 0.35));
-        Vector step = end.toVector().subtract(start.toVector())
-                .normalize().multiply(totalDist / totalSteps);
+        // Même pas que normalize() × distance / étapes, sans NaN quand départ = arrivée
+        Vector step = end.toVector().subtract(start.toVector()).multiply(1.0 / totalSteps);
 
         // Orbe magique : petite sphère (bloc violet) qui voyage réellement
         // vers la cible via ItemDisplay, au lieu d'une traînée de particules.
@@ -655,8 +656,9 @@ public class AutoAttackManager {
         double totalDist = start.distance(end);
         // Projectile rapide : 0.6 blocs/tick (≈ 12 blocs/s)
         int totalSteps = Math.max(3, (int)(totalDist / 0.6));
-        Vector step = end.toVector().subtract(start.toVector())
-                .normalize().multiply(totalDist / totalSteps);
+        // Même pas que normalize() × distance / étapes, sans NaN quand départ = arrivée
+        // (avant : la téléportation plantait à chaque tick et la tâche ne s'arrêtait jamais)
+        Vector step = end.toVector().subtract(start.toVector()).multiply(1.0 / totalSteps);
 
         // Tête du projectile : petit bloc clair qui voyage réellement
         var head = world.spawn(start, org.bukkit.entity.ItemDisplay.class, disp -> {

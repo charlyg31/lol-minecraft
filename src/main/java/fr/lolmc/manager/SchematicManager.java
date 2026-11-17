@@ -181,6 +181,14 @@ public class SchematicManager {
 
                                 SavedBlock sb = blocks.get(index);
 
+                                // Le four repère (0,0,0) ne sert qu'à lire l'orientation : le coller
+                                // empilait un second four sur celui du sol, visible dans chaque structure
+                                if (sb.getRelX() == 0 && sb.getRelY() == 0 && sb.getRelZ() == 0
+                                        && sb.getBlockData().startsWith("minecraft:furnace")) {
+                                    index++;
+                                    continue;
+                                }
+
                                 // Rotation mathématique X et Z
                                 int rotatedX = sb.getRelX();
                                 int rotatedZ = sb.getRelZ();
