@@ -41,6 +41,14 @@ public final class WorldContext {
         return Bukkit.getWorld(getGameWorldName());
     }
 
+    /** Vrai pour le monde de jeu configuré et les mondes d'instances (copies du template). */
+    public static boolean isGameWorld(World world) {
+        if (world == null) return false;
+        if (world.getName().equals(getGameWorldName())) return true;
+        var im = LolPlugin.getInstance().getInstanceManager();
+        return im != null && im.getInstanceByWorldName(world.getName()) != null;
+    }
+
     /** Retourne le monde lobby, ou null si non configuré/chargé. */
     public static World getLobbyWorld() {
         String name = getLobbyWorldName();

@@ -168,6 +168,7 @@ public class MinionManager {
     public void startWaves() {
         if (spawning) return;
         purgeWorld(myWorld());
+        fr.lolmc.listener.GameWorldMobListener.purgeStrayMobs(myWorld());
         spawning = true;
         holdSpawnChunks();
 
@@ -739,6 +740,12 @@ public class MinionManager {
     private final Map<UUID, UUID> lockedTarget = new HashMap<>();
 
     /** Champion ennemi vivant que ce sbire peut viser : pas mort, pas caché dans un bush. */
+    /** Vrai si le sbire peut viser ce joueur : champion ennemi, visible, ciblable. */
+    public static boolean canTarget(LivingEntity minion, Player p) {
+        Team team = getMinionTeam(minion);
+        return team != null && canSeeChampion(minion, team, p);
+    }
+
     private static boolean canSeeChampion(LivingEntity minion, Team team, Player p) {
         var cm = LolPlugin.getInstance().getChampionManager();
         var tm = LolPlugin.getInstance().getTeamManager();

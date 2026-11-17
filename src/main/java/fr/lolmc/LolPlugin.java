@@ -119,6 +119,7 @@ public class LolPlugin extends JavaPlugin {
         instance = this;
         getServer().getPluginManager().registerEvents(new fr.lolmc.listener.OrphanPurgeListener(), this);
         getServer().getPluginManager().registerEvents(new fr.lolmc.listener.FreezeListener(), this);
+        getServer().getPluginManager().registerEvents(new fr.lolmc.listener.GameWorldMobListener(), this);
         getServer().getScheduler().runTaskLater(this, fr.lolmc.game.MinionManager::purgeAllWorlds, 100L);
         saveDefaultConfig();
         mergeMissingConfigKeys();
