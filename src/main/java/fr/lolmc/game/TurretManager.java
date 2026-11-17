@@ -168,7 +168,7 @@ public class TurretManager {
         this.championManager = championManager;
         this.teamManager = teamManager;
         var config = LolPlugin.getInstance().getConfig();
-        this.attackRadius = config.getDouble("turrets.attack-radius", 7.5);
+        this.attackRadius = config.getDouble("turrets.attack-radius", 11.5);
         this.detectionHeight = config.getDouble("turrets.detection-height", 6.0);
         this.beamHeight = config.getDouble("turrets.beam-height", 6.0);
         startTurretTaskTracked();
@@ -289,10 +289,36 @@ public class TurretManager {
         }
         if (current == null) current = findNewTarget(center, turretTeam);
 
+        showRangeRing(turret, current);
         if (current == null) { target.remove(id); return; }
         target.put(id, current.getUniqueId());
         if (current instanceof Player p) fireAtPlayer(turret, beamOrigin, p);
         else fireAtMinion(turret, beamOrigin, current);
+    }
+
+    /**
+     * Cercle de portée (comme dans LoL) : affiché aux champions ennemis qui approchent de la
+     * tourelle, blanc en temps normal, rouge quand la tourelle les vise. Seul le joueur concerné le voit.
+     */
+    private void showRangeRing(GameStructure turret, LivingEntity current) {
+        Location c = turret.getCenter();
+        double show = attackRadius + 6;
+        for (Player p : c.getWorld().getPlayers()) {
+            if (!championManager.hasChampion(p) || p.getGameMode() == org.bukkit.GameMode.SPECTATOR) continue;
+            Team pt = teamManager.getTeam(p);
+            if (pt == null || pt == turret.getTeam()) continue;
+            double dx = p.getLocation().getX() - (c.getX() + 0.5), dz = p.getLocation().getZ() - (c.getZ() + 0.5);
+            if (dx * dx + dz * dz > show * show || Math.abs(p.getLocation().getY() - c.getY()) > detectionHeight + 4) continue;
+            boolean targeted = p.equals(current);
+            var dust = new org.bukkit.Particle.DustOptions(targeted ? org.bukkit.Color.RED : org.bukkit.Color.WHITE, 1.2f);
+            int points = (int) Math.max(48, attackRadius * 8);
+            double y = p.getLocation().getY() + 0.15;
+            for (int i = 0; i < points; i++) {
+                double a = 2 * Math.PI * i / points;
+                p.spawnParticle(org.bukkit.Particle.DUST, c.getX() + 0.5 + Math.cos(a) * attackRadius, y,
+                        c.getZ() + 0.5 + Math.sin(a) * attackRadius, 1, 0, 0, 0, 0, dust);
+            }
+        }
     }
 
     // ══════════════════════════════════════════════════════════════

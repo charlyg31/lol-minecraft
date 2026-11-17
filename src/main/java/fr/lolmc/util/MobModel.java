@@ -94,8 +94,6 @@ public final class MobModel {
                     disp.setTransformation(baseT);
                     disp.setBrightness(new Display.Brightness(15, 15)); // toujours bien visible
                     disp.setTeleportDuration(4); // rotation lissée (le modèle suit l'orientation du mob)
-                    disp.setTeleportDuration(4); // rotation lissée (le modèle suit l'orientation du mob)
-                    disp.setTeleportDuration(4); // rotation lissée (le modèle suit l'orientation du mob)
                     disp.setPersistent(true);
                     disp.getPersistentDataContainer().set(
                             MobAppearance.decoKey(), PersistentDataType.BYTE, (byte) 1);
@@ -108,12 +106,55 @@ public final class MobModel {
                 LolPlugin.getInstance().getLogger().warning("MobModel part echec: " + e.getMessage());
             }
         }
+        // Barre de vie : le nom du mob de base ne s'affiche pas (Minecraft cache le nom d'une
+        // entité invisible ou qui porte des passagers). On la recopie dans un TextDisplay.
+        org.bukkit.entity.TextDisplay label = null;
+        if (!parts.isEmpty()) {
+            float top = Float.NEGATIVE_INFINITY;
+            for (Part p : parts) top = Math.max(top, p.oy + p.sy);
+            final float labelY = top - 1.6f + 0.35f;
+            try {
+                label = base.getWorld().spawn(base.getLocation(), org.bukkit.entity.TextDisplay.class, t -> {
+                    t.setBillboard(Display.Billboard.CENTER);
+                    t.setTransformation(new Transformation(new Vector3f(0f, labelY, 0f), new Quaternionf(),
+                            new Vector3f(0.8f, 0.8f, 0.8f), new Quaternionf()));
+                    t.setViewRange(0.3f); // ~20 blocs : pas visible depuis l'autre bout de la carte
+                    t.setShadowed(true);
+                    t.setPersistent(true);
+                    if (base.customName() != null) t.text(base.customName());
+                    t.getPersistentDataContainer().set(MobAppearance.decoKey(), PersistentDataType.BYTE, (byte) 1);
+                    t.getPersistentDataContainer().set(labelKey(), PersistentDataType.BYTE, (byte) 1);
+                });
+                base.addPassenger(label);
+                ids.add(label.getUniqueId());
+            } catch (Exception e) {
+                LolPlugin.getInstance().getLogger().warning("MobModel label echec: " + e.getMessage());
+            }
+        }
         // Enregistrer le modele pour l'animation (respiration / marche / attaque)
         if (!displays.isEmpty()) {
             MobAnimator.register(base, displays, baseTransforms);
-            fitToGround(base, displays, baseTransforms);
+            fitToGround(base, displays, baseTransforms, label);
         }
         return ids;
+    }
+
+    private static org.bukkit.NamespacedKey labelKey;
+    /** Marque le TextDisplay qui affiche la barre de vie d'un mob à modèle. */
+    public static org.bukkit.NamespacedKey labelKey() {
+        if (labelKey == null) labelKey = new org.bukkit.NamespacedKey(LolPlugin.getInstance(), "hp_label");
+        return labelKey;
+    }
+
+    /** Recopie le nom (barre de vie) du mob dans son TextDisplay, s'il en a un. */
+    public static void syncLabel(LivingEntity base) {
+        for (var e : base.getPassengers()) {
+            if (e instanceof org.bukkit.entity.TextDisplay t
+                    && t.getPersistentDataContainer().has(labelKey(), PersistentDataType.BYTE)) {
+                t.text(base.customName());
+                return;
+            }
+        }
     }
 
     /**
@@ -122,7 +163,8 @@ public final class MobModel {
      * un décalage fixe de 1,6 bloc enfonçait la plupart des modèles dans le sol ou les faisait
      * flotter. On mesure le point réel une fois le modèle monté et l'échelle appliquée.
      */
-    private static void fitToGround(LivingEntity base, List<BlockDisplay> displays, List<Transformation> baseTransforms) {
+    private static void fitToGround(LivingEntity base, List<BlockDisplay> displays, List<Transformation> baseTransforms,
+                                    org.bukkit.entity.TextDisplay label) {
         org.bukkit.Bukkit.getScheduler().runTaskLater(LolPlugin.getInstance(), () -> {
             if (!base.isValid() || !displays.getFirst().isValid()) return;
             float attach = (float) (displays.getFirst().getLocation().getY() - base.getLocation().getY());
@@ -135,6 +177,11 @@ public final class MobModel {
                 baseTransforms.set(i, fixed);
                 BlockDisplay d = displays.get(i);
                 if (d.isValid()) d.setTransformation(fixed);
+            }
+            if (label != null && label.isValid()) {
+                Transformation t = label.getTransformation();
+                label.setTransformation(new Transformation(new Vector3f(t.getTranslation()).add(0f, shift, 0f),
+                        t.getLeftRotation(), t.getScale(), t.getRightRotation()));
             }
         }, 3L);
     }

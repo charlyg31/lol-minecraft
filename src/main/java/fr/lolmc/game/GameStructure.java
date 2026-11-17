@@ -79,13 +79,13 @@ public class GameStructure {
     public boolean takeDamage(double amount) {
         if (destroyed) return false;
         currentHP = Math.max(0, currentHP - amount);
-        // Mettre à jour la HealthBar au-dessus de la structure
-        updateHealthBarNametag();
         if (currentHP <= 0) {
             destroyed = true;
             if (!phases.isEmpty()) currentPhaseIndex = phases.size() - 1; // phase la plus basse (ruines)
+            updateHealthBarNametag(); // détruite : retire la barre (avant : restait figée à 0)
             return true;
         }
+        updateHealthBarNametag();
         return checkPhaseChange();
     }
 
@@ -109,6 +109,7 @@ public class GameStructure {
         currentHP = maxHP;
         destroyed = false;
         currentPhaseIndex = 0;
+        updateHealthBarNametag();
     }
 
     // ── Getters ───────────────────────────────────────────────────
@@ -128,7 +129,10 @@ public class GameStructure {
     public void setAngle(int a)     { this.angle = a; }
     public double getMaxHP()        { return maxHP; }
     public double getCurrentHP()    { return currentHP; }
-    public void respawn() { this.currentHP = this.maxHP; this.destroyed = false; this.currentPhaseIndex = 0; }
+    public void respawn() {
+        this.currentHP = this.maxHP; this.destroyed = false; this.currentPhaseIndex = 0;
+        updateHealthBarNametag();
+    }
 
     /** Réapparition à un % des PV max (tourelles de nexus : 40 %). */
     public void reviveAt(double ratio) {
@@ -147,39 +151,70 @@ public class GameStructure {
     }
     public boolean isDestroyed()    { return destroyed; }
 
+    /** Barre de vie flottante au-dessus de la structure (TextDisplay, créé à la demande). */
+    private java.util.UUID hpLabelId;
+    /** Hauteur de la barre au-dessus du point de pose (mesurée sur les blocs de la structure). */
+    private double labelHeight = -1;
+
     /**
-     * Met à jour la barre de vie de la structure (nametag ArmorStand).
+     * Met à jour la barre de vie de la structure (TextDisplay au-dessus d'elle).
      *
-     * Fog of war : le nametag n'est visible que par les joueurs qui ont
+     * Fog of war : la barre n'est visible que par les joueurs qui ont
      * vision de la structure — l'équipe propriétaire toujours, l'équipe
      * ennemie seulement si un de ses membres est à portée de vision.
      * Un ennemi hors vision voit la structure (blocs) mais pas ses HP à jour,
      * exactement comme dans LoL.
      */
     public void updateHealthBarNametag() {
-        if (center == null || center.getWorld() == null) return;
-        // Trouver l'ArmorStand taggé "structure" près du centre
-        for (var entity : center.getWorld().getNearbyEntities(center, 5, 6, 5)) {
-            if (!(entity instanceof org.bukkit.entity.ArmorStand as)) continue;
-            var pdc = as.getPersistentDataContainer();
-            var key = new org.bukkit.NamespacedKey(fr.lolmc.LolPlugin.getInstance(), "structure");
-            if (!pdc.has(key, org.bukkit.persistence.PersistentDataType.STRING)) continue;
+        if (center == null || center.getWorld() == null || !center.isChunkLoaded()) return;
+        if (destroyed) { removeHealthLabel(); return; }
+        String label = switch (type) {
+            case TURRET     -> "🗼";
+            case INHIBITOR  -> "💎";
+            case NEXUS, NEXUS_BASE -> "🏰";
+        } + " " + (team == Team.BLUE ? "Bleu" : "Rouge");
+        var text = fr.lolmc.util.HealthBar.build(currentHP, maxHP, label);
 
-            String label = switch (type) {
-                case TURRET     -> "🗼";
-                case INHIBITOR  -> "💎";
-                case NEXUS, NEXUS_BASE -> "🏰";
-            } + " " + (team == Team.BLUE ? "§9" : "§c");
-            fr.lolmc.util.HealthBar.apply(as, currentHP, maxHP, label);
-
-            // Fog of war : cacher le nametag aux ennemis hors vision
-            applyNametagVisibility(as);
-            return;
+        org.bukkit.entity.TextDisplay td = hpLabelId != null
+                && org.bukkit.Bukkit.getEntity(hpLabelId) instanceof org.bukkit.entity.TextDisplay t && t.isValid() ? t : null;
+        if (td == null) {
+            if (labelHeight < 0) labelHeight = measureHeight() + 1.2;
+            Location at = center.clone().add(0.5, labelHeight, 0.5);
+            td = center.getWorld().spawn(at, org.bukkit.entity.TextDisplay.class, t -> {
+                t.setBillboard(org.bukkit.entity.Display.Billboard.CENTER);
+                t.setTransformation(new org.bukkit.util.Transformation(new org.joml.Vector3f(),
+                        new org.joml.Quaternionf(), new org.joml.Vector3f(1.6f, 1.6f, 1.6f), new org.joml.Quaternionf()));
+                t.setViewRange(1.0f);
+                t.setShadowed(true);
+                t.setPersistent(false);
+                t.getScoreboardTags().add("lol_structure_hp");
+            });
+            hpLabelId = td.getUniqueId();
         }
+        td.text(text);
+        applyNametagVisibility(td);
     }
 
-    /** Cache/montre l'ArmorStand de la barre de vie selon la vision des joueurs. */
-    private void applyNametagVisibility(org.bukkit.entity.ArmorStand as) {
+    /** Retire la barre de vie (structure détruite, fin de partie, rechargement de la carte). */
+    public void removeHealthLabel() {
+        if (hpLabelId != null && org.bukkit.Bukkit.getEntity(hpLabelId) instanceof org.bukkit.entity.Entity e) e.remove();
+        hpLabelId = null;
+    }
+
+    /** Point le plus haut de la structure (blocs non vides dans un rayon de 3 autour du point de pose). */
+    private double measureHeight() {
+        var w = center.getWorld();
+        for (int dy = 30; dy >= 1; dy--) {
+            for (int dx = -3; dx <= 3; dx++) for (int dz = -3; dz <= 3; dz++) {
+                var m = w.getBlockAt(center.getBlockX() + dx, center.getBlockY() + dy, center.getBlockZ() + dz).getType();
+                if (!m.isAir() && m != org.bukkit.Material.BARRIER) return dy + 1;
+            }
+        }
+        return 4;
+    }
+
+    /** Cache/montre la barre de vie selon la vision des joueurs. */
+    private void applyNametagVisibility(org.bukkit.entity.Entity as) {
         var plugin = fr.lolmc.LolPlugin.getInstance();
         var tm = plugin.getTeamManager();
         var fog = plugin.getFogOfWarManager();

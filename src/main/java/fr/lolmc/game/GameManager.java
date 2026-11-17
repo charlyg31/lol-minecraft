@@ -181,6 +181,8 @@ public class GameManager {
 
     public void stopGame() {
         gameRunning = false;
+        var mapForLabels = siblingMapManager();
+        if (mapForLabels != null) mapForLabels.removeHealthLabels();
         // Plantes de la jungle de cette partie (les instances les retirent dans GameInstance.stop)
         if (gameInstance == null) LolPlugin.getInstance().getPlantManager().clearAll();
         stopSystems();

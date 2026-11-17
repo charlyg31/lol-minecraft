@@ -130,7 +130,7 @@ public class JungleManager {
         // (PV/or/XP réels : statsFor(), selon le niveau moyen des champions ; ici le niveau 1)
         GROMP        (EntityType.SLIME,        2050,  80, 120, 135, "none", 1, "🐸 Gromp"),
         MURKWOLF     (EntityType.WOLF,         1600,  55,  50, 135, "none", 3, "🐺 Loups"),       // 1 grand + 2 petits
-        RAPTOR       (EntityType.VEX,          1200,  35,  20, 135, "none", 6, "🦅 Raptors"),     // 1 grand + 5 petits
+        RAPTOR       (EntityType.WOLF,         1200,  35,  20, 135, "none", 6, "🦅 Raptors"),     // 1 grand + 5 petits
         KRUG         (EntityType.SILVERFISH,   1350,  15,  15, 135, "none", 2, "🪨 Krugs"),       // Ancien + Krug (se divisent)
         // ── Buffs ──
         RED_BUFF     (EntityType.MAGMA_CUBE,   2300,  90, 95, 300, "red",  1, "🔴 Sanglepince"),
@@ -414,6 +414,7 @@ public class JungleManager {
 
     public void startJungle() {
         active = true;
+        startScuttlePatrol();
         baronPit.restore(baronPitWorld()); // partie précédente interrompue avant la fin
         for (CampSpawn camp : camps.values()) {
             int delay = initialSpawnDelay(camp.type);
@@ -435,6 +436,7 @@ public class JungleManager {
 
     public void stopJungle() {
         active = false;
+        if (scuttleTask != null) { scuttleTask.cancel(); scuttleTask = null; }
         for (var t : initialSpawnTasks) { if (t != null && !t.isCancelled()) t.cancel(); }
         initialSpawnTasks.clear();
         epicRespawnAt.clear();
@@ -812,6 +814,72 @@ public class JungleManager {
     }
 
     private org.bukkit.scheduler.BukkitTask respawnTask;
+
+    // ── Crabe Pillargot : patrouille dans la rivière (LoL) ──
+    private org.bukkit.scheduler.BukkitTask scuttleTask;
+    /** Sens de marche par crabe : +1 vers le centre de la rivière, -1 vers son camp. */
+    private final Map<UUID, Integer> scuttleDir = new HashMap<>();
+    /** Distance parcourue depuis le camp vers le centre de la carte (blocs). */
+    private static final double SCUTTLE_PATROL = 22.0;
+    private static final double SCUTTLE_STEP = 0.14; // par 2 ticks ≈ 1,4 bloc/s
+
+    private void startScuttlePatrol() {
+        if (scuttleTask != null) return;
+        scuttleTask = new BukkitRunnable() {
+            @Override public void run() {
+                if (!active) return;
+                var cfg = LolPlugin.getInstance().getConfig();
+                double cx = cfg.getDouble("minimap.center-x", 0), cz = cfg.getDouble("minimap.center-z", 0);
+                for (CampSpawn camp : camps.values()) {
+                    if (camp.type != MonsterType.SCUTTLE_CRAB) continue;
+                    for (UUID id : camp.liveEntities) {
+                        if (!(org.bukkit.Bukkit.getEntity(id) instanceof LivingEntity crab) || crab.isDead()) continue;
+                        patrolStep(crab, camp.location, cx, cz);
+                    }
+                }
+            }
+        }.runTaskTimer(LolPlugin.getInstance(), 40L, 2L);
+    }
+
+    /** Un pas de patrouille : aller-retour entre le camp et un point vers le centre de la rivière. */
+    private void patrolStep(LivingEntity crab, Location camp, double cx, double cz) {
+        double vx = cx - camp.getX(), vz = cz - camp.getZ();
+        double len = Math.sqrt(vx * vx + vz * vz);
+        if (len < 1) return;
+        vx /= len; vz /= len;
+        Location at = crab.getLocation();
+        // Avancement le long de l'axe camp → centre
+        double along = (at.getX() - camp.getX()) * vx + (at.getZ() - camp.getZ()) * vz;
+        int dir = scuttleDir.getOrDefault(crab.getUniqueId(), 1);
+        if (dir > 0 && along >= Math.min(SCUTTLE_PATROL, len * 0.45)) dir = -1;
+        else if (dir < 0 && along <= 0) dir = 1;
+        // Cible : point sur l'axe, en revenant doucement sur l'axe si le crabe a dérivé
+        double tx = camp.getX() + vx * (along + dir * 2.0), tz = camp.getZ() + vz * (along + dir * 2.0);
+        double dx = tx - at.getX(), dz = tz - at.getZ();
+        double d = Math.sqrt(dx * dx + dz * dz);
+        if (d < 1e-3) { scuttleDir.put(crab.getUniqueId(), dir); return; }
+        dx = dx / d * SCUTTLE_STEP; dz = dz / d * SCUTTLE_STEP;
+        Location next = at.clone().add(dx, 0, dz);
+        var feet = next.getBlock();
+        if (!feet.isPassable()) {
+            // Marche d'un bloc : on monte si la place au-dessus est libre, sinon demi-tour
+            if (feet.getRelative(org.bukkit.block.BlockFace.UP).isPassable()
+                    && feet.getRelative(org.bukkit.block.BlockFace.UP, 2).isPassable()) next.add(0, 1, 0);
+            else { scuttleDir.put(crab.getUniqueId(), -dir); return; }
+        } else if (feet.getRelative(org.bukkit.block.BlockFace.DOWN).isPassable()
+                && !feet.getRelative(org.bukkit.block.BlockFace.DOWN).isLiquid()) {
+            next.add(0, -1, 0); // descente d'une marche
+        }
+        next.setYaw((float) Math.toDegrees(Math.atan2(-dx, dz)));
+        next.setPitch(0f);
+        scuttleDir.put(crab.getUniqueId(), dir);
+        crab.teleport(next, io.papermc.paper.entity.TeleportFlag.EntityState.RETAIN_PASSENGERS);
+        // La position de « retour au camp » suit le crabe (il ne rentre pas en courant quand on le frappe)
+        crab.getPersistentDataContainer().set(new NamespacedKey(LolPlugin.getInstance(), "camp_x"),
+                PersistentDataType.DOUBLE, next.getX());
+        crab.getPersistentDataContainer().set(new NamespacedKey(LolPlugin.getInstance(), "camp_z"),
+                PersistentDataType.DOUBLE, next.getZ());
+    }
 
     /** Libère la tâche de réapparition des camps (fin d'une instance : le manager est jeté). */
     public void dispose() {
@@ -1286,18 +1354,30 @@ public class JungleManager {
                     .cube(Material.BLACK_CONCRETE,  0f, 0.7f, 0.85f, 0.16f)            // pupille
                     .cube(Material.SCULK_CATALYST,  0f, 1.5f, 0.0f, 0.3f);             // sommet
 
-            // 🪱 Baron Nashor : énorme serpent du néant violet avec crocs et pics
+            // 🪱 Baron Nashor : énorme ver du Néant qui sort de sa fosse, gueule à crocs, pics
             case BARON -> new MobModel()
-                    .box(Material.PURPLE_CONCRETE,  0f, 0.3f, -0.2f, 1.0f, 1.0f, 1.6f)  // corps
-                    .box(Material.MAGENTA_CONCRETE, 0f, 0.7f, 0.9f, 0.9f, 0.9f, 0.7f)   // tête
-                    .box(Material.WHITE_CONCRETE,   0f, 0.58f, 1.25f, 0.7f, 0.12f, 0.15f) // crocs haut
-                    .box(Material.WHITE_CONCRETE,   0f, 0.38f, 1.25f, 0.7f, 0.12f, 0.15f) // crocs bas
-                    .cube(Material.MAGENTA_CONCRETE, -0.3f, 1.05f, 1.0f, 0.18f)         // œil G
-                    .cube(Material.MAGENTA_CONCRETE,  0.3f, 1.05f, 1.0f, 0.18f)         // œil D
-                    .box(Material.BLACK_CONCRETE,   0f, 1.3f, 0.2f, 0.12f, 0.5f, 0.12f)  // pic central
-                    .box(Material.BLACK_CONCRETE, -0.35f, 1.15f, -0.2f, 0.12f, 0.4f, 0.12f) // pic G
-                    .box(Material.BLACK_CONCRETE,  0.35f, 1.15f, -0.2f, 0.12f, 0.4f, 0.12f) // pic D
-                    .box(Material.PURPLE_CONCRETE,  0f, 0.2f, -1.3f, 0.5f, 0.5f, 0.8f); // queue
+                    .box(Material.PURPLE_CONCRETE,    0f, 0.0f,  0.0f, 2.8f, 0.8f, 2.8f)   // anneau de base
+                    .box(Material.PURPLE_TERRACOTTA,  0f, 0.8f,  0.1f, 2.1f, 0.9f, 2.1f)   // 2e anneau
+                    .box(Material.PURPLE_CONCRETE,    0f, 1.6f,  0.3f, 1.4f, 1.8f, 1.4f)   // corps dressé
+                    .box(Material.MAGENTA_TERRACOTTA, 0f, 1.9f,  1.0f, 0.9f, 1.3f, 0.2f)   // ventre
+                    .box(Material.PURPLE_CONCRETE,    0f, 3.3f,  0.6f, 1.3f, 1.0f, 1.3f)   // cou
+                    .box(Material.MAGENTA_CONCRETE,   0f, 4.0f,  1.1f, 1.7f, 1.1f, 1.7f)   // tête
+                    .box(Material.PURPLE_TERRACOTTA,  0f, 3.65f, 1.7f, 1.4f, 0.35f, 1.1f)  // mâchoire
+                    .box(Material.WHITE_CONCRETE,  -0.5f, 3.45f, 2.3f, 0.16f, 0.55f, 0.16f) // croc G
+                    .box(Material.WHITE_CONCRETE,   0.5f, 3.45f, 2.3f, 0.16f, 0.55f, 0.16f) // croc D
+                    .box(Material.WHITE_CONCRETE,  -0.18f, 3.6f, 2.35f, 0.12f, 0.4f, 0.12f) // dent G
+                    .box(Material.WHITE_CONCRETE,   0.18f, 3.6f, 2.35f, 0.12f, 0.4f, 0.12f) // dent D
+                    .cube(Material.PEARLESCENT_FROGLIGHT, -0.5f, 4.55f, 1.9f, 0.28f)       // œil G
+                    .cube(Material.PEARLESCENT_FROGLIGHT,  0.5f, 4.55f, 1.9f, 0.28f)       // œil D
+                    .box(Material.BLACK_CONCRETE,     0f, 5.1f,  0.9f, 0.22f, 1.0f, 0.22f) // corne centrale
+                    .box(Material.BLACK_CONCRETE, -0.55f, 4.95f, 0.7f, 0.2f, 0.8f, 0.2f)   // corne G
+                    .box(Material.BLACK_CONCRETE,  0.55f, 4.95f, 0.7f, 0.2f, 0.8f, 0.2f)   // corne D
+                    .box(Material.BLACK_CONCRETE,     0f, 3.0f, -0.5f, 0.2f, 0.7f, 0.2f)   // pic de dos haut
+                    .box(Material.BLACK_CONCRETE,     0f, 2.0f, -0.5f, 0.2f, 0.7f, 0.2f)   // pic de dos bas
+                    .box(Material.PURPLE_CONCRETE, -1.7f, 0.4f,  0.7f, 0.45f, 1.5f, 0.45f, 20f)  // tentacule AV G
+                    .box(Material.PURPLE_CONCRETE,  1.7f, 0.4f,  0.7f, 0.45f, 1.5f, 0.45f, -20f) // tentacule AV D
+                    .box(Material.PURPLE_CONCRETE, -1.5f, 0.4f, -1.1f, 0.4f, 1.2f, 0.4f, -20f)   // tentacule AR G
+                    .box(Material.PURPLE_CONCRETE,  1.5f, 0.4f, -1.1f, 0.4f, 1.2f, 0.4f, 20f);   // tentacule AR D
 
             // 🐉 Dragons élémentaires : même structure, couleurs selon l'élément
             case DRAGON_INFERNAL -> dragonModel(Material.RED_CONCRETE,   Material.MAGMA_BLOCK,    Material.RED_TERRACOTTA);
@@ -1313,15 +1393,31 @@ public class JungleManager {
         return m;
     }
 
-    /** Modèle générique de dragon (corps + tête + corne + queue + 2 ailes), couleurs paramétrables. */
+    /** Modèle de dragon quadrupède (corps, cou, tête à cornes, pattes, ailes, queue), couleurs par élément. */
     private MobModel dragonModel(Material body, Material accent, Material wing) {
         return new MobModel()
-                .box(body,   0f, 0.3f,  0.0f, 0.6f, 0.6f, 1.4f)        // corps
-                .box(body,   0f, 0.55f, 0.8f, 0.45f, 0.45f, 0.5f)      // tête
-                .box(accent, 0f, 0.9f,  0.85f, 0.15f, 0.3f, 0.15f)     // corne
-                .box(body,   0f, 0.3f, -0.9f, 0.3f, 0.3f, 0.7f)        // queue
-                .box(wing, -0.8f, 0.6f, 0.0f, 0.9f, 0.06f, 0.7f, 35f)  // aile G
-                .box(wing,  0.8f, 0.6f, 0.0f, 0.9f, 0.06f, 0.7f, -35f); // aile D
+                .box(body,   0f, 0.6f,  0.0f, 1.4f, 1.1f, 2.4f)          // corps
+                .box(accent, 0f, 0.5f,  0.1f, 1.0f, 0.25f, 1.8f)         // ventre
+                .box(body, -0.55f, 0f,  0.8f, 0.4f, 0.75f, 0.45f)        // patte AV G
+                .box(body,  0.55f, 0f,  0.8f, 0.4f, 0.75f, 0.45f)        // patte AV D
+                .box(body, -0.55f, 0f, -0.8f, 0.45f, 0.75f, 0.5f)        // patte AR G
+                .box(body,  0.55f, 0f, -0.8f, 0.45f, 0.75f, 0.5f)        // patte AR D
+                .box(body,   0f, 1.35f, 1.3f, 0.65f, 0.95f, 0.8f)        // cou
+                .box(body,   0f, 2.0f,  1.9f, 0.95f, 0.75f, 1.1f)        // tête
+                .box(body,   0f, 1.95f, 2.65f, 0.6f, 0.45f, 0.6f)        // museau
+                .box(accent, -0.3f, 2.65f, 1.55f, 0.16f, 0.65f, 0.16f)   // corne G
+                .box(accent,  0.3f, 2.65f, 1.55f, 0.16f, 0.65f, 0.16f)   // corne D
+                .cube(Material.GLOWSTONE, -0.36f, 2.3f, 2.4f, 0.16f)     // œil G
+                .cube(Material.GLOWSTONE,  0.36f, 2.3f, 2.4f, 0.16f)     // œil D
+                .box(accent, 0f, 1.7f,  0.6f, 0.16f, 0.4f, 0.3f)         // pic de dos
+                .box(accent, 0f, 1.7f, -0.3f, 0.16f, 0.35f, 0.3f)        // pic de dos
+                .box(body,   0f, 0.9f, -1.65f, 0.6f, 0.5f, 1.0f)         // queue
+                .box(body,   0f, 0.8f, -2.5f, 0.35f, 0.35f, 0.9f)        // bout de queue
+                .box(accent, 0f, 0.75f, -3.1f, 0.3f, 0.3f, 0.4f)         // pointe
+                .box(wing,  -1.7f, 1.65f, 0.0f, 2.3f, 0.08f, 1.7f, 25f)  // aile G
+                .box(wing,   1.7f, 1.65f, 0.0f, 2.3f, 0.08f, 1.7f, -25f) // aile D
+                .box(accent, -1.7f, 1.7f, 0.8f, 2.3f, 0.14f, 0.14f, 25f) // os d'aile G
+                .box(accent,  1.7f, 1.7f, 0.8f, 2.3f, 0.14f, 0.14f, -25f); // os d'aile D
     }
 
     /**
@@ -1337,9 +1433,9 @@ public class JungleManager {
             case RED_BUFF     -> 2.0f;   // magma cube petit
             case BLUE_BUFF    -> 0.8f;   // iron golem deja grand -> reduire un peu
             case DRAGON_INFERNAL, DRAGON_OCEAN, DRAGON_MOUNTAIN,
-                 DRAGON_CLOUD, DRAGON_CHEMTECH, DRAGON_HEXTECH, DRAGON_ELDER -> 0.85f; // ravager -> modele plus fin
+                 DRAGON_CLOUD, DRAGON_CHEMTECH, DRAGON_HEXTECH, DRAGON_ELDER -> 1.15f; // modèle agrandi
             case HERALD       -> 0.85f;
-            case BARON        -> 0.9f;
+            case BARON        -> 1.35f;  // modèle agrandi (sort de la fosse)
             case VOIDGRUB     -> 0.8f;
         };
     }

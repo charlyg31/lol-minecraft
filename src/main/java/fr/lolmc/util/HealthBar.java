@@ -74,6 +74,7 @@ public final class HealthBar {
     public static void apply(LivingEntity entity, double current, double max, String label) {
         entity.customName(build(current, max, label));
         entity.setCustomNameVisible(true);
+        MobModel.syncLabel(entity); // sbires/monstres à modèle : barre affichée par un TextDisplay
     }
 
     /**
@@ -88,7 +89,8 @@ public final class HealthBar {
             String plain = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
                 .plainText().serialize(existing);
             int bracket = plain.indexOf('[');
-            if (bracket > 0) label = plain.substring(0, bracket).trim();
+            // Nom sans barre (monstre pas encore touché) : tout le nom devient le libellé
+            label = bracket > 0 ? plain.substring(0, bracket).trim() : bracket < 0 ? plain.trim() : "";
         }
         apply(entity, current, max, label);
     }

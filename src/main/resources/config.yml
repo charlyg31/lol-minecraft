@@ -118,8 +118,9 @@ combat:
 # ═══════════════════════════════════════════════════════
 # Zone d'attaque en forme de CYLINDRE depuis le point de pose du schématique.
 turrets:
-  # Rayon horizontal de la zone de tir (en blocs). LoL : 750 unités = 7.5 blocs.
-  attack-radius: 7.5
+  # Rayon horizontal de la zone de tir (en blocs). LoL : 750 unités ; la carte est à ~65 unités
+  # par bloc (voir minimap), soit 11.5 blocs. Un cercle de portée s'affiche aux ennemis qui approchent.
+  attack-radius: 11.5
   # Hauteur de la zone de DÉTECTION (cylindre, en blocs au-dessus/dessous du point de pose)
   detection-height: 6
   # Hauteur d'où part visuellement l'ANIMATION du tir (en blocs au-dessus du point de pose)
@@ -129,6 +130,13 @@ turrets:
 # ═══════════════════════════════════════════════════════
 # BASE DE DONNÉES
 # ═══════════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════
+# SBIRES — équilibrage
+# ═══════════════════════════════════════════════════════
+minions:
+  # Part des dégâts des sbires infligée aux champions (LoL : 0.60).
+  champion-damage-multiplier: 0.35
+
 database:
   # Type de base : "sqlite" (local, simple) ou "mysql"
   type: sqlite

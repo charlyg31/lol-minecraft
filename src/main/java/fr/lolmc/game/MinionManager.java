@@ -608,7 +608,7 @@ public class MinionManager {
         if (foe instanceof Player p) {
             if (!LolPlugin.getInstance().getChampionManager().hasChampion(p)
                     || p.getGameMode() == org.bukkit.GameMode.SPECTATOR) return;
-            fr.lolmc.util.DamageUtil.damage(null, p, ad * MINION_DAMAGE_VS_CHAMPIONS_STRUCTURES, false,
+            fr.lolmc.util.DamageUtil.damage(null, p, ad * championDamageMultiplier(), false,
                     fr.lolmc.util.DamageUtil.Type.PHYSICAL);
         } else if (isMinion(foe) && !fr.lolmc.util.VirtualHP.isDying(foe)) {
             fr.lolmc.util.MobCombat.damage(null, foe, ad + onHitPct * fr.lolmc.util.VirtualHP.getCurrent(foe),
@@ -646,22 +646,40 @@ public class MinionManager {
     }
 
     // Portée d'attaque d'un sbire sur une tourelle (blocs)
-    private static final double MINION_TURRET_RANGE = 6.0;
+    private static final double MINION_TURRET_RANGE = 10.0; // repérage, mesuré jusqu'au bord
     // Contre les champions et les structures, les sbires infligent 60 % de leurs dégâts (LoL)
     public static final double MINION_DAMAGE_VS_CHAMPIONS_STRUCTURES = 0.60;
+
+    /**
+     * Part des dégâts des sbires infligée aux champions (config « minions.champion-damage-multiplier »,
+     * 0,60 dans LoL). Réglable : sur cette carte les champions ont moins de PV/objets qu'en vraie partie.
+     */
+    public static double championDamageMultiplier() {
+        return LolPlugin.getInstance().getConfig().getDouble("minions.champion-damage-multiplier",
+                MINION_DAMAGE_VS_CHAMPIONS_STRUCTURES);
+    }
     // Cadence d'attaque sur les tourelles (cooldown en ms par sbire)
     private final Map<java.util.UUID, Long> lastTurretHit = new HashMap<>();
     private static final long TURRET_HIT_COOLDOWN = 1000L; // 1 coup/seconde
 
-    /** Cherche une structure ENNEMIE à portée d'un sbire. */
+    /**
+     * Structure ENNEMIE la plus proche que le sbire repère (distance mesurée jusqu'au BORD de la
+     * structure). Avant : distance au centre ≤ 6 blocs et première structure trouvée (même alliée),
+     * si bien que les sbires dont la route passait un peu loin longeaient la tourelle sans la frapper.
+     */
     private GameStructure findNearbyEnemyStructure(Zombie minion, Team team) {
         var mapManager = siblingMapManager();
         double range = isRangedMinion(minion) ? Math.max(MINION_TURRET_RANGE, rangedRange(minion)) : MINION_TURRET_RANGE;
-        GameStructure s = mapManager.getStructureAt(minion.getLocation(), range);
-        if (s == null) return null;
-        // La structure doit appartenir à l'équipe ADVERSE et ne pas être protégée (anti-backdoor)
-        if (s.getTeam() == team || mapManager.isInvulnerable(s)) return null;
-        return s;
+        GameStructure best = null;
+        double bestD = range;
+        for (GameStructure s : mapManager.getStructures()) {
+            if (s.isDestroyed() || s.getTeam() == team || mapManager.isInvulnerable(s)) continue;
+            if (!s.getCenter().getWorld().equals(minion.getWorld())) continue;
+            if (s.getCenter().distanceSquared(minion.getLocation()) > 40 * 40) continue;
+            double d = StructureTargeting.edgeDistance(mapManager, s, minion.getLocation());
+            if (d <= bestD) { bestD = d; best = s; }
+        }
+        return best;
     }
 
     /**
@@ -671,21 +689,26 @@ public class MinionManager {
     private void attackStructure(Zombie minion, GameStructure structure) {
         // Même règle que pour les champions : structure protégée (anti-backdoor)
         if (siblingMapManager().isInvulnerable(structure)) return;
-        Location target = structure.getCenter();
+        var mmS = siblingMapManager();
+        Location from = minion.getLocation();
+        // Point du bord de la structure le plus proche : le centre est à l'intérieur des blocs,
+        // un sbire de mêlée ne pouvait jamais s'en approcher à 2,5 blocs et ne frappait donc jamais
+        Location target = StructureTargeting.nearestPoint(mmS, structure, from);
+        target.setY(from.getY());
+        double edge = StructureTargeting.edgeDistance(mmS, structure, from);
         boolean ranged = isRangedMinion(minion);
         boolean empS = JungleBuffs.isEmpowered(minion);
         // Main du Baron : +75 de portée pour la mêlée (wiki)
-        double reach = ranged ? rangedRange(minion) : 2.5 + (empS && "melee".equals(getMinionTypeTag(minion)) ? 0.75 : 0);
-        Location from = minion.getLocation();
-        if (from.distance(target) > reach) {
+        double reach = ranged ? rangedRange(minion) : 1.6 + (empS && "melee".equals(getMinionTypeTag(minion)) ? 0.75 : 0);
+        if (edge > reach) {
             minion.getPathfinder().moveTo(target, 1.0);
-        } else if (ranged) {
+        } else {
             minion.getPathfinder().stopPathfinding();
             minion.setRotation((float) Math.toDegrees(Math.atan2(-(target.getX() - from.getX()),
                     target.getZ() - from.getZ())), 0f);
         }
-        // Infliger des dégâts à cadence limitée (à portée seulement pour les sbires à distance)
-        if (ranged && from.distance(target) > reach) return;
+        // Infliger des dégâts à cadence limitée, une fois à portée du bord
+        if (edge > reach) return;
         long now = System.currentTimeMillis();
         Long last = lastTurretHit.get(minion.getUniqueId());
         if (last != null && (now - last) < TURRET_HIT_COOLDOWN) return;
@@ -700,7 +723,7 @@ public class MinionManager {
         double ad = empS && cannon ? 2 * baseAD + 3 * bonusAD : baseAD + bonusAD;
         double dmg = ad * fr.lolmc.util.MobCombat.getAttackSpeed(minion) * (empS && cannon ? 0.5 : 1.0) * vsStructure;
         org.bukkit.World world = minion.getWorld();
-        Location hit = target.clone().add(0.5, 1, 0.5);
+        Location hit = target.clone().add(0, 1, 0);
         if (!ranged) {
             minion.swingMainHand();
             fr.lolmc.util.VisualEffectUtil.impact(world, hit, Material.WHITE_STAINED_GLASS, 0.26f, 3L);

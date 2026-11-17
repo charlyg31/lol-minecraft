@@ -558,7 +558,7 @@ public class AbilityListener implements Listener {
         if (manager.hasChampion(victim)) {
             double rawDmg = fr.lolmc.util.MobCombat.getAD(damagerLe)
                     * fr.lolmc.util.MobCombat.getAttackSpeed(damagerLe)
-                    * fr.lolmc.game.MinionManager.MINION_DAMAGE_VS_CHAMPIONS_STRUCTURES;
+                    * fr.lolmc.game.MinionManager.championDamageMultiplier();
             fr.lolmc.util.DamageUtil.damage(null, victim, rawDmg, false, fr.lolmc.util.DamageUtil.Type.PHYSICAL);
         }
     }

@@ -25,6 +25,8 @@ public class MapManager {
 
     // Structures actives en jeu (rechargées au reset)
     private final List<GameStructure> structures = new ArrayList<>();
+    /** Dégradation visible par paliers de 25 % (photo des blocs réels de chaque structure). */
+    private final StructureRuins ruins = new StructureRuins();
     // Spawns : "blue_1" → Location
     private final Map<String, Location> spawns = new HashMap<>();
 
@@ -155,6 +157,7 @@ public class MapManager {
      * remet les HP au max, et colle les schématiques de base (100%).
      */
     public void resetAllStructures() {
+        for (GameStructure old : structures) old.removeHealthLabel();
         structures.clear();
 
         var section = config.getConfigurationSection("structures");
@@ -250,19 +253,32 @@ public class MapManager {
             }
             structures.add(structure);
 
+            // Structure remise intacte (blocs de la carte compris) avant de recoller sa schématique
+            ruins.restore(structure);
             String schem = structure.getCurrentSchematic();
             if (schem != null) {
                 schematics.pasteSchematicAboveAnchor(schem, center, 200);
             }
         }
 
+        // Barres de vie : une fois les schématiques collées (collage asynchrone), pour mesurer leur hauteur
+        var snapshot = new ArrayList<>(structures);
+        org.bukkit.Bukkit.getScheduler().runTaskLater(LolPlugin.getInstance(),
+                () -> snapshot.forEach(st -> { ruins.captureIfMissing(st); st.updateHealthBarNametag(); }), 60L);
         LolPlugin.getInstance().getLogger().info("Reset: " + structures.size() + " structures rechargées.");
     }
 
     /**
      * Met à jour la schématique d'une structure quand elle change de phase.
      */
+    /** Fin de partie : retire les barres de vie flottantes des structures. */
+    public void removeHealthLabels() {
+        for (GameStructure s : structures) s.removeHealthLabel();
+    }
+
     public void updateStructurePhase(GameStructure structure) {
+        // Dégradation de toute la structure (blocs de la carte compris) depuis sa photo
+        if (ruins.apply(structure)) return;
         String schem = structure.getCurrentSchematic();
         if (schem != null) {
             schematics.pasteSchematicAboveAnchor(schem, structure.getCenter(), 200);

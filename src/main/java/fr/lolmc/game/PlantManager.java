@@ -308,11 +308,29 @@ public class PlantManager {
         stand.setMarker(true);
         stand.setInvulnerable(true);
         stand.setPersistent(false);
-        stand.setCustomNameVisible(true);
-        stand.customName(stage == 1
+        // Nom porté par un TextDisplay : visible à ~16 blocs et pas à travers les murs
+        // (le nom d'une ArmorStand se voit de 64 blocs, à travers le décor)
+        Component name = stage == 1
                 ? Component.text("🌱 " + p.spot.type().displayName.substring(p.spot.type().displayName.indexOf(' ') + 1)
                         + " (bourgeon)", NamedTextColor.DARK_GREEN)
-                : Component.text(p.spot.type().displayName, p.spot.type().color));
+                : Component.text(p.spot.type().displayName, p.spot.type().color);
+        stand.setCustomNameVisible(false);
+        stand.customName(name);
+        var label = p.location.getWorld().spawn(stand.getLocation(),
+                org.bukkit.entity.TextDisplay.class, t -> {
+                    t.text(name);
+                    // Passager d'une ArmorStand marqueur (point d'attache au niveau de ses pieds) :
+                    // on remonte le texte juste au-dessus de l'icône de la plante
+                    t.setTransformation(new org.bukkit.util.Transformation(
+                            new org.joml.Vector3f(0f, 2.3f, 0f), new org.joml.Quaternionf(),
+                            new org.joml.Vector3f(0.8f, 0.8f, 0.8f), new org.joml.Quaternionf()));
+                    t.setBillboard(org.bukkit.entity.Display.Billboard.CENTER);
+                    t.setViewRange(0.25f);
+                    t.setSeeThrough(false);
+                    t.setPersistent(false);
+                    t.getScoreboardTags().add("lol_plant");
+                });
+        stand.addPassenger(label);
         stand.getEquipment().setHelmet(new ItemStack(stage == 1 ? Material.OAK_SAPLING : p.spot.type().icon));
         stand.getScoreboardTags().add("lol_plant");
         p.markerId = stand.getUniqueId();
@@ -321,7 +339,9 @@ public class PlantManager {
     private static void removeMarker(UUID id) {
         if (id == null) return;
         Entity e = org.bukkit.Bukkit.getEntity(id);
-        if (e != null) e.remove();
+        if (e == null) return;
+        for (Entity passenger : e.getPassengers()) passenger.remove(); // nom (TextDisplay)
+        e.remove();
     }
 
     // ══════════════════════════════════════════════════════════════

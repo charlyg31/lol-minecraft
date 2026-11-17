@@ -153,6 +153,29 @@ public class AutoAttackManager {
         return true;
     }
 
+    private final Map<UUID, Long> lockHintAt = new HashMap<>();
+
+    /**
+     * Indicateur de cible sur une structure (seul l'attaquant le voit) : anneau vert au pied de la
+     * structure et rappel dans la barre d'action (à portée / hors de portée), toutes les 0,4 s.
+     */
+    private void showStructureLock(Player attacker, GameStructure s, boolean inRange) {
+        long now = System.currentTimeMillis();
+        Long last = lockHintAt.get(attacker.getUniqueId());
+        if (last != null && now - last < 400) return;
+        lockHintAt.put(attacker.getUniqueId(), now);
+        Location c = s.getCenter();
+        var dust = new Particle.DustOptions(inRange ? org.bukkit.Color.LIME : org.bukkit.Color.YELLOW, 1.4f);
+        double r = s.getType() == GameStructure.Type.TURRET ? 2.5 : 3.0;
+        for (int i = 0; i < 28; i++) {
+            double a = 2 * Math.PI * i / 28;
+            attacker.spawnParticle(Particle.DUST, c.getX() + 0.5 + Math.cos(a) * r, c.getY() + 1.2,
+                    c.getZ() + 0.5 + Math.sin(a) * r, 1, 0, 0, 0, 0, dust);
+        }
+        attacker.sendActionBar(Component.text("🎯 " + structureName(s) + " ciblée"
+                + (inRange ? "" : " — rapproche-toi"), inRange ? NamedTextColor.GREEN : NamedTextColor.YELLOW));
+    }
+
     /** Un tick d'auto-fire pour les locks de structure. */
     private void tickStructureLocks() {
         if (lockedStructures.isEmpty()) return;
@@ -179,6 +202,7 @@ public class AutoAttackManager {
             double range = champ.getAutoAttackRange() + fr.lolmc.item.ItemEffects.bonusAttackRange(attacker);
             double dist = StructureTargeting.edgeDistance(mm, s, attacker.getLocation());
             if (dist > LOCK_MAX_DISTANCE) { it.remove(); continue; }
+            showStructureLock(attacker, s, dist <= range);
             if (dist > range) continue;            // hors de portée : on attend de se rapprocher
             if (!canAutoAttack(attacker)) continue; // cadence AS pas prête
             attackStructure(attacker, champ, s, mm);

@@ -181,6 +181,7 @@ public class LolCommand implements CommandExecutor, TabCompleter, Listener {
             case "buff"    -> handleBuff(player, args);
             case "resetcd" -> handleResetCd(player, args);
             case "hp"      -> handleHp(player, args);
+            case "structhp" -> handleStructHp(player, args);
             case "wave"    -> handleWave(player);
             case "instance", "instances" -> handleInstance(player, args);
             case "template" -> handleTemplate(player, args);
@@ -880,7 +881,7 @@ private void handleSolo(Player player, String[] args) {
     static {
         for (String s : List.of("set", "position", "center", "schem", "road", "jungle", "plant", "baronpit",
                 "shopnpc", "mode", "template")) ADMIN_GROUPS.put(s, "config");
-        for (String s : List.of("solo", "testgame", "give", "level", "gold", "hp", "resetcd", "buff", "spawn",
+        for (String s : List.of("solo", "testgame", "give", "level", "gold", "hp", "structhp", "resetcd", "buff", "spawn",
                 "wave", "team", "debug")) ADMIN_GROUPS.put(s, "test");
         for (String s : List.of("start", "stop", "select", "join", "instance", "reload", "permcheck"))
             ADMIN_GROUPS.put(s, "game");
@@ -1103,6 +1104,30 @@ private void handleSolo(Player player, String[] args) {
     }
 
     // ── /lola hp <montant|full> [joueur] ───────────────────────────────────
+    /** Test : règle les PV de la structure la plus proche (30 blocs) à un pourcentage et affiche son palier. */
+    private void handleStructHp(Player player, String[] args) {
+        if (args.length < 2) { player.sendMessage(Component.text("/lola structhp <0-100>", NamedTextColor.RED)); return; }
+        double pct;
+        try { pct = Math.max(0, Math.min(100, Double.parseDouble(args[1]))); }
+        catch (NumberFormatException e) { player.sendMessage(Component.text("Pourcentage invalide", NamedTextColor.RED)); return; }
+        var mm = fr.lolmc.instance.InstanceHelper.mapManager(player);
+        fr.lolmc.game.GameStructure best = null;
+        double bestD = 30 * 30;
+        for (var st : mm.getStructures()) {
+            if (!st.getCenter().getWorld().equals(player.getWorld())) continue;
+            double d = st.getCenter().distanceSquared(player.getLocation());
+            if (d < bestD) { bestD = d; best = st; }
+        }
+        if (best == null) { player.sendMessage(Component.text("Aucune structure à moins de 30 blocs", NamedTextColor.RED)); return; }
+        double target = best.getMaxHP() * pct / 100.0;
+        boolean phase;
+        if (target < best.getCurrentHP()) phase = best.takeDamage(best.getCurrentHP() - target);
+        else { best.reset(); phase = true; if (target < best.getMaxHP()) best.takeDamage(best.getMaxHP() - target); }
+        mm.updateStructurePhase(best);
+        player.sendMessage(Component.text("✔ " + best.getId() + " → " + (int) best.getCurrentHP() + "/" + (int) best.getMaxHP()
+                + " (palier : " + best.getCurrentSchematic() + ")", NamedTextColor.GREEN));
+    }
+
     private void handleHp(Player player, String[] args) {
         if (args.length < 2) { player.sendMessage(Component.text("§c/lola hp <montant|full> [joueur]", NamedTextColor.RED)); return; }
         Player target = player;
@@ -1267,6 +1292,7 @@ private void handleSolo(Player player, String[] args) {
                 {"/lola buff <type> [joueur]",    "Appliquer un buff"},
                 {"/lola spawn <entité> [team]",   "Spawner une entité"},
                 {"/lola wave",                    "Forcer une vague de sbires"},
+                {"/lola structhp <0-100>",        "PV (%) de la structure la plus proche (test des paliers)"},
                 {"/lola start",                   "Lancer la partie"},
                 {"/lola stop",                    "Arrêter la partie"},
                 {"/lola testgame",                "Lancer une partie test"},
